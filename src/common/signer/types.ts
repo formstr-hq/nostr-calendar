@@ -7,4 +7,5 @@ export interface NostrSigner {
   decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
   nip44Encrypt?: (pubkey: string, txt: string) => Promise<string>;
   nip44Decrypt?: (pubkey: string, ct: string) => Promise<string>;
+  getRelays?: () => Promise<string[]>;
 }

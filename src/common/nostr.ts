@@ -475,34 +475,33 @@ export async function fetchPrivateCalendarEvents(
 export const publishToRelays = (
   event: Event,
   onAcceptedRelays: (url: string) => void = _onAcceptedRelays,
+  relays?: string[],
 ) => {
+  const relayList = (relays ?? getRelays()).map(normalizeURL);
   return Promise.any(
-    getRelays()
-      .map(normalizeURL)
-      .map(async (url) => {
-        let relay: AbstractRelay | null = null;
-        try {
-          relay = await ensureRelay(url, { connectionTimeout: 5000 });
-          return await Promise.race<string>([
-            relay.publish(event).then((reason) => {
-              // console.log("accepted relays", url);
-              onAcceptedRelays(url);
-              return reason;
-            }),
-            new Promise<string>((_, reject) =>
-              setTimeout(() => reject("timeout"), 5000),
-            ),
-          ]);
-        } finally {
-          if (relay) {
-            try {
-              await relay.close();
-            } catch {
-              // Ignore closing errors
-            }
+    relayList.map(async (url) => {
+      let relay: AbstractRelay | null = null;
+      try {
+        relay = await ensureRelay(url, { connectionTimeout: 5000 });
+        return await Promise.race<string>([
+          relay.publish(event).then((reason) => {
+            onAcceptedRelays(url);
+            return reason;
+          }),
+          new Promise<string>((_, reject) =>
+            setTimeout(() => reject("timeout"), 5000),
+          ),
+        ]);
+      } finally {
+        if (relay) {
+          try {
+            await relay.close();
+          } catch {
+            // Ignore closing errors
           }
         }
-      }),
+      }
+    }),
   );
 };
 
@@ -619,7 +618,10 @@ export const fetchUserProfile = async (
 };
 
 export const fetchRelayList = async (pubkey: string): Promise<string[]> => {
-  const event = await nostrRuntime.fetchOne(defaultRelays, {
+  // Combine default relays with signer-provided relays for broader discovery
+  const signerRelays = await signerManager.getSignerRelays();
+  const queryRelays = [...new Set([...defaultRelays, ...signerRelays])];
+  const event = await nostrRuntime.fetchOne(queryRelays, {
     kinds: [EventKinds.RelayList],
     authors: [pubkey],
   });
@@ -644,28 +646,5 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   fullEvent.id = getEventHash(baseEvent);
   // Publish to both user relays and default relays so the list is discoverable
   const allRelays = [...new Set([...relays, ...defaultRelays])];
-  await Promise.any(
-    allRelays
-      .map(normalizeURL)
-      .map(async (url) => {
-        let relay: AbstractRelay | null = null;
-        try {
-          relay = await ensureRelay(url, { connectionTimeout: 5000 });
-          return await Promise.race<string>([
-            relay.publish(fullEvent).then((reason) => reason),
-            new Promise<string>((_, reject) =>
-              setTimeout(() => reject("timeout"), 5000),
-            ),
-          ]);
-        } finally {
-          if (relay) {
-            try {
-              await relay.close();
-            } catch {
-              // Ignore closing errors
-            }
-          }
-        }
-      }),
-  );
+  await publishToRelays(fullEvent, () => {}, allRelays);
 };

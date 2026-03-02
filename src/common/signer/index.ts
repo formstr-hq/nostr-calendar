@@ -224,6 +224,15 @@ class Signer {
     throw new Error("NO_SIGNER_AVAILABLE_AND_NO_LOGIN_REQUEST_REGISTERED");
   }
 
+  async getSignerRelays(): Promise<string[]> {
+    if (!this.signer?.getRelays) return [];
+    try {
+      return await this.signer.getRelays();
+    } catch {
+      return [];
+    }
+  }
+
   getUser() {
     return this.user;
   }

@@ -33,4 +33,13 @@ export const nip07Signer: NostrSigner = {
       throw new Error("NIP-44 encryption not supported");
     return window.nostr.nip44.encrypt(pubkey, plaintext);
   },
+  getRelays: async (): Promise<string[]> => {
+    if (!window.nostr?.getRelays) return [];
+    try {
+      const relayMap = await window.nostr.getRelays();
+      return Object.keys(relayMap);
+    } catch {
+      return [];
+    }
+  },
 };

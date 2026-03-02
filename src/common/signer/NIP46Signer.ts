@@ -48,5 +48,6 @@ const wrapBunkerSigner = (bunker: BunkerSigner) => {
       bunker.nip44Encrypt(pubkey, txt),
     nip44Decrypt: async (pubkey: string, ct: string) =>
       bunker.nip44Decrypt(pubkey, ct),
+    getRelays: async () => bunker.bp?.relays ?? [],
   };
 };
