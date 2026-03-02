@@ -67,34 +67,8 @@ DESCRIPTION:${calendarEvent.description || ""}
     icsContent += `ATTACH;FMTTYPE=image/jpeg:${calendarEvent.image}\n`;
   }
 
-  if (
-    calendarEvent.repeat?.frequency &&
-    calendarEvent.repeat.frequency !== "none"
-  ) {
-    let rule = "RRULE:";
-
-    switch (calendarEvent.repeat.frequency) {
-      case "daily":
-        rule += "FREQ=DAILY";
-        break;
-      case "weekly":
-        rule += "FREQ=WEEKLY";
-        break;
-      case "weekdays":
-        rule += "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
-        break;
-      case "monthly":
-        rule += "FREQ=MONTHLY";
-        break;
-      case "quarterly":
-        rule += "FREQ=MONTHLY;INTERVAL=3";
-        break;
-      case "yearly":
-        rule += "FREQ=YEARLY";
-        break;
-    }
-
-    icsContent += rule + "\n";
+  if (calendarEvent.repeat?.rrule) {
+    icsContent += `RRULE:${calendarEvent.repeat.rrule}\n`;
   }
 
   icsContent += `END:VEVENT

@@ -49,6 +49,6 @@ export interface ICalendarEvent {
   isPrivateEvent: boolean;
   viewKey?: string;
   repeat: {
-    frequency: RepeatingFrequency | null;
+    rrule: string | null;
   };
 }

@@ -20,6 +20,10 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
+import {
+  frequencyToRRule,
+  rruleToFrequency,
+} from "../utils/repeatingEventsHelper";
 import { ParticipantAdd } from "./ParticipantAdd";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import { Participant } from "./Participant";
@@ -89,7 +93,7 @@ export function CalendarEventEdit({
       user: "",
       isPrivateEvent: true,
       repeat: {
-        frequency: null,
+        rrule: null,
       },
     } as ICalendarEvent;
   });
@@ -143,12 +147,9 @@ export function CalendarEventEdit({
   };
 
   const handleFrequencyChange = (e: SelectChangeEvent<string>) => {
-    const value = e.target.value;
+    const value = e.target.value as RepeatingFrequency;
     updateField("repeat", {
-      frequency:
-        value !== RepeatingFrequency.None
-          ? (value as RepeatingFrequency)
-          : null,
+      rrule: value !== RepeatingFrequency.None ? frequencyToRRule(value) : null,
     });
   };
 
@@ -261,7 +262,11 @@ export function CalendarEventEdit({
             <FormControl fullWidth size="small">
               <InputLabel>Select recurrence pattern</InputLabel>
               <Select
-                value={eventDetails.repeat.frequency || RepeatingFrequency.None}
+                value={
+                  (eventDetails.repeat.rrule
+                    ? rruleToFrequency(eventDetails.repeat.rrule)
+                    : null) || RepeatingFrequency.None
+                }
                 label="Select recurrence pattern"
                 onChange={handleFrequencyChange}
               >

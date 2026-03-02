@@ -14,8 +14,7 @@
     "release-android": "./scripts/build-release.sh",
     "simulate-ios": "pnpm cap run ios",
     "build-ios": "pnpm cap build ios",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -48,6 +47,7 @@
     "react-router": "^7.11.0",
     "react-select": "^5.10.2",
     "remark-gfm": "^4.0.1",
+    "rrule": "^2.8.1",
     "uuid": "^11.1.0",
     "vitest": "^4.0.18",
     "zustand": "^5.0.6"

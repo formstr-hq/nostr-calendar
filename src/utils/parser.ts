@@ -1,6 +1,5 @@
 import { Event } from "nostr-tools";
 import type { ICalendarEvent } from "./types";
-import { getRepeatFrequency } from "./repeatingEventsHelper";
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -28,7 +27,7 @@ export const nostrEventToCalendar = (
     viewKey: viewKey,
     isPrivateEvent: !!isPrivateEvent,
     repeat: {
-      frequency: null,
+      rrule: null,
     },
     rsvpResponses: [],
   };
@@ -70,9 +69,9 @@ export const nostrEventToCalendar = (
         break;
       case "L":
         switch (value) {
-          case "recurring":
+          case "rrule":
             parsedEvent.repeat = {
-              frequency: getRepeatFrequency(event.tags[index + 1]?.[1]),
+              rrule: event.tags[index + 1]?.[1] || null,
             };
             break;
         }

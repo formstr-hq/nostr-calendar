@@ -3,15 +3,22 @@ import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import { Box, Typography } from "@mui/material";
 import { ICalendarEvent } from "../stores/events";
 import dayjs from "dayjs";
+import { RRule } from "rrule";
 
 const Repeat = ({ repeat }: { repeat: ICalendarEvent["repeat"] }) => {
-  if (!repeat.frequency) {
+  if (!repeat.rrule) {
     return null;
+  }
+  let label: string;
+  try {
+    label = RRule.fromString(`RRULE:${repeat.rrule}`).toText();
+  } catch {
+    label = repeat.rrule;
   }
   return (
     <>
       <EventRepeatIcon />
-      <Typography>Repeats {repeat.frequency}</Typography>
+      <Typography>Repeats {label}</Typography>
     </>
   );
 };

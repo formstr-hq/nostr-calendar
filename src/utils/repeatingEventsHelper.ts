@@ -1,118 +1,41 @@
 import { ICalendarEvent } from "../stores/events";
 import { RepeatingFrequency } from "./types";
+import { RRule } from "rrule";
 
-export const getRepeatFrequency = (
-  repeatValue: string,
-): RepeatingFrequency | null => {
-  const value = Object.values(RepeatingFrequency).find(
-    (val) => val === repeatValue,
-  );
-  if (!value) {
-    return null;
-  }
-  return value as RepeatingFrequency;
+const RRULE_TO_FREQUENCY: Record<string, RepeatingFrequency> = {
+  "FREQ=DAILY": RepeatingFrequency.Daily,
+  "FREQ=WEEKLY": RepeatingFrequency.Weekly,
+  "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR": RepeatingFrequency.Weekday,
+  "FREQ=MONTHLY": RepeatingFrequency.Monthly,
+  "FREQ=MONTHLY;INTERVAL=3": RepeatingFrequency.Quarterly,
+  "FREQ=YEARLY": RepeatingFrequency.Yearly,
 };
 
-/**
- * Calculate the start timestamp of the Nth occurrence of a recurring event.
- */
-function getOccurrenceStart(
-  eventStart: Date,
-  freq: RepeatingFrequency,
-  occurrences: number,
-): number {
-  const interval = 1;
-  const d = new Date(eventStart);
-  switch (freq) {
-    case RepeatingFrequency.Daily:
-      d.setUTCDate(d.getUTCDate() + interval * occurrences);
-      break;
-    case RepeatingFrequency.Weekly:
-      d.setUTCDate(d.getUTCDate() + 7 * interval * occurrences);
-      break;
-    case RepeatingFrequency.Monthly:
-      d.setUTCMonth(d.getUTCMonth() + interval * occurrences);
-      break;
-    case RepeatingFrequency.Quarterly:
-      d.setUTCMonth(d.getUTCMonth() + 3 * interval * occurrences);
-      break;
-    case RepeatingFrequency.Yearly:
-      d.setUTCFullYear(d.getUTCFullYear() + interval * occurrences);
-      break;
-    case RepeatingFrequency.Weekday: {
-      const weekdaysToAdd = interval * occurrences;
-      let totalDays = 0;
-      let added = 0;
-      while (added < weekdaysToAdd) {
-        totalDays++;
-        const test = new Date(eventStart.getTime());
-        test.setUTCDate(test.getUTCDate() + totalDays);
-        const day = test.getUTCDay();
-        if (day !== 0 && day !== 6) added++;
-      }
-      d.setUTCDate(d.getUTCDate() + totalDays);
-      break;
-    }
-  }
-  return d.getTime();
+const FREQUENCY_TO_RRULE: Record<RepeatingFrequency, string | null> = {
+  [RepeatingFrequency.None]: null,
+  [RepeatingFrequency.Daily]: "FREQ=DAILY",
+  [RepeatingFrequency.Weekly]: "FREQ=WEEKLY",
+  [RepeatingFrequency.Weekday]: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+  [RepeatingFrequency.Monthly]: "FREQ=MONTHLY",
+  [RepeatingFrequency.Quarterly]: "FREQ=MONTHLY;INTERVAL=3",
+  [RepeatingFrequency.Yearly]: "FREQ=YEARLY",
+};
+
+export function frequencyToRRule(freq: RepeatingFrequency): string | null {
+  return FREQUENCY_TO_RRULE[freq] ?? null;
 }
 
-/**
- * Estimate how many occurrences have elapsed between event start and a given time.
- */
-function estimateOccurrencesToSkip(
-  eventStart: Date,
-  rangeStartDate: Date,
-  freq: RepeatingFrequency,
-): number {
-  const interval = 1;
-  const diff = rangeStartDate.getTime() - eventStart.getTime();
-  let occurrencesToSkip = 0;
+export function rruleToFrequency(rule: string): RepeatingFrequency | null {
+  // Normalize: remove "RRULE:" prefix if present
+  const normalized = rule.replace(/^RRULE:/i, "").trim();
+  return RRULE_TO_FREQUENCY[normalized] ?? null;
+}
 
-  switch (freq) {
-    case RepeatingFrequency.Daily:
-      occurrencesToSkip = Math.floor(diff / (1000 * 60 * 60 * 24 * interval));
-      break;
-    case RepeatingFrequency.Weekly:
-      occurrencesToSkip = Math.floor(
-        diff / (1000 * 60 * 60 * 24 * 7 * interval),
-      );
-      break;
-    case RepeatingFrequency.Monthly:
-      occurrencesToSkip =
-        ((rangeStartDate.getUTCFullYear() - eventStart.getUTCFullYear()) * 12 +
-          (rangeStartDate.getUTCMonth() - eventStart.getUTCMonth())) /
-        interval;
-      occurrencesToSkip = Math.floor(occurrencesToSkip);
-      break;
-    case RepeatingFrequency.Quarterly:
-      occurrencesToSkip =
-        ((rangeStartDate.getUTCFullYear() - eventStart.getUTCFullYear()) * 12 +
-          (rangeStartDate.getUTCMonth() - eventStart.getUTCMonth())) /
-        (3 * interval);
-      occurrencesToSkip = Math.floor(occurrencesToSkip);
-      break;
-    case RepeatingFrequency.Yearly:
-      occurrencesToSkip =
-        (rangeStartDate.getUTCFullYear() - eventStart.getUTCFullYear()) /
-        interval;
-      occurrencesToSkip = Math.floor(occurrencesToSkip);
-      break;
-    case RepeatingFrequency.Weekday: {
-      const totalDays = Math.floor(diff / (1000 * 60 * 60 * 24));
-      let weekdayCount = 0;
-      for (let i = 0; i < totalDays; i++) {
-        const d = new Date(eventStart.getTime());
-        d.setUTCDate(d.getUTCDate() + i);
-        const day = d.getUTCDay();
-        if (day !== 0 && day !== 6) weekdayCount++;
-      }
-      occurrencesToSkip = Math.floor(weekdayCount / interval);
-      break;
-    }
-  }
-
-  return Math.max(0, occurrencesToSkip);
+function parseRRule(rruleStr: string, dtstart: Date): RRule {
+  const normalized = rruleStr.replace(/^RRULE:/i, "").trim();
+  return RRule.fromString(
+    `DTSTART:${dtstart.toISOString().replace(/[-:]/g, "").split(".")[0]}Z\nRRULE:${normalized}`,
+  );
 }
 
 export function isEventInDateRange(
@@ -124,7 +47,7 @@ export function isEventInDateRange(
   const duration = end - begin;
 
   // Non-repeating: simple overlap check
-  if (!repeat?.frequency || repeat.frequency === RepeatingFrequency.None) {
+  if (!repeat?.rrule) {
     return (
       (begin >= rangeStart && begin <= rangeEnd) ||
       (end >= rangeStart && end <= rangeEnd) ||
@@ -132,33 +55,22 @@ export function isEventInDateRange(
     );
   }
 
-  const freq = repeat.frequency;
-  const eventStart = new Date(begin);
-  const rangeStartDate = new Date(rangeStart);
+  const dtstart = new Date(begin);
+  const rule = parseRRule(repeat.rrule, dtstart);
 
-  const occurrencesToSkip = estimateOccurrencesToSkip(
-    eventStart,
-    rangeStartDate,
-    freq,
-  );
+  // Search for occurrences that could overlap with the range.
+  // An occurrence overlaps if its start <= rangeEnd and its end >= rangeStart.
+  // So we need occurrences starting between (rangeStart - duration) and rangeEnd.
+  const searchStart = new Date(Math.max(begin, rangeStart - duration));
+  const searchEnd = new Date(rangeEnd);
 
-  // Compute the first possible occurrence within or after rangeStart
-  const nextStart = getOccurrenceStart(eventStart, freq, occurrencesToSkip);
-  const nextEnd = nextStart + duration;
+  const occurrences = rule.between(searchStart, searchEnd, true);
 
-  // If the first computed occurrence ends before the range, try the next one
-  if (nextEnd < rangeStart) {
-    const nextNextStart = getOccurrenceStart(
-      eventStart,
-      freq,
-      occurrencesToSkip + 1,
-    );
-    const nextNextEnd = nextNextStart + duration;
-    return nextNextStart <= rangeEnd && nextNextEnd >= rangeStart;
-  }
-
-  // Otherwise, check this occurrence
-  return nextStart <= rangeEnd && nextEnd >= rangeStart;
+  return occurrences.some((occ) => {
+    const occStart = occ.getTime();
+    const occEnd = occStart + duration;
+    return occStart <= rangeEnd && occEnd >= rangeStart;
+  });
 }
 
 /**
@@ -172,7 +84,7 @@ export function getNextOccurrenceInRange(
 ): number | null {
   const { begin, repeat } = event;
 
-  if (!repeat?.frequency || repeat.frequency === RepeatingFrequency.None) {
+  if (!repeat?.rrule) {
     // Non-repeating: return begin if it's in range
     if (begin >= rangeStart && begin <= rangeEnd) {
       return begin;
@@ -180,22 +92,16 @@ export function getNextOccurrenceInRange(
     return null;
   }
 
-  const freq = repeat.frequency;
-  const eventStart = new Date(begin);
-  const rangeStartDate = new Date(rangeStart);
+  const dtstart = new Date(begin);
+  const rule = parseRRule(repeat.rrule, dtstart);
 
-  const occurrencesToSkip = estimateOccurrencesToSkip(
-    eventStart,
-    rangeStartDate,
-    freq,
-  );
+  const searchStart = new Date(Math.max(begin, rangeStart));
+  const searchEnd = new Date(rangeEnd);
 
-  // Check this occurrence and the next (in case estimate is off by one)
-  for (let i = 0; i <= 1; i++) {
-    const start = getOccurrenceStart(eventStart, freq, occurrencesToSkip + i);
-    if (start >= rangeStart && start <= rangeEnd) {
-      return start;
-    }
+  const occurrences = rule.between(searchStart, searchEnd, true);
+
+  if (occurrences.length > 0) {
+    return occurrences[0].getTime();
   }
 
   return null;

@@ -215,7 +215,7 @@ export async function publishPrivateCalendarEvent({
 }: ICalendarEvent) {
   const viewSecretKey = generateSecretKey();
   const uniqueCalId = uuid();
-  const eventKind = repeat.frequency
+  const eventKind = repeat.rrule
     ? EventKinds.PrivateCalendarRecurringEvent
     : EventKinds.PrivateCalendarEvent;
   const eventData = [
@@ -227,9 +227,9 @@ export async function publishPrivateCalendarEvent({
     ["d", uniqueCalId],
     ["location", location],
   ];
-  if (repeat && repeat.frequency) {
-    eventData.push(["L", "recurring"]);
-    eventData.push(["l", repeat.frequency]);
+  if (repeat && repeat.rrule) {
+    eventData.push(["L", "rrule"]);
+    eventData.push(["l", repeat.rrule]);
   }
 
   participants.forEach((participant) => {
@@ -534,11 +534,15 @@ export const publishPublicCalendarEvent = async (
     ["d", id],
     ["start", String(Math.floor(event.begin / 1000))],
     ["end", String(Math.floor(event.end / 1000))],
-    ["image", event.image],
-    ["location", event.location],
   ];
   if (event.image) {
     tags.push(["image", event.image]);
+  }
+
+  if (event.location.length > 0) {
+    event.location.map((location) => {
+      tags.push(["image", location]);
+    });
   }
 
   if (event.participants.length > 0) {
