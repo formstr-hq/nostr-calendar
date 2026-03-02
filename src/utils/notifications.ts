@@ -93,6 +93,11 @@ export async function scheduleEventNotifications(
   const baseId = hashToNumber(notificationKey);
   const tenMinBefore = occurrenceStart - 10 * 60 * 1000;
 
+  const locationSuffix =
+    event.location?.length > 0 && event.location[0]
+      ? ` at ${event.location[0]}`
+      : "";
+
   const notifications: Array<{
     id: number;
     title: string;
@@ -105,7 +110,7 @@ export async function scheduleEventNotifications(
     notifications.push({
       id: baseId,
       title: `Upcoming: ${event.title}`,
-      body: `Starts in 10 minutes`,
+      body: `Starts in 10 minutes${locationSuffix}`,
       schedule: { at: new Date(tenMinBefore), allowWhileIdle: true },
       extra: { eventId: event.eventId, notificationKey },
     });
@@ -115,7 +120,7 @@ export async function scheduleEventNotifications(
     notifications.push({
       id: baseId + 1,
       title: event.title,
-      body: `Starting now`,
+      body: `Starting now${locationSuffix}`,
       schedule: { at: new Date(occurrenceStart), allowWhileIdle: true },
       extra: { eventId: event.eventId, notificationKey },
     });

@@ -99,6 +99,45 @@ describe("scheduleEventNotifications", () => {
     expect(scheduled[0].body).toBe("Starting now");
   });
 
+  it("includes location in notification body when location exists", async () => {
+    const futureStart = Date.now() + HOUR;
+    const event = makeEvent({
+      begin: futureStart,
+      location: ["Conference Room A"],
+    });
+
+    await scheduleEventNotifications(event);
+
+    const scheduled = mockSchedule.mock.calls[0][0].notifications;
+    expect(scheduled[0].body).toBe("Starts in 10 minutes at Conference Room A");
+    expect(scheduled[1].body).toBe("Starting now at Conference Room A");
+  });
+
+  it("omits location from notification body when location is empty", async () => {
+    const futureStart = Date.now() + HOUR;
+    const event = makeEvent({ begin: futureStart, location: [] });
+
+    await scheduleEventNotifications(event);
+
+    const scheduled = mockSchedule.mock.calls[0][0].notifications;
+    expect(scheduled[0].body).toBe("Starts in 10 minutes");
+    expect(scheduled[1].body).toBe("Starting now");
+  });
+
+  it("uses first location when multiple locations exist", async () => {
+    const futureStart = Date.now() + HOUR;
+    const event = makeEvent({
+      begin: futureStart,
+      location: ["Main Hall", "Room 101"],
+    });
+
+    await scheduleEventNotifications(event);
+
+    const scheduled = mockSchedule.mock.calls[0][0].notifications;
+    expect(scheduled[0].body).toBe("Starts in 10 minutes at Main Hall");
+    expect(scheduled[1].body).toBe("Starting now at Main Hall");
+  });
+
   it("skips events that have already started (non-repeating)", async () => {
     const pastStart = Date.now() - HOUR;
     const event = makeEvent({ begin: pastStart });
