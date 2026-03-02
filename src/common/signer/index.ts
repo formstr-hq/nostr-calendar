@@ -202,6 +202,8 @@ class Signer {
 
   async logout() {
     this.signer = null;
+    this.user = null;
+    this.loginModalCallback = null;
     removeNsec();
     removeKeysFromLocalStorage();
     removeBunkerUriFromLocalStorage();

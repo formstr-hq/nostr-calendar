@@ -58,28 +58,40 @@ describe("NIP07Signer — window.nostr present", () => {
   it("encrypt delegates to window.nostr.nip04.encrypt", async () => {
     const { nip07Signer } = await import("./NIP07Signer");
     const result = await nip07Signer.encrypt!(PEER_PUBKEY, "plaintext");
-    expect(mockNostr.nip04.encrypt).toHaveBeenCalledWith(PEER_PUBKEY, "plaintext");
+    expect(mockNostr.nip04.encrypt).toHaveBeenCalledWith(
+      PEER_PUBKEY,
+      "plaintext",
+    );
     expect(result).toBe("nip04-encrypted");
   });
 
   it("decrypt delegates to window.nostr.nip04.decrypt", async () => {
     const { nip07Signer } = await import("./NIP07Signer");
     const result = await nip07Signer.decrypt!(PEER_PUBKEY, "ciphertext");
-    expect(mockNostr.nip04.decrypt).toHaveBeenCalledWith(PEER_PUBKEY, "ciphertext");
+    expect(mockNostr.nip04.decrypt).toHaveBeenCalledWith(
+      PEER_PUBKEY,
+      "ciphertext",
+    );
     expect(result).toBe("nip04-decrypted");
   });
 
   it("nip44Encrypt delegates to window.nostr.nip44.encrypt", async () => {
     const { nip07Signer } = await import("./NIP07Signer");
     const result = await nip07Signer.nip44Encrypt!(PEER_PUBKEY, "plaintext");
-    expect(mockNostr.nip44.encrypt).toHaveBeenCalledWith(PEER_PUBKEY, "plaintext");
+    expect(mockNostr.nip44.encrypt).toHaveBeenCalledWith(
+      PEER_PUBKEY,
+      "plaintext",
+    );
     expect(result).toBe("nip44-encrypted");
   });
 
   it("nip44Decrypt delegates to window.nostr.nip44.decrypt", async () => {
     const { nip07Signer } = await import("./NIP07Signer");
     const result = await nip07Signer.nip44Decrypt!(PEER_PUBKEY, "ciphertext");
-    expect(mockNostr.nip44.decrypt).toHaveBeenCalledWith(PEER_PUBKEY, "ciphertext");
+    expect(mockNostr.nip44.decrypt).toHaveBeenCalledWith(
+      PEER_PUBKEY,
+      "ciphertext",
+    );
     expect(result).toBe("nip44-decrypted");
   });
 });

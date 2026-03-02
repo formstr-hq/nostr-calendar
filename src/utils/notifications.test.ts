@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { RepeatingFrequency, ICalendarEvent } from "./types";
+import { ICalendarEvent } from "./types";
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ function makeEvent(
     website: "",
     user: "test-user",
     isPrivateEvent: false,
-    repeat: { frequency: null },
+    repeat: { rrule: null },
     ...overrides,
   };
 }
@@ -164,7 +164,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       eventId: "daily-evt",
-      repeat: { frequency: RepeatingFrequency.Daily },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);
@@ -187,7 +187,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startDate,
       eventId: "weekly-far",
-      repeat: { frequency: RepeatingFrequency.Weekly },
+      repeat: { rrule: "FREQ=WEEKLY" },
     });
 
     await scheduleEventNotifications(event);
@@ -201,7 +201,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: oneWeekAgo,
       eventId: "weekly-soon",
-      repeat: { frequency: RepeatingFrequency.Weekly },
+      repeat: { rrule: "FREQ=WEEKLY" },
     });
 
     await scheduleEventNotifications(event);
@@ -214,7 +214,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       eventId: "daily-dedup",
-      repeat: { frequency: RepeatingFrequency.Daily },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);
@@ -229,12 +229,12 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event1 = makeEvent({
       begin: startTime,
       eventId: "evt-a",
-      repeat: { frequency: RepeatingFrequency.Daily },
+      repeat: { rrule: "FREQ=DAILY" },
     });
     const event2 = makeEvent({
       begin: startTime,
       eventId: "evt-b",
-      repeat: { frequency: RepeatingFrequency.Daily },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event1);
@@ -258,7 +258,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       eventId: "recurring-key-test",
-      repeat: { frequency: RepeatingFrequency.Daily },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);

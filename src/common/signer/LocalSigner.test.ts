@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { generateSecretKey, verifyEvent, getPublicKey } from "nostr-tools";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { createLocalSigner } from "./LocalSigner";
@@ -93,7 +93,10 @@ describe("LocalSigner.signEvent", () => {
     const signer = createLocalSigner(privkey);
     const event = {
       ...BASE_EVENT,
-      tags: [["e", "some-event-id"], ["p", "some-pubkey"]],
+      tags: [
+        ["e", "some-event-id"],
+        ["p", "some-pubkey"],
+      ],
     };
     const signed = await signer.signEvent(event);
     expect(signed.tags).toEqual([
@@ -161,7 +164,10 @@ describe("LocalSigner NIP-44 encrypt/decrypt", () => {
 
     const plaintext = "nip44 secret";
     const ciphertext = await signer.nip44Encrypt!(peerPubkey, plaintext);
-    const decrypted = await peerSigner.nip44Decrypt!(expectedPubkey, ciphertext);
+    const decrypted = await peerSigner.nip44Decrypt!(
+      expectedPubkey,
+      ciphertext,
+    );
     expect(decrypted).toBe(plaintext);
   });
 
@@ -178,16 +184,16 @@ describe("LocalSigner NIP-44 encrypt/decrypt", () => {
     const longMessage = "a".repeat(1000);
 
     const ciphertext = await signer.nip44Encrypt!(peerPubkey, longMessage);
-    const decrypted = await peerSigner.nip44Decrypt!(expectedPubkey, ciphertext);
+    const decrypted = await peerSigner.nip44Decrypt!(
+      expectedPubkey,
+      ciphertext,
+    );
     expect(decrypted).toBe(longMessage);
   });
 
-  it("encrypts empty string correctly", async () => {
+  it("rejects empty string (NIP-44 requires 1-65535 bytes)", async () => {
     const signer = createLocalSigner(privkey);
-    const peerSigner = createLocalSigner(peerPrivkey);
 
-    const ciphertext = await signer.nip44Encrypt!(peerPubkey, "");
-    const decrypted = await peerSigner.nip44Decrypt!(expectedPubkey, ciphertext);
-    expect(decrypted).toBe("");
+    await expect(signer.nip44Encrypt!(peerPubkey, "")).rejects.toThrow();
   });
 });

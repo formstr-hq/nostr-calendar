@@ -9,7 +9,9 @@ const FAKE_PEER_PUBKEY = "b".repeat(64);
 function makeMockSigner(overrides: Partial<NostrSigner> = {}): NostrSigner {
   return {
     getPublicKey: vi.fn().mockResolvedValue(FAKE_PUBKEY),
-    signEvent: vi.fn().mockResolvedValue({ id: "signed-id", sig: "sig" } as any),
+    signEvent: vi
+      .fn()
+      .mockResolvedValue({ id: "signed-id", sig: "sig" } as any),
     encrypt: vi.fn().mockResolvedValue("encrypted"),
     decrypt: vi.fn().mockResolvedValue("decrypted"),
     nip44Encrypt: vi.fn().mockResolvedValue("nip44-encrypted"),
@@ -109,7 +111,10 @@ describe("DeferredSigner.encrypt / decrypt (NIP-04)", () => {
     deferred.resolve(realSigner);
 
     await deferred.encrypt(FAKE_PEER_PUBKEY, "plaintext");
-    expect(realSigner.encrypt).toHaveBeenCalledWith(FAKE_PEER_PUBKEY, "plaintext");
+    expect(realSigner.encrypt).toHaveBeenCalledWith(
+      FAKE_PEER_PUBKEY,
+      "plaintext",
+    );
   });
 
   it("delegates decrypt to the real signer", async () => {
@@ -118,7 +123,10 @@ describe("DeferredSigner.encrypt / decrypt (NIP-04)", () => {
     deferred.resolve(realSigner);
 
     await deferred.decrypt(FAKE_PEER_PUBKEY, "ciphertext");
-    expect(realSigner.decrypt).toHaveBeenCalledWith(FAKE_PEER_PUBKEY, "ciphertext");
+    expect(realSigner.decrypt).toHaveBeenCalledWith(
+      FAKE_PEER_PUBKEY,
+      "ciphertext",
+    );
   });
 
   it("throws when real signer does not support encrypt", async () => {
@@ -149,7 +157,10 @@ describe("DeferredSigner NIP-44", () => {
     deferred.resolve(realSigner);
 
     const result = await deferred.nip44Encrypt(FAKE_PEER_PUBKEY, "plaintext");
-    expect(realSigner.nip44Encrypt).toHaveBeenCalledWith(FAKE_PEER_PUBKEY, "plaintext");
+    expect(realSigner.nip44Encrypt).toHaveBeenCalledWith(
+      FAKE_PEER_PUBKEY,
+      "plaintext",
+    );
     expect(result).toBe("nip44-encrypted");
   });
 
@@ -159,7 +170,10 @@ describe("DeferredSigner NIP-44", () => {
     deferred.resolve(realSigner);
 
     const result = await deferred.nip44Decrypt(FAKE_PEER_PUBKEY, "ciphertext");
-    expect(realSigner.nip44Decrypt).toHaveBeenCalledWith(FAKE_PEER_PUBKEY, "ciphertext");
+    expect(realSigner.nip44Decrypt).toHaveBeenCalledWith(
+      FAKE_PEER_PUBKEY,
+      "ciphertext",
+    );
     expect(result).toBe("nip44-decrypted");
   });
 
@@ -168,9 +182,9 @@ describe("DeferredSigner NIP-44", () => {
     const realSigner = makeMockSigner({ nip44Encrypt: undefined });
     deferred.resolve(realSigner);
 
-    await expect(deferred.nip44Encrypt(FAKE_PEER_PUBKEY, "txt")).rejects.toThrow(
-      "Signer does not support nip44Encrypt",
-    );
+    await expect(
+      deferred.nip44Encrypt(FAKE_PEER_PUBKEY, "txt"),
+    ).rejects.toThrow("Signer does not support nip44Encrypt");
   });
 
   it("throws when real signer does not support nip44Decrypt", async () => {
