@@ -1,10 +1,24 @@
+/**
+ * Events Store
+ *
+ * Manages calendar events displayed in the UI. Events come from two sources:
+ * 1. Public events: fetched directly from relays (kind 31923)
+ * 2. Private events: fetched via calendar list references (kind 32678/32679)
+ *
+ * The private event flow has been refactored from the old gift-wrap-based approach:
+ * - OLD: subscribe to gift wraps → unwrap → fetch event → display
+ * - NEW: read event refs from visible calendar lists → split into recurring/non-recurring
+ *        → fetch events by d-tag → decrypt with viewKey from the ref → display
+ *
+ * Recurring events (isRecurring=true in the ref) are always fetched regardless
+ * of the time range, since old recurring events may have future occurrences.
+ */
+
 import { Event } from "nostr-tools";
 import { create } from "zustand";
 import {
   fetchCalendarEvents,
-  fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
-  getUserPublicKey,
   viewPrivateEvent,
 } from "../common/nostr";
 import { isValid } from "date-fns";
@@ -14,7 +28,6 @@ import {
   normalize,
   removeOne,
 } from "@voiceflow/normal-store";
-import { SubCloser } from "nostr-tools/abstract-pool";
 import { nostrEventToCalendar } from "../utils/parser";
 import { RSVPResponse } from "../utils/types";
 import type { ICalendarEvent } from "../utils/types";
@@ -24,6 +37,9 @@ import {
   setSecureItem,
   removeSecureItem,
 } from "../common/localStorage";
+import { useCalendarLists } from "./calendarLists";
+import { parseEventRef } from "../utils/calendarListTypes";
+import type { SubscriptionHandle } from "../common/nostrRuntime";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
@@ -31,8 +47,8 @@ const saveEventsToStorage = (events: ICalendarEvent[]) => {
   setSecureItem(EVENTS_STORAGE_KEY, events);
 };
 
-let subscriptionCloser: SubCloser | undefined;
-let privateSubloser: SubCloser | undefined;
+let publicSubscription: SubscriptionHandle | undefined;
+let privateSubscription: SubscriptionHandle | undefined;
 
 export { ICalendarEvent, RSVPResponse };
 
@@ -40,10 +56,11 @@ interface TimeRangeConfig {
   daysBefore: number;
   daysAfter: number;
 }
-// Configuration for time range - can be modified in one place
+
+// Updated time range: -14 days / +28 days per requirements
 export const getTimeRangeConfig = (): TimeRangeConfig => ({
-  daysBefore: 7,
-  daysAfter: 21,
+  daysBefore: 14,
+  daysAfter: 28,
 });
 
 // Helper function to get configurable time range
@@ -68,10 +85,15 @@ const getTimeRange = (customConfig?: {
   };
 };
 
+/**
+ * Processes a decrypted private event and adds it to the store.
+ * Handles deduplication by keeping the newer version if the event already exists.
+ */
 const processPrivateEvent = (
   event: Event,
   _timeRange: ReturnType<typeof getTimeRange>,
   viewKey?: string,
+  calendarId?: string,
 ) => {
   const { events } = useTimeBasedEvents.getState();
   let store = normalize(events);
@@ -79,6 +101,12 @@ const processPrivateEvent = (
     viewKey,
     isPrivateEvent: true,
   });
+
+  // Attach the calendar ID so events can be themed by calendar color
+  if (calendarId) {
+    parsedEvent.calendarId = calendarId;
+  }
+
   // Check if we have valid begin/end times after processing all tags
   if (parsedEvent.begin === 0 || parsedEvent.end === 0) {
     return;
@@ -100,7 +128,6 @@ const processPrivateEvent = (
       store = appendOne(store, parsedEvent.id, parsedEvent);
     }
   }
-  console.log(parsedEvent);
   scheduleEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
   saveEventsToStorage(updatedEvents);
@@ -110,21 +137,10 @@ const processPrivateEvent = (
   });
 };
 
-const processedEventIds: string[] = [];
-
-const processGiftWraps = (
-  rumor: { viewKey: string; eventId: string },
-  timeRange: ReturnType<typeof getTimeRange>,
-) => {
-  if (processedEventIds.includes(rumor.eventId)) {
-    return;
-  }
-  processedEventIds.push(rumor.eventId);
-  fetchPrivateCalendarEvents({ eventIds: [rumor.eventId] }, async (event) => {
-    const decryptedEvent = viewPrivateEvent(event, rumor.viewKey);
-    processPrivateEvent(decryptedEvent, timeRange, rumor.viewKey);
-  });
-};
+/**
+ * Tracks which event IDs have already been fetched to avoid duplicate requests.
+ */
+const processedEventIds = new Set<string>();
 
 export const useTimeBasedEvents = create<{
   events: ICalendarEvent[];
@@ -156,7 +172,6 @@ export const useTimeBasedEvents = create<{
     });
   },
   events: [],
-  eventIds: [],
   eventById: {},
   isCacheLoaded: false,
   loadCachedEvents: async () => {
@@ -182,36 +197,104 @@ export const useTimeBasedEvents = create<{
   updateTimeRangeConfig: (newConfig) => {
     Object.assign(getTimeRangeConfig(), newConfig);
   },
-  async fetchPrivateEvents(customTimeRange) {
-    if (privateSubloser) {
-      privateSubloser.close();
-    }
-    const userPublicKey = await getUserPublicKey();
-    if (!userPublicKey) {
-      return;
+
+  /**
+   * Fetches private events from calendar list references.
+   *
+   * Instead of subscribing to gift wraps, this reads event refs from
+   * visible calendar lists and fetches each event by its d-tag.
+   *
+   * Event refs are split into two groups:
+   * - Non-recurring: filtered by time range (-14/+28 days)
+   * - Recurring (isRecurring=true): always fetched regardless of time range,
+   *   because old recurring events may have occurrences in the current window
+   */
+  fetchPrivateEvents(customTimeRange) {
+    if (privateSubscription) {
+      privateSubscription.unsubscribe();
+      privateSubscription = undefined;
     }
 
     const timeRange = getTimeRange(customTimeRange);
+    const visibleRefs = useCalendarLists.getState().getVisibleEventRefs();
 
-    privateSubloser = fetchCalendarGiftWraps(
-      {
-        participants: [userPublicKey],
-        since: timeRange.since,
-        until: timeRange.until,
-      },
+    if (visibleRefs.length === 0) return;
+
+    // Get calendar ID for each ref so events can be colored by their calendar
+    // Key by coordinate (first element of ref array) since it uniquely identifies the event
+    const calendars = useCalendarLists
+      .getState()
+      .calendars.filter((c) => c.isVisible);
+    const refToCalendarId = new Map<string, string>();
+    for (const cal of calendars) {
+      for (const ref of cal.eventRefs) {
+        refToCalendarId.set(ref[0], cal.id);
+      }
+    }
+
+    // Parse refs and split into recurring vs non-recurring
+    const eventIdsToFetch: string[] = [];
+    const authorPubkeys = new Set<string>();
+    const viewKeyMap = new Map<
+      string,
+      { viewKey: string; calendarId: string }
+    >();
+
+    for (const ref of visibleRefs) {
+      const parsed = parseEventRef(ref);
+
+      // Skip already-processed events
+      if (processedEventIds.has(parsed.eventDTag)) continue;
+
+      // Recurring events bypass time-range filter — they may have
+      // future occurrences even if the original start date is old
+      const inTimeRange =
+        parsed.beginTimeSecs >= timeRange.since &&
+        parsed.beginTimeSecs <= timeRange.until;
+
+      if (parsed.isRecurring || inTimeRange) {
+        eventIdsToFetch.push(parsed.eventDTag);
+        authorPubkeys.add(parsed.authorPubkey);
+        viewKeyMap.set(parsed.eventDTag, {
+          viewKey: parsed.viewKey,
+          calendarId: refToCalendarId.get(ref[0]) || "",
+        });
+        processedEventIds.add(parsed.eventDTag);
+      }
+    }
+
+    if (eventIdsToFetch.length === 0) return;
+
+    // Fetch all matching events in a single subscription
+    privateSubscription = fetchPrivateCalendarEvents(
+      { eventIds: eventIdsToFetch, authors: Array.from(authorPubkeys) },
       (event) => {
-        processGiftWraps(event, timeRange);
+        const dTag = event.tags.find((t) => t[0] === "d")?.[1];
+        const meta = dTag ? viewKeyMap.get(dTag) : undefined;
+        if (meta) {
+          const decrypted = viewPrivateEvent(event, meta.viewKey);
+          processPrivateEvent(
+            decrypted,
+            timeRange,
+            meta.viewKey,
+            meta.calendarId,
+          );
+        }
       },
     );
   },
+
+  /**
+   * Fetches public calendar events from relays via nostrRuntime.
+   */
   fetchEvents: (customTimeRange) => {
-    if (subscriptionCloser) {
+    if (publicSubscription) {
       return;
     }
 
     const timeRange = getTimeRange(customTimeRange);
 
-    subscriptionCloser = fetchCalendarEvents(
+    publicSubscription = fetchCalendarEvents(
       {
         since: timeRange.since,
         until: timeRange.until,
@@ -260,5 +343,4 @@ export const useTimeBasedEvents = create<{
       },
     );
   },
-  clearEvents: () => set({ events: [], eventById: {} }),
 }));

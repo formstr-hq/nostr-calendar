@@ -4,6 +4,7 @@ import { NotificationEventPage } from "./NotificationEventPage";
 import { ROUTES } from "../utils/routingHelper";
 import { Index } from "./Index";
 import Calendar from "./Calendar";
+import { InvitationPanel } from "./InvitationPanel";
 
 export const Routing = () => {
   return (
@@ -13,6 +14,7 @@ export const Routing = () => {
         path="/notification-event/:eventId"
         element={<NotificationEventPage />}
       />
+      <Route path={ROUTES.Notifications} element={<InvitationPanel />} />
       <Route path={ROUTES.WeekCalendar} element={<Calendar />} />
       <Route path={ROUTES.MonthCalendar} element={<Calendar />} />
       <Route path={ROUTES.DayCalendar} element={<Calendar />} />

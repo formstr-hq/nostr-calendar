@@ -15,6 +15,7 @@ import { isWeekend } from "../utils/dateHelper";
 import ShortcutIcon from "@mui/icons-material/Shortcut";
 import { isMobile } from "../common/utils";
 import { isEventInDateRange } from "../utils/repeatingEventsHelper";
+import { useIntl } from "react-intl";
 
 interface MonthViewProps {
   events: ICalendarEvent[];
@@ -30,6 +31,7 @@ const StyledPaper = styled(Paper)`
 `;
 
 export function MonthView({ events }: MonthViewProps) {
+  const intl = useIntl();
   const { date, setDate } = useDateWithRouting();
   const end = date.endOf("month").endOf("week");
   const start = date.startOf("month").startOf("week");
@@ -101,7 +103,7 @@ export function MonthView({ events }: MonthViewProps) {
                 top: 0,
                 right: 0,
               }}
-              title="go to week"
+              title={intl.formatMessage({ id: "navigation.goToWeek" })}
               onClick={() => {
                 setDate(day, "week");
               }}

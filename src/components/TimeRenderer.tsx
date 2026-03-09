@@ -4,8 +4,10 @@ import { Box, Typography } from "@mui/material";
 import { ICalendarEvent } from "../stores/events";
 import dayjs from "dayjs";
 import { RRule } from "rrule";
+import { useIntl } from "react-intl";
 
 const Repeat = ({ repeat }: { repeat: ICalendarEvent["repeat"] }) => {
+  const intl = useIntl();
   if (!repeat.rrule) {
     return null;
   }
@@ -18,7 +20,7 @@ const Repeat = ({ repeat }: { repeat: ICalendarEvent["repeat"] }) => {
   return (
     <>
       <EventRepeatIcon />
-      <Typography>Repeats {label}</Typography>
+      <Typography>{intl.formatMessage({ id: "event.repeats" }, { label })}</Typography>
     </>
   );
 };

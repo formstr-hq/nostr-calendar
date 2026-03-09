@@ -22,9 +22,11 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { useRelayStore } from "../stores/relays";
 import { defaultRelays, getRelays, publishRelayList } from "../common/nostr";
+import { useIntl } from "react-intl";
 
 export function RelayManager() {
   const { showRelayModal, updateRelayModal } = useRelayStore();
+  const intl = useIntl();
   const [localRelays, setLocalRelays] = useState<string[]>([]);
   const [newRelay, setNewRelay] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,7 +56,7 @@ export function RelayManager() {
     if (!url.startsWith("wss://") && !url.startsWith("ws://")) {
       setSnackbar({
         open: true,
-        message: "Relay URL must start with wss:// or ws://",
+        message: intl.formatMessage({ id: "relay.relayUrlError" }),
         severity: "error",
       });
       return;
@@ -62,7 +64,7 @@ export function RelayManager() {
     if (localRelays.includes(url)) {
       setSnackbar({
         open: true,
-        message: "Relay already in list",
+        message: intl.formatMessage({ id: "relay.relayAlreadyInList" }),
         severity: "error",
       });
       return;
@@ -83,7 +85,7 @@ export function RelayManager() {
     if (localRelays.length === 0) {
       setSnackbar({
         open: true,
-        message: "You must have at least one relay",
+        message: intl.formatMessage({ id: "relay.atLeastOneRelay" }),
         severity: "error",
       });
       return;
@@ -94,7 +96,7 @@ export function RelayManager() {
       await publishRelayList(localRelays);
       setSnackbar({
         open: true,
-        message: "Relay list saved and published",
+        message: intl.formatMessage({ id: "relay.relaySavedAndPublished" }),
         severity: "success",
       });
       handleClose();
@@ -104,7 +106,7 @@ export function RelayManager() {
       useRelayStore.getState().setRelays(localRelays);
       setSnackbar({
         open: true,
-        message: "Saved locally but failed to publish to relays",
+        message: intl.formatMessage({ id: "relay.savedLocallyFailedPublish" }),
         severity: "error",
       });
     } finally {
@@ -137,7 +139,7 @@ export function RelayManager() {
             }}
           >
             <Typography variant="h6" style={{ fontWeight: 600 }}>
-              Manage Relays
+              {intl.formatMessage({ id: "relay.manageRelays" })}
             </Typography>
             <IconButton onClick={handleClose} size="small">
               <CloseIcon />
@@ -169,7 +171,7 @@ export function RelayManager() {
                 startIcon={<AddIcon />}
                 style={{ minWidth: isMobile ? undefined : 100 }}
               >
-                Add
+                {intl.formatMessage({ id: "navigation.add" })}
               </Button>
             </Box>
 
@@ -212,7 +214,7 @@ export function RelayManager() {
                 color="textSecondary"
                 style={{ textAlign: "center", padding: 16 }}
               >
-                No relays configured. Add a relay or reset to defaults.
+                {intl.formatMessage({ id: "relay.noRelaysConfigured" })}
               </Typography>
             )}
 
@@ -221,21 +223,21 @@ export function RelayManager() {
               color="inherit"
               onClick={handleResetToDefaults}
             >
-              Reset to Defaults
+              {intl.formatMessage({ id: "relay.resetToDefaults" })}
             </Button>
           </Box>
         </DialogContent>
 
         <DialogActions style={{ padding: 16 }}>
           <Button onClick={handleClose} color="inherit">
-            Cancel
+            {intl.formatMessage({ id: "navigation.cancel" })}
           </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             disabled={saving || localRelays.length === 0}
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? intl.formatMessage({ id: "event.saving" }) : intl.formatMessage({ id: "navigation.save" })}
           </Button>
         </DialogActions>
       </Dialog>

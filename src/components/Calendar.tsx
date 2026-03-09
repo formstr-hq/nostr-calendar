@@ -9,21 +9,39 @@ import { CalendarHeader } from "./CalendarHeader";
 import { Box } from "@mui/material";
 import { SwipeableView } from "./SwipeableView";
 import { isMobile } from "../common/utils";
+import { useCalendarLists } from "../stores/calendarLists";
+import { useInvitations } from "../stores/invitations";
+import { useEffect } from "react";
 
 function Calendar() {
-  // const { history, match } = props
-  // const theme = useTheme()
   const {
     settings: { filters },
   } = useSettings((state) => state);
   const { user } = useUser();
   const events = useTimeBasedEvents((state) => state);
+  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
+
   if (filters?.showPublicEvents && !isMobile) {
     events.fetchEvents();
   }
-  if (user) {
-    events.fetchPrivateEvents();
-  }
+
+  // When user is logged in, fetch calendar lists and invitations.
+  // Private events are fetched reactively when calendars are loaded.
+  useEffect(() => {
+    if (user) {
+      useCalendarLists.getState().fetchCalendars();
+      useInvitations.getState().fetchInvitations();
+    }
+  }, [user]);
+
+  // Fetch private events whenever visible calendars change.
+  // This ensures events update when calendars load from network
+  // or when the user toggles calendar visibility.
+  useEffect(() => {
+    if (user && calendarsLoaded && calendars.length > 0) {
+      events.fetchPrivateEvents();
+    }
+  }, [user, calendarsLoaded, calendars]);
 
   const { layout } = useLayout();
 

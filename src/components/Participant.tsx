@@ -9,6 +9,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { nip19 } from "nostr-tools";
 import { RSVPResponse } from "../stores/events";
 import { useState } from "react";
+import { useIntl } from "react-intl";
 
 interface ParticipantProps {
   pubKey: string;
@@ -62,10 +63,11 @@ export const Participant = ({
   pubKey,
   rsvpResponse = RSVPResponse.pending,
 }: ParticipantProps) => {
+  const intl = useIntl();
   const theme = useTheme();
   const { participant, loading } = useGetParticipant({ pubKey });
   const npub = nip19.npubEncode(pubKey);
-  const [copyTooltip, setCopyTooltip] = useState("Click to copy");
+  const [copyTooltip, setCopyTooltip] = useState(intl.formatMessage({ id: "participant.clickToCopy" }));
 
   const displayName = participant?.name || npub;
   const isLongText = displayName.length > 20;
@@ -74,8 +76,8 @@ export const Participant = ({
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(displayName);
-      setCopyTooltip("Copied!");
-      setTimeout(() => setCopyTooltip("Click to copy"), 2000);
+      setCopyTooltip(intl.formatMessage({ id: "participant.copied" }));
+      setTimeout(() => setCopyTooltip(intl.formatMessage({ id: "participant.clickToCopy" })), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
     }

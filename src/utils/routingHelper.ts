@@ -3,6 +3,7 @@ export enum ROUTES {
   WeekCalendar = "/w/:year/:weekNumber",
   DayCalendar = "/d/:year/:month/:day",
   MonthCalendar = "/m/:year/:monthNumber",
+  Notifications = "/notifications",
 }
 
 export function getEventPage(naddr: string, viewKey?: string) {

@@ -4,6 +4,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
+import NotificationsIcon from "@mui/icons-material/Notifications";
 import {
   Box,
   IconButton,
@@ -11,6 +12,7 @@ import {
   Menu,
   MenuItem,
   Button,
+  Badge,
   useTheme,
   Drawer,
   useMediaQuery,
@@ -20,13 +22,14 @@ import dayjs from "dayjs";
 import { getRouteFromDate } from "../utils/dateBasedRouting";
 import { useNavigate } from "react-router";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
-import { DatePicker } from "./DatePicker";
 import { StyledSecondaryHeader } from "./StyledComponents";
-import { Filters } from "./Filters";
-import CloseIcon from "@mui/icons-material/Close";
 import { WeekHeader } from "./WeekView";
+import { CalendarSidebar } from "./CalendarSidebar";
+import { useInvitations } from "../stores/invitations";
+import { useIntl } from "react-intl";
 
 export function CalendarHeader() {
+  const intl = useIntl();
   const { layout, updateLayout } = useLayout();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -44,6 +47,9 @@ export function CalendarHeader() {
   const closeDrawer = () => updateDrawerOpen(false);
   const openDrawer = () => updateDrawerOpen(true);
   const move = (dir: number) => setDate(date.add(dir, layout), layout);
+
+  const { unreadCount } = useInvitations();
+
   return (
     <>
       <StyledSecondaryHeader
@@ -79,6 +85,20 @@ export function CalendarHeader() {
           </Typography>
         </Box>
         <Box display="flex" gap={theme.spacing(2)} alignItems="center">
+          {/* Notification bell for pending invitations */}
+          <IconButton
+            onClick={() => {
+              if (isMobile) {
+                navigate("/notifications");
+              } else {
+                navigate("/notifications");
+              }
+            }}
+          >
+            <Badge badgeContent={unreadCount} color="error">
+              <NotificationsIcon />
+            </Badge>
+          </IconButton>
           <IconButton
             onClick={() => {
               const route = getRouteFromDate(dayjs(), layout);
@@ -94,7 +114,7 @@ export function CalendarHeader() {
             variant="outlined"
             startIcon={<KeyboardArrowDown />}
           >
-            {layout}
+            {intl.formatMessage({ id: `navigation.${layout}` })}
           </Button>
           <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
             <MenuItem
@@ -105,7 +125,7 @@ export function CalendarHeader() {
                 handleClose();
               }}
             >
-              Day
+              {intl.formatMessage({ id: "navigation.day" })}
             </MenuItem>
             <MenuItem
               selected={layout === "week"}
@@ -115,7 +135,7 @@ export function CalendarHeader() {
                 handleClose();
               }}
             >
-              Week
+              {intl.formatMessage({ id: "navigation.week" })}
             </MenuItem>
             <MenuItem
               selected={layout === "month"}
@@ -125,24 +145,14 @@ export function CalendarHeader() {
                 handleClose();
               }}
             >
-              Month
+              {intl.formatMessage({ id: "navigation.month" })}
             </MenuItem>
           </Menu>
         </Box>
       </StyledSecondaryHeader>
       {layout === "week" && <WeekHeader date={date} />}
       <Drawer open={drawerOpen} onClose={closeDrawer}>
-        <Box padding={(theme) => theme.spacing(2)}>
-          <Box width={"100%"} justifyContent={"end"} display={"flex"}>
-            {isMobile && (
-              <IconButton onClick={closeDrawer}>
-                <CloseIcon />
-              </IconButton>
-            )}
-          </Box>
-          <DatePicker onSelect={closeDrawer} />
-          {!isMobile && <Filters />}
-        </Box>
+        <CalendarSidebar onClose={closeDrawer} />
       </Drawer>
     </>
   );

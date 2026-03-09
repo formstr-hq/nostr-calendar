@@ -5,6 +5,8 @@ import { useTimeBasedEvents } from "./events";
 import { cancelAllNotifications } from "../utils/notifications";
 import { fetchRelayList } from "../common/nostr";
 import { useRelayStore } from "./relays";
+import { useCalendarLists } from "./calendarLists";
+import { useInvitations } from "./invitations";
 
 export interface IUser {
   name?: string;
@@ -45,6 +47,8 @@ export const useUser = create<{
     cancelAllNotifications();
     useRelayStore.getState().resetRelays();
     await useTimeBasedEvents.getState().clearCachedEvents();
+    await useCalendarLists.getState().clearCachedCalendars();
+    await useInvitations.getState().clearCachedInvitations();
     set({ user: null });
     localStorage.removeItem(USER_STORAGE_KEY);
   },
@@ -76,6 +80,9 @@ const onUserChange = async () => {
           useRelayStore.getState().setRelays(relays);
         }
       });
+      // Initialize calendar lists and invitations for the new user
+      useCalendarLists.getState().loadCachedCalendars();
+      useInvitations.getState().loadCachedInvitations();
     }
   } else {
     useUser.setState({

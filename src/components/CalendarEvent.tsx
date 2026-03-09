@@ -31,6 +31,8 @@ import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
 import { getEventPage } from "../utils/routingHelper";
 import { isNative } from "../utils/platform";
+import { useCalendarLists } from "../stores/calendarLists";
+import { useIntl } from "react-intl";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -41,18 +43,46 @@ export interface CalendarEventViewProps {
   event: ICalendarEvent;
 }
 
-function getColorScheme(event: ICalendarEvent, theme: Theme) {
+/**
+ * Returns color scheme for an event card based on its type:
+ * - Invitation events: grey background with dashed border
+ * - Private events with a calendar: themed by the calendar's color
+ * - Other private events: default dark theme
+ * - Public events: semi-transparent primary
+ */
+function getColorScheme(
+  event: ICalendarEvent,
+  theme: Theme,
+  calendarColor?: string,
+) {
+  // Invitation events get a distinct grey/dashed style
+  if (event.isInvitation) {
+    return {
+      color: theme.palette.text.secondary,
+      backgroundColor: "#e0e0e0",
+      border: "2px dashed #999",
+    };
+  }
+
+  // Private events themed by their calendar's color
+  if (event.isPrivateEvent && calendarColor) {
+    return {
+      color: "#fff",
+      backgroundColor: alpha(calendarColor, 0.7),
+    };
+  }
+
   if (event.isPrivateEvent) {
     return {
       color: "#fff",
       backgroundColor: theme.palette.primary.light,
     };
-  } else {
-    return {
-      backgroundColor: alpha(theme.palette.primary.main, 0.3),
-      color: "#fff",
-    };
   }
+
+  return {
+    backgroundColor: alpha(theme.palette.primary.main, 0.3),
+    color: "#fff",
+  };
 }
 
 export function CalendarEventCard({
@@ -64,7 +94,13 @@ export function CalendarEventCard({
   const handleClose = () => setOpen(false);
   const maxDescLength = 20;
   const theme = useTheme();
-  const colorScheme = getColorScheme(event, theme);
+
+  // Look up the calendar color for this event's calendar
+  const calendars = useCalendarLists.getState().calendars;
+  const calendarColor = event.calendarId
+    ? calendars.find((c) => c.id === event.calendarId)?.color
+    : undefined;
+  const colorScheme = getColorScheme(event, theme, calendarColor);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const title =
     event.title ??
@@ -143,6 +179,7 @@ function ActionButtons({
   event: ICalendarEvent;
   closeModal: () => void;
 }) {
+  const intl = useIntl();
   const linkToEvent = getEventPage(
     encodeNAddr({
       pubkey: event.user,
@@ -159,13 +196,13 @@ function ActionButtons({
       {!isMobile && (
         <>
           <IconButton onClick={copyLinkToEvent}>
-            <Tooltip title="Copy link to this event">
+            <Tooltip title={intl.formatMessage({ id: "event.copyLink" })}>
               <ContentCopy />
             </Tooltip>
           </IconButton>
 
           <IconButton component={Link} href={linkToEvent}>
-            <Tooltip title="Open event in new tab">
+            <Tooltip title={intl.formatMessage({ id: "event.openNewTab" })}>
               <OpenInNew />
             </Tooltip>
           </IconButton>
@@ -174,12 +211,12 @@ function ActionButtons({
 
       {!isNative && (
         <IconButton onClick={() => exportICS(event)}>
-          <Tooltip title="Download event details">
+          <Tooltip title={intl.formatMessage({ id: "event.downloadDetails" })}>
             <Download />
           </Tooltip>
         </IconButton>
       )}
-      <IconButton aria-label="close" onClick={closeModal}>
+      <IconButton aria-label={intl.formatMessage({ id: "navigation.close" })} onClick={closeModal}>
         <CloseIcon />
       </IconButton>
     </Box>
@@ -187,6 +224,7 @@ function ActionButtons({
 }
 
 export function CalendarEvent({ event }: CalendarEventViewProps) {
+  const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const locations = event.location.filter((location) => !!location?.trim?.());
@@ -226,7 +264,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
 
           {event.description && (
             <>
-              <Typography variant="subtitle1">Description</Typography>
+              <Typography variant="subtitle1">{intl.formatMessage({ id: "navigation.description" })}</Typography>
               <Typography variant="body2">
                 <Markdown remarkPlugins={[remarkGfm]}>
                   {event.description}
@@ -239,7 +277,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
 
           {locations.length > 0 && (
             <>
-              <Typography variant="subtitle1">Location</Typography>
+              <Typography variant="subtitle1">{intl.formatMessage({ id: "navigation.location" })}</Typography>
               <Typography>{locations.join(", ")}</Typography>
 
               <Divider />
@@ -248,7 +286,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
 
           <Box display={"flex"} flexWrap={"wrap"} gap={1}>
             <Typography width={"100%"} fontWeight={600}>
-              Participants
+              {intl.formatMessage({ id: "navigation.participants" })}
             </Typography>
             <Stack direction="row" gap={0.5} flexWrap="wrap">
               {event.participants.map((p) => (

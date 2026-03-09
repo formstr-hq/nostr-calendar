@@ -5,6 +5,8 @@ import {
   getReplaceableKey,
   shouldReplaceEvent,
   isValidEventStructure,
+  isDeletionEvent,
+  getEventCoordinate,
 } from "./utils/eventValidation";
 import { eventMatchesFilter, extractTagKeys } from "./utils/filterUtils";
 import { EventCallback } from "./types";
@@ -36,6 +38,10 @@ export class EventStore {
   // Replaceable event tracking
   private replaceableKeys: Map<string, string> = new Map(); // key -> event ID
 
+  // Deletion tracking (NIP-09)
+  private deletedEventIds: Set<string> = new Set();
+  private deletedCoordinates: Set<string> = new Set();
+
   // Reactive subscriptions
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private listenerIdCounter = 0;
@@ -55,6 +61,17 @@ export class EventStore {
     if (isEphemeralEvent(event.kind)) {
       // Still notify listeners even if not storing
       this.notifyListeners(event);
+      return false;
+    }
+
+    // Handle deletion events (NIP-09, kind 5)
+    if (isDeletionEvent(event.kind)) {
+      this.processDeletionEvent(event);
+      return true;
+    }
+
+    // Reject events that have been deleted
+    if (this.isDeleted(event)) {
       return false;
     }
 
@@ -288,6 +305,50 @@ export class EventStore {
   }
 
   /**
+   * Process a kind 5 deletion event (NIP-09).
+   * Extracts referenced event IDs ("e" tags) and coordinates ("a" tags),
+   * adds them to the deleted sets, and removes matching events from the store.
+   * Only honors deletions from the same author as the deleted event.
+   */
+  private processDeletionEvent(deletionEvent: Event): void {
+    for (const tag of deletionEvent.tags) {
+      if (tag[0] === "e" && tag[1]) {
+        // Check that the deleted event was authored by the same pubkey
+        const existing = this.eventsById.get(tag[1]);
+        if (existing && existing.pubkey !== deletionEvent.pubkey) continue;
+
+        this.deletedEventIds.add(tag[1]);
+        if (existing) {
+          this.removeEvent(tag[1]);
+        }
+      } else if (tag[0] === "a" && tag[1]) {
+        // "a" tag format: "{kind}:{pubkey}:{d-tag}"
+        // Only honor if the deletion author matches the coordinate author
+        const parts = tag[1].split(":");
+        if (parts.length >= 2 && parts[1] !== deletionEvent.pubkey) continue;
+
+        this.deletedCoordinates.add(tag[1]);
+        // Remove any matching event currently in the store
+        for (const [eventId, event] of Array.from(this.eventsById.entries())) {
+          if (getEventCoordinate(event) === tag[1]) {
+            this.removeEvent(eventId);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if an event has been marked as deleted.
+   */
+  private isDeleted(event: Event): boolean {
+    if (this.deletedEventIds.has(event.id)) return true;
+    const coordinate = getEventCoordinate(event);
+    if (coordinate && this.deletedCoordinates.has(coordinate)) return true;
+    return false;
+  }
+
+  /**
    * Clear all events (useful for testing)
    */
   clear(): void {
@@ -296,6 +357,8 @@ export class EventStore {
     this.eventsByAuthor.clear();
     this.eventsByTag.clear();
     this.replaceableKeys.clear();
+    this.deletedEventIds.clear();
+    this.deletedCoordinates.clear();
   }
 
   /**

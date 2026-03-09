@@ -17,6 +17,7 @@ import { TimeRenderer } from "./TimeRenderer";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useIntl } from "react-intl";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -74,6 +75,7 @@ const EventRenderer = ({
 };
 
 const ErrorRenderer = () => {
+  const intl = useIntl();
   return (
     <Box
       style={{
@@ -84,8 +86,7 @@ const ErrorRenderer = () => {
       }}
     >
       <Alert severity="error">
-        We could not load the event. It may be a temporary error. Please refresh
-        the page to try again
+        {intl.formatMessage({ id: "event.loadError" })}
       </Alert>
     </Box>
   );

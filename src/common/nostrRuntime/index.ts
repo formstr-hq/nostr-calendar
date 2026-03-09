@@ -341,6 +341,24 @@ export class NostrRuntime {
   };
 
   /**
+   * Fetches all kind 5 deletion events authored by the given pubkey
+   * and feeds them into the EventStore so that subsequently received
+   * events matching those deletions are rejected.
+   *
+   * Call this once at app init after login.
+   */
+  async fetchDeletionEvents(
+    relays: string[],
+    userPubkey: string,
+  ): Promise<void> {
+    const filter: Filter = {
+      kinds: [5],
+      authors: [userPubkey],
+    };
+    await this.querySync(relays, filter);
+  }
+
+  /**
    * Cleanup - close all subscriptions and clear store
    * Useful for testing or app shutdown
    */

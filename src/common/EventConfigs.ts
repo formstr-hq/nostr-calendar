@@ -13,6 +13,12 @@ export enum EventKinds {
   // User Profile
   UserProfile = 0,
 
+  // Calendar List (custom kind for private calendar collections)
+  PrivateCalendarList = 32123,
+
+  // Deletion (NIP-09)
+  DeletionEvent = 5,
+
   // Relay List (NIP-65)
   RelayList = 10002,
 }

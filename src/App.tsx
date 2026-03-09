@@ -11,7 +11,7 @@ import {
 import { theme } from "./theme";
 import { useEffect, useState } from "react";
 import { useUser } from "./stores/user";
-import { IntlProvider } from "react-intl";
+import { IntlProvider, useIntl } from "react-intl";
 import { flattenMessages } from "./common/utils";
 import dictionary from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
@@ -24,6 +24,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
 import { useRelayStore } from "./stores/relays";
+import { isNative } from "./utils/platform";
 
 let _locale =
   (navigator.languages && navigator.languages[0]) ||
@@ -32,6 +33,7 @@ let _locale =
 _locale = ~Object.keys(dictionary).indexOf(_locale) ? _locale : "en-US";
 
 function Application() {
+  const intl = useIntl();
   const {
     user,
     isInitialized,
@@ -54,6 +56,30 @@ function Application() {
       navigate(`/notification-event/${eventId}`);
     });
   }, [navigate]);
+
+  // Handle Android back button: navigate back instead of closing the app.
+  // Only exit the app if there's no browser history to go back to.
+  useEffect(() => {
+    if (!isNative) return;
+
+    let cleanup: (() => void) | undefined;
+    import("@capacitor/app").then(({ App: CapApp }) => {
+      const listener = CapApp.addListener("backButton", ({ canGoBack }) => {
+        if (canGoBack) {
+          window.history.back();
+        } else {
+          CapApp.exitApp();
+        }
+      });
+      cleanup = () => {
+        listener.then((l) => l.remove());
+      };
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!user && !appMode && isInitialized) {
@@ -93,7 +119,9 @@ function Application() {
         <Dialog open>
           <DialogContent>
             <Box display="flex" justifyContent="center" alignItems="center">
-              <Typography>Logging in...</Typography>
+              <Typography>
+                {intl.formatMessage({ id: "message.loggingIn" })}
+              </Typography>
             </Box>
           </DialogContent>
         </Dialog>

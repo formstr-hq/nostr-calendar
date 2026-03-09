@@ -24,6 +24,7 @@ import {
 import KeyIcon from "@mui/icons-material/VpnKey";
 import LinkIcon from "@mui/icons-material/Link";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { useIntl } from "react-intl";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
 import { SignerAppInfo } from "nostr-signer-capacitor-plugin/dist/esm/definitions";
 import { isAndroidNative, isNative } from "../utils/platform";
@@ -34,6 +35,7 @@ interface Nip46SectionProps {
 }
 
 const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
+  const intl = useIntl();
   const [activeTab, setActiveTab] = useState("manual");
   const [bunkerUri, setBunkerUri] = useState("");
   const [loadingConnect, setLoadingConnect] = useState(false);
@@ -88,13 +90,13 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
 
   const connectToBunkerUri = async (bunkerUri: string) => {
     await signerManager.loginWithNip46(bunkerUri);
-    showMessage("Connected to Remote Signer", "success");
+    showMessage(intl.formatMessage({ id: "login.connectedToRemoteSigner" }), "success");
     onSuccess();
   };
 
   const handleConnectManual = async () => {
     if (!bunkerUri) {
-      showMessage("Please enter a bunker URI.", "error");
+      showMessage(intl.formatMessage({ id: "login.enterBunkerUri" }), "error");
       return;
     }
     setLoadingConnect(true);
@@ -102,7 +104,7 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
       await connectToBunkerUri(bunkerUri);
     } catch (e) {
       console.log(e);
-      showMessage("Connection failed.", "error");
+      showMessage(intl.formatMessage({ id: "login.connectionFailed" }), "error");
     } finally {
       setLoadingConnect(false);
     }
@@ -120,13 +122,13 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
         }}
         aria-label="NIP-46 connection tabs"
       >
-        <Tab label="Paste URI" value="manual" />
-        <Tab label="QR Code" value="qr" />
+        <Tab label={intl.formatMessage({ id: "login.pasteUri" })} value="manual" />
+        <Tab label={intl.formatMessage({ id: "login.qrCode" })} value="qr" />
       </Tabs>
       {activeTab === "manual" && (
         <Stack spacing={2} sx={{ width: "100%", marginTop: 2 }}>
           <TextField
-            placeholder="Enter bunker URI"
+            placeholder={intl.formatMessage({ id: "login.enterBunkerUriPlaceholder" })}
             value={bunkerUri}
             onChange={(e) => setBunkerUri(e.target.value)}
             fullWidth
@@ -136,7 +138,7 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
             onClick={handleConnectManual}
             disabled={loadingConnect}
           >
-            Connect
+            {intl.formatMessage({ id: "login.connect" })}
           </Button>
         </Stack>
       )}
@@ -158,7 +160,7 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
               sx={{ marginTop: 1 }}
               onClick={() => {
                 navigator.clipboard.writeText(qrPayload);
-                showMessage("Copied to clipboard", "success");
+                showMessage(intl.formatMessage({ id: "login.copiedToClipboard" }), "success");
               }}
             >
               <ContentCopyIcon fontSize="small" />
@@ -173,13 +175,11 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
                 alignItems: "center",
               }}
             >
-              Copy the nostrconnect URI
+              {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
             </Typography>
           </Box>
           <Typography color="textSecondary" sx={{ fontSize: 12, marginTop: 1 }}>
-            Using{" "}
-            {Nip46Relays.map((relay) => relay.replace("wss://", "")).join(", ")}{" "}
-            for communication
+            {intl.formatMessage({ id: "login.usingRelaysForCommunication" }, { relays: Nip46Relays.map((relay) => relay.replace("wss://", "")).join(", ") })}
           </Typography>
         </Box>
       )}
@@ -203,12 +203,13 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
 
 // Footer info component
 const FooterInfo: React.FC = () => {
+  const intl = useIntl();
   // const [isFAQModalVisible, setIsFAQModalVisible] = useState(false);
 
   return (
     <div style={{ marginTop: 24, textAlign: "center", width: "100%" }}>
       <Typography color="textSecondary" sx={{ fontSize: 12 }}>
-        Your keys never leave your control.
+        {intl.formatMessage({ id: "login.keysNeverLeave" })}
       </Typography>
       <br />
       {/* <Link
@@ -264,6 +265,7 @@ function Nip55Section({
   onClose: () => void;
   onError: (error: string) => void;
 }) {
+  const intl = useIntl();
   const [installedSigners, setInstalledSigners] = useState<{
     apps: SignerAppInfo[];
   }>();
@@ -294,7 +296,7 @@ function Nip55Section({
             variant="contained"
             fullWidth
           >
-            Log In with {app.name}
+            {intl.formatMessage({ id: "login.logInWith" }, { name: app.name })}
           </Button>
         );
       })}
@@ -303,6 +305,7 @@ function Nip55Section({
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
+  const intl = useIntl();
   const [showNip46, setShowNip46] = useState(false);
 
   const [loadingNip07, setLoadingNip07] = useState(false);
@@ -330,15 +333,15 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       setLoadingNip07(true);
       try {
         await signerManager.loginWithNip07();
-        showMessage("Logged in with NIP-07", "success");
+        showMessage(intl.formatMessage({ id: "login.loggedInWithNip07" }), "success");
         onClose();
       } catch {
-        showMessage("Login failed.", "error");
+        showMessage(intl.formatMessage({ id: "login.loginFailed" }), "error");
       } finally {
         setLoadingNip07(false);
       }
     } else {
-      showMessage("No NIP-07 extension found.", "error");
+      showMessage(intl.formatMessage({ id: "login.noNip07Extension" }), "error");
     }
   };
 
@@ -346,14 +349,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
     <>
       <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ textAlign: "center" }}>
-          Sign in to Formstr
+          {intl.formatMessage({ id: "login.signInToFormstr" })}
           <Typography
             variant="body2"
             color="textSecondary"
             align="center"
             sx={{ mt: 0.5 }}
           >
-            Choose your preferred login method
+            {intl.formatMessage({ id: "login.chooseLoginMethod" })}
           </Typography>
         </DialogTitle>
         <DialogContent>
@@ -362,14 +365,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
               <Nip55Section
                 onClose={onClose}
                 onError={() =>
-                  showMessage("Could not login due to some error", "error")
+                  showMessage(intl.formatMessage({ id: "login.couldNotLogin" }), "error")
                 }
               />
             )}
             {!isNative && (
               <LoginOptionButton
                 icon={<KeyIcon />}
-                text="Sign in with Nostr Extension (NIP-07)"
+                text={intl.formatMessage({ id: "login.signInWithExtension" })}
                 type="contained"
                 onClick={handleNip07}
                 loading={loadingNip07}
@@ -377,7 +380,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             )}
             <LoginOptionButton
               icon={<LinkIcon />}
-              text="Connect with Remote Signer (NIP-46)"
+              text={intl.formatMessage({ id: "login.connectRemoteSigner" })}
               onClick={() => setShowNip46(!showNip46)}
             />
             {showNip46 && <Nip46Section onSuccess={onClose} />}
