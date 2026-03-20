@@ -76,6 +76,14 @@ public class NotificationWorker extends Worker {
         }
     }
 
+    private String getNotificationBody(int timeToBegin, String location){
+        if(timeToBegin <= 0){
+            return "Starting now";
+        } else {
+            return "Starting in " + timeToBegin + " minutes";
+        }
+    }
+
     private int processEvent(JSONObject event, long now, long twoDaysFromNow,
                               Set<Integer> existingNotificationIds) {
         try {
@@ -111,18 +119,14 @@ public class NotificationWorker extends Worker {
             // Schedule "10 minutes before" notification
             long tenMinBefore = nextOccurrence - TEN_MINUTES_MS;
             if (tenMinBefore > now && !existingNotificationIds.contains(baseId)) {
-                String body = location != null
-                        ? "Starts in 10 minutes at " + location
-                        : "Starts in 10 minutes";
+                String body = getNotificationBody(10, location);
                 scheduleAlarm(baseId, "Upcoming: " + title, body, eventId, tenMinBefore);
                 count++;
             }
 
             // Schedule "starting now" notification
             if (nextOccurrence > now && !existingNotificationIds.contains(baseId + 1)) {
-                String body = location != null
-                        ? "Starting now at " + location
-                        : "Starting now";
+                String body =  getNotificationBody(0, location);
                 scheduleAlarm(baseId + 1, title, body, eventId, nextOccurrence);
                 count++;
             }
