@@ -40,6 +40,7 @@ import {
 import { useCalendarLists } from "./calendarLists";
 import { parseEventRef } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
+import { getDTag } from "../common/nostrRuntime/utils/helpers";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
@@ -234,6 +235,7 @@ export const useTimeBasedEvents = create<{
 
     // Parse refs and split into recurring vs non-recurring
     const eventIdsToFetch: string[] = [];
+    const kinds = new Set<number>();
     const authorPubkeys = new Set<string>();
     const viewKeyMap = new Map<
       string,
@@ -255,11 +257,11 @@ export const useTimeBasedEvents = create<{
       if (parsed.isRecurring || inTimeRange) {
         eventIdsToFetch.push(parsed.eventDTag);
         authorPubkeys.add(parsed.authorPubkey);
+        kinds.add(parsed.kind);
         viewKeyMap.set(parsed.eventDTag, {
           viewKey: parsed.viewKey,
           calendarId: refToCalendarId.get(ref[0]) || "",
         });
-        processedEventIds.add(parsed.eventDTag);
       }
     }
 
@@ -267,9 +269,16 @@ export const useTimeBasedEvents = create<{
 
     // Fetch all matching events in a single subscription
     privateSubscription = fetchPrivateCalendarEvents(
-      { eventIds: eventIdsToFetch, authors: Array.from(authorPubkeys) },
+      {
+        eventIds: eventIdsToFetch,
+        authors: Array.from(authorPubkeys),
+        kinds: Array.from(kinds),
+      },
       (event) => {
-        const dTag = event.tags.find((t) => t[0] === "d")?.[1];
+        const dTag = getDTag(event);
+        if (!dTag) {
+          return;
+        }
         const meta = dTag ? viewKeyMap.get(dTag) : undefined;
         if (meta) {
           const decrypted = viewPrivateEvent(event, meta.viewKey);
@@ -279,6 +288,7 @@ export const useTimeBasedEvents = create<{
             meta.viewKey,
             meta.calendarId,
           );
+          processedEventIds.add(dTag);
         }
       },
     );

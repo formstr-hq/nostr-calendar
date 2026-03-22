@@ -121,9 +121,9 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           [
             EventKinds.PrivateCalendarRecurringEvent,
             EventKinds.PrivateCalendarEvent,
-          ].includes(Number(inv.kind))
+          ].includes(inv.kind)
         ) {
-          kinds.add(Number(inv.kind));
+          kinds.add(inv.kind);
           pubkeys.add(inv.pubkey);
           eventIds.add(inv.eventId);
         }
@@ -195,7 +195,6 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     if (!invitation) return;
 
     // Build the event reference for the calendar list
-    const isRecurring = invitation.event?.repeat?.rrule != null;
     const beginTimeSecs = invitation.event
       ? Math.floor(invitation.event.begin / 1000)
       : 0;
@@ -204,13 +203,12 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       : 0;
 
     const eventRef = buildEventRef({
-      kind: invitation.event?.kind || EventKinds.PrivateCalendarEvent,
+      kind: invitation.kind,
       authorPubkey: invitation.event?.user || "",
       eventDTag: invitation.eventId,
       viewKey: invitation.viewKey,
       beginTimeSecs,
       endTimeSecs,
-      isRecurring,
     });
 
     // Add to the selected calendar

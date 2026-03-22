@@ -1,3 +1,4 @@
+import { EventKinds } from "../common/EventConfigs";
 import type { ICalendarEvent } from "./types";
 
 /**
@@ -50,7 +51,7 @@ export interface ICalendarList {
  */
 export interface IInvitation {
   /** kind of Invitation */
-  kind: string;
+  kind: number;
   /** Event author's pubkey */
   pubkey: string;
   /** Nostr event ID of the gift wrap */
@@ -98,7 +99,8 @@ export function parseEventRef(ref: string[]): {
     viewKey: metadataParts[0],
     beginTimeSecs: parseInt(metadataParts[1], 10),
     endTimeSecs: parseInt(metadataParts[3], 10),
-    isRecurring: metadataParts[4] === "true",
+    isRecurring:
+      Number(coordinateParts[0]) === EventKinds.PrivateCalendarRecurringEvent,
   };
 }
 
@@ -115,11 +117,10 @@ export function buildEventRef(params: {
   viewKey: string;
   beginTimeSecs: number;
   endTimeSecs: number;
-  isRecurring: boolean;
 }): string[] {
   return [
     `${params.kind}:${params.authorPubkey}:${params.eventDTag}`,
     params.relayUrl || "",
-    `${params.viewKey}:${params.beginTimeSecs}::${params.endTimeSecs}:${params.isRecurring}`,
+    `${params.viewKey}:${params.beginTimeSecs}::${params.endTimeSecs}`,
   ];
 }

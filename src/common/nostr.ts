@@ -310,7 +310,6 @@ export async function publishPrivateCalendarEvent(
     viewKey: nip19.nsecEncode(viewSecretKey),
     beginTimeSecs: Math.floor(start / 1000),
     endTimeSecs: Math.floor(end / 1000),
-    isRecurring: repeat.rrule != null,
   });
   await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
 
@@ -329,7 +328,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
   }
   const eventId = aTag[1].split(":")[2]; // Extract event id from the tag
   const authorPubkey = aTag[1].split(":")[1]; // Extract author pubkey from the tag
-  const kind = aTag[1].split(":")[0]; // Extract kind from the tag
+  const kind = Number(aTag[1].split(":")[0]); // Extract kind from the tag
   const viewKey = rumor.tags.find((tag) => tag[0] === "viewKey")?.[1];
   if (!viewKey) {
     throw new Error("invalid rumor: viewKey not found");
@@ -359,7 +358,7 @@ export const fetchCalendarGiftWraps = (
     eventId: string;
     viewKey: string;
     authorPubkey: string;
-    kind: string;
+    kind: number;
   }) => void,
   onEose: () => void,
 ) => {
@@ -518,7 +517,7 @@ export function fetchPrivateCalendarEvents(
     until?: number;
   },
   onEvent: (event: Event) => void,
-  onEose: () => void,
+  onEose?: () => void,
 ) {
   const relayList = getRelays();
   const filter: Filter = {
