@@ -168,13 +168,15 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
         </Box>
       )}
 
-      <CalendarManageDialog
-        open={manageDialogOpen}
-        onClose={() => setManageDialogOpen(false)}
-        calendar={editingCalendar}
-        onSave={handleSave}
-        onDelete={editingCalendar ? handleDelete : undefined}
-      />
+      {manageDialogOpen && (
+        <CalendarManageDialog
+          open={manageDialogOpen}
+          onClose={() => setManageDialogOpen(false)}
+          calendar={editingCalendar}
+          onSave={handleSave}
+          onDelete={editingCalendar ? handleDelete : undefined}
+        />
+      )}
     </Box>
   );
 }

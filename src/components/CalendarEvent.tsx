@@ -27,12 +27,15 @@ import CloseIcon from "@mui/icons-material/Close";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import OpenInNew from "@mui/icons-material/OpenInNew";
 import Download from "@mui/icons-material/Download";
+import Edit from "@mui/icons-material/Edit";
+import Delete from "@mui/icons-material/Delete";
 import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
 import { getEventPage } from "../utils/routingHelper";
 import { isNative } from "../utils/platform";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useIntl } from "react-intl";
+import { useUser } from "../stores/user";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -192,6 +195,8 @@ function ActionButtons({
   const copyLinkToEvent = () => {
     navigator.clipboard.writeText(`${window.location.origin}${linkToEvent}`);
   };
+  const { user } = useUser();
+  const isEditable = event.user === user?.pubkey;
   return (
     <Box minWidth={isMobile ? "inherit" : "160px"}>
       {!isMobile && (
@@ -217,6 +222,18 @@ function ActionButtons({
           </Tooltip>
         </IconButton>
       )}
+      {isEditable && (
+        <IconButton onClick={() => window.alert("edit event")}>
+          <Tooltip title={intl.formatMessage({ id: "event.editEvent" })}>
+            <Edit />
+          </Tooltip>
+        </IconButton>
+      )}
+      <IconButton onClick={() => window.alert("delete event")}>
+        <Tooltip title={intl.formatMessage({ id: "event.deleteEvent" })}>
+          <Delete />
+        </Tooltip>
+      </IconButton>
       <IconButton
         aria-label={intl.formatMessage({ id: "navigation.close" })}
         onClick={closeModal}

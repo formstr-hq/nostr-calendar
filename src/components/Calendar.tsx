@@ -39,6 +39,7 @@ function Calendar() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && calendarsLoaded) {
+      console.log(calendars.length);
       fetchInvitations();
       events.fetchPrivateEvents();
     }
@@ -53,7 +54,7 @@ function Calendar() {
   );
   const allEvents = [
     ...visibleEvents,
-    ...invitations.filter((inv) => inv.event).map((inv) => inv.event),
+    ...invitations.filter((inv) => inv.event).map((inv) => inv.event!),
   ];
   return (
     <Box p={2}>

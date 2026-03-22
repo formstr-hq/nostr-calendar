@@ -59,6 +59,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
       enterTitle: "Enter event title",
       imageUrlPlaceholder: "Image URL eg. https://example.com/image.jpg",
@@ -140,7 +141,8 @@ const dictionary: NestedObject = {
       relayAlreadyInList: "Relay already in list",
       atLeastOneRelay: "You must have at least one relay",
       relaySavedAndPublished: "Relay list saved and published",
-      savedLocallyFailedPublish: "Saved locally but failed to publish to relays",
+      savedLocallyFailedPublish:
+        "Saved locally but failed to publish to relays",
       noRelaysConfigured:
         "No relays configured. Add a relay or reset to defaults.",
       resetToDefaults: "Reset to Defaults",
@@ -186,14 +188,14 @@ const dictionary: NestedObject = {
       participants: "Teilnehmer",
       addParticipants: "Teilnehmer nPub eingeben",
       rsvpDetails: "RSVP Details",
-      privateEvent: "Privates Ereignis",
+      privateEvent: "Privater Termin",
       privateEventCaption:
-        "Private Ereignisse sind nur für Sie und die eingeladenen Teilnehmer sichtbar",
+        "Private Termine sind nur für Sie und die eingeladenen Teilnehmer sichtbar",
       relays: "Relays",
       goToWeek: "Zur Woche gehen",
     },
     filters: {
-      showPublicEvents: "Öffentliche Ereignisse anzeigen",
+      showPublicEvents: "Öffentliche Termine anzeigen",
     },
     message: {
       title: "Kalender von Formstr",
@@ -202,14 +204,15 @@ const dictionary: NestedObject = {
       modeSelection_loginButton: "Mit Nostr anmelden",
       modeSelection_guestButton: "Als Gast fortfahren",
       modeSelection_loginInfo:
-        "Melden Sie sich an, um Ereignisse zu speichern und geräteübergreifend zu synchronisieren",
-      login_description: "Anmelden, um Ihre Ereignisse zu verwalten",
+        "Melden Sie sich an, um Termine zu speichern und geräteübergreifend zu synchronisieren",
+      login_description: "Anmelden, um Ihre Termine zu verwalten",
       login_error: "Anmeldung fehlgeschlagen",
       loggingIn: "Anmeldung läuft...",
     },
     event: {
-      editEvent: "Ereignis bearbeiten",
-      createNewEvent: "Neues Ereignis erstellen",
+      editEvent: "Termin bearbeiten",
+      deleteEvent: "Termin löschen",
+      createNewEvent: "Neuen Termin erstellen",
       enterTitle: "Titel eingeben",
       imageUrlPlaceholder: "Bild-URL z.B. https://example.com/image.jpg",
       enterLocation: "Ort eingeben",
@@ -224,21 +227,21 @@ const dictionary: NestedObject = {
       addDescription: "Beschreibung hinzufügen...",
       calendar: "Kalender",
       selectCalendar: "Kalender auswählen",
-      eventType: "Ereignistyp",
+      eventType: "Termintyp",
       private: "Privat",
       public: "Öffentlich",
       publishingToRelays: "Veröffentlichung an {count} Relay(s)",
       saving: "Speichern...",
-      saveEvent: "Ereignis speichern",
-      copyLink: "Link zu diesem Ereignis kopieren",
-      openNewTab: "Ereignis in neuem Tab öffnen",
-      downloadDetails: "Ereignisdetails herunterladen",
+      saveEvent: "Termin speichern",
+      copyLink: "Link zu diesem Termin kopieren",
+      openNewTab: "Termin in neuem Tab öffnen",
+      downloadDetails: "Termindetails herunterladen",
       repeats: "Wiederholt sich {label}",
-      event: "Ereignis",
+      event: "Termin",
       eventNotFound:
-        "Ereignis nicht gefunden. Es wurde möglicherweise noch nicht geladen.",
+        "Termin nicht gefunden. Er wurde möglicherweise noch nicht geladen.",
       loadError:
-        "Das Ereignis konnte nicht geladen werden. Es kann sich um einen vorübergehenden Fehler handeln. Bitte aktualisieren Sie die Seite, um es erneut zu versuchen",
+        "Der Termin konnte nicht geladen werden. Es kann sich um einen vorübergehenden Fehler handeln. Bitte aktualisieren Sie die Seite, um es erneut zu versuchen",
     },
     calendarManage: {
       editCalendar: "Kalender bearbeiten",
@@ -260,7 +263,7 @@ const dictionary: NestedObject = {
     invitation: {
       invitations: "Einladungen",
       noPendingInvitations: "Keine ausstehenden Einladungen",
-      loadingEventDetails: "Ereignisdetails werden geladen...",
+      loadingEventDetails: "Termindetails werden geladen...",
       dismiss: "Verwerfen",
     },
     login: {
