@@ -25,6 +25,8 @@ import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
 import { useRelayStore } from "./stores/relays";
 import { isNative } from "./utils/platform";
+import { ICSListener } from "./components/ICSListener";
+import { ICalendarEvent } from "./utils/types";
 
 let _locale =
   (navigator.languages && navigator.languages[0]) ||
@@ -43,6 +45,9 @@ function Application() {
   } = useUser();
   const [appMode, setAppMode] = useState<"login" | "guest" | null>(null);
   const [showModeSelection, setShowModeSelection] = useState(false);
+  const [importedEvent, setImportedEvent] = useState<ICalendarEvent | null>(
+    null,
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,7 +113,12 @@ function Application() {
 
   return (
     <>
-      <Header />
+      <Header onImportEvent={setImportedEvent} />
+      <ICSListener
+        importedEvent={importedEvent}
+        onClose={() => setImportedEvent(null)}
+        onImportEvent={setImportedEvent}
+      />
       {/* Mode Selection Modal */}
       <ModeSelectionModal
         isOpen={showModeSelection}
