@@ -204,9 +204,7 @@ export const useRSVPManager = (
             eventId: calendarEvent.id,
             status: status,
             participants: calendarEvent.participants || [],
-            referenceKind: calendarEvent.repeat.rrule
-              ? EventKinds.PrivateCalendarRecurringEvent
-              : EventKinds.PrivateCalendarEvent,
+            referenceKind: EventKinds.PrivateCalendarEvent,
           });
         } else {
           await publishPublicRSVPEvent({

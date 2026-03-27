@@ -204,7 +204,7 @@ function ActionButtons({
     const editLink = getEditEventPage(
       encodeNAddr({
         pubkey: event.user,
-        identifier: event.eventId,
+        identifier: event.id,
         kind: event.kind,
       }),
       event.viewKey,

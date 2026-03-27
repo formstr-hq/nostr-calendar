@@ -85,7 +85,6 @@ export function parseEventRef(ref: string[]): {
   eventDTag: string;
   relayUrl: string;
   viewKey: string;
-  isRecurring: boolean;
 } {
   const coordinateParts = ref[0].split(":");
   const metadataParts = ref[2].split(":");
@@ -95,8 +94,6 @@ export function parseEventRef(ref: string[]): {
     eventDTag: coordinateParts[2],
     relayUrl: ref[1],
     viewKey: metadataParts[0],
-    isRecurring:
-      Number(coordinateParts[0]) === EventKinds.PrivateCalendarRecurringEvent,
   };
 }
 

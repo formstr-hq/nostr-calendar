@@ -1,6 +1,5 @@
 export enum EventKinds {
   PrivateCalendarEvent = 32678,
-  PrivateCalendarRecurringEvent = 32679,
   CalendarEventGiftWrap = 1052,
   CalendarEventRumor = 52,
   PrivateRSVPEvent = 32069,

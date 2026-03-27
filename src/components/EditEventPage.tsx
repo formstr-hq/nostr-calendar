@@ -9,6 +9,7 @@ import type { ICalendarEvent } from "../utils/types";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
+import { useCalendarLists } from "../stores/calendarLists";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -22,11 +23,23 @@ export const EditEventPage = () => {
   const navigate = useNavigate();
   const intl = useIntl();
   const { user } = useUser();
+  const {
+    calendars,
+    isLoaded: calendarsLoaded,
+    fetchCalendars,
+  } = useCalendarLists();
 
   const [loadState, setLoadState] = React.useState<ILoadState>({
     event: null,
     fetchState: "loading",
   });
+
+  // Ensure calendar lists are fetched
+  React.useEffect(() => {
+    if (!calendarsLoaded) {
+      fetchCalendars();
+    }
+  }, [calendarsLoaded, fetchCalendars]);
 
   React.useEffect(() => {
     if (!naddr) return;
@@ -51,6 +64,20 @@ export const EditEventPage = () => {
       });
   }, [naddr, viewKey]);
 
+  // Once both the event and calendars are loaded, resolve the calendarId
+  const eventWithCalendar = React.useMemo(() => {
+    if (!loadState.event || !calendarsLoaded) return null;
+    const event = loadState.event;
+    const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
+    const owningCalendar = calendars.find((cal) =>
+      cal.eventRefs.some((ref) => ref[0] === eventCoordinate),
+    );
+    return {
+      ...event,
+      calendarId: owningCalendar?.id || "",
+    };
+  }, [loadState.event, calendarsLoaded, calendars]);
+
   if (!naddr) return null;
 
   return (
@@ -58,7 +85,7 @@ export const EditEventPage = () => {
       <Header />
       <Box component="main" style={{ width: "100%", minHeight: "100vh" }}>
         <Toolbar />
-        {loadState.fetchState === "loading" && (
+        {(loadState.fetchState === "loading" || !calendarsLoaded) && (
           <Box
             style={{
               width: "100%",
@@ -86,7 +113,7 @@ export const EditEventPage = () => {
             </Alert>
           </Box>
         )}
-        {loadState.event && loadState.event.user !== user?.pubkey && (
+        {eventWithCalendar && eventWithCalendar.user !== user?.pubkey && (
           <Box
             style={{
               width: "100%",
@@ -101,10 +128,10 @@ export const EditEventPage = () => {
             </Alert>
           </Box>
         )}
-        {loadState.event && loadState.event.user === user?.pubkey && (
+        {eventWithCalendar && eventWithCalendar.user === user?.pubkey && (
           <CalendarEventEdit
             open={true}
-            event={loadState.event}
+            event={eventWithCalendar}
             onClose={() => navigate(-1)}
             onSave={() => navigate(-1)}
             mode="edit"

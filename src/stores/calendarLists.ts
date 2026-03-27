@@ -23,17 +23,12 @@ import {
 import {
   fetchCalendarLists,
   publishCalendarList,
-  createDefaultCalendar,
   addEventToCalendarList as addEventToCalList,
   removeEventFromCalendarList as removeEventFromCalList,
+  moveEventBetweenCalendarLists,
   createCalendar,
 } from "../common/calendarList";
-import {
-  getUserPublicKey,
-  getRelays,
-  publishDeletionEvent,
-} from "../common/nostr";
-import { nostrRuntime } from "../common/nostrRuntime";
+import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
 import type { ICalendarList } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
@@ -76,6 +71,11 @@ interface CalendarListsState {
   addEventToCalendar: (calendarId: string, eventRef: string[]) => Promise<void>;
   removeEventFromCalendar: (
     calendarId: string,
+    eventRef: string[],
+  ) => Promise<void>;
+  moveEventToCalendar: (
+    targetCalendarId: string,
+    eventCoordinate: string,
     eventRef: string[],
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
@@ -308,6 +308,37 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       saveCalendarsToStorage(calendars);
       return { calendars };
     });
+  },
+
+  /**
+   * Moves an event from its current calendar to a different one.
+   * If the event is already in the target calendar, this is a no-op.
+   */
+  moveEventToCalendar: async (targetCalendarId, eventCoordinate, eventRef) => {
+    const { calendars } = get();
+
+    const result = await moveEventBetweenCalendarLists(
+      calendars,
+      targetCalendarId,
+      eventCoordinate,
+      eventRef,
+    );
+
+    if (result) {
+      set((state) => {
+        let updated = state.calendars;
+        if (result.source) {
+          updated = updated.map((c) =>
+            c.id === result.source?.id ? result.source : c,
+          );
+        }
+        updated = updated.map((c) =>
+          c.id === result.target.id ? result.target : c,
+        );
+        saveCalendarsToStorage(updated);
+        return { calendars: updated };
+      });
+    }
   },
 
   /**

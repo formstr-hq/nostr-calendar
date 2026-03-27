@@ -117,12 +117,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       const pubkeys = new Set<string>();
       const eventIds = new Set<string>();
       invitations.forEach((inv) => {
-        if (
-          [
-            EventKinds.PrivateCalendarRecurringEvent,
-            EventKinds.PrivateCalendarEvent,
-          ].includes(inv.kind)
-        ) {
+        if ([EventKinds.PrivateCalendarEvent].includes(inv.kind)) {
           kinds.add(inv.kind);
           pubkeys.add(inv.pubkey);
           eventIds.add(inv.eventId);

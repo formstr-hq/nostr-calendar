@@ -80,9 +80,7 @@ export async function publishPrivateRSVPEvent({
   authorpubKey: string;
   status: string;
   participants: string[];
-  referenceKind:
-    | EventKinds.PrivateCalendarEvent
-    | EventKinds.PrivateCalendarRecurringEvent;
+  referenceKind: EventKinds.PrivateCalendarEvent;
 }) {
   const uniqueRSVPId = uuid();
   const userPublicKey = await getUserPublicKey();
@@ -222,9 +220,7 @@ async function preparePrivateCalendarEvent(
   dTag: string,
   viewSecretKey: Uint8Array,
 ) {
-  const eventKind = event.repeat.rrule
-    ? EventKinds.PrivateCalendarRecurringEvent
-    : EventKinds.PrivateCalendarEvent;
+  const eventKind = EventKinds.PrivateCalendarEvent;
   const eventData: (string | number)[][] = [
     ["title", event.title],
     ["description", event.description],
@@ -333,19 +329,32 @@ export async function publishPrivateCalendarEvent(
   };
 }
 
-export async function editPrivateCalendarEvent(event: ICalendarEvent) {
+export async function editPrivateCalendarEvent(
+  event: ICalendarEvent,
+  calendarId: string,
+) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
-  const { signedEvent } = await preparePrivateCalendarEvent(
-    event,
-    dTag,
-    viewSecretKey,
-  );
+  const { signedEvent, eventKind, userPublicKey } =
+    await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
   await publishToRelays(signedEvent);
 
+  const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
+  const eventRef = buildEventRef({
+    kind: eventKind,
+    authorPubkey: userPublicKey,
+    eventDTag: dTag,
+    viewKey: nip19.nsecEncode(viewSecretKey),
+  });
+
+  await useCalendarLists
+    .getState()
+    .moveEventToCalendar(calendarId, eventCoordinate, eventRef);
+
   return {
-    calendarEvent: signedEvent,
+    event,
+    calendarId,
   };
 }
 
@@ -714,7 +723,7 @@ export const fetchCalendarEvent = async (naddr: NAddr): Promise<Event> => {
   const { data } = decode(naddr as NAddr);
   const relays = data.relays ?? defaultRelays;
   const filter: Filter = {
-    ids: [data.identifier],
+    "#d": [data.identifier],
     kinds: [data.kind],
     authors: [data.pubkey],
   };

@@ -270,3 +270,51 @@ export async function removeEventFromCalendarList(
   await publishCalendarList(updated);
   return updated;
 }
+
+/**
+ * Moves an event from its current calendar list to a new one.
+ * If the event is already in the target calendar, this is a no-op.
+ * If the event is not found in any other calendar, it is simply added to the target.
+ *
+ * @param calendars - All calendar lists to search through
+ * @param targetCalendarId - The ID of the calendar to move the event to
+ * @param eventCoordinate - The event coordinate string ("{kind}:{authorPubkey}:{eventDTag}")
+ * @param eventRef - The full event reference array to add to the target calendar
+ * @returns Object with updated source and target calendars, or null if no move was needed
+ */
+export async function moveEventBetweenCalendarLists(
+  calendars: ICalendarList[],
+  targetCalendarId: string,
+  eventCoordinate: string,
+  eventRef: string[],
+): Promise<{ source?: ICalendarList; target: ICalendarList } | null> {
+  // Find which calendar currently contains the event
+  const sourceCalendar = calendars.find(
+    (cal) =>
+      cal.id !== targetCalendarId &&
+      cal.eventRefs.some((ref) => ref[0] === eventCoordinate),
+  );
+
+  const targetCalendar = calendars.find((cal) => cal.id === targetCalendarId);
+  if (!targetCalendar) {
+    throw new Error(`Target calendar not found: ${targetCalendarId}`);
+  }
+
+  // Event is already in the target calendar
+  if (targetCalendar.eventRefs.some((ref) => ref[0] === eventCoordinate)) {
+    return null;
+  }
+
+  // Remove from source calendar if found
+  let updatedSource: ICalendarList | undefined;
+  if (sourceCalendar) {
+    updatedSource = await removeEventFromCalendarList(sourceCalendar, [
+      eventCoordinate,
+    ]);
+  }
+
+  // Add to target calendar
+  const updatedTarget = await addEventToCalendarList(targetCalendar, eventRef);
+
+  return { source: updatedSource, target: updatedTarget };
+}

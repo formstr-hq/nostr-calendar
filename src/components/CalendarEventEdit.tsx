@@ -130,16 +130,19 @@ export function CalendarEventEdit({
 
       if (isPrivate) {
         if (mode === "edit") {
-          await editPrivateCalendarEvent(eventToSave);
+          const updates = await editPrivateCalendarEvent(
+            eventToSave,
+            selectedCalendarId,
+          );
+
+          useTimeBasedEvents
+            .getState()
+            .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
           await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
         }
       } else {
         await publishPublicCalendarEvent(eventToSave);
-      }
-
-      if (mode === "edit") {
-        useTimeBasedEvents.getState().updateEvent(eventToSave);
       }
 
       if (onSave) {
