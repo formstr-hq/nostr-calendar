@@ -3,7 +3,6 @@ import { utf8ToBytes } from "@noble/hashes/utils";
 import { bytesToHex } from "nostr-tools/utils";
 import { ICalendarEvent } from "../stores/events";
 import { NestedObject } from "./dictionary";
-import { v4 as uuidv4 } from "uuid";
 
 export function flattenMessages(
   nestedMessages: NestedObject,
