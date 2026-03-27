@@ -158,6 +158,7 @@ export const useTimeBasedEvents = create<{
     daysAfter?: number;
   }) => void;
   updateEvent: (event: ICalendarEvent) => void;
+  removeEvent: (eventId: string) => void;
   resetPrivateEvents: () => void;
   getTimeRangeConfig: () => { daysBefore: number; daysAfter: number };
   updateTimeRangeConfig: (config: {
@@ -172,6 +173,20 @@ export const useTimeBasedEvents = create<{
         store = removeOne(store, updatedEvent.id);
       }
       store = appendOne(store, updatedEvent.id, updatedEvent);
+      const updatedEvents = denormalize(store);
+      saveEventsToStorage(updatedEvents);
+      return {
+        eventById: store.byKey,
+        events: updatedEvents,
+      };
+    });
+  },
+  removeEvent: (eventId) => {
+    set(({ events }) => {
+      let store = normalize(events);
+      if (store.allKeys.includes(eventId)) {
+        store = removeOne(store, eventId);
+      }
       const updatedEvents = denormalize(store);
       saveEventsToStorage(updatedEvents);
       return {

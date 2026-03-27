@@ -38,6 +38,7 @@ import { isNative } from "../utils/platform";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
+import { DeleteEventDialog } from "./DeleteEventDialog";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -266,6 +267,7 @@ function ActionButtons({
   const { user } = useUser();
   const navigate = useNavigate();
   const isEditable = event.user === user?.pubkey;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const editEvent = () => {
     const editLink = getEditEventPage(
@@ -314,11 +316,19 @@ function ActionButtons({
           </Tooltip>
         </IconButton>
       )}
-      <IconButton onClick={() => window.alert("delete event")}>
+      <IconButton onClick={() => setDeleteDialogOpen(true)}>
         <Tooltip title={intl.formatMessage({ id: "event.deleteEvent" })}>
           <Delete />
         </Tooltip>
       </IconButton>
+      <DeleteEventDialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          closeModal();
+        }}
+        event={event}
+      />
       {showClose && (
         <IconButton
           aria-label={intl.formatMessage({ id: "navigation.close" })}

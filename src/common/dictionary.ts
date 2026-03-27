@@ -93,6 +93,19 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
     },
+    deleteEvent: {
+      title: "Delete Event",
+      deleteForEveryone: "Delete for all participants",
+      deleteForEveryoneDescription:
+        "This will delete the event from the Nostr network for all participants",
+      removeFromCalendar: "Remove from my calendar",
+      removeFromCalendarDescription:
+        "The event will still exist for other participants",
+      ignoreInvitation: "Ignore invitation",
+      ignoreInvitationDescription: "No action will be taken",
+      confirm: "Confirm",
+      deleting: "Deleting...",
+    },
     calendarManage: {
       editCalendar: "Edit Calendar",
       newCalendar: "New Calendar",
@@ -250,6 +263,19 @@ const dictionary: NestedObject = {
         "Sie sind nicht berechtigt, diesen Termin zu bearbeiten.",
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
+    },
+    deleteEvent: {
+      title: "Termin löschen",
+      deleteForEveryone: "Für alle Teilnehmer löschen",
+      deleteForEveryoneDescription:
+        "Der Termin wird aus dem Nostr-Netzwerk für alle Teilnehmer gelöscht",
+      removeFromCalendar: "Aus meinem Kalender entfernen",
+      removeFromCalendarDescription:
+        "Der Termin bleibt für andere Teilnehmer bestehen",
+      ignoreInvitation: "Einladung ignorieren",
+      ignoreInvitationDescription: "Es wird keine Aktion durchgeführt",
+      confirm: "Bestätigen",
+      deleting: "Löschen...",
     },
     calendarManage: {
       editCalendar: "Kalender bearbeiten",
