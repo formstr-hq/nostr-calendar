@@ -28,6 +28,7 @@ import {
 } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
+import { useTimeBasedEvents } from "./events";
 import { buildEventRef } from "../utils/calendarListTypes";
 import type { IInvitation } from "../utils/calendarListTypes";
 import { EventKinds } from "../common/EventConfigs";
@@ -200,6 +201,17 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
 
     // Add to the selected calendar
     await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
+
+    // Update the event in the events store so it reflects the calendar assignment
+    // and is no longer treated as an invitation. This prevents duplication when
+    // fetchPrivateEvents picks up the same event from the calendar ref.
+    if (invitation.event) {
+      useTimeBasedEvents.getState().updateEvent({
+        ...invitation.event,
+        calendarId,
+        isInvitation: false,
+      });
+    }
 
     // Remove from invitations
     set((state) => {

@@ -1,8 +1,8 @@
 // import { useDraggable } from "@dnd-kit/core";
 import {
-  Alert,
   alpha,
   Box,
+  Button,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -39,6 +39,8 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
+import { CalendarListSelect } from "./CalendarListSelect";
+import { useInvitations } from "../stores/invitations";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -442,13 +444,61 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
           ) : (
             <>
               <Divider />
-              <Alert severity="info">
-                {intl.formatMessage({ id: "event.notInCalendar" })}
-              </Alert>
+              <InvitationAcceptBar event={event} />
             </>
           )}
         </Stack>
       </Box>
     </Box>
+  );
+}
+
+function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
+  const intl = useIntl();
+  const { calendars } = useCalendarLists();
+  const { acceptInvitation } = useInvitations();
+  const [selectedCalendarId, setSelectedCalendarId] = useState(
+    calendars[0]?.id || "",
+  );
+  const [accepting, setAccepting] = useState(false);
+
+  const handleAccept = async () => {
+    if (!selectedCalendarId) return;
+    setAccepting(true);
+    await acceptInvitation(event.id, selectedCalendarId);
+    setAccepting(false);
+  };
+
+  return (
+    <Stack
+      spacing={1.5}
+      sx={{
+        backgroundColor: "action.hover",
+        borderRadius: 1,
+        p: 1.5,
+      }}
+    >
+      <Typography variant="body2" color="text.secondary">
+        {intl.formatMessage({ id: "event.notInCalendar" })}
+      </Typography>
+      <Box display="flex" alignItems="center" gap={1}>
+        <Box maxWidth={500}>
+          <CalendarListSelect
+            value={selectedCalendarId}
+            onChange={setSelectedCalendarId}
+            size="small"
+          />
+        </Box>
+        <Button
+          variant="contained"
+          size="small"
+          disabled={!selectedCalendarId || accepting}
+          onClick={handleAccept}
+          sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+        >
+          {intl.formatMessage({ id: "invitation.acceptInvitation" })}
+        </Button>
+      </Box>
+    </Stack>
   );
 }

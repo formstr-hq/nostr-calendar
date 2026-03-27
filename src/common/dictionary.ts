@@ -129,6 +129,7 @@ const dictionary: NestedObject = {
       noPendingInvitations: "No pending invitations",
       loadingEventDetails: "Loading event details...",
       dismiss: "Dismiss",
+      acceptInvitation: "Add to Calendar",
     },
     login: {
       signInToFormstr: "Sign in to Formstr",
@@ -299,6 +300,7 @@ const dictionary: NestedObject = {
       noPendingInvitations: "Keine ausstehenden Einladungen",
       loadingEventDetails: "Termindetails werden geladen...",
       dismiss: "Verwerfen",
+      acceptInvitation: "Zum Kalender hinzufügen",
     },
     login: {
       signInToFormstr: "Bei Formstr anmelden",
