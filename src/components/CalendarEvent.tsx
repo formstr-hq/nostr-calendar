@@ -45,6 +45,9 @@ interface CalendarEventCardProps {
 
 export interface CalendarEventViewProps {
   event: ICalendarEvent;
+  display?: "modal" | "page";
+  open?: boolean;
+  onClose?: () => void;
 }
 
 /**
@@ -105,7 +108,6 @@ export function CalendarEventCard({
     ? calendars.find((c) => c.id === event.calendarId)?.color
     : undefined;
   const colorScheme = getColorScheme(event, theme, calendarColor);
-  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const title =
     event.title ??
     (event.description.length > maxDescLength
@@ -141,54 +143,118 @@ export function CalendarEventCard({
           {title}
         </Typography>
       </Paper>
-      <Dialog
-        fullWidth
-        maxWidth="lg"
-        fullScreen={fullScreen}
-        slotProps={{
-          paper: {
-            sx: {
-              height: {
-                sm: "100vh",
-                md: "60vh",
-              },
-            },
-          },
-        }}
+      <CalendarEventView
+        event={event}
+        display="modal"
         open={open}
         onClose={handleClose}
-      >
-        <DialogTitle
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-          }}
-        >
-          <Typography component={"p"} variant="h5">
-            {title}
-          </Typography>
-          <ActionButtons event={event} closeModal={handleClose} />
-        </DialogTitle>
-        <DialogContent dividers>
-          <CalendarEvent event={event}></CalendarEvent>
-        </DialogContent>
-      </Dialog>
+      />
     </>
+  );
+}
+
+export function CalendarEventView({
+  event,
+  display = "modal",
+  open = false,
+  onClose,
+}: CalendarEventViewProps) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
+  const maxDescLength = 20;
+  const title =
+    event.title ??
+    (event.description.length > maxDescLength
+      ? `${event.description.substring(0, maxDescLength)}...`
+      : event.description);
+
+  const handleClose = () => onClose?.();
+
+  const titleBar = (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        width: "100%",
+      }}
+    >
+      <Typography component={"p"} variant="h5">
+        {title}
+      </Typography>
+      <ActionButtons
+        event={event}
+        closeModal={handleClose}
+        showClose={display === "modal"}
+        showOpenInNew={display !== "page"}
+      />
+    </Box>
+  );
+
+  if (display === "page") {
+    return (
+      <Box
+        sx={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: 3,
+        }}
+      >
+        <Box sx={{ marginBottom: 2 }}>{titleBar}</Box>
+        <CalendarEvent event={event} />
+      </Box>
+    );
+  }
+
+  return (
+    <Dialog
+      fullWidth
+      maxWidth="lg"
+      fullScreen={fullScreen}
+      slotProps={{
+        paper: {
+          sx: {
+            height: {
+              sm: "100vh",
+              md: "60vh",
+            },
+          },
+        },
+      }}
+      open={open}
+      onClose={handleClose}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
+        {titleBar}
+      </DialogTitle>
+      <DialogContent dividers>
+        <CalendarEvent event={event} />
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ActionButtons({
   event,
   closeModal,
+  showClose = true,
+  showOpenInNew = true,
 }: {
   event: ICalendarEvent;
   closeModal: () => void;
+  showClose?: boolean;
+  showOpenInNew?: boolean;
 }) {
   const intl = useIntl();
   const linkToEvent = getEventPage(
     encodeNAddr({
       pubkey: event.user,
-      identifier: event.eventId,
+      identifier: event.id,
       kind: event.kind,
     }),
     event.viewKey,
@@ -223,11 +289,13 @@ function ActionButtons({
             </Tooltip>
           </IconButton>
 
-          <IconButton component={Link} href={linkToEvent}>
-            <Tooltip title={intl.formatMessage({ id: "event.openNewTab" })}>
-              <OpenInNew />
-            </Tooltip>
-          </IconButton>
+          {showOpenInNew && (
+            <IconButton component={Link} href={linkToEvent}>
+              <Tooltip title={intl.formatMessage({ id: "event.openNewTab" })}>
+                <OpenInNew />
+              </Tooltip>
+            </IconButton>
+          )}
         </>
       )}
 
@@ -250,12 +318,14 @@ function ActionButtons({
           <Delete />
         </Tooltip>
       </IconButton>
-      <IconButton
-        aria-label={intl.formatMessage({ id: "navigation.close" })}
-        onClick={closeModal}
-      >
-        <CloseIcon />
-      </IconButton>
+      {showClose && (
+        <IconButton
+          aria-label={intl.formatMessage({ id: "navigation.close" })}
+          onClick={closeModal}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
     </Box>
   );
 }
