@@ -51,9 +51,9 @@ const getRSVPIcon = (response: RSVPResponse, theme: Theme) => {
 const truncateText = (text: string, maxLength: number = 20) => {
   if (text.length <= maxLength) return text;
 
-  // For npub, show first 25 and last 4 characters
+  // For npub, show first 8 and last 4 characters
   if (text.startsWith("npub")) {
-    return `${text.slice(0, 25)}...${text.slice(-4)}`;
+    return `${text.slice(0, 8)}...${text.slice(-4)}`;
   }
 
   // For regular names, truncate with ellipsis
