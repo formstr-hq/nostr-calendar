@@ -114,6 +114,8 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "e.g., Work, Personal, Travel",
       optionalDescription: "Optional description",
       color: "Color",
+      onboardingExplanation:
+        "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
     },
     sidebar: {
       calendars: "Calendars",
@@ -288,6 +290,8 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "z.B. Arbeit, Persönlich, Reise",
       optionalDescription: "Optionale Beschreibung",
       color: "Farbe",
+      onboardingExplanation:
+        "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
     },
     sidebar: {
       calendars: "Kalender",

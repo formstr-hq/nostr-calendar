@@ -28,6 +28,8 @@ import { useRelayStore } from "./stores/relays";
 import { isNative } from "./utils/platform";
 import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
+import { useCalendarLists } from "./stores/calendarLists";
+import { CalendarManageDialog } from "./components/CalendarManageDialog";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -53,6 +55,12 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
+  const {
+    calendars,
+    isLoaded: calendarsLoaded,
+    createCalendar,
+  } = useCalendarLists();
+  const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
 
   useEffect(() => {
     initializeUser();
@@ -95,6 +103,22 @@ function Application() {
       setShowModeSelection(true);
     }
   }, [user, isInitialized, appMode]);
+
+  // Show onboarding dialog when user is logged in but has no calendars
+  useEffect(() => {
+    if (user && calendarsLoaded && calendars.length === 0) {
+      setShowOnboardingDialog(true);
+    }
+  }, [user, calendarsLoaded, calendars.length]);
+
+  const handleOnboardingSave = async (data: {
+    title: string;
+    description: string;
+    color: string;
+  }) => {
+    await createCalendar(data.title, data.description, data.color);
+    setShowOnboardingDialog(false);
+  };
 
   useEffect(() => {
     if (appMode === "login" && isInitialized && !user) {
@@ -144,6 +168,14 @@ function Application() {
         open={showLoginModal}
         onClose={() => updateLoginModal(false)}
       />
+      {showOnboardingDialog && (
+        <CalendarManageDialog
+          open={showOnboardingDialog}
+          onClose={() => setShowOnboardingDialog(false)}
+          onSave={handleOnboardingSave}
+          blocking
+        />
+      )}
       <RelayManager />
       <Toolbar />
       <Box>{user && isInitialized && <Routing />}</Box>

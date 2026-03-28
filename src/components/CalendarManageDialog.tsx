@@ -36,6 +36,8 @@ interface CalendarManageDialogProps {
   calendar?: ICalendarList;
   onSave: (data: { title: string; description: string; color: string }) => void;
   onDelete?: () => void;
+  /** When true, the dialog cannot be dismissed — used for onboarding when no calendars exist. */
+  blocking?: boolean;
 }
 
 export function CalendarManageDialog({
@@ -44,6 +46,7 @@ export function CalendarManageDialog({
   calendar,
   onSave,
   onDelete,
+  blocking = false,
 }: CalendarManageDialogProps) {
   const [title, setTitle] = useState(calendar?.title || "");
   const [description, setDescription] = useState(calendar?.description || "");
@@ -64,27 +67,40 @@ export function CalendarManageDialog({
     <Dialog
       fullScreen={isMobile}
       open={open}
-      onClose={onClose}
+      onClose={blocking ? undefined : onClose}
       maxWidth="sm"
       fullWidth
     >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" fontWeight={600}>
-            {isEdit ? intl.formatMessage({ id: "calendarManage.editCalendar" }) : intl.formatMessage({ id: "calendarManage.newCalendar" })}
+            {isEdit
+              ? intl.formatMessage({ id: "calendarManage.editCalendar" })
+              : intl.formatMessage({ id: "calendarManage.newCalendar" })}
           </Typography>
-          <IconButton onClick={onClose} size="small">
-            <CloseIcon />
-          </IconButton>
+          {!blocking && (
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          )}
         </Box>
       </DialogTitle>
 
       <DialogContent dividers>
         <Box display="flex" flexDirection="column" gap={3}>
+          {blocking && (
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({
+                id: "calendarManage.onboardingExplanation",
+              })}
+            </Typography>
+          )}
           <TextField
             fullWidth
             label={intl.formatMessage({ id: "calendarManage.calendarName" })}
-            placeholder={intl.formatMessage({ id: "calendarManage.calendarNamePlaceholder" })}
+            placeholder={intl.formatMessage({
+              id: "calendarManage.calendarNamePlaceholder",
+            })}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -94,7 +110,9 @@ export function CalendarManageDialog({
           <TextField
             fullWidth
             label={intl.formatMessage({ id: "navigation.description" })}
-            placeholder={intl.formatMessage({ id: "calendarManage.optionalDescription" })}
+            placeholder={intl.formatMessage({
+              id: "calendarManage.optionalDescription",
+            })}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             multiline
@@ -134,15 +152,19 @@ export function CalendarManageDialog({
             {intl.formatMessage({ id: "navigation.delete" })}
           </Button>
         )}
-        <Button onClick={onClose} color="inherit">
-          {intl.formatMessage({ id: "navigation.cancel" })}
-        </Button>
+        {!blocking && (
+          <Button onClick={onClose} color="inherit">
+            {intl.formatMessage({ id: "navigation.cancel" })}
+          </Button>
+        )}
         <Button
           onClick={handleSave}
           variant="contained"
           disabled={!title.trim()}
         >
-          {isEdit ? intl.formatMessage({ id: "navigation.save" }) : intl.formatMessage({ id: "navigation.create" })}
+          {isEdit
+            ? intl.formatMessage({ id: "navigation.save" })
+            : intl.formatMessage({ id: "navigation.create" })}
         </Button>
       </DialogActions>
     </Dialog>
