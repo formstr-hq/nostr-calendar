@@ -78,7 +78,7 @@ export function MonthView({ events }: MonthViewProps) {
               : "transparent",
           }}
         >
-          <DateLabel day={day} />
+          <DateLabel day={day} size={30} />
           <Box display={"flex"} flexDirection={"column"}>
             {events
               .filter((e) =>

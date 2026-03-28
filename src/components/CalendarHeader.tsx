@@ -1,6 +1,5 @@
 import React from "react";
 import ChevronLeft from "@mui/icons-material/ChevronLeft";
-import MenuIcon from "@mui/icons-material/Menu";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
@@ -14,7 +13,6 @@ import {
   Button,
   Badge,
   useTheme,
-  Drawer,
   useMediaQuery,
 } from "@mui/material";
 import { useLayout } from "../hooks/useLayout";
@@ -24,7 +22,6 @@ import { useNavigate } from "react-router";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { StyledSecondaryHeader } from "./StyledComponents";
 import { WeekHeader } from "./WeekView";
-import { CalendarSidebar } from "./CalendarSidebar";
 import { useInvitations } from "../stores/invitations";
 import { useIntl } from "react-intl";
 
@@ -43,9 +40,6 @@ export function CalendarHeader() {
     setAnchorEl(null);
   };
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const [drawerOpen, updateDrawerOpen] = React.useState(false);
-  const closeDrawer = () => updateDrawerOpen(false);
-  const openDrawer = () => updateDrawerOpen(true);
   const move = (dir: number) => setDate(date.add(dir, layout), layout);
 
   const { unreadCount } = useInvitations();
@@ -62,9 +56,6 @@ export function CalendarHeader() {
         <Box display="flex" alignItems="center">
           {!isMobile && (
             <>
-              <IconButton onClick={openDrawer}>
-                <MenuIcon />
-              </IconButton>
               <IconButton onClick={() => move(-1)}>
                 <ChevronLeft />
               </IconButton>
@@ -151,9 +142,6 @@ export function CalendarHeader() {
         </Box>
       </StyledSecondaryHeader>
       {layout === "week" && <WeekHeader date={date} />}
-      <Drawer open={drawerOpen} onClose={closeDrawer}>
-        <CalendarSidebar onClose={closeDrawer} />
-      </Drawer>
     </>
   );
 }

@@ -24,7 +24,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import CircleIcon from "@mui/icons-material/Circle";
 import { DatePicker } from "./DatePicker";
-import { Filters } from "./Filters";
 import { useCalendarLists } from "../stores/calendarLists";
 import { CalendarManageDialog } from "./CalendarManageDialog";
 import type { ICalendarList } from "../utils/calendarListTypes";
@@ -162,11 +161,6 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
         )}
       </Box>
 
-      {!isMobile && (
-        <Box mt={3}>
-          <Filters />
-        </Box>
-      )}
 
       {manageDialogOpen && (
         <CalendarManageDialog

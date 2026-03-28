@@ -1,5 +1,4 @@
 import { useTimeBasedEvents } from "../stores/events";
-import { useSettings } from "../stores/settings";
 import { useUser } from "../stores/user";
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
@@ -8,23 +7,15 @@ import { useLayout } from "../hooks/useLayout";
 import { CalendarHeader } from "./CalendarHeader";
 import { Box } from "@mui/material";
 import { SwipeableView } from "./SwipeableView";
-import { isMobile } from "../common/utils";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
 import { useEffect } from "react";
 
 function Calendar() {
-  const {
-    settings: { filters },
-  } = useSettings((state) => state);
   const { user } = useUser();
   const events = useTimeBasedEvents((state) => state);
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
   const { fetchInvitations, invitations } = useInvitations();
-
-  if (filters?.showPublicEvents && !isMobile) {
-    events.fetchEvents();
-  }
 
   // When user is logged in, fetch calendar lists and invitations.
   // Private events are fetched reactively when calendars are loaded.
@@ -63,7 +54,9 @@ function Calendar() {
       {layout === "week" && (
         <SwipeableView View={WeekView} events={allEvents} />
       )}
-      {layout === "month" && <MonthView events={allEvents} />}
+      {layout === "month" && (
+        <SwipeableView View={MonthView} events={allEvents} />
+      )}
     </Box>
   );
 }

@@ -6,10 +6,18 @@ import React from "react";
 
 const today = dayjs();
 
-export function DateLabel({ day }: { day: Dayjs }) {
+const defaultSize = 36;
+
+export function DateLabel({
+  day,
+  size = defaultSize,
+}: {
+  day: Dayjs;
+  size?: number;
+}) {
   const isToday = today.isSame(day, "date");
   const navigate = useNavigate();
-
+  const fontSize = size / defaultSize;
   const onDateClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     navigate(getRouteFromDate(day, "day"));
     e.stopPropagation();
@@ -18,13 +26,14 @@ export function DateLabel({ day }: { day: Dayjs }) {
     <IconButton
       variant={isToday ? "highlighted" : undefined}
       color="primary"
+      size="small"
       onClick={onDateClick}
       style={{
-        width: "36px",
-        height: "36px",
+        width: `${size}px`,
+        height: `${size}px`,
       }}
     >
-      <Typography variant="body1" fontWeight={600}>
+      <Typography fontSize={`${fontSize}rem`} variant="body1" fontWeight={600}>
         {day.date()}
       </Typography>
     </IconButton>
