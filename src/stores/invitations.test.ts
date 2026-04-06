@@ -30,6 +30,7 @@ vi.mock("../common/nostr", () => ({
   }),
   getRelays: vi.fn().mockReturnValue(["wss://relay.test"]),
   publishToRelays: vi.fn().mockResolvedValue("ok"),
+  publishParticipantRemovalEvent: vi.fn().mockResolvedValue("ok"),
 }));
 
 // Mock calendarList protocol
@@ -104,6 +105,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "original-wrap-1",
+          pubkey: "test-pubkey",
+          kind: 32678,
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -117,7 +121,7 @@ describe("useInvitations store", () => {
     useInvitations.getState().dismissInvitation("wrap-1");
 
     const state = useInvitations.getState();
-    expect(state.invitations[0].status).toBe("dismissed");
+    expect(state.invitations).toHaveLength(0);
     expect(state.unreadCount).toBe(0);
   });
 
@@ -126,6 +130,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "original-wrap-1",
+          pubkey: "test-pubkey",
+          kind: 32678,
           giftWrapId: "wrap-1",
           eventId: "event-123",
           viewKey: "nsec1testkey",
@@ -204,6 +211,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "original-wrap-1",
+          pubkey: "test-pubkey",
+          kind: 32678,
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -228,6 +238,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "original-wrap-recurring",
+          pubkey: "test-pubkey",
+          kind: 32679,
           giftWrapId: "wrap-recurring",
           eventId: "recurring-event",
           viewKey: "nsec1recur",

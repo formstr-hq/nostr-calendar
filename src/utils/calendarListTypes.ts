@@ -88,15 +88,29 @@ export function parseEventRef(ref: string[]): {
   eventDTag: string;
   relayUrl: string;
   viewKey: string;
+  beginTimeSecs: number;
+  endTimeSecs: number;
+  isRecurring: boolean;
 } {
   const coordinateParts = ref[0].split(":");
-  const metadataParts = ref[2].split(":");
+  const metadataParts = (ref[2] || "").split(":");
+
+  const beginTimeSecs = Number.parseInt(metadataParts[1] || "0", 10);
+  const endTimeSecs = Number.parseInt(metadataParts[3] || "0", 10);
+  const hasRecurringFlag = metadataParts[4] === "true";
+  const kind = Number.parseInt(coordinateParts[0], 10);
+  const isRecurring =
+    hasRecurringFlag || kind === EventKinds.PrivateCalendarRecurringEvent;
+
   return {
-    kind: parseInt(coordinateParts[0], 10),
+    kind,
     authorPubkey: coordinateParts[1],
     eventDTag: coordinateParts[2],
     relayUrl: ref[1],
     viewKey: metadataParts[0],
+    beginTimeSecs: Number.isFinite(beginTimeSecs) ? beginTimeSecs : 0,
+    endTimeSecs: Number.isFinite(endTimeSecs) ? endTimeSecs : 0,
+    isRecurring,
   };
 }
 
@@ -111,10 +125,23 @@ export function buildEventRef(params: {
   eventDTag: string;
   relayUrl?: string;
   viewKey: string;
+  beginTimeSecs?: number;
+  endTimeSecs?: number;
+  isRecurring?: boolean;
 }): string[] {
+  const beginTimeSecs = Math.max(
+    0,
+    Math.floor(Number(params.beginTimeSecs ?? 0) || 0),
+  );
+  const endTimeSecs = Math.max(
+    0,
+    Math.floor(Number(params.endTimeSecs ?? 0) || 0),
+  );
+  const isRecurring = Boolean(params.isRecurring);
+
   return [
     `${params.kind}:${params.authorPubkey}:${params.eventDTag}`,
     params.relayUrl || "",
-    `${params.viewKey}`,
+    `${params.viewKey}:${beginTimeSecs}::${endTimeSecs}:${isRecurring}`,
   ];
 }

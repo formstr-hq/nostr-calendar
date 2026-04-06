@@ -253,6 +253,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       authorPubkey: invitation.event?.user || "",
       eventDTag: invitation.eventId,
       viewKey: invitation.viewKey,
+      beginTimeSecs: invitation.event
+        ? Math.floor(invitation.event.begin / 1000)
+        : 0,
+      endTimeSecs: invitation.event ? Math.floor(invitation.event.end / 1000) : 0,
+      isRecurring:
+        invitation.event?.repeat?.rrule != null
+          ? !!invitation.event.repeat.rrule
+          : invitation.kind === EventKinds.PrivateCalendarRecurringEvent,
     });
 
     // Add to the selected calendar

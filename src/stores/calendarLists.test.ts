@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useCalendarLists } from "./calendarLists";
 
+let calendarIdCounter = 0;
+
 // Mock secure storage
 vi.mock("../common/localStorage", () => ({
   getSecureItem: vi.fn().mockResolvedValue([]),
   setSecureItem: vi.fn(),
+  getItem: vi.fn().mockReturnValue({}),
+  setItem: vi.fn(),
   removeSecureItem: vi.fn(),
 }));
 
@@ -12,6 +16,16 @@ vi.mock("../common/localStorage", () => ({
 vi.mock("../common/calendarList", () => ({
   fetchCalendarLists: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
   publishCalendarList: vi.fn().mockResolvedValue({}),
+  createCalendar: vi
+    .fn()
+    .mockImplementation(async (calendar: Record<string, unknown>) => ({
+      id: `calendar-${++calendarIdCounter}`,
+      createdAt: 1700000000 + calendarIdCounter,
+      eventId: "",
+      eventRefs: [],
+      isVisible: true,
+      ...calendar,
+    })),
   createDefaultCalendar: vi.fn().mockResolvedValue({
     id: "default-cal-id",
     title: "My Calendar",
@@ -29,7 +43,7 @@ vi.mock("../common/calendarList", () => ({
   removeEventFromCalendarList: vi.fn().mockImplementation((cal, ref) =>
     Promise.resolve({
       ...cal,
-      eventRefs: cal.eventRefs.filter((r: string) => r !== ref),
+      eventRefs: cal.eventRefs.filter((r: string[]) => r[0] !== ref[0]),
     }),
   ),
 }));
@@ -39,10 +53,12 @@ vi.mock("../common/nostr", () => ({
   getUserPublicKey: vi.fn().mockResolvedValue("test-pubkey-" + "0".repeat(50)),
   getRelays: vi.fn().mockReturnValue(["wss://relay.test"]),
   publishToRelays: vi.fn().mockResolvedValue("ok"),
+  publishDeletionEvent: vi.fn().mockResolvedValue("ok"),
 }));
 
 describe("useCalendarLists store", () => {
   beforeEach(() => {
+    calendarIdCounter = 0;
     // Reset store state between tests
     useCalendarLists.setState({
       calendars: [],
