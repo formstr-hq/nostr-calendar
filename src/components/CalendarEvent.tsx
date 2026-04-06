@@ -20,7 +20,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,6 +44,8 @@ import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import { useTimeBasedEvents } from "../stores/events";
+import { buildEventRef } from "../utils/calendarListTypes";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -357,10 +359,78 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const locations = event.location.filter((location) => !!location?.trim?.());
-  const calendars = useCalendarLists.getState().calendars;
-  const calendar = event.calendarId
-    ? calendars.find((c) => c.id === event.calendarId)
+  const { calendars, moveEventToCalendar } = useCalendarLists();
+  const { updateEvent } = useTimeBasedEvents();
+  const [activeCalendarId, setActiveCalendarId] = useState(
+    event.calendarId || "",
+  );
+  const [selectedCalendarId, setSelectedCalendarId] = useState(
+    event.calendarId || "",
+  );
+  const [isEditingCalendar, setIsEditingCalendar] = useState(false);
+  const [savingCalendar, setSavingCalendar] = useState(false);
+  const [calendarEditError, setCalendarEditError] = useState(false);
+
+  useEffect(() => {
+    setActiveCalendarId(event.calendarId || "");
+    setSelectedCalendarId(event.calendarId || "");
+    setIsEditingCalendar(false);
+    setCalendarEditError(false);
+  }, [event.calendarId]);
+
+  const calendar = activeCalendarId
+    ? calendars.find((c) => c.id === activeCalendarId)
     : undefined;
+
+  const handleSaveCalendar = async () => {
+    if (!activeCalendarId || !selectedCalendarId) {
+      return;
+    }
+    if (selectedCalendarId === activeCalendarId) {
+      setIsEditingCalendar(false);
+      return;
+    }
+
+    const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
+    const sourceCalendar = calendars.find((c) => c.id === activeCalendarId);
+    const currentEventRef = sourceCalendar?.eventRefs.find(
+      (ref) => ref[0] === eventCoordinate,
+    );
+
+    const eventRef =
+      currentEventRef ||
+      (event.viewKey
+        ? buildEventRef({
+            kind: event.kind,
+            authorPubkey: event.user,
+            eventDTag: event.id,
+            viewKey: event.viewKey,
+          })
+        : undefined);
+
+    if (!eventRef) {
+      setCalendarEditError(true);
+      return;
+    }
+
+    setSavingCalendar(true);
+    setCalendarEditError(false);
+    try {
+      await moveEventToCalendar(selectedCalendarId, eventCoordinate, eventRef);
+      setActiveCalendarId(selectedCalendarId);
+      updateEvent({
+        ...event,
+        calendarId: selectedCalendarId,
+      });
+      setIsEditingCalendar(false);
+    } catch (error) {
+      setCalendarEditError(true);
+      console.error("Failed to move event to selected calendar", error);
+    } finally {
+      setSavingCalendar(false);
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -437,18 +507,87 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
           {calendar ? (
             <>
               <Divider />
-              <Box display="flex" alignItems="center" gap={1}>
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: calendar.color,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography variant="body2">{calendar.title}</Typography>
-              </Box>
+              {isEditingCalendar ? (
+                <Stack spacing={1}>
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    gap={1}
+                    flexWrap="wrap"
+                  >
+                    <Box maxWidth={500} flex={1} minWidth={150}>
+                      <CalendarListSelect
+                        value={selectedCalendarId}
+                        onChange={setSelectedCalendarId}
+                        size="small"
+                        label={intl.formatMessage({
+                          id: "event.selectCalendar",
+                        })}
+                      />
+                    </Box>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={handleSaveCalendar}
+                      disabled={
+                        !selectedCalendarId ||
+                        selectedCalendarId === activeCalendarId ||
+                        savingCalendar
+                      }
+                      sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+                    >
+                      {intl.formatMessage({ id: "navigation.save" })}
+                    </Button>
+                    <Button
+                      variant="text"
+                      size="small"
+                      disabled={savingCalendar}
+                      onClick={() => {
+                        setSelectedCalendarId(activeCalendarId);
+                        setIsEditingCalendar(false);
+                        setCalendarEditError(false);
+                      }}
+                      sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+                    >
+                      {intl.formatMessage({ id: "navigation.cancel" })}
+                    </Button>
+                  </Box>
+                  {calendarEditError ? (
+                    <Typography variant="caption" color="error">
+                      {intl.formatMessage({ id: "event.loadError" })}
+                    </Typography>
+                  ) : null}
+                </Stack>
+              ) : (
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      backgroundColor: calendar.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Typography variant="body2">{calendar.title}</Typography>
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: "calendarManage.editCalendar",
+                    })}
+                  >
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setSelectedCalendarId(activeCalendarId);
+                        setIsEditingCalendar(true);
+                        setCalendarEditError(false);
+                      }}
+                    >
+                      <Edit fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
             </>
           ) : (
             <>
