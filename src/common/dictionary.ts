@@ -57,6 +57,14 @@ const dictionary: NestedObject = {
       login_error: "Login failed",
       loggingIn: "Logging in...",
     },
+    startup: {
+      loadingCache: "Retrieving login data from cache...",
+      welcomeBack: "Welcome back, {user}!",
+      welcomeBackGeneric: "Welcome back!",
+      fetchingEvents: "Fetching your calendar lists and events...",
+      noLogin: "No saved login found.",
+      error: "Could not load your data. Check your connection.",
+    },
     event: {
       editEvent: "Edit Event",
       deleteEvent: "Delete Event",
@@ -233,6 +241,14 @@ const dictionary: NestedObject = {
       login_description: "Anmelden, um Ihre Termine zu verwalten",
       login_error: "Anmeldung fehlgeschlagen",
       loggingIn: "Anmeldung läuft...",
+    },
+    startup: {
+      loadingCache: "Anmeldedaten aus dem Cache abrufen...",
+      welcomeBack: "Willkommen zurück, {user}!",
+      welcomeBackGeneric: "Willkommen zurück!",
+      fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
+      noLogin: "Keine gespeicherte Anmeldung gefunden.",
+      error: "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
     },
     event: {
       editEvent: "Termin bearbeiten",

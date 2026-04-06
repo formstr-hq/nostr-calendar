@@ -3,16 +3,13 @@ import {
   ThemeProvider,
   CssBaseline,
   Box,
-  Typography,
   Toolbar,
-  Dialog,
-  DialogContent,
 } from "@mui/material";
 import { theme } from "./theme";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
-import { IntlProvider, useIntl } from "react-intl";
+import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
 import dictionary from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
@@ -32,6 +29,9 @@ import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
+import { AppLoadingBar } from "./components/AppLoadingBar";
+import { AppStatusMessage } from "./components/AppStatusMessage";
+import { useAppStartup } from "./hooks/useAppStartup";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -43,7 +43,6 @@ const _locale = ~Object.keys(dictionary).indexOf(browserLocale)
   : "en-US";
 
 function Application() {
-  const intl = useIntl();
   const {
     user,
     isInitialized,
@@ -64,6 +63,9 @@ function Application() {
     fetchCalendars,
   } = useCalendarLists();
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
+
+  // Startup state machine: drives the loading bar + status message
+  const { stage, statusMessage, retry } = useAppStartup(appMode);
 
   useEffect(() => {
     initializeUser();
@@ -178,32 +180,32 @@ function Application() {
   return (
     <>
       <Header onImportEvent={setImportedEvent} />
+
+      {/* Non-blocking startup indicators — sit below the AppBar */}
+      <AppLoadingBar stage={stage} />
+      <AppStatusMessage
+        stage={stage}
+        statusMessage={statusMessage}
+        onRetry={retry}
+      />
+
       <ICSListener
         importedEvent={importedEvent}
         onClose={() => setImportedEvent(null)}
         onImportEvent={setImportedEvent}
       />
-      {/* Mode Selection Modal */}
+
+      {/* Mode Selection Modal (shown once cache read is done and no user found) */}
       <ModeSelectionModal
         isOpen={showModeSelection}
         onModeSelect={handleModeSelection}
       />
-      {/* Loading State */}
-      {!showModeSelection && !appMode && !user && (
-        <Dialog open>
-          <DialogContent>
-            <Box display="flex" justifyContent="center" alignItems="center">
-              <Typography>
-                {intl.formatMessage({ id: "message.loggingIn" })}
-              </Typography>
-            </Box>
-          </DialogContent>
-        </Dialog>
-      )}
+
       <LoginModal
         open={showLoginModal}
         onClose={() => updateLoginModal(false)}
       />
+
       {showOnboardingDialog && (
         <CalendarManageDialog
           open={showOnboardingDialog}
@@ -213,6 +215,7 @@ function Application() {
           blocking
         />
       )}
+
       <RelayManager />
       <Toolbar />
       <Box>{user && isInitialized && <Routing />}</Box>
