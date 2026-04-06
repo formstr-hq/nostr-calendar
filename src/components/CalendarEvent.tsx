@@ -20,7 +20,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -370,13 +370,17 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const [isEditingCalendar, setIsEditingCalendar] = useState(false);
   const [savingCalendar, setSavingCalendar] = useState(false);
   const [calendarEditError, setCalendarEditError] = useState(false);
+  const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
+  const activeEventCoordinateRef = useRef(eventCoordinate);
 
   useEffect(() => {
+    activeEventCoordinateRef.current = eventCoordinate;
     setActiveCalendarId(event.calendarId || "");
     setSelectedCalendarId(event.calendarId || "");
     setIsEditingCalendar(false);
+    setSavingCalendar(false);
     setCalendarEditError(false);
-  }, [event.calendarId]);
+  }, [eventCoordinate, event.calendarId]);
 
   const calendar = activeCalendarId
     ? calendars.find((c) => c.id === activeCalendarId)
@@ -391,7 +395,6 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
       return;
     }
 
-    const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
     const sourceCalendar = calendars.find((c) => c.id === activeCalendarId);
     const currentEventRef = sourceCalendar?.eventRefs.find(
       (ref) => ref[0] === eventCoordinate,
@@ -413,21 +416,28 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
       return;
     }
 
+    const saveEventCoordinate = eventCoordinate;
     setSavingCalendar(true);
     setCalendarEditError(false);
     try {
       await moveEventToCalendar(selectedCalendarId, eventCoordinate, eventRef);
-      setActiveCalendarId(selectedCalendarId);
       updateEvent({
         ...event,
         calendarId: selectedCalendarId,
       });
-      setIsEditingCalendar(false);
+      if (activeEventCoordinateRef.current === saveEventCoordinate) {
+        setActiveCalendarId(selectedCalendarId);
+        setIsEditingCalendar(false);
+      }
     } catch (error) {
-      setCalendarEditError(true);
+      if (activeEventCoordinateRef.current === saveEventCoordinate) {
+        setCalendarEditError(true);
+      }
       console.error("Failed to move event to selected calendar", error);
     } finally {
-      setSavingCalendar(false);
+      if (activeEventCoordinateRef.current === saveEventCoordinate) {
+        setSavingCalendar(false);
+      }
     }
   };
 
@@ -554,7 +564,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                   </Box>
                   {calendarEditError ? (
                     <Typography variant="caption" color="error">
-                      {intl.formatMessage({ id: "event.loadError" })}
+                      {intl.formatMessage({ id: "event.calendarMoveError" })}
                     </Typography>
                   ) : null}
                 </Stack>

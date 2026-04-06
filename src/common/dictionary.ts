@@ -89,6 +89,8 @@ const dictionary: NestedObject = {
       eventNotFound: "Event not found. It may not have loaded yet.",
       loadError:
         "We could not load the event. It may be a temporary error. Please refresh the page to try again",
+      calendarMoveError:
+        "We could not move the event to the selected calendar. Please try again.",
       notAuthorized: "You are not allowed to edit this event.",
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
@@ -267,6 +269,8 @@ const dictionary: NestedObject = {
         "Termin nicht gefunden. Er wurde möglicherweise noch nicht geladen.",
       loadError:
         "Der Termin konnte nicht geladen werden. Es kann sich um einen vorübergehenden Fehler handeln. Bitte aktualisieren Sie die Seite, um es erneut zu versuchen",
+      calendarMoveError:
+        "Der Termin konnte nicht in den ausgewählten Kalender verschoben werden. Bitte versuchen Sie es erneut.",
       notAuthorized: "Sie sind nicht berechtigt, diesen Termin zu bearbeiten.",
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
