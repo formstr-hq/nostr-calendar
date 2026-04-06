@@ -66,6 +66,7 @@ public class NotificationWorker extends Worker {
             }
 
             Log.d(TAG, "NotificationWorker finished. Scheduled " + scheduled + " notifications.");
+            CalendarWidget.refreshAll(getApplicationContext());
             return Result.success();
         } catch (JSONException e) {
             Log.e(TAG, "Failed to parse events JSON", e);
