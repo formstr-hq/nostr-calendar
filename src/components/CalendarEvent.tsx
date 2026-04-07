@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -11,6 +12,7 @@ import {
   Link,
   Paper,
   Stack,
+  TextField,
   Theme,
   Tooltip,
   Typography,
@@ -25,7 +27,7 @@ import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CloseIcon from "@mui/icons-material/Close";
-import ContentCopy from "@mui/icons-material/ContentCopy";
+import ShareIcon from "@mui/icons-material/Share";
 import OpenInNew from "@mui/icons-material/OpenInNew";
 import Download from "@mui/icons-material/Download";
 import Edit from "@mui/icons-material/Edit";
@@ -266,13 +268,12 @@ function ActionButtons({
     }),
     event.viewKey,
   );
-  const copyLinkToEvent = () => {
-    navigator.clipboard.writeText(`${window.location.origin}${linkToEvent}`);
-  };
+  
   const { user } = useUser();
   const navigate = useNavigate();
   const isEditable = event.user === user?.pubkey;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const editEvent = () => {
     const editLink = getEditEventPage(
@@ -294,14 +295,14 @@ function ActionButtons({
       minWidth={isMobile ? "inherit" : "160px"}
       sx={{ whiteSpace: "nowrap" }}
     >
+      <IconButton size={iconSize} onClick={() => setShareDialogOpen(true)}>
+        <Tooltip title={intl.formatMessage({ id: "event.shareEvent", defaultMessage: "Share Event" })}>
+          <ShareIcon fontSize={iconSize} />
+        </Tooltip>
+      </IconButton>
+
       {!isMobile && (
         <>
-          <IconButton size={iconSize} onClick={copyLinkToEvent}>
-            <Tooltip title={intl.formatMessage({ id: "event.copyLink" })}>
-              <ContentCopy fontSize={iconSize} />
-            </Tooltip>
-          </IconButton>
-
           {showOpenInNew && (
             <IconButton size={iconSize} component={Link} href={linkToEvent}>
               <Tooltip title={intl.formatMessage({ id: "event.openNewTab" })}>
@@ -339,6 +340,11 @@ function ActionButtons({
         }}
         event={event}
       />
+      <ShareEventDialog
+        open={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        linkToEvent={linkToEvent}
+      />
       {showClose && (
         <IconButton
           size={iconSize}
@@ -349,6 +355,71 @@ function ActionButtons({
         </IconButton>
       )}
     </Box>
+  );
+}
+
+function ShareEventDialog({
+  open,
+  onClose,
+  linkToEvent,
+}: {
+  open: boolean;
+  onClose: () => void;
+  linkToEvent: string;
+}) {
+  const intl = useIntl();
+  const [copied, setCopied] = useState(false);
+
+  // We only concatenate if access via browser (to get domain name)
+  const fullUrl = `${window.location.origin}${linkToEvent}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(fullUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleNativeShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: intl.formatMessage({ id: "event.shareTitle", defaultMessage: "Calendar Event" }),
+        url: fullUrl,
+      }).catch(console.error);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{intl.formatMessage({ id: "event.shareEvent", defaultMessage: "Share Event" })}</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          {intl.formatMessage({ id: "event.shareInstructions", defaultMessage: "Anyone with this link can view the event details." })}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+          <TextField
+            fullWidth
+            size="small"
+            value={fullUrl}
+            InputProps={{
+              readOnly: true,
+            }}
+          />
+          <Button variant={copied ? "outlined" : "contained"} color={copied ? "success" : "primary"} onClick={handleCopy} sx={{ whiteSpace: "nowrap" }}>
+            {copied ? intl.formatMessage({ id: "event.copied", defaultMessage: "Copied!" }) : intl.formatMessage({ id: "event.copyLink", defaultMessage: "Copy Link" })}
+          </Button>
+        </Box>
+        {!!navigator.share && (
+          <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+            <Button startIcon={<ShareIcon />} onClick={handleNativeShare}>
+              {intl.formatMessage({ id: "event.nativeShare", defaultMessage: "Share via Device" })}
+            </Button>
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{intl.formatMessage({ id: "navigation.close", defaultMessage: "Close" })}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
