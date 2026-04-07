@@ -46,7 +46,12 @@ export function addUntilToRRule(rule: string, untilTimestampMs: number): string 
     .split(";")
     .map((fragment) => fragment.trim())
     .filter((fragment) => {
-      return fragment && !fragment.toUpperCase().startsWith("UNTIL=");
+      const upperFragment = fragment.toUpperCase();
+      return (
+        fragment &&
+        !upperFragment.startsWith("UNTIL=") &&
+        !upperFragment.startsWith("COUNT=")
+      );
     });
 
   fragments.push(`UNTIL=${formatRRuleUntil(untilTimestampMs)}`);

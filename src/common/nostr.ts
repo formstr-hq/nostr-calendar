@@ -234,7 +234,7 @@ async function preparePrivateCalendarEvent(
   const recurrenceRules = getEventRRules(event.repeat);
   for (const recurrenceRule of recurrenceRules) {
     eventData.push(["L", "rrule"]);
-    eventData.push(["l", recurrenceRule]);
+    eventData.push(["l", recurrenceRule, "rrule"]);
   }
 
   event.location.forEach((loc) => {
@@ -662,7 +662,7 @@ export const publishPublicCalendarEvent = async (
   const recurrenceRules = getEventRRules(event.repeat);
   for (const recurrenceRule of recurrenceRules) {
     tags.push(["L", "rrule"]);
-    tags.push(["l", recurrenceRule]);
+    tags.push(["l", recurrenceRule, "rrule"]);
   }
 
   const baseEvent: UnsignedEvent = {

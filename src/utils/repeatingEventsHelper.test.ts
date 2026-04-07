@@ -118,6 +118,15 @@ describe("addUntilToRRule", () => {
     );
     expect(result).toBe("FREQ=MONTHLY;INTERVAL=2;UNTIL=20260303T080000Z");
   });
+
+  it("removes COUNT when adding UNTIL", () => {
+    const timestamp = Date.UTC(2026, 2, 3, 8, 0, 0);
+    const result = addUntilToRRule(
+      "FREQ=MONTHLY;COUNT=10;INTERVAL=2",
+      timestamp,
+    );
+    expect(result).toBe("FREQ=MONTHLY;INTERVAL=2;UNTIL=20260303T080000Z");
+  });
 });
 
 // ─── isEventInDateRange: non-repeating ──────────────────────────────
