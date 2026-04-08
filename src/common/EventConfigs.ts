@@ -21,6 +21,9 @@ export enum EventKinds {
   // Participant Removal (kind 84 - participant opts out of an event)
   ParticipantRemoval = 84,
 
+  // Text Note (Comments/Replies)
+  TextNote = 1,
+
   // Relay List (NIP-65)
   RelayList = 10002,
 }

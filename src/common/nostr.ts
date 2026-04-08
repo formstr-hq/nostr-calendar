@@ -825,3 +825,38 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   const allRelays = [...new Set([...relays, ...defaultRelays])];
   await publishToRelays(fullEvent, () => {}, allRelays);
 };
+
+export const fetchEventComments = (
+  aTagString: string,
+  onEvent: (event: Event) => void,
+) => {
+  const relayList = getRelays();
+  const filter: Filter = {
+    kinds: [EventKinds.TextNote],
+    "#a": [aTagString],
+  };
+
+  return nostrRuntime.subscribe(relayList, [filter], {
+    onEvent: (event: Event) => {
+      onEvent(event);
+    },
+  });
+};
+
+export const publishEventComment = async (
+  aTagString: string,
+  content: string,
+) => {
+  const pubKey = await getUserPublicKey();
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.TextNote,
+    pubkey: pubKey,
+    tags: [["a", aTagString]],
+    content: content,
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  const signer = await signerManager.getSigner();
+  const fullEvent = await signer.signEvent(baseEvent);
+  fullEvent.id = getEventHash(baseEvent);
+  return publishToRelays(fullEvent);
+};

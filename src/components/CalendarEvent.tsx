@@ -44,6 +44,7 @@ import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import { EventComments } from "./EventComments";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -458,6 +459,10 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
           )}
 
           <ScheduledNotificationsSection eventId={event.id} />
+          
+          {/* Comments Section */}
+          <Divider />
+          <EventComments event={event} />
         </Stack>
       </Box>
     </Box>
