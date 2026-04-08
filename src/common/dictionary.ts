@@ -73,7 +73,7 @@ const dictionary: NestedObject = {
       quarterly: "Quarterly",
       yearly: "Yearly",
       preserveRecurrenceHistoryPrompt:
-        "Keep past occurrences? Click OK to preserve history and end the old recurrence rule at the current time.",
+        "Keep past occurrences? Click OK to preserve historical events",
       addDescription: "Add event description...",
       calendar: "Calendar",
       selectCalendar: "Select calendar",
@@ -252,7 +252,7 @@ const dictionary: NestedObject = {
       quarterly: "Vierteljährlich",
       yearly: "Jährlich",
       preserveRecurrenceHistoryPrompt:
-        "Vergangene Vorkommen beibehalten? Klicken Sie auf OK, um die Historie zu behalten und die alte Wiederholungsregel zur aktuellen Zeit zu beenden.",
+        "Vergangene Vorkommen beibehalten? Klicken Sie auf OK, um historische Termine zu erhalten.",
       addDescription: "Beschreibung hinzufügen...",
       calendar: "Kalender",
       selectCalendar: "Kalender auswählen",
