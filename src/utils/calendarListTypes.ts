@@ -1,4 +1,3 @@
-import { EventKinds } from "../common/EventConfigs";
 import type { ICalendarEvent } from "./types";
 
 /**
@@ -117,4 +116,16 @@ export function buildEventRef(params: {
     params.relayUrl || "",
     `${params.viewKey}`,
   ];
+}
+
+/**
+ * Builds the canonical coordinate used in calendar refs and Nostr "a" tags.
+ * Format: "{kind}:{authorPubkey}:{eventDTag}"
+ */
+export function getCalendarEventCoordinate(event: {
+  kind: number;
+  user: string;
+  id: string;
+}): string {
+  return `${event.kind}:${event.user}:${event.id}`;
 }
