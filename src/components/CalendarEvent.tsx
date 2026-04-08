@@ -46,6 +46,7 @@ import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import { buildEventRef, parseEventRef } from "../utils/calendarListTypes";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -248,6 +249,64 @@ export function CalendarEventView({
   );
 }
 
+function AddToCalendarButton({ event }: { event: ICalendarEvent }) {
+  const { user, updateLoginModal } = useUser();
+  const { calendars, addEventToCalendar } = useCalendarLists();
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  const isAlreadyAdded = calendars.some((cal) =>
+    cal.eventRefs.some((ref) => parseEventRef(ref).eventDTag === event.id),
+  );
+
+  const handleAdd = async () => {
+    if (!user) {
+      updateLoginModal(true);
+      return;
+    }
+
+    const targetCalendarId = calendars[0]?.id;
+    if (!targetCalendarId) {
+      setSaveState("error");
+      return;
+    }
+
+    setSaveState("loading");
+    try {
+      const eventRef = buildEventRef({
+        kind: event.kind,
+        authorPubkey: event.user,
+        eventDTag: event.id,
+        viewKey: event.viewKey || "",
+      });
+      await addEventToCalendar(targetCalendarId, eventRef);
+      setSaveState("success");
+    } catch (e) {
+      console.error(e);
+      setSaveState("error");
+    }
+  };
+
+  if (isAlreadyAdded || event.user === user?.pubkey) {
+    return null;
+  }
+
+  return (
+    <Button
+      variant="contained"
+      size="small"
+      onClick={handleAdd}
+      disabled={saveState === "loading" || saveState === "success"}
+      color={saveState === "error" ? "error" : "primary"}
+      sx={{ whiteSpace: "nowrap", mr: 1 }}
+    >
+      {saveState === "idle" && "Add to my calendar"}
+      {saveState === "loading" && "Adding..."}
+      {saveState === "success" && "Added ✓"}
+      {saveState === "error" && "Error - Retry"}
+    </Button>
+  );
+}
+
 function ActionButtons({
   event,
   closeModal,
@@ -293,8 +352,9 @@ function ActionButtons({
   return (
     <Box
       minWidth={isMobile ? "inherit" : "160px"}
-      sx={{ whiteSpace: "nowrap" }}
+      sx={{ whiteSpace: "nowrap", display: "flex", alignItems: "center" }}
     >
+      <AddToCalendarButton event={event} />
       <IconButton size={iconSize} onClick={() => setShareDialogOpen(true)}>
         <Tooltip title={intl.formatMessage({ id: "event.shareEvent", defaultMessage: "Share Event" })}>
           <ShareIcon fontSize={iconSize} />
