@@ -181,14 +181,6 @@ function Application() {
     <>
       <Header onImportEvent={setImportedEvent} />
 
-      {/* Non-blocking startup indicators — sit below the AppBar */}
-      <AppLoadingBar stage={stage} />
-      <AppStatusMessage
-        stage={stage}
-        statusMessage={statusMessage}
-        onRetry={retry}
-      />
-
       <ICSListener
         importedEvent={importedEvent}
         onClose={() => setImportedEvent(null)}
@@ -218,6 +210,17 @@ function Application() {
 
       <RelayManager />
       <Toolbar />
+      
+      {/* Startup indicators float inside normal flow, positioned straight under toolbar */}
+      <Box sx={{ position: "relative", zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <AppLoadingBar stage={stage} />
+        <AppStatusMessage
+          stage={stage}
+          statusMessage={statusMessage}
+          onRetry={retry}
+        />
+      </Box>
+
       <Box>{user && isInitialized && <Routing />}</Box>
     </>
   );

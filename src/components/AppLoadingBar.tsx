@@ -7,7 +7,6 @@
  */
 
 import { LinearProgress, Box } from "@mui/material";
-import { HEADER_HEIGHT } from "./Header";
 import type { StartupStage } from "../hooks/useAppStartup";
 
 interface AppLoadingBarProps {
@@ -22,11 +21,10 @@ export function AppLoadingBar({ stage }: AppLoadingBarProps) {
   return (
     <Box
       sx={{
-        position: "fixed",
-        top: HEADER_HEIGHT,
+        position: "absolute",
+        top: 0,
         left: 0,
         right: 0,
-        zIndex: (theme) => theme.zIndex.appBar + 1,
         bgcolor: "background.paper",
         opacity: visible ? 1 : 0,
         transition: TRANSITION,

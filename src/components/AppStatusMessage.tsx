@@ -8,7 +8,6 @@
  */
 
 import { Box, Typography, Button, Fade } from "@mui/material";
-import { HEADER_HEIGHT } from "./Header";
 import type { StartupStage } from "../hooks/useAppStartup";
 
 interface AppStatusMessageProps {
@@ -29,12 +28,10 @@ export function AppStatusMessage({
     <Fade in={visible} timeout={300} unmountOnExit={false}>
       <Box
         sx={{
-          position: "fixed",
-          // Sit just below the loading bar (header + 3px bar)
-          top: HEADER_HEIGHT + 3,
+          position: "absolute",
+          top: 3,
           left: 0,
           right: 0,
-          zIndex: (theme) => theme.zIndex.appBar - 2,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",

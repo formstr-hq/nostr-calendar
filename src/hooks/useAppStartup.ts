@@ -93,11 +93,19 @@ export function useAppStartup(appMode: "login" | "guest" | null): AppStartupStat
   useEffect(() => {
     if (stage !== "user_loaded") return;
 
-    const fetchTimeout = setTimeout(() => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    fetchTimeoutRef.current = setTimeout(() => {
       setStage("fetching_events");
     }, WELCOME_LINGER_MS);
 
-    return () => clearTimeout(fetchTimeout);
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [stage]);
 
   // Once we start fetching, start the safety timeout
