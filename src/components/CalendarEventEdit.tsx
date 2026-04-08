@@ -8,24 +8,14 @@ import {
   Button,
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
-  SelectChangeEvent,
   Divider,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
-import {
-  addUntilToRRule,
-  frequencyToRRule,
-  getEventRRules,
-  normalizeRRule,
-} from "../utils/repeatingEventsHelper";
+import { ICalendarEvent } from "../utils/types";
+import { addUntilToRRule, getEventRRules } from "../utils/repeatingEventsHelper";
 import { ParticipantAdd } from "./ParticipantAdd";
 import { useIntl } from "react-intl";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -50,6 +40,7 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { RecurrenceEditor } from "./RecurrenceEditor";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -86,8 +77,6 @@ export function CalendarEventEdit({
       return {
         ...initialEvent,
         repeat: {
-          ...initialEvent.repeat,
-          rrule: recurrenceRules[0] ?? null,
           rrules: recurrenceRules,
         },
       };
@@ -115,7 +104,6 @@ export function CalendarEventEdit({
       user: "",
       isPrivateEvent: true,
       repeat: {
-        rrule: null,
         rrules: [],
       },
     } as ICalendarEvent;
@@ -180,90 +168,53 @@ export function CalendarEventEdit({
     updateField("end", value.unix() * 1000);
   };
 
-  const recurrenceOptions: Array<{
-    value: string;
-    labelId: string;
-  }> = [
-    {
-      value: frequencyToRRule(RepeatingFrequency.Daily)!,
-      labelId: "event.daily",
-    },
-    {
-      value: frequencyToRRule(RepeatingFrequency.Weekly)!,
-      labelId: "event.weekly",
-    },
-    {
-      value: frequencyToRRule(RepeatingFrequency.Weekday)!,
-      labelId: "event.weekdays",
-    },
-    {
-      value: frequencyToRRule(RepeatingFrequency.Monthly)!,
-      labelId: "event.monthly",
-    },
-    {
-      value: frequencyToRRule(RepeatingFrequency.Quarterly)!,
-      labelId: "event.quarterly",
-    },
-    {
-      value: frequencyToRRule(RepeatingFrequency.Yearly)!,
-      labelId: "event.yearly",
-    },
-  ];
-
   const setRecurrenceRules = (rules: string[]) => {
-    const normalizedRules = getEventRRules({ rrule: null, rrules: rules });
+    const normalizedRules = getEventRRules({ rrules: rules });
 
     updateField("repeat", {
-      rrule: normalizedRules[0] ?? null,
       rrules: normalizedRules,
     });
   };
 
-  const handleRecurrenceRuleChange = (
-    index: number,
-    event: SelectChangeEvent<string>,
-  ) => {
-    const selectedRule = normalizeRRule(event.target.value);
-    const existingRules = getEventRRules(eventDetails.repeat);
-    const editableRules = existingRules.length > 0 ? [...existingRules] : [""];
-
-    const previousRule = editableRules[index] || "";
+  const handleReplaceRecurrenceRule = ({
+    index,
+    previousRule,
+    nextRule,
+  }: {
+    index: number;
+    previousRule: string;
+    nextRule: string;
+    rules: string[];
+  }): string[] | undefined => {
     const shouldPromptForHistoryPreservation =
-      mode === "edit" && !!previousRule && !!selectedRule && previousRule !== selectedRule;
+      mode === "edit" && !!previousRule && !!nextRule && previousRule !== nextRule;
 
-    if (shouldPromptForHistoryPreservation) {
-      const preserveHistory = window.confirm(
-        intl.formatMessage({ id: "event.preserveRecurrenceHistoryPrompt" }),
-      );
-
-      if (preserveHistory) {
-        const nextRules = editableRules.filter((_, i) => i !== index).filter(Boolean);
-        nextRules.push(addUntilToRRule(previousRule, Date.now()));
-        nextRules.push(selectedRule);
-        setRecurrenceRules(nextRules);
-        return;
-      }
+    if (!shouldPromptForHistoryPreservation) {
+      return undefined;
     }
 
-    editableRules[index] = selectedRule;
-    setRecurrenceRules(editableRules.filter(Boolean));
-  };
+    const preserveHistory = window.confirm(
+      intl.formatMessage({ id: "event.preserveRecurrenceHistoryPrompt" }),
+    );
 
-  const handleAddRecurrenceRule = () => {
-    const defaultRule = frequencyToRRule(RepeatingFrequency.Daily);
-    if (!defaultRule) {
-      return;
+    if (!preserveHistory) {
+      return undefined;
     }
 
     const existingRules = getEventRRules(eventDetails.repeat);
-    setRecurrenceRules([...existingRules, defaultRule]);
-  };
+    const nextRules = existingRules
+      .map((rule, ruleIndex) => {
+        if (ruleIndex !== index) {
+          return rule;
+        }
 
-  const handleRemoveRecurrenceRule = (index: number) => {
-    const existingRules = getEventRRules(eventDetails.repeat);
-    setRecurrenceRules(existingRules.filter((_, i) => i !== index));
-  };
+        return addUntilToRRule(rule, Date.now());
+      })
+      .filter(Boolean);
 
+    nextRules.push(nextRule);
+    return nextRules;
+  };
   const buttonDisabled = !(
     !processing &&
     eventDetails.title &&
@@ -277,8 +228,6 @@ export function CalendarEventEdit({
   }
 
   const recurrenceRules = getEventRRules(eventDetails.repeat);
-  const displayedRecurrenceRules =
-    recurrenceRules.length > 0 ? recurrenceRules : [""];
 
   const titleBar = (
     <Box
@@ -372,54 +321,11 @@ export function CalendarEventEdit({
       {/* Recurrence */}
       <EventAttributeEditContainer>
         <EventRepeatIcon />
-        <Box style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-          {displayedRecurrenceRules.map((rule, index) => {
-            const isCustomRule =
-              !!rule && !recurrenceOptions.some((option) => option.value === rule);
-
-            return (
-              <Box
-                key={`${rule || "none"}-${index}`}
-                style={{ display: "flex", gap: 8, alignItems: "center" }}
-              >
-                <FormControl fullWidth size="small">
-                  <InputLabel>
-                    {intl.formatMessage({ id: "event.selectRecurrence" })}
-                  </InputLabel>
-                  <Select
-                    value={rule}
-                    label={intl.formatMessage({ id: "event.selectRecurrence" })}
-                    onChange={(event) => handleRecurrenceRuleChange(index, event)}
-                  >
-                    <MenuItem value="">
-                      {intl.formatMessage({ id: "event.doesNotRepeat" })}
-                    </MenuItem>
-                    {recurrenceOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {intl.formatMessage({ id: option.labelId })}
-                      </MenuItem>
-                    ))}
-                    {isCustomRule && <MenuItem value={rule}>{rule}</MenuItem>}
-                  </Select>
-                </FormControl>
-                {displayedRecurrenceRules.length > 1 && (
-                  <Button
-                    color="error"
-                    onClick={() => handleRemoveRecurrenceRule(index)}
-                  >
-                    {intl.formatMessage({ id: "navigation.remove" })}
-                  </Button>
-                )}
-              </Box>
-            );
-          })}
-
-          <Box>
-            <Button onClick={handleAddRecurrenceRule}>
-              {intl.formatMessage({ id: "navigation.add" })}
-            </Button>
-          </Box>
-        </Box>
+        <RecurrenceEditor
+          rules={recurrenceRules}
+          onChange={setRecurrenceRules}
+          onReplaceRule={handleReplaceRecurrenceRule}
+        />
       </EventAttributeEditContainer>
       <Divider />
       {/* Participants */}

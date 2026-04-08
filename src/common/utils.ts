@@ -200,7 +200,6 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
     isPrivateEvent: true,
     image,
     repeat: {
-      rrule: rrules[0] ?? null,
       rrules,
     },
   };

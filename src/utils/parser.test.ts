@@ -142,7 +142,6 @@ describe("nostrEventToCalendar", () => {
       ],
     });
     const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBe("FREQ=WEEKLY");
     expect(result.repeat.rrules).toEqual(["FREQ=WEEKLY"]);
   });
 
@@ -157,7 +156,6 @@ describe("nostrEventToCalendar", () => {
     });
     const result = nostrEventToCalendar(event);
 
-    expect(result.repeat.rrule).toBe("FREQ=WEEKLY");
     expect(result.repeat.rrules).toEqual(["FREQ=WEEKLY", "FREQ=MONTHLY"]);
   });
 
@@ -171,7 +169,6 @@ describe("nostrEventToCalendar", () => {
     });
     const result = nostrEventToCalendar(event);
 
-    expect(result.repeat.rrule).toBeNull();
     expect(result.repeat.rrules).toEqual([]);
   });
 
@@ -185,14 +182,12 @@ describe("nostrEventToCalendar", () => {
     });
     const result = nostrEventToCalendar(event);
 
-    expect(result.repeat.rrule).toBe("FREQ=MONTHLY");
     expect(result.repeat.rrules).toEqual(["FREQ=MONTHLY"]);
   });
 
-  it("sets repeat.rrule to null for non-recurring events", () => {
+  it("sets repeat.rrules to empty for non-recurring events", () => {
     const event = makeNostrEvent({ tags: [] });
     const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBeNull();
     expect(result.repeat.rrules).toEqual([]);
   });
 
@@ -266,7 +261,6 @@ describe("nostrEventToCalendar", () => {
     expect(result.participants).toEqual(["alice", "bob"]);
     expect(result.reference).toEqual(["https://nostr.com"]);
     expect(result.image).toBe("https://img.com/pic.png");
-    expect(result.repeat.rrule).toBe("FREQ=DAILY");
     expect(result.repeat.rrules).toEqual(["FREQ=DAILY"]);
   });
 });

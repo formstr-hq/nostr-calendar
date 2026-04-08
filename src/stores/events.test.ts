@@ -62,7 +62,7 @@ vi.mock("../utils/parser", () => ({
     website: "",
     user: "test-pubkey",
     isPrivateEvent: true,
-    repeat: { rrule: null },
+    repeat: { rrules: [] },
   }),
 }));
 
@@ -192,7 +192,7 @@ describe("useTimeBasedEvents store", () => {
           website: "",
           user: "someone",
           isPrivateEvent: false,
-          repeat: { rrule: null },
+          repeat: { rrules: [] },
         },
         {
           id: "private-1",
@@ -212,7 +212,7 @@ describe("useTimeBasedEvents store", () => {
           website: "",
           user: "me",
           isPrivateEvent: true,
-          repeat: { rrule: null },
+          repeat: { rrules: [] },
         },
       ],
     });
@@ -298,7 +298,7 @@ describe("useTimeBasedEvents store", () => {
           website: "",
           user: "me",
           isPrivateEvent: true,
-          repeat: { rrule: null },
+          repeat: { rrules: [] },
         },
       ],
     });

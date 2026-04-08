@@ -30,7 +30,6 @@ END:VCALENDAR`;
     const parsed = parseICS(ics);
 
     expect(parsed).not.toBeNull();
-    expect(parsed?.repeat.rrule).toBeNull();
     expect(parsed?.repeat.rrules).toEqual([]);
   });
 
@@ -50,7 +49,6 @@ END:VCALENDAR`;
     const parsed = parseICS(ics);
 
     expect(parsed).not.toBeNull();
-    expect(parsed?.repeat.rrule).toBe("FREQ=DAILY");
     expect(parsed?.repeat.rrules).toEqual(["FREQ=DAILY", "FREQ=WEEKLY"]);
   });
 });

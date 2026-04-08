@@ -80,8 +80,11 @@ export function getEventRRules(
     rules.push(normalized);
   };
 
-  repeat.rrules?.forEach(addRule);
-  addRule(repeat.rrule);
+  repeat.rrules.forEach(addRule);
+
+  // Backward-compatibility for cached events that may still include repeat.rrule.
+  const legacyRule = (repeat as { rrule?: string | null }).rrule;
+  addRule(legacyRule);
 
   return rules;
 }

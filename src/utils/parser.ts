@@ -28,7 +28,6 @@ export const nostrEventToCalendar = (
     viewKey: viewKey,
     isPrivateEvent: !!isPrivateEvent,
     repeat: {
-      rrule: null,
       rrules: [],
     },
     rsvpResponses: [],
@@ -93,7 +92,6 @@ export const nostrEventToCalendar = (
   });
 
   parsedEvent.repeat = {
-    rrule: recurrenceRules[0] ?? null,
     rrules: recurrenceRules,
   };
 
