@@ -25,7 +25,6 @@ export function AppLoadingBar({ stage }: AppLoadingBarProps) {
         top: 0,
         left: 0,
         right: 0,
-        bgcolor: "background.paper",
         opacity: visible ? 1 : 0,
         transition: TRANSITION,
         pointerEvents: "none",
