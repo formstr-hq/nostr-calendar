@@ -32,12 +32,10 @@ export function AppLoadingBar({ stage }: AppLoadingBarProps) {
       }}
     >
       <LinearProgress
-        color="info"
         sx={{
           height: 3,
           "& .MuiLinearProgress-bar": {
             transition: "none",
-            color: theme.palette.primary.main,
           },
         }}
       />
