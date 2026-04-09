@@ -27,6 +27,9 @@ export interface PositionedEvent extends CalendarEventSegment {
   colSpan: number;
 }
 
+// Convert an event occurrence into the slice that should be drawn inside one
+// specific day column. Multi-day events are clipped to the visible bounds of
+// the day so the first/middle/last day each render with the correct time span.
 const buildSegment = (
   event: ICalendarEvent,
   dayStart: number,
@@ -62,6 +65,8 @@ export function getEventSegmentForDay(
     return buildSegment(event, dayStart, event.begin, event.end);
   }
 
+  // For recurring events we first resolve the occurrence that overlaps this
+  // day, then clip that occurrence down to the current day's visible range.
   const occurrenceStart = getNextOccurrenceInRange(
     event,
     dayStart - duration,
@@ -100,6 +105,8 @@ export function layoutDayEvents(
 
   sorted.forEach((event) => {
     let placed = false;
+    // Greedy placement: reuse the first column whose last event has already
+    // ended, otherwise open a new parallel column for overlapping events.
     for (const col of columns) {
       if (
         dayjs(col[col.length - 1].renderEnd).isSameOrBefore(
@@ -122,6 +129,8 @@ export function layoutDayEvents(
         dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute();
       const rawDuration = dayjs(e.renderEnd).diff(dayjs(e.renderBegin), "minute");
 
+      // renderEnd may be exactly at the next midnight, so clamp the drawn
+      // height to the current day to avoid spilling into the next column.
       const clippedDuration = Math.max(
         0,
         Math.min(rawDuration, DAY_MINUTES - startMinutes),
