@@ -287,9 +287,7 @@ export async function publishPrivateCalendarEvent(
   // These serve as invitations — recipients will see them as notifications
   // and can accept them into their own calendars.
   const giftWraps: Event[] = [];
-  const targetPubKeys = Array.from(
-    new Set([userPublicKey, ...event.participants]),
-  );
+  const targetPubKeys = Array.from(new Set([...event.participants]));
   for (const participant of targetPubKeys) {
     const giftWrap = await nip59.wrapEvent(
       {
