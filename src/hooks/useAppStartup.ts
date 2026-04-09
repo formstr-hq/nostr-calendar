@@ -34,7 +34,7 @@ const WELCOME_LINGER_MS = 900;
 /** How long to wait for calendars before declaring an error */
 const FETCH_TIMEOUT_MS = 15_000;
 
-export function useAppStartup(appMode: "login" | "guest" | null): AppStartupState {
+export function useAppStartup(): AppStartupState {
   const intl = useIntl();
   const { user, isInitialized } = useUser();
   const { isLoaded: calendarsLoaded } = useCalendarLists();
@@ -44,7 +44,11 @@ export function useAppStartup(appMode: "login" | "guest" | null): AppStartupStat
   const retryCountRef = useRef(0);
 
   // Derive a human-readable message from the current stage
-  const statusMessage = getStatusMessage(stage, user?.name ?? user?.pubkey?.slice(0, 8), intl);
+  const statusMessage = getStatusMessage(
+    stage,
+    user?.name ?? user?.pubkey?.slice(0, 8),
+    intl,
+  );
 
   // Clears the fetch timeout if one is running
   const clearFetchTimeout = () => {
@@ -65,12 +69,6 @@ export function useAppStartup(appMode: "login" | "guest" | null): AppStartupStat
   // --- State transitions ---
 
   useEffect(() => {
-    // Guest mode: nothing to fetch, skip straight to ready
-    if (appMode === "guest") {
-      setStage("ready");
-      return;
-    }
-
     if (!isInitialized) {
       // Still reading from cache – stay on loading_cache
       setStage("loading_cache");
@@ -87,7 +85,7 @@ export function useAppStartup(appMode: "login" | "guest" | null): AppStartupStat
     if (stage === "loading_cache" || stage === "no_login") {
       setStage("user_loaded");
     }
-  }, [isInitialized, user, appMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isInitialized, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // After briefly showing "Welcome back!", advance to fetching_events
   useEffect(() => {
@@ -141,19 +139,37 @@ function getStatusMessage(
 ): string {
   switch (stage) {
     case "loading_cache":
-      return intl.formatMessage({ id: "startup.loadingCache" }, { defaultMessage: "Retrieving login data from cache…" });
+      return intl.formatMessage(
+        { id: "startup.loadingCache" },
+        { defaultMessage: "Retrieving login data from cache…" },
+      );
     case "user_loaded":
       return userLabel
-        ? intl.formatMessage({ id: "startup.welcomeBack" }, { user: userLabel, defaultMessage: `Welcome back, ${userLabel}!` })
-        : intl.formatMessage({ id: "startup.welcomeBackGeneric" }, { defaultMessage: "Welcome back!" });
+        ? intl.formatMessage(
+            { id: "startup.welcomeBack" },
+            { user: userLabel, defaultMessage: `Welcome back, ${userLabel}!` },
+          )
+        : intl.formatMessage(
+            { id: "startup.welcomeBackGeneric" },
+            { defaultMessage: "Welcome back!" },
+          );
     case "fetching_events":
-      return intl.formatMessage({ id: "startup.fetchingEvents" }, { defaultMessage: "Fetching your calendar lists and events…" });
+      return intl.formatMessage(
+        { id: "startup.fetchingEvents" },
+        { defaultMessage: "Fetching your calendar lists and events…" },
+      );
     case "ready":
       return "";
     case "no_login":
-      return intl.formatMessage({ id: "startup.noLogin" }, { defaultMessage: "No saved login found." });
+      return intl.formatMessage(
+        { id: "startup.noLogin" },
+        { defaultMessage: "No saved login found." },
+      );
     case "error":
-      return intl.formatMessage({ id: "startup.error" }, { defaultMessage: "Could not load your data. Check your connection." });
+      return intl.formatMessage(
+        { id: "startup.error" },
+        { defaultMessage: "Could not load your data. Check your connection." },
+      );
     default:
       return "";
   }

@@ -1,9 +1,4 @@
-import {
-  ThemeProvider,
-  CssBaseline,
-  Box,
-  Toolbar,
-} from "@mui/material";
+import { ThemeProvider, CssBaseline, Box, Toolbar } from "@mui/material";
 import { theme } from "./theme";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -62,7 +57,7 @@ function Application() {
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
 
   // Startup state machine: drives the loading bar + status message
-  const { stage, statusMessage, retry } = useAppStartup(appMode);
+  const { stage, statusMessage, retry } = useAppStartup();
 
   useEffect(() => {
     initializeUser();
@@ -108,7 +103,10 @@ function Application() {
     import("@capacitor/app").then(({ App: CapApp }) => {
       const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
-          setSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME, Math.floor(Date.now() / 1000));
+          setSecureItem(
+            BG_KEY_LAST_INVITATION_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         }
       });
       cleanup = () => {
@@ -155,7 +153,6 @@ function Application() {
     setShowOnboardingDialog(false);
   };
 
-
   return (
     <>
       <Header onImportEvent={setImportedEvent} />
@@ -182,9 +179,14 @@ function Application() {
 
       <RelayManager />
       <Toolbar />
-      
+
       {/* Startup indicators float inside normal flow, positioned straight under toolbar */}
-      <Box sx={{ position: "relative", zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
         <AppLoadingBar stage={stage} />
         <AppStatusMessage
           stage={stage}
