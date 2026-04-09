@@ -6,7 +6,7 @@
  * the stage reaches "ready".
  */
 
-import { LinearProgress, Box } from "@mui/material";
+import { LinearProgress, Box, useTheme } from "@mui/material";
 import type { StartupStage } from "../hooks/useAppStartup";
 
 interface AppLoadingBarProps {
@@ -17,7 +17,8 @@ const TRANSITION = "opacity 400ms ease";
 
 export function AppLoadingBar({ stage }: AppLoadingBarProps) {
   const visible = stage !== "ready" && stage !== "no_login";
-
+  const theme = useTheme()
+  
   return (
     <Box
       sx={{
@@ -36,6 +37,7 @@ export function AppLoadingBar({ stage }: AppLoadingBarProps) {
           height: 3,
           "& .MuiLinearProgress-bar": {
             transition: "none",
+            color: theme.palette.primary.main,
           },
         }}
       />
