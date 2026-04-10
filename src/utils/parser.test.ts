@@ -145,6 +145,17 @@ describe("nostrEventToCalendar", () => {
     expect(result.repeat.rrule).toBe("FREQ=WEEKLY");
   });
 
+  it("preserves COUNT and UNTIL in recurring rules", () => {
+    const event = makeNostrEvent({
+      tags: [
+        ["L", "rrule"],
+        ["l", "FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z"],
+      ],
+    });
+    const result = nostrEventToCalendar(event);
+    expect(result.repeat.rrule).toBe("FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z");
+  });
+
   it("sets repeat.rrule to null for non-recurring events", () => {
     const event = makeNostrEvent({ tags: [] });
     const result = nostrEventToCalendar(event);
