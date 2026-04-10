@@ -1,7 +1,7 @@
 // singletons/Signer/LocalSigner.ts
 import { getPublicKey, finalizeEvent, nip04, nip44 } from "nostr-tools";
 import { NostrSigner } from "./types";
-import { hexToBytes } from "@noble/hashes/utils";
+import { hexToBytes } from "@noble/hashes/utils.js";
 export function createLocalSigner(privkey: string): NostrSigner {
   const pubkey = getPublicKey(hexToBytes(privkey));
 

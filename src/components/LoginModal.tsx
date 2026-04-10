@@ -1,135 +1,99 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, type ReactNode } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { signerManager } from "../common/signer";
 import { getAppSecretKeyFromLocalStorage } from "../common/signer/utils";
-import { getPublicKey } from "nostr-tools";
+import { getPublicKey, generateSecretKey } from "nostr-tools";
 import { createNostrConnectURI, Nip46Relays } from "../common/signer/nip46";
 import {
   Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tabs,
   Tab,
   Stack,
   TextField,
   Typography,
-  Snackbar,
   Alert,
   IconButton,
   Box,
+  ButtonBase,
+  Divider,
   InputAdornment,
-  // Link,
 } from "@mui/material";
-import KeyIcon from "@mui/icons-material/VpnKey";
-import LinkIcon from "@mui/icons-material/Link";
+import { useTheme } from "@mui/material/styles";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import PhonelinkLockOutlinedIcon from "@mui/icons-material/PhonelinkLockOutlined";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useIntl } from "react-intl";
-import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
-import { SignerAppInfo } from "nostr-signer-capacitor-plugin/dist/esm/definitions";
+import { bytesToHex } from "nostr-tools/utils";
 import { isAndroidNative, isNative } from "../utils/platform";
 
-// NIP-46 Section (Manual + QR)
-interface Nip46SectionProps {
+const Nip46Section: React.FC<{
   onSuccess: () => void;
-}
-
-const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
+  onError: (msg: string) => void;
+}> = ({ onSuccess, onError }) => {
   const intl = useIntl();
   const [activeTab, setActiveTab] = useState("manual");
   const [bunkerUri, setBunkerUri] = useState("");
   const [loadingConnect, setLoadingConnect] = useState(false);
 
-  const [qrPayload] = useState(() => generateNostrConnectURI());
-
-  function generateNostrConnectURI() {
+  const [qrPayload] = useState(() => {
     const clientSecretKey = getAppSecretKeyFromLocalStorage();
     const clientPubkey = getPublicKey(clientSecretKey);
-
-    // Required secret (short random string)
     const secret = Math.random().toString(36).slice(2, 10);
-
-    // Permissions you want (optional, but usually good to ask explicitly)
     const perms = [
       "nip44_encrypt",
       "nip44_decrypt",
       "sign_event",
       "get_public_key",
     ];
-
-    // Build query params
-    const params = {
+    return createNostrConnectURI({
       clientPubkey,
       relays: Nip46Relays,
       secret,
       perms,
       name: "Calendar",
       url: window.location.origin,
-    };
+    });
+  });
 
-    const finalUrl = createNostrConnectURI(params);
-    console.log("FINAL URL is", finalUrl);
-    return finalUrl;
-  }
-
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
-
-  const showMessage = (
-    message: string,
-    severity: "success" | "error" = "success",
-  ) => {
-    setSnackbar({ open: true, message, severity });
-  };
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const connectToBunkerUri = async (bunkerUri: string) => {
-    await signerManager.loginWithNip46(bunkerUri);
-    showMessage(
-      intl.formatMessage({ id: "login.connectedToRemoteSigner" }),
-      "success",
-    );
+  const connectToBunkerUri = async (uri: string) => {
+    await signerManager.loginWithNip46(uri);
     onSuccess();
   };
 
   const handleConnectManual = async () => {
     if (!bunkerUri) {
-      showMessage(intl.formatMessage({ id: "login.enterBunkerUri" }), "error");
+      onError(intl.formatMessage({ id: "login.enterBunkerUri" }));
       return;
     }
     setLoadingConnect(true);
     try {
       await connectToBunkerUri(bunkerUri);
-    } catch (e) {
-      console.log(e);
-      showMessage(
-        intl.formatMessage({ id: "login.connectionFailed" }),
-        "error",
-      );
+    } catch {
+      onError(intl.formatMessage({ id: "login.connectionFailed" }));
     } finally {
       setLoadingConnect(false);
     }
   };
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <Box sx={{ px: 2, pb: 2, bgcolor: "action.hover" }}>
       <Tabs
         value={activeTab}
-        onChange={(_event: React.SyntheticEvent, newValue: string) => {
-          setActiveTab(newValue);
-          if (newValue === "qr") {
-            connectToBunkerUri(qrPayload);
+        onChange={(_e, val) => {
+          setActiveTab(val);
+          if (val === "qr") {
+            void connectToBunkerUri(qrPayload).catch(() => {
+              onError(intl.formatMessage({ id: "login.connectionFailed" }));
+            });
           }
         }}
-        aria-label="NIP-46 connection tabs"
+        sx={{ mb: 1 }}
       >
         <Tab
           label={intl.formatMessage({ id: "login.pasteUri" })}
@@ -137,65 +101,49 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
         />
         <Tab label={intl.formatMessage({ id: "login.qrCode" })} value="qr" />
       </Tabs>
+
       {activeTab === "manual" && (
-        <Stack spacing={2} sx={{ width: "100%", marginTop: 2 }}>
+        <Stack spacing={1} direction="row">
           <TextField
+            size="small"
+            fullWidth
             placeholder={intl.formatMessage({
               id: "login.enterBunkerUriPlaceholder",
             })}
             value={bunkerUri}
             onChange={(e) => setBunkerUri(e.target.value)}
-            fullWidth
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                void handleConnectManual();
+              }
+            }}
           />
           <Button
             variant="contained"
-            onClick={handleConnectManual}
-            disabled={loadingConnect}
+            onClick={() => void handleConnectManual()}
+            disabled={loadingConnect || !bunkerUri}
+            sx={{ flexShrink: 0 }}
           >
             {intl.formatMessage({ id: "login.connect" })}
           </Button>
         </Stack>
       )}
+
       {activeTab === "qr" && (
-        <Box style={{ textAlign: "center", marginTop: 16 }}>
-          <QRCodeCanvas value={qrPayload} size={180} />
-          <Box
-            color="textSecondary"
-            sx={{
-              fontSize: 12,
-              marginTop: 1,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
+        <Box textAlign="center">
+          <QRCodeCanvas value={qrPayload} size={160} />
+          <Box display="flex" justifyContent="center" alignItems="center" mt={1}>
             <IconButton
               size="small"
-              sx={{ marginTop: 1 }}
-              onClick={() => {
-                navigator.clipboard.writeText(qrPayload);
-                showMessage(
-                  intl.formatMessage({ id: "login.copiedToClipboard" }),
-                  "success",
-                );
-              }}
+              onClick={() => void navigator.clipboard.writeText(qrPayload)}
             >
               <ContentCopyIcon fontSize="small" />
             </IconButton>
-            <Typography
-              color="textSecondary"
-              sx={{
-                fontSize: 12,
-                marginTop: 1,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
+            <Typography variant="caption" color="text.secondary">
               {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
             </Typography>
           </Box>
-          <Typography color="textSecondary" sx={{ fontSize: 12, marginTop: 1 }}>
+          <Typography variant="caption" color="text.secondary">
             {intl.formatMessage(
               { id: "login.usingRelaysForCommunication" },
               {
@@ -207,87 +155,73 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
           </Typography>
         </Box>
       )}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </div>
+    </Box>
   );
 };
 
-// Footer info component
-const FooterInfo: React.FC = () => {
+function Nip55Section({
+  onClose,
+  onError,
+}: {
+  onClose: () => void;
+  onError: (msg: string) => void;
+}) {
   const intl = useIntl();
-  // const [isFAQModalVisible, setIsFAQModalVisible] = useState(false);
+  const [installedSigners, setInstalledSigners] = useState<{
+    apps: { packageName: string; name: string; iconUrl?: string }[];
+  }>();
+
+  useEffect(() => {
+    const load = async () => {
+      const { NostrSignerPlugin } = await import(
+        "nostr-signer-capacitor-plugin"
+      );
+      const result = await NostrSignerPlugin.getInstalledSignerApps();
+      setInstalledSigners(result);
+    };
+    void load();
+  }, []);
 
   return (
-    <div style={{ marginTop: 24, textAlign: "center", width: "100%" }}>
-      <Typography color="textSecondary" sx={{ fontSize: 12 }}>
-        {intl.formatMessage({ id: "login.keysNeverLeave" })}
-      </Typography>
-      <br />
-      {/* <Link
-        component="button"
-        variant="body2"
-        sx={{ fontSize: 12 }}
-        onClick={() => {
-          setIsFAQModalVisible(true);
-        }}
-      >
-        Need help?
-      </Link>
-      <ThemedUniversalModal
-        visible={isFAQModalVisible}
-        onClose={() => {
-          setIsFAQModalVisible(false);
-        }}
-        filePath="/docs/faq.md"
-        title="Frequently Asked Questions"
-      /> */}
-    </div>
+    <>
+      {installedSigners?.apps.map((app) => (
+        <OptionButton
+          key={app.packageName}
+          icon={
+            app.iconUrl ? (
+              <img
+                src={app.iconUrl}
+                alt={app.name}
+                style={{ width: 24, height: 24, borderRadius: 4 }}
+              />
+            ) : (
+              <PhonelinkLockOutlinedIcon />
+            )
+          }
+          title={app.name}
+          description="Sign with external Android signer"
+          onClick={() => {
+            void (async () => {
+              try {
+                await signerManager.loginWithNip55(app.packageName);
+                onClose();
+              } catch {
+                onError(intl.formatMessage({ id: "login.couldNotLogin" }));
+              }
+            })();
+          }}
+        />
+      ))}
+    </>
   );
-};
-
-interface LoginModalProps {
-  open: boolean;
-  onClose: () => void;
 }
-
-const LoginOptionButton: React.FC<{
-  icon: React.ReactNode;
-  text: string;
-  onClick: () => void;
-  type?: "outlined" | "contained";
-  loading?: boolean;
-}> = ({ icon, text, onClick, type, loading = false }) => (
-  <Button
-    variant={type}
-    startIcon={icon}
-    size="large"
-    onClick={onClick}
-    style={{ marginBottom: 8 }}
-    disabled={loading}
-  >
-    {text}
-  </Button>
-);
 
 function NsecSection({
   onClose,
-  showMessage,
+  onError,
 }: {
   onClose: () => void;
-  showMessage: (message: string, severity?: "success" | "error") => void;
+  onError: (msg: string) => void;
 }) {
   const intl = useIntl();
   const [nsec, setNsec] = useState("");
@@ -297,242 +231,309 @@ function NsecSection({
   const handleNsecLogin = async () => {
     const trimmedNsec = nsec.trim();
     if (!trimmedNsec) {
-      showMessage(intl.formatMessage({ id: "login.enterNsec" }), "error");
+      onError(intl.formatMessage({ id: "login.enterNsec" }));
       return;
     }
 
     setLoading(true);
+    onError("");
     try {
       await signerManager.loginWithNsec(trimmedNsec);
-      showMessage(
-        intl.formatMessage({ id: "login.loggedInWithNsec" }),
-        "success",
-      );
       onClose();
     } catch (error) {
-      console.error(error);
-      const messageId =
+      const message =
         error instanceof Error && error.message === "Invalid nsec"
-          ? "login.invalidNsec"
-          : "login.loginFailed";
-      showMessage(intl.formatMessage({ id: messageId }), "error");
+          ? intl.formatMessage({ id: "login.invalidNsec" })
+          : intl.formatMessage({ id: "login.loginFailed" });
+      onError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Stack spacing={2} sx={{ width: "100%" }}>
-      <TextField
-        placeholder={intl.formatMessage({ id: "login.enterNsecPlaceholder" })}
-        value={nsec}
-        onChange={(e) => setNsec(e.target.value)}
-        fullWidth
-        type={showNsec ? "text" : "password"}
-        autoComplete="off"
-        inputProps={{
-          autoCapitalize: "none",
-          autoCorrect: "off",
-          spellCheck: false,
-        }}
-        InputProps={{
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton
-                edge="end"
-                onClick={() => setShowNsec((prev) => !prev)}
-                aria-label={intl.formatMessage({
-                  id: showNsec ? "login.hideNsec" : "login.showNsec",
-                })}
-              >
-                {showNsec ? <VisibilityOffIcon /> : <VisibilityIcon />}
-              </IconButton>
-            </InputAdornment>
-          ),
-        }}
-      />
-      <Button variant="contained" onClick={handleNsecLogin} disabled={loading}>
-        {intl.formatMessage({ id: "navigation.login" })}
-      </Button>
-    </Stack>
+    <Box sx={{ px: 2, pb: 2, bgcolor: "action.hover" }}>
+      <Stack spacing={1.5}>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder={intl.formatMessage({
+            id: "login.enterNsecPlaceholder",
+          })}
+          value={nsec}
+          onChange={(e) => setNsec(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              void handleNsecLogin();
+            }
+          }}
+          type={showNsec ? "text" : "password"}
+          autoComplete="off"
+          inputProps={{
+            autoCapitalize: "none",
+            autoCorrect: "off",
+            spellCheck: false,
+          }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  edge="end"
+                  onClick={() => setShowNsec((prev) => !prev)}
+                  aria-label={intl.formatMessage({
+                    id: showNsec ? "login.hideNsec" : "login.showNsec",
+                  })}
+                >
+                  {showNsec ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Button
+          variant="contained"
+          onClick={() => void handleNsecLogin()}
+          disabled={loading || !nsec.trim()}
+        >
+          {intl.formatMessage({ id: "navigation.login" })}
+        </Button>
+      </Stack>
+    </Box>
   );
 }
 
-function Nip55Section({
-  onClose,
-  onError,
+function OptionButton({
+  icon,
+  title,
+  description,
+  onClick,
+  showChevron = false,
+  chevronRotated = false,
 }: {
-  onClose: () => void;
-  onError: (error: string) => void;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+  showChevron?: boolean;
+  chevronRotated?: boolean;
 }) {
-  const intl = useIntl();
-  const [installedSigners, setInstalledSigners] = useState<{
-    apps: SignerAppInfo[];
-  }>();
+  const theme = useTheme();
+  const accent = theme.palette.primary.main;
+  const alpha = theme.palette.mode === "dark" ? "22" : "18";
 
-  useEffect(() => {
-    const initialize = async () => {
-      const installedSigners = await NostrSignerPlugin.getInstalledSignerApps();
-      setInstalledSigners(installedSigners);
-    };
-    initialize();
-  }, []);
   return (
-    <>
-      {installedSigners?.apps.map((app) => {
-        return (
-          <Button
-            onClick={async () => {
-              try {
-                await signerManager.loginWithNip55(app.packageName);
-                onClose();
-              } catch (e: Error) {
-                onError(e.message);
-              }
-            }}
-            startIcon={
-              <img src={app.iconUrl} height={24} width={24} alt={app.name} />
-            }
-            variant="contained"
-            fullWidth
-          >
-            {intl.formatMessage({ id: "login.logInWith" }, { name: app.name })}
-          </Button>
-        );
-      })}
-    </>
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        px: 2.5,
+        py: 1.75,
+        textAlign: "left",
+        transition: "background 0.15s",
+        "&:hover": { bgcolor: `${accent}${alpha}` },
+      }}
+    >
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: 2,
+          bgcolor: `${accent}${alpha}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: accent,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </Box>
+      <Box flex={1} minWidth={0}>
+        <Typography variant="body1" fontWeight={600} lineHeight={1.3}>
+          {title}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {description}
+        </Typography>
+      </Box>
+      {showChevron && (
+        <ChevronRightIcon
+          sx={{
+            color: "text.secondary",
+            opacity: 0.5,
+            flexShrink: 0,
+            transition: "transform 0.2s",
+            transform: chevronRotated ? "rotate(90deg)" : "none",
+          }}
+        />
+      )}
+    </ButtonBase>
   );
+}
+
+interface LoginModalProps {
+  open: boolean;
+  onClose: () => void;
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const intl = useIntl();
+  const theme = useTheme();
   const [showNip46, setShowNip46] = useState(false);
-  const [showNsec, setShowNsec] = useState(false);
-
-  const [loadingNip07, setLoadingNip07] = useState(false);
-
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
-
-  const showMessage = (
-    message: string,
-    severity: "success" | "error" = "success",
-  ) => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
+  const [showNsecLogin, setShowNsecLogin] = useState(false);
+  const [error, setError] = useState("");
 
   const handleNip07 = async () => {
-    console.log("handle nip07 called");
-    if (window.nostr) {
-      setLoadingNip07(true);
-      try {
-        await signerManager.loginWithNip07();
-        showMessage(
-          intl.formatMessage({ id: "login.loggedInWithNip07" }),
-          "success",
-        );
-        onClose();
-      } catch {
-        showMessage(intl.formatMessage({ id: "login.loginFailed" }), "error");
-      } finally {
-        setLoadingNip07(false);
-      }
-    } else {
-      showMessage(
-        intl.formatMessage({ id: "login.noNip07Extension" }),
-        "error",
-      );
+    if (!window.nostr) {
+      setError(intl.formatMessage({ id: "login.noNip07Extension" }));
+      return;
+    }
+    setError("");
+    try {
+      await signerManager.loginWithNip07();
+      onClose();
+    } catch {
+      setError(intl.formatMessage({ id: "login.loginFailed" }));
+    }
+  };
+
+  const handleGuest = async () => {
+    setError("");
+    try {
+      const key = bytesToHex(generateSecretKey());
+      await signerManager.createGuestAccount(key, {});
+      onClose();
+    } catch {
+      setError(intl.formatMessage({ id: "login.loginFailed" }));
     }
   };
 
   return (
-    <>
-      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ textAlign: "center" }}>
-          {intl.formatMessage({ id: "login.signInToFormstr" })}
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            align="center"
-            sx={{ mt: 0.5 }}
-          >
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+    >
+      <Box
+        sx={{
+          px: 3,
+          pt: 4,
+          pb: 3,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 1.5,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+        }}
+      >
+        <img
+          src="/formstr.png"
+          alt="Calendar by Form*"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            objectFit: "contain",
+          }}
+        />
+        <Box textAlign="center">
+          <Typography variant="h6" fontWeight={700}>
+            {intl.formatMessage({ id: "login.signInToFormstr" })}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mt={0.5}>
             {intl.formatMessage({ id: "login.chooseLoginMethod" })}
           </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ width: "100%" }}>
-            {isAndroidNative() && (
-              <Nip55Section
-                onClose={onClose}
-                onError={() =>
-                  showMessage(
-                    intl.formatMessage({ id: "login.couldNotLogin" }),
-                    "error",
-                  )
-                }
-              />
-            )}
-            {isAndroidNative() && (
-              <>
-                <LoginOptionButton
-                  icon={<KeyIcon />}
-                  text={intl.formatMessage({ id: "login.signInWithNsec" })}
-                  onClick={() => {
-                    setShowNsec((prev) => !prev);
-                    setShowNip46(false);
-                  }}
-                />
-                {showNsec && (
-                  <NsecSection onClose={onClose} showMessage={showMessage} />
-                )}
-              </>
-            )}
-            {!isNative && (
-              <LoginOptionButton
-                icon={<KeyIcon />}
-                text={intl.formatMessage({ id: "login.signInWithExtension" })}
-                type="contained"
-                onClick={handleNip07}
-                loading={loadingNip07}
-              />
-            )}
-            <LoginOptionButton
-              icon={<LinkIcon />}
-              text={intl.formatMessage({ id: "login.connectRemoteSigner" })}
+        </Box>
+        {error && (
+          <Alert severity="error" sx={{ width: "100%", borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
+      </Box>
+
+      <Stack divider={<Divider />}>
+        {!isNative && (
+          <OptionButton
+            icon={<VpnKeyOutlinedIcon />}
+            title={intl.formatMessage({ id: "login.signInWithExtension" })}
+            description="Alby, nos2x, Flamingo"
+            onClick={() => void handleNip07()}
+          />
+        )}
+
+        {isAndroidNative() && (
+          <Nip55Section onClose={onClose} onError={setError} />
+        )}
+
+        {isAndroidNative() && (
+          <Box>
+            <OptionButton
+              icon={<VpnKeyOutlinedIcon />}
+              title={intl.formatMessage({ id: "login.signInWithNsec" })}
+              description={intl.formatMessage({ id: "login.keysNeverLeave" })}
               onClick={() => {
-                setShowNip46((prev) => !prev);
-                setShowNsec(false);
+                setError("");
+                setShowNsecLogin((prev) => !prev);
+                setShowNip46(false);
               }}
+              showChevron
+              chevronRotated={showNsecLogin}
             />
-            {showNip46 && <Nip46Section onSuccess={onClose} />}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <FooterInfo />
-        </DialogActions>
-      </Dialog>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            {showNsecLogin && (
+              <NsecSection onClose={onClose} onError={setError} />
+            )}
+          </Box>
+        )}
+
+        <Box>
+          <OptionButton
+            icon={<HubOutlinedIcon />}
+            title={intl.formatMessage({ id: "login.connectRemoteSigner" })}
+            description="Connect via NIP-46"
+            onClick={() => {
+              setError("");
+              setShowNip46((prev) => !prev);
+              setShowNsecLogin(false);
+            }}
+            showChevron
+            chevronRotated={showNip46}
+          />
+          {showNip46 && (
+            <Nip46Section onSuccess={onClose} onError={setError} />
+          )}
+        </Box>
+
+        <OptionButton
+          icon={<PersonOutlinedIcon />}
+          title="Temporary Account"
+          description="Quick access, no keys needed"
+          onClick={() => void handleGuest()}
+        />
+      </Stack>
+
+      <Box
+        sx={{
+          px: 3,
+          py: 1.5,
+          borderTop: `1px solid ${theme.palette.divider}`,
+        }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          display="block"
+          textAlign="center"
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </>
+          {intl.formatMessage({ id: "login.keysNeverLeave" })}
+        </Typography>
+      </Box>
+    </Dialog>
   );
 };
 

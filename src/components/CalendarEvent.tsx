@@ -39,11 +39,17 @@ import { useNavigate } from "react-router";
 import { isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
+import { useTimeBasedEvents } from "../stores/events";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import {
+  buildEventRef,
+  getCalendarEventCoordinate,
+} from "../utils/calendarListTypes";
+import { EventCalendarListManagement } from "./EventCalendarListManagement";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -357,10 +363,47 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const locations = event.location.filter((location) => !!location?.trim?.());
-  const calendars = useCalendarLists.getState().calendars;
+  const { calendars, moveEventToCalendar } = useCalendarLists();
+  const { updateEvent } = useTimeBasedEvents();
+  const eventCoordinate = getCalendarEventCoordinate(event);
+
   const calendar = event.calendarId
     ? calendars.find((c) => c.id === event.calendarId)
     : undefined;
+
+  const handleCalendarUpdate = async (nextCalendarId: string) => {
+    const sourceCalendarId = event.calendarId;
+    if (!sourceCalendarId) {
+      throw new Error("Event is not in any calendar");
+    }
+
+    const sourceCalendar = calendars.find((c) => c.id === sourceCalendarId);
+    const currentEventRef = sourceCalendar?.eventRefs.find(
+      (ref) => ref[0] === eventCoordinate,
+    );
+
+    const eventRef =
+      currentEventRef ||
+      (event.viewKey
+        ? buildEventRef({
+            kind: event.kind,
+            authorPubkey: event.user,
+            eventDTag: event.id,
+            viewKey: event.viewKey,
+          })
+        : undefined);
+
+    if (!eventRef) {
+      throw new Error("Event reference not found");
+    }
+
+    await moveEventToCalendar(nextCalendarId, eventCoordinate, eventRef);
+    updateEvent({
+      ...event,
+      calendarId: nextCalendarId,
+    });
+  };
+
   return (
     <Box
       sx={{
@@ -437,18 +480,10 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
           {calendar ? (
             <>
               <Divider />
-              <Box display="flex" alignItems="center" gap={1}>
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: calendar.color,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography variant="body2">{calendar.title}</Typography>
-              </Box>
+              <EventCalendarListManagement
+                calendarId={event.calendarId || ""}
+                onCalendarUpdate={handleCalendarUpdate}
+              />
             </>
           ) : (
             <>

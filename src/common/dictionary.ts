@@ -57,6 +57,14 @@ const dictionary: NestedObject = {
       login_error: "Login failed",
       loggingIn: "Logging in...",
     },
+    startup: {
+      loadingCache: "Retrieving login data from cache...",
+      welcomeBack: "Welcome back, {user}!",
+      welcomeBackGeneric: "Welcome back!",
+      fetchingEvents: "Fetching your calendar lists and events...",
+      noLogin: "No saved login found.",
+      error: "Could not load your data. Check your connection.",
+    },
     event: {
       editEvent: "Edit Event",
       deleteEvent: "Delete Event",
@@ -89,6 +97,8 @@ const dictionary: NestedObject = {
       eventNotFound: "Event not found. It may not have loaded yet.",
       loadError:
         "We could not load the event. It may be a temporary error. Please refresh the page to try again",
+      calendarMoveError:
+        "We could not move the event to the selected calendar. Please try again.",
       notAuthorized: "You are not allowed to edit this event.",
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
@@ -241,6 +251,14 @@ const dictionary: NestedObject = {
       login_error: "Anmeldung fehlgeschlagen",
       loggingIn: "Anmeldung läuft...",
     },
+    startup: {
+      loadingCache: "Anmeldedaten aus dem Cache abrufen...",
+      welcomeBack: "Willkommen zurück, {user}!",
+      welcomeBackGeneric: "Willkommen zurück!",
+      fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
+      noLogin: "Keine gespeicherte Anmeldung gefunden.",
+      error: "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
+    },
     event: {
       editEvent: "Termin bearbeiten",
       deleteEvent: "Termin löschen",
@@ -274,6 +292,8 @@ const dictionary: NestedObject = {
         "Termin nicht gefunden. Er wurde möglicherweise noch nicht geladen.",
       loadError:
         "Der Termin konnte nicht geladen werden. Es kann sich um einen vorübergehenden Fehler handeln. Bitte aktualisieren Sie die Seite, um es erneut zu versuchen",
+      calendarMoveError:
+        "Der Termin konnte nicht in den ausgewählten Kalender verschoben werden. Bitte versuchen Sie es erneut.",
       notAuthorized: "Sie sind nicht berechtigt, diesen Termin zu bearbeiten.",
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",

@@ -30,7 +30,7 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -287,9 +287,7 @@ export async function publishPrivateCalendarEvent(
   // These serve as invitations — recipients will see them as notifications
   // and can accept them into their own calendars.
   const giftWraps: Event[] = [];
-  const targetPubKeys = Array.from(
-    new Set([userPublicKey, ...event.participants]),
-  );
+  const targetPubKeys = Array.from(new Set([...event.participants]));
   for (const participant of targetPubKeys) {
     const giftWrap = await nip59.wrapEvent(
       {

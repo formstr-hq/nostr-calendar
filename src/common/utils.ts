@@ -1,5 +1,5 @@
-import { sha256 } from "@noble/hashes/sha2";
-import { utf8ToBytes } from "@noble/hashes/utils";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { ICalendarEvent } from "../stores/events";
 import { NestedObject } from "./dictionary";
@@ -11,7 +11,7 @@ export function flattenMessages(
   return (
     nestedMessages &&
     Object.keys(nestedMessages).reduce<Record<string, string>>(
-      (messages: string | NestedObject, key: string) => {
+      (messages, key) => {
         const value = nestedMessages[key];
         const prefixedKey = prefix ? `${prefix}.${key}` : key.toString();
 

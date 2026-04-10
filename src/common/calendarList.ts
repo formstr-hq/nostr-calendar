@@ -24,7 +24,7 @@
 
 import { Event, UnsignedEvent, getEventHash, Filter } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 import { signerManager } from "./signer";
 import { EventKinds } from "./EventConfigs";
