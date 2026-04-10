@@ -16,6 +16,7 @@ const { mockEncrypt, mockDecrypt, mockSignEvent } = vi.hoisted(() => ({
       ["title", "Test Calendar"],
       ["content", "A test calendar"],
       ["color", "#d50000"],
+      ["notifications", "disabled"],
       [
         "a",
         "32678:testpubkey:event-1",
@@ -71,6 +72,7 @@ const makeCalendar = (overrides?: Partial<ICalendarList>): ICalendarList => ({
   title: "My Calendar",
   description: "Personal events",
   color: "#4285f4",
+  notificationPreference: "enabled",
   eventRefs: [
     ["32678:testpubkey:event-1", "", "nsec1key:1700000000::1700003600:false"],
   ],
@@ -96,6 +98,7 @@ describe("calendarList protocol layer", () => {
       expect(tags).toContainEqual(["title", "My Calendar"]);
       expect(tags).toContainEqual(["content", "Personal events"]);
       expect(tags).toContainEqual(["color", "#4285f4"]);
+      expect(tags).toContainEqual(["notifications", "enabled"]);
       expect(tags).toContainEqual([
         "a",
         "32678:testpubkey:event-1",
@@ -157,6 +160,7 @@ describe("calendarList protocol layer", () => {
       expect(result.title).toBe("Test Calendar");
       expect(result.description).toBe("A test calendar");
       expect(result.color).toBe("#d50000");
+      expect(result.notificationPreference).toBe("disabled");
       expect(result.eventRefs).toEqual([
         [
           "32678:testpubkey:event-1",
@@ -190,6 +194,7 @@ describe("calendarList protocol layer", () => {
       expect(result.title).toBe("Minimal");
       expect(result.description).toBe("");
       expect(result.color).toBe("#4285f4"); // default color
+      expect(result.notificationPreference).toBe("enabled");
       expect(result.eventRefs).toEqual([]);
     });
 

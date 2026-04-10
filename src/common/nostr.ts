@@ -233,6 +233,9 @@ async function preparePrivateCalendarEvent(
     eventData.push(["L", "rrule"]);
     eventData.push(["l", event.repeat.rrule]);
   }
+  if (event.notificationPreference) {
+    eventData.push(["notification", event.notificationPreference]);
+  }
 
   event.location.forEach((loc) => {
     eventData.push(["location", loc]);
@@ -638,6 +641,9 @@ export const publishPublicCalendarEvent = async (
     ["start", String(Math.floor(event.begin / 1000))],
     ["end", String(Math.floor(event.end / 1000))],
   ];
+  if (event.notificationPreference) {
+    tags.push(["notification", event.notificationPreference]);
+  }
   if (event.image) {
     tags.push(["image", event.image]);
   }

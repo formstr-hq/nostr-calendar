@@ -30,7 +30,10 @@ import {
 } from "../common/calendarList";
 import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
-import type { ICalendarList } from "../utils/calendarListTypes";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCE,
+  type ICalendarList,
+} from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { isNative } from "../utils/platform";
 
@@ -54,6 +57,12 @@ const saveVisibilityToStorage = (visibility: Record<string, boolean>) => {
 
 let subscriptionHandle: SubscriptionHandle | undefined;
 
+const withNotificationPreference = (calendar: ICalendarList): ICalendarList => ({
+  ...calendar,
+  notificationPreference:
+    calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
+});
+
 interface CalendarListsState {
   calendars: ICalendarList[];
   isLoaded: boolean;
@@ -64,6 +73,7 @@ interface CalendarListsState {
     title: string,
     description?: string,
     color?: string,
+    notificationPreference?: "enabled" | "disabled",
   ) => Promise<ICalendarList>;
   updateCalendar: (calendar: ICalendarList) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;
@@ -105,10 +115,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     );
 
     // Restore visibility state from separate storage
-    const calendarsWithVisibility = cached.map((cal) => ({
-      ...cal,
-      isVisible: visibility[cal.id] !== undefined ? visibility[cal.id] : true,
-    }));
+    const calendarsWithVisibility = cached.map((cal) =>
+      withNotificationPreference({
+        ...cal,
+        isVisible: visibility[cal.id] !== undefined ? visibility[cal.id] : true,
+      }),
+    );
 
     if (calendarsWithVisibility.length > 0) {
       set({ calendars: calendarsWithVisibility, isLoaded: true });
@@ -144,6 +156,8 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
         // Preserve client-side visibility state
         list.isVisible =
           visibility[list.id] !== undefined ? visibility[list.id] : true;
+        list.notificationPreference =
+          list.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE;
         fetchedCalendars.push(list);
 
         // Merge with existing: replace if newer, add if new
@@ -193,11 +207,17 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   /**
    * Creates a new calendar with the given properties and publishes it.
    */
-  createCalendar: async (title, description = "", color = "#4285f4") => {
+  createCalendar: async (
+    title,
+    description = "",
+    color = "#4285f4",
+    notificationPreference = DEFAULT_NOTIFICATION_PREFERENCE,
+  ) => {
     const newCalendar = await createCalendar({
       title,
       description,
       color,
+      notificationPreference,
       eventId: "",
       eventRefs: [],
       isVisible: true,
@@ -218,6 +238,8 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   updateCalendar: async (calendar) => {
     const updated = {
       ...calendar,
+      notificationPreference:
+        calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
       createdAt: Math.floor(Date.now() / 1000),
     };
     const publishedEvent = await publishCalendarList(updated);

@@ -28,6 +28,7 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { CalendarManageDialog } from "./CalendarManageDialog";
 import type { ICalendarList } from "../utils/calendarListTypes";
 import { useIntl } from "react-intl";
+import { useTimeBasedEvents } from "../stores/events";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -64,11 +65,26 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
     title: string;
     description: string;
     color: string;
+    notificationPreference: "enabled" | "disabled";
   }) => {
     if (editingCalendar) {
+      const preferenceChanged =
+        (editingCalendar.notificationPreference || "enabled") !==
+        data.notificationPreference;
+
       await updateCalendar({ ...editingCalendar, ...data });
+      if (preferenceChanged) {
+        useTimeBasedEvents
+          .getState()
+          .refreshNotificationPreferencesForCalendar(editingCalendar.id);
+      }
     } else {
-      await createCalendar(data.title, data.description, data.color);
+      await createCalendar(
+        data.title,
+        data.description,
+        data.color,
+        data.notificationPreference,
+      );
     }
   };
 
