@@ -436,6 +436,12 @@ export function CalendarEventEdit({
                     setRecurrenceUntilDate(value ? value.startOf("day") : null)
                   }
                   minDate={dayjs(eventDetails.begin).startOf("day")}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                    },
+                  }}
                 />
               )}
             </Box>
