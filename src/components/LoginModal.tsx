@@ -19,11 +19,14 @@ import {
   Alert,
   IconButton,
   Box,
+  InputAdornment,
   // Link,
 } from "@mui/material";
 import KeyIcon from "@mui/icons-material/VpnKey";
 import LinkIcon from "@mui/icons-material/Link";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useIntl } from "react-intl";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
 import { SignerAppInfo } from "nostr-signer-capacitor-plugin/dist/esm/definitions";
@@ -90,7 +93,10 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
 
   const connectToBunkerUri = async (bunkerUri: string) => {
     await signerManager.loginWithNip46(bunkerUri);
-    showMessage(intl.formatMessage({ id: "login.connectedToRemoteSigner" }), "success");
+    showMessage(
+      intl.formatMessage({ id: "login.connectedToRemoteSigner" }),
+      "success",
+    );
     onSuccess();
   };
 
@@ -104,7 +110,10 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
       await connectToBunkerUri(bunkerUri);
     } catch (e) {
       console.log(e);
-      showMessage(intl.formatMessage({ id: "login.connectionFailed" }), "error");
+      showMessage(
+        intl.formatMessage({ id: "login.connectionFailed" }),
+        "error",
+      );
     } finally {
       setLoadingConnect(false);
     }
@@ -122,13 +131,18 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
         }}
         aria-label="NIP-46 connection tabs"
       >
-        <Tab label={intl.formatMessage({ id: "login.pasteUri" })} value="manual" />
+        <Tab
+          label={intl.formatMessage({ id: "login.pasteUri" })}
+          value="manual"
+        />
         <Tab label={intl.formatMessage({ id: "login.qrCode" })} value="qr" />
       </Tabs>
       {activeTab === "manual" && (
         <Stack spacing={2} sx={{ width: "100%", marginTop: 2 }}>
           <TextField
-            placeholder={intl.formatMessage({ id: "login.enterBunkerUriPlaceholder" })}
+            placeholder={intl.formatMessage({
+              id: "login.enterBunkerUriPlaceholder",
+            })}
             value={bunkerUri}
             onChange={(e) => setBunkerUri(e.target.value)}
             fullWidth
@@ -160,7 +174,10 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
               sx={{ marginTop: 1 }}
               onClick={() => {
                 navigator.clipboard.writeText(qrPayload);
-                showMessage(intl.formatMessage({ id: "login.copiedToClipboard" }), "success");
+                showMessage(
+                  intl.formatMessage({ id: "login.copiedToClipboard" }),
+                  "success",
+                );
               }}
             >
               <ContentCopyIcon fontSize="small" />
@@ -179,7 +196,14 @@ const Nip46Section: React.FC<Nip46SectionProps> = ({ onSuccess }) => {
             </Typography>
           </Box>
           <Typography color="textSecondary" sx={{ fontSize: 12, marginTop: 1 }}>
-            {intl.formatMessage({ id: "login.usingRelaysForCommunication" }, { relays: Nip46Relays.map((relay) => relay.replace("wss://", "")).join(", ") })}
+            {intl.formatMessage(
+              { id: "login.usingRelaysForCommunication" },
+              {
+                relays: Nip46Relays.map((relay) =>
+                  relay.replace("wss://", ""),
+                ).join(", "),
+              },
+            )}
           </Typography>
         </Box>
       )}
@@ -258,6 +282,82 @@ const LoginOptionButton: React.FC<{
   </Button>
 );
 
+function NsecSection({
+  onClose,
+  showMessage,
+}: {
+  onClose: () => void;
+  showMessage: (message: string, severity?: "success" | "error") => void;
+}) {
+  const intl = useIntl();
+  const [nsec, setNsec] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showNsec, setShowNsec] = useState(false);
+
+  const handleNsecLogin = async () => {
+    const trimmedNsec = nsec.trim();
+    if (!trimmedNsec) {
+      showMessage(intl.formatMessage({ id: "login.enterNsec" }), "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signerManager.loginWithNsec(trimmedNsec);
+      showMessage(
+        intl.formatMessage({ id: "login.loggedInWithNsec" }),
+        "success",
+      );
+      onClose();
+    } catch (error) {
+      console.error(error);
+      const messageId =
+        error instanceof Error && error.message === "Invalid nsec"
+          ? "login.invalidNsec"
+          : "login.loginFailed";
+      showMessage(intl.formatMessage({ id: messageId }), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Stack spacing={2} sx={{ width: "100%" }}>
+      <TextField
+        placeholder={intl.formatMessage({ id: "login.enterNsecPlaceholder" })}
+        value={nsec}
+        onChange={(e) => setNsec(e.target.value)}
+        fullWidth
+        type={showNsec ? "text" : "password"}
+        autoComplete="off"
+        inputProps={{
+          autoCapitalize: "none",
+          autoCorrect: "off",
+          spellCheck: false,
+        }}
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                edge="end"
+                onClick={() => setShowNsec((prev) => !prev)}
+                aria-label={intl.formatMessage({
+                  id: showNsec ? "login.hideNsec" : "login.showNsec",
+                })}
+              >
+                {showNsec ? <VisibilityOffIcon /> : <VisibilityIcon />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+      />
+      <Button variant="contained" onClick={handleNsecLogin} disabled={loading}>
+        {intl.formatMessage({ id: "navigation.login" })}
+      </Button>
+    </Stack>
+  );
+}
+
 function Nip55Section({
   onClose,
   onError,
@@ -307,6 +407,7 @@ function Nip55Section({
 const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const intl = useIntl();
   const [showNip46, setShowNip46] = useState(false);
+  const [showNsec, setShowNsec] = useState(false);
 
   const [loadingNip07, setLoadingNip07] = useState(false);
 
@@ -333,7 +434,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       setLoadingNip07(true);
       try {
         await signerManager.loginWithNip07();
-        showMessage(intl.formatMessage({ id: "login.loggedInWithNip07" }), "success");
+        showMessage(
+          intl.formatMessage({ id: "login.loggedInWithNip07" }),
+          "success",
+        );
         onClose();
       } catch {
         showMessage(intl.formatMessage({ id: "login.loginFailed" }), "error");
@@ -341,7 +445,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
         setLoadingNip07(false);
       }
     } else {
-      showMessage(intl.formatMessage({ id: "login.noNip07Extension" }), "error");
+      showMessage(
+        intl.formatMessage({ id: "login.noNip07Extension" }),
+        "error",
+      );
     }
   };
 
@@ -365,9 +472,27 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
               <Nip55Section
                 onClose={onClose}
                 onError={() =>
-                  showMessage(intl.formatMessage({ id: "login.couldNotLogin" }), "error")
+                  showMessage(
+                    intl.formatMessage({ id: "login.couldNotLogin" }),
+                    "error",
+                  )
                 }
               />
+            )}
+            {isAndroidNative() && (
+              <>
+                <LoginOptionButton
+                  icon={<KeyIcon />}
+                  text={intl.formatMessage({ id: "login.signInWithNsec" })}
+                  onClick={() => {
+                    setShowNsec((prev) => !prev);
+                    setShowNip46(false);
+                  }}
+                />
+                {showNsec && (
+                  <NsecSection onClose={onClose} showMessage={showMessage} />
+                )}
+              </>
             )}
             {!isNative && (
               <LoginOptionButton
@@ -381,7 +506,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             <LoginOptionButton
               icon={<LinkIcon />}
               text={intl.formatMessage({ id: "login.connectRemoteSigner" })}
-              onClick={() => setShowNip46(!showNip46)}
+              onClick={() => {
+                setShowNip46((prev) => !prev);
+                setShowNsec(false);
+              }}
             />
             {showNip46 && <Nip46Section onSuccess={onClose} />}
           </Stack>

@@ -116,7 +116,12 @@ class Signer {
   async loginWithNsec(nsec: string) {
     if (!isNative) throw new Error("NSEC login only allowed on native");
 
-    const privkey = nip19.decode(nsec).data as Uint8Array;
+    let privkey: Uint8Array;
+    try {
+      privkey = nip19.decode(nsec).data as Uint8Array;
+    } catch {
+      throw new Error("Invalid nsec");
+    }
     if (!privkey) throw new Error("Invalid nsec");
 
     this.signer = createLocalSigner(bytesToHex(privkey));
