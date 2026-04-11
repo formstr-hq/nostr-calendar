@@ -24,6 +24,7 @@ import {
 } from "nostr-tools/nip19";
 import { signerManager } from "./signer";
 import { RSVPStatus } from "../utils/types";
+import type { ISchedulingPage } from "../utils/types";
 import { EventKinds } from "./EventConfigs";
 import { nostrRuntime } from "./nostrRuntime";
 import { useRelayStore } from "../stores/relays";
@@ -31,6 +32,7 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { schedulingPageToTags } from "../utils/parser";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -777,3 +779,285 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   const allRelays = [...new Set([...relays, ...defaultRelays])];
   await publishToRelays(fullEvent, () => {}, allRelays);
 };
+
+// --- Appointment Scheduling ---
+
+/**
+ * Publish a scheduling page (kind 31927) to relays.
+ * This is a public, parameterized replaceable event that contains
+ * the creator's availability configuration.
+ */
+export async function publishSchedulingPage(
+  page: ISchedulingPage,
+): Promise<Event> {
+  const pubKey = await getUserPublicKey();
+  const tags = schedulingPageToTags(page);
+
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.SchedulingPage,
+    pubkey: pubKey,
+    tags,
+    content: page.description,
+    created_at: Math.floor(Date.now() / 1000),
+  };
+
+  const signer = await signerManager.getSigner();
+  const signedEvent = await signer.signEvent(baseEvent);
+  signedEvent.id = getEventHash(baseEvent);
+
+  await publishToRelays(signedEvent);
+  nostrRuntime.addEvent(signedEvent);
+
+  return signedEvent;
+}
+
+/**
+ * Fetch a single scheduling page by naddr.
+ */
+export async function fetchSchedulingPage(naddr: NAddr): Promise<Event> {
+  const { data } = decode(naddr as NAddr);
+  const relays = data.relays ?? defaultRelays;
+  const filter: Filter = {
+    "#d": [data.identifier],
+    kinds: [EventKinds.SchedulingPage],
+    authors: [data.pubkey],
+  };
+
+  const event = await nostrRuntime.fetchOne(relays, filter);
+  if (!event) {
+    throw new Error("SCHEDULING_PAGE_NOT_FOUND");
+  }
+  return event;
+}
+
+/**
+ * Subscribe to all scheduling pages owned by a specific user.
+ */
+export function fetchUserSchedulingPages(
+  pubkey: string,
+  onEvent: (event: Event) => void,
+  onEose?: () => void,
+) {
+  const relayList = getRelays();
+  const filter: Filter = {
+    kinds: [EventKinds.SchedulingPage],
+    authors: [pubkey],
+  };
+
+  return nostrRuntime.subscribe(relayList, [filter], {
+    onEvent,
+    onEose,
+  });
+}
+
+/**
+ * Delete a scheduling page by publishing a kind 5 deletion event.
+ */
+export async function deleteSchedulingPage(
+  page: ISchedulingPage,
+): Promise<Event> {
+  return publishDeletionEvent({
+    kinds: [EventKinds.SchedulingPage],
+    coordinates: [`${EventKinds.SchedulingPage}:${page.user}:${page.id}`],
+    reason: "",
+  });
+}
+
+/**
+ * Send a booking request to a scheduling page creator via NIP-59 gift wrap.
+ * Creates a rumor (kind 57) wrapped in a gift wrap (kind 1057).
+ */
+export async function sendBookingRequest({
+  schedulingPageRef,
+  creatorPubkey,
+  start,
+  end,
+  title,
+  note,
+}: {
+  schedulingPageRef: string;
+  creatorPubkey: string;
+  start: number;
+  end: number;
+  title: string;
+  note: string;
+}): Promise<Event> {
+  const userPublicKey = await getUserPublicKey();
+
+  const giftWrap = await nip59.wrapEvent(
+    {
+      pubkey: userPublicKey,
+      created_at: Math.floor(Date.now() / 1000),
+      kind: EventKinds.BookingRequestRumor,
+      content: "",
+      tags: [
+        ["a", schedulingPageRef],
+        ["start", String(Math.floor(start / 1000))],
+        ["end", String(Math.floor(end / 1000))],
+        ["title", title],
+        ["note", note],
+      ],
+    },
+    creatorPubkey,
+    EventKinds.BookingRequestGiftWrap,
+  );
+
+  await publishToRelays(giftWrap);
+  return giftWrap;
+}
+
+/**
+ * Send a booking response (approve/decline) from creator to booker
+ * via NIP-59 gift wrap. Creates a rumor (kind 58) wrapped in kind 1058.
+ */
+export async function sendBookingResponse({
+  schedulingPageRef,
+  bookerPubkey,
+  start,
+  end,
+  status,
+  eventRef,
+  viewKey,
+  reason,
+}: {
+  schedulingPageRef: string;
+  bookerPubkey: string;
+  start: number;
+  end: number;
+  status: "approved" | "declined";
+  eventRef?: string;
+  viewKey?: string;
+  reason?: string;
+}): Promise<Event> {
+  const userPublicKey = await getUserPublicKey();
+
+  const tags: string[][] = [
+    ["a", schedulingPageRef],
+    ["start", String(Math.floor(start / 1000))],
+    ["end", String(Math.floor(end / 1000))],
+    ["status", status],
+  ];
+
+  if (status === "approved" && eventRef) {
+    tags.push(["event_ref", eventRef]);
+  }
+  if (status === "approved" && viewKey) {
+    tags.push(["viewKey", viewKey]);
+  }
+  if (status === "declined" && reason) {
+    tags.push(["reason", reason]);
+  }
+
+  const giftWrap = await nip59.wrapEvent(
+    {
+      pubkey: userPublicKey,
+      created_at: Math.floor(Date.now() / 1000),
+      kind: EventKinds.BookingResponseRumor,
+      content: "",
+      tags,
+    },
+    bookerPubkey,
+    EventKinds.BookingResponseGiftWrap,
+  );
+
+  await publishToRelays(giftWrap);
+  return giftWrap;
+}
+
+/**
+ * Unwrap a booking request gift wrap (kind 1057) to extract the request details.
+ */
+export async function unwrapBookingRequest(giftWrap: Event): Promise<{
+  schedulingPageRef: string;
+  bookerPubkey: string;
+  start: number;
+  end: number;
+  title: string;
+  note: string;
+}> {
+  const rumor = await nip59.unwrapEvent(giftWrap);
+
+  const getTag = (name: string) =>
+    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
+
+  return {
+    schedulingPageRef: getTag("a"),
+    bookerPubkey: rumor.pubkey,
+    start: Number(getTag("start")) * 1000,
+    end: Number(getTag("end")) * 1000,
+    title: getTag("title"),
+    note: getTag("note"),
+  };
+}
+
+/**
+ * Unwrap a booking response gift wrap (kind 1058) to extract the response details.
+ */
+export async function unwrapBookingResponse(giftWrap: Event): Promise<{
+  schedulingPageRef: string;
+  creatorPubkey: string;
+  start: number;
+  end: number;
+  status: "approved" | "declined";
+  eventRef?: string;
+  viewKey?: string;
+  reason?: string;
+}> {
+  const rumor = await nip59.unwrapEvent(giftWrap);
+
+  const getTag = (name: string) =>
+    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
+
+  return {
+    schedulingPageRef: getTag("a"),
+    creatorPubkey: rumor.pubkey,
+    start: Number(getTag("start")) * 1000,
+    end: Number(getTag("end")) * 1000,
+    status: getTag("status") as "approved" | "declined",
+    eventRef: getTag("event_ref") || undefined,
+    viewKey: getTag("viewKey") || undefined,
+    reason: getTag("reason") || undefined,
+  };
+}
+
+/**
+ * Subscribe to incoming booking request gift wraps (kind 1057) for a user.
+ */
+export function subscribeBookingRequests(
+  pubkey: string,
+  onEvent: (event: Event) => void,
+  onEose?: () => void,
+) {
+  const relayList = getRelays();
+  const filter: Filter = {
+    kinds: [EventKinds.BookingRequestGiftWrap],
+    "#p": [pubkey],
+    limit: 50,
+  };
+
+  return nostrRuntime.subscribe(relayList, [filter], {
+    onEvent,
+    onEose,
+  });
+}
+
+/**
+ * Subscribe to incoming booking response gift wraps (kind 1058) for a user.
+ */
+export function subscribeBookingResponses(
+  pubkey: string,
+  onEvent: (event: Event) => void,
+  onEose?: () => void,
+) {
+  const relayList = getRelays();
+  const filter: Filter = {
+    kinds: [EventKinds.BookingResponseGiftWrap],
+    "#p": [pubkey],
+    limit: 50,
+  };
+
+  return nostrRuntime.subscribe(relayList, [filter], {
+    onEvent,
+    onEose,
+  });
+}

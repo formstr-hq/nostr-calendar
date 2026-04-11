@@ -1,5 +1,10 @@
 import { Event } from "nostr-tools";
-import type { ICalendarEvent } from "./types";
+import type {
+  ICalendarEvent,
+  ISchedulingPage,
+  IAvailabilityWindow,
+  DurationMode,
+} from "./types";
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -86,4 +91,144 @@ export const nostrEventToCalendar = (
     }
   });
   return parsedEvent;
+};
+
+/**
+ * Parse a Nostr event (kind 31927) into an ISchedulingPage.
+ */
+export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
+  const page: ISchedulingPage = {
+    id: "",
+    eventId: event.id,
+    user: event.pubkey,
+    title: "",
+    description: event.content,
+    slotDurations: [],
+    durationMode: "fixed",
+    availabilityWindows: [],
+    blockedDates: [],
+    timezone: "UTC",
+    minNotice: 3600,
+    maxAdvance: 2592000,
+    buffer: 900,
+    expiry: 172800,
+    location: "",
+    image: undefined,
+    createdAt: event.created_at,
+  };
+
+  event.tags.forEach(([key, ...values]) => {
+    switch (key) {
+      case "d":
+        page.id = values[0];
+        break;
+      case "title":
+        page.title = values[0];
+        break;
+      case "slot_duration":
+        page.slotDurations.push(Number(values[0]));
+        break;
+      case "duration_mode":
+        page.durationMode = values[0] as DurationMode;
+        break;
+      case "avail": {
+        const window: IAvailabilityWindow = {
+          type: values[0] as "recurring" | "date",
+          startTime: "",
+          endTime: "",
+        };
+        if (values[0] === "recurring") {
+          window.dayOfWeek = Number(values[1]);
+          window.startTime = values[2];
+          window.endTime = values[3];
+        } else if (values[0] === "date") {
+          window.date = values[1];
+          window.startTime = values[2];
+          window.endTime = values[3];
+        }
+        page.availabilityWindows.push(window);
+        break;
+      }
+      case "blocked":
+        page.blockedDates.push(values[0]);
+        break;
+      case "timezone":
+        page.timezone = values[0];
+        break;
+      case "min_notice":
+        page.minNotice = Number(values[0]);
+        break;
+      case "max_advance":
+        page.maxAdvance = Number(values[0]);
+        break;
+      case "buffer":
+        page.buffer = Number(values[0]);
+        break;
+      case "expiry":
+        page.expiry = Number(values[0]);
+        break;
+      case "location":
+        page.location = values[0];
+        break;
+      case "image":
+        page.image = values[0];
+        break;
+    }
+  });
+
+  return page;
+};
+
+/**
+ * Serialize an ISchedulingPage into Nostr tags for publishing.
+ */
+export const schedulingPageToTags = (page: ISchedulingPage): string[][] => {
+  const tags: string[][] = [
+    ["d", page.id],
+    ["title", page.title],
+    ["duration_mode", page.durationMode],
+    ["timezone", page.timezone],
+    ["min_notice", String(page.minNotice)],
+    ["max_advance", String(page.maxAdvance)],
+    ["buffer", String(page.buffer)],
+    ["expiry", String(page.expiry)],
+  ];
+
+  for (const duration of page.slotDurations) {
+    tags.push(["slot_duration", String(duration)]);
+  }
+
+  for (const window of page.availabilityWindows) {
+    if (window.type === "recurring") {
+      tags.push([
+        "avail",
+        "recurring",
+        String(window.dayOfWeek),
+        window.startTime,
+        window.endTime,
+      ]);
+    } else if (window.type === "date") {
+      tags.push([
+        "avail",
+        "date",
+        window.date!,
+        window.startTime,
+        window.endTime,
+      ]);
+    }
+  }
+
+  for (const date of page.blockedDates) {
+    tags.push(["blocked", date]);
+  }
+
+  if (page.location) {
+    tags.push(["location", page.location]);
+  }
+
+  if (page.image) {
+    tags.push(["image", page.image]);
+  }
+
+  return tags;
 };
