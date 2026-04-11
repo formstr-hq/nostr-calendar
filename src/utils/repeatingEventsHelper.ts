@@ -189,8 +189,13 @@ export function frequencyToRRule(freq: RepeatingFrequency): string | null {
   return FREQUENCY_TO_RRULE[freq] ?? null;
 }
 
-export function normalizeRRule(rule: string): string {
-  return rule.replace(/^RRULE:/i, "").trim();
+function toRRuleBody(rule: string): string {
+  const trimmed = rule.trim();
+  if (trimmed.toUpperCase().startsWith("RRULE:")) {
+    return trimmed.slice(6).trim();
+  }
+
+  return trimmed;
 }
 
 export function getEventRRules(
@@ -207,7 +212,7 @@ export function getEventRRules(
       return;
     }
 
-    const normalized = normalizeRRule(rule);
+    const normalized = toRRuleBody(rule);
     if (!normalized || rules.includes(normalized)) {
       return;
     }
@@ -225,12 +230,12 @@ export function getEventRRules(
 }
 
 export function rruleToFrequency(rule: string): RepeatingFrequency | null {
-  const normalized = normalizeRRule(rule);
+  const normalized = toRRuleBody(rule);
   return RRULE_TO_FREQUENCY[normalized] ?? null;
 }
 
 function parseRRule(rruleStr: string, dtstart: Date): RRule | null {
-  const normalized = normalizeRRule(rruleStr);
+  const normalized = toRRuleBody(rruleStr);
   if (!normalized) {
     return null;
   }

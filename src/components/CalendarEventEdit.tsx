@@ -315,9 +315,12 @@ export function CalendarEventEdit({
       </EventAttributeEditContainer>
       <Divider />
       {/* Recurrence */}
-      <EventAttributeEditContainer>
+      <EventAttributeEditContainer sx={{ alignItems: "flex-start" }}>
         <EventRepeatIcon />
-        <RecurrenceEditor rules={recurrenceRules} onChange={setRecurrenceRules} />
+        <RecurrenceEditor
+          rules={recurrenceRules}
+          onChange={setRecurrenceRules}
+        />
       </EventAttributeEditContainer>
       <Divider />
       {/* Participants */}

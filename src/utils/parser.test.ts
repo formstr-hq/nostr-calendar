@@ -172,7 +172,7 @@ describe("nostrEventToCalendar", () => {
     expect(result.repeat.rrules).toEqual([]);
   });
 
-  it("parses namespaced rrule labels even when not adjacent to L tag", () => {
+  it("ignores namespaced rrule labels when not adjacent to L tag", () => {
     const event = makeNostrEvent({
       tags: [
         ["L", "status"],
@@ -182,7 +182,7 @@ describe("nostrEventToCalendar", () => {
     });
     const result = nostrEventToCalendar(event);
 
-    expect(result.repeat.rrules).toEqual(["FREQ=MONTHLY"]);
+    expect(result.repeat.rrules).toEqual([]);
   });
 
   it("sets repeat.rrules to empty for non-recurring events", () => {

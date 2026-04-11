@@ -54,7 +54,7 @@ export const TimeRenderer = ({
           {dayjs(end).format("HH:mm")}
         </Typography>
       </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
         <Repeat repeat={repeat} />
       </Box>
     </Box>

@@ -1,6 +1,5 @@
 import { Event } from "nostr-tools";
 import type { ICalendarEvent } from "./types";
-import { normalizeRRule } from "./repeatingEventsHelper";
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -34,7 +33,7 @@ export const nostrEventToCalendar = (
   };
   const recurrenceRules: string[] = [];
 
-  event.tags.forEach(([key, value, labelNamespace], index) => {
+  event.tags.forEach(([key, value], index) => {
     switch (key) {
       case "description":
         parsedEvent.description = value;
@@ -74,14 +73,12 @@ export const nostrEventToCalendar = (
         const previousTag = event.tags[index - 1];
         const followsRRuleLabel =
           previousTag?.[0] === "L" && previousTag?.[1] === "rrule";
-        const isRRuleLabel =
-          labelNamespace === "rrule" || followsRRuleLabel;
 
-        if (!isRRuleLabel || !value) {
+        if (!followsRRuleLabel || !value) {
           break;
         }
 
-        const normalizedRule = normalizeRRule(value);
+        const normalizedRule = value.trim();
         if (normalizedRule && !recurrenceRules.includes(normalizedRule)) {
           recurrenceRules.push(normalizedRule);
         }

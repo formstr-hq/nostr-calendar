@@ -3,7 +3,7 @@ import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { ICalendarEvent } from "../stores/events";
 import { NestedObject } from "./dictionary";
-import { getEventRRules, normalizeRRule } from "../utils/repeatingEventsHelper";
+import { getEventRRules } from "../utils/repeatingEventsHelper";
 
 export function flattenMessages(
   nestedMessages: NestedObject,
@@ -165,7 +165,7 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
         break;
       case "RRULE":
         {
-          const normalizedRule = normalizeRRule(value);
+          const normalizedRule = value.trim();
           if (normalizedRule && !rrules.includes(normalizedRule)) {
             rrules.push(normalizedRule);
           }
