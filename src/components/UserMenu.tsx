@@ -19,7 +19,7 @@ export const UserMenu = () => {
   return (
     <>
       <IconButton onClick={handleClick}>
-        <NostrAvatar pubkey={user?.pubkey} />
+        <NostrAvatar user={user} />
       </IconButton>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
         <Auth />
