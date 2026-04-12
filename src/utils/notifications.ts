@@ -1,7 +1,10 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
-import { getEventRRules, getNextOccurrenceInRange } from "./repeatingEventsHelper";
+import {
+  getEventRRules,
+  getNextOccurrenceInRange,
+} from "./repeatingEventsHelper";
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
