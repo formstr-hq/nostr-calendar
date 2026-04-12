@@ -22,7 +22,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -249,63 +249,7 @@ export function CalendarEventView({
   );
 }
 
-function AddToCalendarButton({ event }: { event: ICalendarEvent }) {
-  const { user, updateLoginModal } = useUser();
-  const { calendars, addEventToCalendar } = useCalendarLists();
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
 
-  const isAlreadyAdded = calendars.some((cal) =>
-    cal.eventRefs.some((ref) => parseEventRef(ref).eventDTag === event.id),
-  );
-
-  const handleAdd = async () => {
-    if (!user) {
-      updateLoginModal(true);
-      return;
-    }
-
-    const targetCalendarId = calendars[0]?.id;
-    if (!targetCalendarId) {
-      setSaveState("error");
-      return;
-    }
-
-    setSaveState("loading");
-    try {
-      const eventRef = buildEventRef({
-        kind: event.kind,
-        authorPubkey: event.user,
-        eventDTag: event.id,
-        viewKey: event.viewKey || "",
-      });
-      await addEventToCalendar(targetCalendarId, eventRef);
-      setSaveState("success");
-    } catch (e) {
-      console.error(e);
-      setSaveState("error");
-    }
-  };
-
-  if (isAlreadyAdded || event.user === user?.pubkey) {
-    return null;
-  }
-
-  return (
-    <Button
-      variant="contained"
-      size="small"
-      onClick={handleAdd}
-      disabled={saveState === "loading" || saveState === "success"}
-      color={saveState === "error" ? "error" : "primary"}
-      sx={{ whiteSpace: "nowrap", mr: 1 }}
-    >
-      {saveState === "idle" && "Add to my calendar"}
-      {saveState === "loading" && "Adding..."}
-      {saveState === "success" && "Added ✓"}
-      {saveState === "error" && "Error - Retry"}
-    </Button>
-  );
-}
 
 function ActionButtons({
   event,
@@ -354,7 +298,6 @@ function ActionButtons({
       minWidth={isMobile ? "inherit" : "160px"}
       sx={{ whiteSpace: "nowrap", display: "flex", alignItems: "center" }}
     >
-      <AddToCalendarButton event={event} />
       <IconButton size={iconSize} onClick={() => setShareDialogOpen(true)}>
         <Tooltip title={intl.formatMessage({ id: "event.shareEvent", defaultMessage: "Share Event" })}>
           <ShareIcon fontSize={iconSize} />
@@ -630,18 +573,43 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
 
 function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const intl = useIntl();
-  const { calendars } = useCalendarLists();
-  const { acceptInvitation } = useInvitations();
+  const { calendars, isLoaded, fetchCalendars, addEventToCalendar } = useCalendarLists();
+  const { user, updateLoginModal } = useUser();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     calendars[0]?.id || "",
   );
   const [accepting, setAccepting] = useState(false);
 
+  useEffect(() => {
+    if (!isLoaded) fetchCalendars();
+  }, [isLoaded, fetchCalendars]);
+
+  useEffect(() => {
+    if (calendars.length > 0 && !selectedCalendarId) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars, selectedCalendarId]);
+
   const handleAccept = async () => {
+    if (!user) {
+      updateLoginModal(true);
+      return;
+    }
     if (!selectedCalendarId) return;
     setAccepting(true);
-    await acceptInvitation(event.id, selectedCalendarId);
-    setAccepting(false);
+    try {
+      const eventRef = buildEventRef({
+        kind: event.kind,
+        authorPubkey: event.user,
+        eventDTag: event.id,
+        viewKey: event.viewKey || "",
+      });
+      await addEventToCalendar(selectedCalendarId, eventRef);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAccepting(false);
+    }
   };
 
   return (
@@ -677,16 +645,22 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       </Box>
       <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
         <Box maxWidth={500} flex={1} minWidth={150}>
-          <CalendarListSelect
-            value={selectedCalendarId}
-            onChange={setSelectedCalendarId}
-            size="small"
-          />
+          {!isLoaded ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
+              Loading calendars...
+            </Typography>
+          ) : (
+            <CalendarListSelect
+              value={selectedCalendarId}
+              onChange={setSelectedCalendarId}
+              size="small"
+            />
+          )}
         </Box>
         <Button
           variant="contained"
           size="small"
-          disabled={!selectedCalendarId || accepting}
+          disabled={!isLoaded || !selectedCalendarId || accepting}
           onClick={handleAccept}
           sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
         >
