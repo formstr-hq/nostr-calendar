@@ -56,6 +56,8 @@ export const BookingsPage = () => {
     outgoingBookings,
     isLoaded,
     loadCached,
+    fetchIncomingRequests,
+    fetchOutgoingBookings,
   } = useBookingRequests();
 
   const { pages } = useSchedulingPages();
@@ -65,6 +67,20 @@ export const BookingsPage = () => {
   useEffect(() => {
     loadCached();
   }, [loadCached]);
+
+  // Keep booking subscriptions fresh while this page is open so
+  // incoming requests appear without manual reload.
+  useEffect(() => {
+    fetchIncomingRequests();
+    fetchOutgoingBookings();
+
+    const refreshTimer = setInterval(() => {
+      fetchIncomingRequests();
+      fetchOutgoingBookings();
+    }, 30_000);
+
+    return () => clearInterval(refreshTimer);
+  }, [fetchIncomingRequests, fetchOutgoingBookings]);
 
   const pendingIncoming = incomingRequests.filter(
     (r) => r.status === "pending",
