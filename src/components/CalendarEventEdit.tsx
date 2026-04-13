@@ -34,6 +34,7 @@ import {
   publishPrivateCalendarEvent,
   publishPublicCalendarEvent,
 } from "../common/nostr";
+import { EventKinds } from "../common/EventConfigs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
@@ -170,7 +171,15 @@ export function CalendarEventEdit({
           await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
         }
       } else {
-        await publishPublicCalendarEvent(eventToSave, selectedCalendarId);
+        const { id: savedId, pubKey } = await publishPublicCalendarEvent(eventToSave, selectedCalendarId);
+        useTimeBasedEvents.getState().updateEvent({
+          ...eventToSave,
+          id: savedId,
+          kind: EventKinds.PublicCalendarEvent,
+          user: pubKey,
+          calendarId: selectedCalendarId,
+          isPrivateEvent: false,
+        });
       }
 
       if (onSave) {
