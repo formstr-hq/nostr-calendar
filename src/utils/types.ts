@@ -58,4 +58,5 @@ export interface ICalendarEvent {
   };
   calendarId?: string;
   isInvitation?: boolean;
+  relayHint?: string;
 }
