@@ -62,6 +62,8 @@ export interface IInvitation {
   eventId: string;
   /** nsec-encoded view key for decrypting the event */
   viewKey: string;
+  /** Relay hint indicating where the main event is published */
+  relayHint?: string;
   /** Resolved event data (populated after fetching and decrypting) */
   event?: ICalendarEvent;
   /** Timestamp when the invitation was received */

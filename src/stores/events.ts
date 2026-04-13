@@ -287,6 +287,7 @@ export const useTimeBasedEvents = create<{
     const eventIdsToFetch: string[] = [];
     const kinds = new Set<number>();
     const authorPubkeys = new Set<string>();
+    const hintRelays = new Set<string>();
     const viewKeyMap = new Map<
       string,
       { viewKey: string; calendarId: string }
@@ -301,6 +302,7 @@ export const useTimeBasedEvents = create<{
       eventIdsToFetch.push(parsed.eventDTag);
       authorPubkeys.add(parsed.authorPubkey);
       kinds.add(parsed.kind);
+      if (parsed.relayUrl) hintRelays.add(parsed.relayUrl);
       viewKeyMap.set(parsed.eventDTag, {
         viewKey: parsed.viewKey,
         calendarId: refToCalendarId.get(ref[0]) || "",
@@ -309,12 +311,14 @@ export const useTimeBasedEvents = create<{
 
     if (eventIdsToFetch.length === 0) return;
 
-    // Fetch all matching events in a single subscription
+    // Fetch all matching events in a single subscription, using stored relay
+    // hints first so events are retrieved from where they were published.
     privateSubscription = fetchPrivateCalendarEvents(
       {
         eventIds: eventIdsToFetch,
         authors: Array.from(authorPubkeys),
         kinds: Array.from(kinds),
+        relays: hintRelays.size > 0 ? Array.from(hintRelays) : undefined,
       },
       (event) => {
         const dTag = getDTag(event);

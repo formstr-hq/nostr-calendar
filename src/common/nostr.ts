@@ -177,7 +177,12 @@ export async function publishPrivateCalendarEvent(
   const { signedEvent, eventKind, userPublicKey } =
     await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
-  await publishToRelays(signedEvent);
+  // Capture which relay accepts the event to use as a hint in invitations
+  // and the creator's calendar list entry, so recipients can fetch from there.
+  let publishedRelayHint = "";
+  await publishToRelays(signedEvent, (url) => {
+    if (!publishedRelayHint) publishedRelayHint = url;
+  });
 
   // Gift-wrap the event keys to each participant (including the creator).
   // These serve as invitations — recipients will see them as notifications
@@ -195,7 +200,11 @@ export async function publishPrivateCalendarEvent(
           kind: EventKinds.CalendarEventRumor,
           content: "",
           tags: [
-            ["a", `${eventKind}:${signedEvent.pubkey}:${dTag}`],
+            [
+              "a",
+              `${eventKind}:${signedEvent.pubkey}:${dTag}`,
+              publishedRelayHint,
+            ],
             ["viewKey", nip19.nsecEncode(viewSecretKey)],
           ],
         },
@@ -214,12 +223,13 @@ export async function publishPrivateCalendarEvent(
   );
 
   // Add the event reference to the creator's calendar list.
-  // The ref includes the viewKey so the event can be decrypted when
-  // loading events from the calendar list later.
+  // The ref includes the viewKey and relay hint so the event can be
+  // decrypted and fetched from the correct relay later.
   const eventRef = buildEventRef({
     kind: eventKind,
     authorPubkey: userPublicKey,
     eventDTag: dTag,
+    relayUrl: publishedRelayHint,
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
   await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
@@ -269,6 +279,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
   const eventId = aTag[1].split(":")[2]; // Extract event id from the tag
   const authorPubkey = aTag[1].split(":")[1]; // Extract author pubkey from the tag
   const kind = Number(aTag[1].split(":")[0]); // Extract kind from the tag
+  const relayHint = aTag[2] || ""; // Relay hint indicating where the main event is published
   const viewKey = rumor.tags.find((tag) => tag[0] === "viewKey")?.[1];
   if (!viewKey) {
     throw new Error("invalid rumor: viewKey not found");
@@ -278,6 +289,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
     viewKey,
     authorPubkey,
     kind,
+    relayHint,
   };
 }
 
@@ -299,6 +311,7 @@ export const fetchCalendarGiftWraps = (
     viewKey: string;
     authorPubkey: string;
     kind: number;
+    relayHint: string;
     originalInvitationId: string;
   }) => void,
   onEose: () => void,
@@ -450,17 +463,22 @@ export function fetchPrivateCalendarEvents(
     kinds,
     since,
     until,
+    relays,
   }: {
     kinds: number[];
     eventIds: string[];
     authors?: string[];
     since?: number;
     until?: number;
+    relays?: string[];
   },
   onEvent: (event: Event) => void,
   onEose?: () => void,
 ) {
-  const relayList = getRelays();
+  // Merge hint relays first so they're tried with priority, then fall back to defaults
+  const relayList = relays
+    ? [...new Set([...relays, ...getRelays()])]
+    : getRelays();
   const filter: Filter = {
     kinds: kinds,
     "#d": eventIds,

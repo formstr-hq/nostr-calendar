@@ -141,11 +141,16 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
 
       if (eventIds.size === 0) return;
 
+      const hintRelays = batch
+        .map((inv) => inv.relayHint)
+        .filter((r): r is string => !!r);
+
       fetchPrivateCalendarEvents(
         {
           eventIds: Array.from(eventIds),
           authors: Array.from(pubkeys),
           kinds: Array.from(kinds),
+          relays: hintRelays.length > 0 ? hintRelays : undefined,
         },
         (event) => {
           const eventId = getDTag(event);
@@ -208,6 +213,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           giftWrapId: rumor.eventId,
           eventId: rumor.eventId,
           viewKey: rumor.viewKey,
+          relayHint: rumor.relayHint,
           receivedAt: Date.now(),
           status: "pending",
           pubkey: rumor.authorPubkey,
@@ -246,12 +252,13 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     const invitation = invitations.find((i) => i.giftWrapId === giftWrapId);
     if (!invitation) return;
 
-    // Build the event reference for the calendar list
-
+    // Build the event reference for the calendar list, including the relay hint
+    // so the event can be fetched from the correct relay after acceptance.
     const eventRef = buildEventRef({
       kind: invitation.kind,
       authorPubkey: invitation.event?.user || "",
       eventDTag: invitation.eventId,
+      relayUrl: invitation.relayHint,
       viewKey: invitation.viewKey,
     });
 
