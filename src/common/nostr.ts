@@ -82,69 +82,7 @@ export async function publishPrivateRSVPEvent({
   participants: string[];
   referenceKind: EventKinds.PrivateCalendarEvent;
 }) {
-  const uniqueRSVPId = uuid();
-  const userPublicKey = await getUserPublicKey();
-
-  const viewSecretKey = generateSecretKey();
-  const viewPublicKey = getPublicKey(viewSecretKey);
-  // Encrypt the RSVP data
-  const eventData = [
-    ["a", `${referenceKind}:${authorpubKey}:${eventId}`],
-    ["d", uniqueRSVPId],
-    ["L", "status"],
-    ["l", `${status}`, "status"],
-    ["L", "freebusy"],
-    ["l", "free", "freebusy"],
-  ];
-  const eventContent = nip44.encrypt(
-    JSON.stringify(eventData),
-    nip44.getConversationKey(viewSecretKey, viewPublicKey),
-  );
-  const unsignedRSVPEvent: UnsignedEvent = {
-    pubkey: userPublicKey, // Your public key here
-    created_at: Math.floor(Date.now() / 1000),
-    kind: EventKinds.PrivateRSVPEvent,
-    content: eventContent,
-    tags: [
-      ["d", uniqueRSVPId], // Unique identifier for the RSVP event
-    ],
-  };
-  const signer = await signerManager.getSigner();
-  const signedRSVPEvent = await signer.signEvent(unsignedRSVPEvent);
-  signedRSVPEvent.id = getEventHash(unsignedRSVPEvent);
-  await publishToRelays(signedRSVPEvent);
-  const giftWraps: Event[] = [];
-  const allParticipants = Array.from(new Set([...participants, userPublicKey]));
-  for (const participant of allParticipants) {
-    // Create a rumor
-    const giftWrap = await nip59.wrapEvent(
-      {
-        pubkey: nip19.npubEncode(userPublicKey),
-        created_at: Math.floor(Date.now() / 1000),
-        kind: EventKinds.RSVPRumor,
-        content: "",
-        tags: [
-          [
-            "a",
-            `${EventKinds.PrivateRSVPEvent}:${participant}:${uniqueRSVPId}`,
-          ],
-          ["viewKey", nip19.nsecEncode(viewSecretKey)],
-        ],
-      },
-      participant,
-      EventKinds.RSVPGiftWrap,
-    );
-    giftWraps.push(giftWrap);
-  }
-  await Promise.all(
-    giftWraps.map((gift) => {
-      return publishToRelays(gift);
-    }),
-  );
-  return {
-    rsvpEvent: signedRSVPEvent,
-    giftWraps,
-  };
+  // this function is noop
 }
 
 export async function publishPublicRSVPEvent({
@@ -156,50 +94,8 @@ export async function publishPublicRSVPEvent({
   eventId: string;
   status: string;
 }) {
-  const uniqueRSVPId = uuid();
-  const userPublicKey = await getUserPublicKey();
-
-  const unsignedRSVPEvent: UnsignedEvent = {
-    pubkey: userPublicKey, // Your public key here
-    created_at: Math.floor(Date.now() / 1000),
-    kind: EventKinds.PublicRSVPEvent,
-    content: "",
-    tags: [
-      ["d", uniqueRSVPId],
-      ["a", `${EventKinds.PublicCalendarEvent}:${authorpubKey}:${eventId}`],
-      ["d", uniqueRSVPId],
-      ["L", "status"],
-      ["l", `${status}`, "status"],
-      ["L", "freebusy"],
-      ["l", "free", "freebusy"],
-    ],
-  };
-  const signer = await signerManager.getSigner();
-  const signedRSVPEvent = await signer.signEvent(unsignedRSVPEvent);
-  signedRSVPEvent.id = getEventHash(unsignedRSVPEvent);
-  await publishToRelays(signedRSVPEvent);
-
-  return {
-    rsvpEvent: signedRSVPEvent,
-  };
+  // this function is noop
 }
-
-export const fetchPublicRSVPEvents = (
-  { eventReference }: { eventReference?: string },
-  onEvent: (event: Event) => void,
-) => {
-  const relayList = getRelays();
-  const filter: Filter = {
-    kinds: [EventKinds.PublicRSVPEvent],
-    ...(eventReference && { "#a": [eventReference] }),
-  };
-
-  return nostrRuntime.subscribe(relayList, [filter], {
-    onEvent: (event: Event) => {
-      onEvent(event);
-    },
-  });
-};
 
 /**
  * Publishes a private calendar event and sends gift-wrap invitations to participants.
@@ -286,28 +182,34 @@ export async function publishPrivateCalendarEvent(
   // Gift-wrap the event keys to each participant (including the creator).
   // These serve as invitations — recipients will see them as notifications
   // and can accept them into their own calendars.
-  const giftWraps: Event[] = [];
+  // Fetch all participants' relay lists in one query so each gift wrap is
+  // published to the recipient's own relays — not the author's.
   const targetPubKeys = Array.from(new Set([...event.participants]));
-  for (const participant of targetPubKeys) {
-    const giftWrap = await nip59.wrapEvent(
-      {
-        pubkey: userPublicKey,
-        created_at: Math.floor(Date.now() / 1000),
-        kind: EventKinds.CalendarEventRumor,
-        content: "",
-        tags: [
-          ["a", `${eventKind}:${signedEvent.pubkey}:${dTag}`],
-          ["viewKey", nip19.nsecEncode(viewSecretKey)],
-        ],
-      },
-      participant,
-      EventKinds.CalendarEventGiftWrap,
-    );
-    giftWraps.push(giftWrap);
-  }
+  const [participantRelayMap, ...giftWraps] = await Promise.all([
+    fetchRelayLists(targetPubKeys),
+    ...targetPubKeys.map(async (participant) => {
+      const giftWrap = await nip59.wrapEvent(
+        {
+          pubkey: userPublicKey,
+          created_at: Math.floor(Date.now() / 1000),
+          kind: EventKinds.CalendarEventRumor,
+          content: "",
+          tags: [
+            ["a", `${eventKind}:${signedEvent.pubkey}:${dTag}`],
+            ["viewKey", nip19.nsecEncode(viewSecretKey)],
+          ],
+        },
+        participant,
+        EventKinds.CalendarEventGiftWrap,
+      );
+      return { giftWrap, participant };
+    }),
+  ]);
   await Promise.all(
-    giftWraps.map((gift) => {
-      return publishToRelays(gift);
+    giftWraps.map(async ({ giftWrap, participant }) => {
+      const relays = participantRelayMap.get(participant) ?? defaultRelays;
+      console.log(`Publishing invitation for ${participant} to ${relays}`);
+      await publishToRelays(giftWrap, undefined, relays);
     }),
   );
 
@@ -324,7 +226,7 @@ export async function publishPrivateCalendarEvent(
 
   return {
     calendarEvent: signedEvent,
-    giftWraps,
+    giftWraps: giftWraps.map(({ giftWrap }) => giftWrap),
   };
 }
 
@@ -804,6 +706,30 @@ export const fetchRelayList = async (pubkey: string): Promise<string[]> => {
   return event.tags
     .filter((tag) => tag[0] === "r" && tag[1])
     .map((tag) => tag[1]);
+};
+
+/**
+ * Fetches relay lists (kind 10002) for multiple pubkeys in a single query.
+ * Returns a map of pubkey → relay URLs. Pubkeys with no relay list are omitted.
+ */
+export const fetchRelayLists = async (
+  pubkeys: string[],
+): Promise<Map<string, string[]>> => {
+  if (pubkeys.length === 0) return new Map();
+  const signerRelays = await signerManager.getSignerRelays();
+  const queryRelays = [...new Set([...defaultRelays, ...signerRelays])];
+  const events = await nostrRuntime.querySync(queryRelays, {
+    kinds: [EventKinds.RelayList],
+    authors: pubkeys,
+  });
+  const result = new Map<string, string[]>();
+  for (const event of events) {
+    const relays = event.tags
+      .filter((tag) => tag[0] === "r" && tag[1])
+      .map((tag) => tag[1]);
+    if (relays.length > 0) result.set(event.pubkey, relays);
+  }
+  return result;
 };
 
 export const publishRelayList = async (relays: string[]): Promise<void> => {
