@@ -6,6 +6,7 @@ import {
   Button,
   CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -557,6 +558,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const [accepting, setAccepting] = useState(false);
   const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
   // Sync selected calendar once calendars load (e.g. right after login)
   useEffect(() => {
@@ -587,6 +589,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
         await addEventToCalendar(selectedCalendarId, eventRef);
         updateEvent({ ...event, calendarId: selectedCalendarId, isInvitation: false });
       }
+      setSuccessDialogOpen(true);
     } catch {
       setErrorOpen(true);
     } finally {
@@ -603,6 +606,12 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     } finally {
       setCreatingGuest(false);
     }
+  };
+
+  const handleViewInCalendar = () => {
+    setSuccessDialogOpen(false);
+    const d = dayjs(event.begin);
+    navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
   };
 
   // ── Login gate ─────────────────────────────────────────────────────────────
@@ -713,6 +722,9 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
             disabled={!selectedCalendarId || accepting}
             onClick={handleAccept}
             sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+            startIcon={
+              accepting ? <CircularProgress size={14} color="inherit" /> : undefined
+            }
           >
             {intl.formatMessage({ id: "invitation.acceptInvitation" })}
           </Button>
@@ -728,6 +740,26 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           {intl.formatMessage({ id: "event.calendarMoveError" })}
         </Alert>
       </Snackbar>
+
+      {/* Success: stay here or navigate to calendar day view */}
+      <Dialog
+        open={successDialogOpen}
+        onClose={() => setSuccessDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {intl.formatMessage({ id: "invitation.addedToCalendar" })}
+        </DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setSuccessDialogOpen(false)}>
+            {intl.formatMessage({ id: "invitation.stayHere" })}
+          </Button>
+          <Button variant="contained" onClick={handleViewInCalendar}>
+            {intl.formatMessage({ id: "invitation.viewInCalendar" })}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
