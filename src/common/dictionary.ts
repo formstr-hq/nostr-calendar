@@ -153,6 +153,7 @@ const dictionary: NestedObject = {
       acceptInvitation: "Add to Calendar",
       invitedBy: "You have been invited by {participant} to this event",
       createdBy: "Shared by {participant}",
+      loginToAdd: "Log in to add this event to your calendar",
     },
     login: {
       signInToFormstr: "Sign in to Formstr",
@@ -348,6 +349,7 @@ const dictionary: NestedObject = {
       acceptInvitation: "Zum Kalender hinzufügen",
       invitedBy: "Sie wurden von {participant} zu diesem Termin eingeladen",
       createdBy: "Geteilt von {participant}",
+      loginToAdd: "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
     },
     login: {
       signInToFormstr: "Bei Formstr anmelden",

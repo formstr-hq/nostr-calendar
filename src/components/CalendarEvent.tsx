@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -22,7 +23,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -53,6 +54,9 @@ import {
 } from "../utils/calendarListTypes";
 import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { useTimeBasedEvents } from "../stores/events";
+import { signerManager } from "../common/signer";
+import { generateSecretKey } from "nostr-tools";
+import { bytesToHex } from "nostr-tools/utils";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -543,6 +547,7 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
 
 function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const intl = useIntl();
+  const { user, updateLoginModal } = useUser();
   const { calendars, addEventToCalendar } = useCalendarLists();
   const { invitations, acceptInvitation } = useInvitations();
   const { updateEvent } = useTimeBasedEvents();
@@ -550,7 +555,15 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     calendars[0]?.id || "",
   );
   const [accepting, setAccepting] = useState(false);
+  const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
+
+  // Sync selected calendar once calendars load (e.g. right after login)
+  useEffect(() => {
+    if (!selectedCalendarId && calendars[0]?.id) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars, selectedCalendarId]);
 
   const handleAccept = async () => {
     if (!selectedCalendarId) return;
@@ -580,6 +593,79 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       setAccepting(false);
     }
   };
+
+  const handleContinueAsGuest = async () => {
+    setCreatingGuest(true);
+    try {
+      await signerManager.createGuestAccount(bytesToHex(generateSecretKey()), {});
+    } catch {
+      setErrorOpen(true);
+    } finally {
+      setCreatingGuest(false);
+    }
+  };
+
+  // ── Login gate ─────────────────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <>
+        <Stack
+          spacing={1.5}
+          sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {intl.formatMessage({ id: "invitation.loginToAdd" })}
+          </Typography>
+          <Box display="flex" gap={1} flexWrap="wrap">
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => updateLoginModal(true)}
+            >
+              {intl.formatMessage({ id: "message.modeSelection_loginButton" })}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={creatingGuest}
+              onClick={handleContinueAsGuest}
+              startIcon={
+                creatingGuest ? <CircularProgress size={14} color="inherit" /> : undefined
+              }
+            >
+              {intl.formatMessage({ id: "message.modeSelection_guestButton" })}
+            </Button>
+          </Box>
+        </Stack>
+        <Snackbar
+          open={errorOpen}
+          autoHideDuration={4000}
+          onClose={() => setErrorOpen(false)}
+        >
+          <Alert severity="error" onClose={() => setErrorOpen(false)}>
+            {intl.formatMessage({ id: "event.calendarMoveError" })}
+          </Alert>
+        </Snackbar>
+      </>
+    );
+  }
+
+  // ── Calendars still loading after login ────────────────────────────────────
+  if (calendars.length === 0) {
+    return (
+      <Stack
+        spacing={1.5}
+        sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
+      >
+        <Box display="flex" alignItems="center" gap={1}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">
+            {intl.formatMessage({ id: "startup.fetchingEvents" })}
+          </Typography>
+        </Box>
+      </Stack>
+    );
+  }
 
   return (
     <>
