@@ -34,7 +34,6 @@ import type { ICalendarList } from "../utils/calendarListTypes";
 import {
   DEFAULT_CALENDAR_COLOR,
   DEFAULT_CALENDAR_TITLE,
-  DEFAULT_NOTIFICATION_PREFERENCE,
 } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "./nostrRuntime";
 
@@ -52,11 +51,12 @@ export async function encryptCalendarList(
     ["title", calendarList.title],
     ["content", calendarList.description],
     ["color", calendarList.color],
-    [
-      "notifications",
-      calendarList.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
-    ],
   ];
+
+  // Persist only non-default notification preference to minimize relay payload.
+  if (calendarList.notificationPreference === "disabled") {
+    tags.push(["notifications", "disabled"]);
+  }
 
   // Add event references as "a" tags: ["a", coordinate, metadata]
   for (const ref of calendarList.eventRefs) {
@@ -96,7 +96,7 @@ export async function decryptCalendarList(
   let title = DEFAULT_CALENDAR_TITLE;
   let description = "";
   let color = DEFAULT_CALENDAR_COLOR;
-  let notificationPreference = DEFAULT_NOTIFICATION_PREFERENCE;
+  let notificationPreference: "enabled" | "disabled" | undefined;
   const eventRefs: string[][] = [];
 
   for (const tag of tags) {
@@ -111,8 +111,7 @@ export async function decryptCalendarList(
         color = tag[1] || DEFAULT_CALENDAR_COLOR;
         break;
       case "notifications":
-        notificationPreference =
-          tag[1] === "disabled" ? "disabled" : DEFAULT_NOTIFICATION_PREFERENCE;
+        notificationPreference = tag[1] === "disabled" ? "disabled" : "enabled";
         break;
       case "a":
         // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
@@ -231,7 +230,6 @@ export async function createDefaultCalendar(): Promise<ICalendarList> {
     title: DEFAULT_CALENDAR_TITLE,
     description: "",
     color: DEFAULT_CALENDAR_COLOR,
-    notificationPreference: DEFAULT_NOTIFICATION_PREFERENCE,
     eventId: "",
     eventRefs: [],
     isVisible: true,

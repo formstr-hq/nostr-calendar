@@ -63,6 +63,12 @@ const withNotificationPreference = (calendar: ICalendarList): ICalendarList => (
     calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
 });
 
+const normalizePreferenceForPublish = (
+  preference?: "enabled" | "disabled",
+): "disabled" | undefined => {
+  return preference === "disabled" ? "disabled" : undefined;
+};
+
 interface CalendarListsState {
   calendars: ICalendarList[];
   isLoaded: boolean;
@@ -217,37 +223,44 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       title,
       description,
       color,
-      notificationPreference,
+      notificationPreference: normalizePreferenceForPublish(
+        notificationPreference,
+      ),
       eventId: "",
       eventRefs: [],
       isVisible: true,
     });
+    const calendarWithDefaults = withNotificationPreference(newCalendar);
 
     set((state) => {
-      const updated = [...state.calendars, newCalendar];
+      const updated = [...state.calendars, calendarWithDefaults];
       saveCalendarsToStorage(updated);
       return { calendars: updated };
     });
 
-    return newCalendar;
+    return calendarWithDefaults;
   },
 
   /**
    * Updates calendar metadata (title, description, color) and republishes.
    */
   updateCalendar: async (calendar) => {
-    const updated = {
+    const updatedForPublish = {
       ...calendar,
-      notificationPreference:
-        calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
+      notificationPreference: normalizePreferenceForPublish(
+        calendar.notificationPreference,
+      ),
       createdAt: Math.floor(Date.now() / 1000),
     };
-    const publishedEvent = await publishCalendarList(updated);
-    updated.eventId = publishedEvent.id;
+    const publishedEvent = await publishCalendarList(updatedForPublish);
+    const updatedForState = withNotificationPreference({
+      ...updatedForPublish,
+      eventId: publishedEvent.id,
+    });
 
     set((state) => {
       const calendars = state.calendars.map((c) =>
-        c.id === calendar.id ? updated : c,
+        c.id === calendar.id ? updatedForState : c,
       );
       saveCalendarsToStorage(calendars);
       return { calendars };

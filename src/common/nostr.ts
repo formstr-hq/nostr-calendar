@@ -641,9 +641,6 @@ export const publishPublicCalendarEvent = async (
     ["start", String(Math.floor(event.begin / 1000))],
     ["end", String(Math.floor(event.end / 1000))],
   ];
-  if (event.notificationPreference) {
-    tags.push(["notification", event.notificationPreference]);
-  }
   if (event.image) {
     tags.push(["image", event.image]);
   }

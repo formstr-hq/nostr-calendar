@@ -126,6 +126,7 @@ const dictionary: NestedObject = {
       notifications: "Notifications",
       notificationsOn: "Enabled for this calendar",
       notificationsOff: "Disabled for this calendar",
+      notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
@@ -315,6 +316,7 @@ const dictionary: NestedObject = {
       notifications: "Benachrichtigungen",
       notificationsOn: "Für diesen Kalender aktiviert",
       notificationsOff: "Für diesen Kalender deaktiviert",
+      notificationsAppOnly: "Benachrichtigungen sind nur in der App verfügbar.",
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
@@ -379,5 +381,7 @@ const dictionary: NestedObject = {
   },
 };
 export default dictionary;
+
+
 
 

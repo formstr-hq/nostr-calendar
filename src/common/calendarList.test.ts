@@ -72,7 +72,6 @@ const makeCalendar = (overrides?: Partial<ICalendarList>): ICalendarList => ({
   title: "My Calendar",
   description: "Personal events",
   color: "#4285f4",
-  notificationPreference: "enabled",
   eventRefs: [
     ["32678:testpubkey:event-1", "", "nsec1key:1700000000::1700003600:false"],
   ],
@@ -98,7 +97,7 @@ describe("calendarList protocol layer", () => {
       expect(tags).toContainEqual(["title", "My Calendar"]);
       expect(tags).toContainEqual(["content", "Personal events"]);
       expect(tags).toContainEqual(["color", "#4285f4"]);
-      expect(tags).toContainEqual(["notifications", "enabled"]);
+      expect(tags).not.toContainEqual(["notifications", "enabled"]);
       expect(tags).toContainEqual([
         "a",
         "32678:testpubkey:event-1",
@@ -130,6 +129,14 @@ describe("calendarList protocol layer", () => {
       const tags = JSON.parse(mockEncrypt.mock.calls[0][1]);
       const aTags = tags.filter((t: string[]) => t[0] === "a");
       expect(aTags).toHaveLength(3);
+    });
+
+    it("stores notification preference only when non-default", async () => {
+      const cal = makeCalendar({ notificationPreference: "disabled" });
+      await encryptCalendarList(cal);
+
+      const tags = JSON.parse(mockEncrypt.mock.calls[0][1]);
+      expect(tags).toContainEqual(["notifications", "disabled"]);
     });
 
     it("handles empty eventRefs", async () => {
@@ -194,7 +201,7 @@ describe("calendarList protocol layer", () => {
       expect(result.title).toBe("Minimal");
       expect(result.description).toBe("");
       expect(result.color).toBe("#4285f4"); // default color
-      expect(result.notificationPreference).toBe("enabled");
+      expect(result.notificationPreference).toBeUndefined();
       expect(result.eventRefs).toEqual([]);
     });
 
