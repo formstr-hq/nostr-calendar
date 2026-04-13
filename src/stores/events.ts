@@ -99,12 +99,14 @@ const processPrivateEvent = (
   _timeRange: ReturnType<typeof getTimeRange>,
   viewKey?: string,
   calendarId?: string,
+  relayHint?: string,
 ) => {
   const { events } = useTimeBasedEvents.getState();
   let store = normalize(events);
   const parsedEvent = nostrEventToCalendar(event, {
     viewKey,
     isPrivateEvent: true,
+    relayHint,
   });
 
   // Attach the calendar ID so events can be themed by calendar color
@@ -290,7 +292,7 @@ export const useTimeBasedEvents = create<{
     const hintRelays = new Set<string>();
     const viewKeyMap = new Map<
       string,
-      { viewKey: string; calendarId: string }
+      { viewKey: string; calendarId: string; relayUrl: string }
     >();
 
     for (const ref of visibleRefs) {
@@ -306,6 +308,7 @@ export const useTimeBasedEvents = create<{
       viewKeyMap.set(parsed.eventDTag, {
         viewKey: parsed.viewKey,
         calendarId: refToCalendarId.get(ref[0]) || "",
+        relayUrl: parsed.relayUrl,
       });
     }
 
@@ -333,6 +336,7 @@ export const useTimeBasedEvents = create<{
             timeRange,
             meta.viewKey,
             meta.calendarId,
+            meta.relayUrl,
           );
           processedEventIds.add(dTag);
         }

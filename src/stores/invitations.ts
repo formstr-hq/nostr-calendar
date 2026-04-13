@@ -160,6 +160,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           const parsed = nostrEventToCalendar(decrypted, {
             viewKey: invitation.viewKey,
             isPrivateEvent: true,
+            relayHint: invitation.relayHint,
           });
           invitation.event = { ...parsed, isInvitation: true };
         },

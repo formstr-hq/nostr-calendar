@@ -682,11 +682,16 @@ export async function publishParticipantRemovalEvent({
   return signedEvent;
 }
 
-export const encodeNAddr = (address: Omit<AddressPointer, "relays">) => {
-  return naddrEncode({ ...address, relays: defaultRelays });
+export const encodeNAddr = (
+  address: Omit<AddressPointer, "relays">,
+  relays?: string[],
+) => {
+  return naddrEncode({ ...address, relays: relays ?? defaultRelays });
 };
 
-export const fetchCalendarEvent = async (naddr: NAddr): Promise<Event> => {
+export const fetchCalendarEvent = async (
+  naddr: NAddr,
+): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
   const relays = data.relays ?? defaultRelays;
   const filter: Filter = {
@@ -699,7 +704,7 @@ export const fetchCalendarEvent = async (naddr: NAddr): Promise<Event> => {
   if (!event) {
     throw new Error("EVENT_NOT_FOUND");
   }
-  return event;
+  return { event, relayHint: data.relays?.[0] ?? "" };
 };
 
 export const fetchUserProfile = async (

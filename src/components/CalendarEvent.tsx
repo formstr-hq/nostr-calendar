@@ -265,11 +265,14 @@ function ActionButtons({
 }) {
   const intl = useIntl();
   const linkToEvent = getEventPage(
-    encodeNAddr({
-      pubkey: event.user,
-      identifier: event.id,
-      kind: event.kind,
-    }),
+    encodeNAddr(
+      {
+        pubkey: event.user,
+        identifier: event.id,
+        kind: event.kind,
+      },
+      event.relayHint ? [event.relayHint] : undefined,
+    ),
     event.viewKey,
   );
   const copyLinkToEvent = () => {
@@ -282,11 +285,14 @@ function ActionButtons({
 
   const editEvent = () => {
     const editLink = getEditEventPage(
-      encodeNAddr({
-        pubkey: event.user,
-        identifier: event.id,
-        kind: event.kind,
-      }),
+      encodeNAddr(
+        {
+          pubkey: event.user,
+          identifier: event.id,
+          kind: event.kind,
+        },
+        event.relayHint ? [event.relayHint] : undefined,
+      ),
       event.viewKey,
     );
     closeModal();
