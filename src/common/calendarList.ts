@@ -194,7 +194,7 @@ export function fetchCalendarLists(
 export async function createCalendar(
   calendarData: Omit<ICalendarList, "id" | "createdAt">,
 ): Promise<ICalendarList> {
-  const idRoot = `${JSON.stringify(calendarData)}-${Date.now}`;
+  const idRoot = `${JSON.stringify(calendarData)}-${Date.now()}`;
   const id = bytesToHex(sha256(utf8ToBytes(idRoot))).substring(0, 30);
   const calendar: ICalendarList = {
     ...calendarData,
