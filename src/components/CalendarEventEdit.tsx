@@ -312,14 +312,19 @@ export function CalendarEventEdit({
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const parsed = Number.parseInt(event.target.value, 10);
-    const nextCount = Number.isFinite(parsed) ? parsed : 0;
+    const nextCount = Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
     setRecurrenceCount(nextCount);
     applyRecurrenceEndMode(recurrenceEndMode, nextCount, recurrenceUntilDate);
   };
 
   const handleRecurrenceUntilDateChange = (value: Dayjs | null) => {
-    setRecurrenceUntilDate(value);
-    applyRecurrenceEndMode(recurrenceEndMode, recurrenceCount, value);
+    const normalizedValue = value ? value.startOf("day") : null;
+    setRecurrenceUntilDate(normalizedValue);
+    applyRecurrenceEndMode(
+      recurrenceEndMode,
+      recurrenceCount,
+      normalizedValue,
+    );
   };
 
   const buttonDisabled = !(
@@ -444,8 +449,20 @@ export function CalendarEventEdit({
             onChange={setRecurrenceRules}
           />
           {showRecurrenceEndControls && (
-            <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <FormControl size="small" fullWidth>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { sm: 180 },
+                  flex: { xs: "1 1 auto", sm: "0 0 180px" },
+                }}
+              >
                 <InputLabel>
                   {intl.formatMessage({ id: "event.recurrenceEnds" })}
                 </InputLabel>
@@ -476,16 +493,18 @@ export function CalendarEventEdit({
                   })}
                   value={recurrenceCount}
                   onChange={handleRecurrenceCountChange}
+                  sx={{ flex: 1 }}
                 />
               )}
 
               {recurrenceEndMode === "until" && (
                 <DatePicker
+                  sx={{ flex: 1 }}
                   label={intl.formatMessage({ id: "event.recurrenceEndDate" })}
                   value={recurrenceUntilDate}
                   minDate={dayjs(eventDetails.begin).startOf("day")}
                   onChange={handleRecurrenceUntilDateChange}
-                  slotProps={{ textField: { size: "small" } }}
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
               )}
             </Box>
