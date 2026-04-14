@@ -1,21 +1,51 @@
 import { Preferences } from "@capacitor/preferences";
+import { getSecureKeyStoragePlugin } from "../plugins/secureKeyStorage";
+import { isAndroidNative } from "./platform";
 
 const NSEC_KEY = "nostr_nsec";
+const secureStorage = getSecureKeyStoragePlugin();
 
-export async function saveNsec(nsec: string) {
+async function setNsecValue(nsec: string) {
+  if (isAndroidNative()) {
+    await secureStorage.set({ key: NSEC_KEY, value: nsec });
+    return;
+  }
+
   await Preferences.set({
     key: NSEC_KEY,
     value: nsec,
   });
 }
 
-export async function getNsec(): Promise<string | null> {
+async function getNsecValue(): Promise<string | null> {
+  if (isAndroidNative()) {
+    const { value } = await secureStorage.get({ key: NSEC_KEY });
+    return value;
+  }
+
   const { value } = await Preferences.get({ key: NSEC_KEY });
   return value;
 }
 
-export async function removeNsec() {
+async function removeNsecValue() {
+  if (isAndroidNative()) {
+    await secureStorage.remove({ key: NSEC_KEY });
+    return;
+  }
+
   await Preferences.remove({ key: NSEC_KEY });
+}
+
+export async function saveNsec(nsec: string) {
+  await setNsecValue(nsec);
+}
+
+export async function getNsec(): Promise<string | null> {
+  return getNsecValue();
+}
+
+export async function removeNsec() {
+  await removeNsecValue();
 }
 
 const NIP55_PACKAGE_KEY = "nip55_package_name";

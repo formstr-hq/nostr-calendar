@@ -209,7 +209,7 @@ class Signer {
     this.signer = null;
     this.user = null;
     this.loginModalCallback = null;
-    removeNsec();
+    await removeNsec();
     removeKeysFromLocalStorage();
     removeBunkerUriFromLocalStorage();
     removeAppSecretFromLocalStorage();

@@ -58,7 +58,7 @@ const dictionary: NestedObject = {
       loggingIn: "Logging in...",
     },
     startup: {
-      loadingCache: "Retrieving login data from cache...",
+      loadingCache: "Restoring login from secure storage...",
       welcomeBack: "Welcome back, {user}!",
       welcomeBackGeneric: "Welcome back!",
       fetchingEvents: "Fetching your calendar lists and events...",
@@ -252,7 +252,7 @@ const dictionary: NestedObject = {
       loggingIn: "Anmeldung läuft...",
     },
     startup: {
-      loadingCache: "Anmeldedaten aus dem Cache abrufen...",
+      loadingCache: "Anmeldung aus sicherem Speicher wiederherstellen...",
       welcomeBack: "Willkommen zurück, {user}!",
       welcomeBackGeneric: "Willkommen zurück!",
       fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
