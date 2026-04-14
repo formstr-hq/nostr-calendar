@@ -8,6 +8,11 @@ import {
   Button,
   Box,
   Typography,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
   IconButton,
   Divider,
   useMediaQuery,
@@ -15,7 +20,12 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent } from "../utils/types";
-import { getEventRRules } from "../utils/repeatingEventsHelper";
+import {
+  buildRecurrenceRule,
+  getEventRRules,
+  parseRecurrenceRule,
+  type RecurrenceEndMode,
+} from "../utils/repeatingEventsHelper";
 import { ParticipantAdd } from "./ParticipantAdd";
 import { useIntl } from "react-intl";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -26,6 +36,7 @@ import {
   publishPublicCalendarEvent,
 } from "../common/nostr";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
@@ -108,6 +119,18 @@ export function CalendarEventEdit({
       },
     } as ICalendarEvent;
   });
+  const initialRecurrence = parseRecurrenceRule(
+    getEventRRules(initialEvent?.repeat)[0] ?? null,
+  );
+  const [recurrenceEndMode, setRecurrenceEndMode] = useState<RecurrenceEndMode>(
+    initialRecurrence.endMode,
+  );
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(
+    initialRecurrence.count ?? 1,
+  );
+  const [recurrenceUntilDate, setRecurrenceUntilDate] = useState<Dayjs | null>(
+    initialRecurrence.untilDate ? dayjs(initialRecurrence.untilDate) : null,
+  );
 
   const handleClose = () => {
     onClose();
@@ -122,6 +145,67 @@ export function CalendarEventEdit({
     value: ICalendarEvent[K],
   ) => {
     setEventDetails((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const syncRecurrenceStateFromRules = (rules: string[]) => {
+    const parsed = parseRecurrenceRule(rules[0] ?? null);
+    setRecurrenceEndMode(parsed.endMode);
+    setRecurrenceCount(parsed.count ?? 1);
+    setRecurrenceUntilDate(parsed.untilDate ? dayjs(parsed.untilDate) : null);
+  };
+
+  const withRecurrenceEndMode = (
+    rules: string[],
+    endMode: RecurrenceEndMode,
+    count: number,
+    untilDate: Dayjs | null,
+    eventStart: number = eventDetails.begin,
+  ): string[] => {
+    if (rules.length !== 1) {
+      return rules;
+    }
+
+    const parsed = parseRecurrenceRule(rules[0]);
+    if (!parsed.frequency) {
+      return rules;
+    }
+
+    const nextRule = buildRecurrenceRule({
+      frequency: parsed.frequency,
+      endMode,
+      count,
+      untilDate: untilDate?.valueOf() ?? null,
+      eventStart,
+    });
+
+    if (!nextRule) {
+      return [];
+    }
+
+    return [nextRule];
+  };
+
+  const applyRecurrenceEndMode = (
+    endMode: RecurrenceEndMode,
+    count: number,
+    untilDate: Dayjs | null,
+    eventStart: number = eventDetails.begin,
+  ) => {
+    const currentRules = getEventRRules(eventDetails.repeat);
+    const nextRules = getEventRRules({
+      rrules: withRecurrenceEndMode(
+        currentRules,
+        endMode,
+        count,
+        untilDate,
+        eventStart,
+      ),
+    });
+
+    updateField("repeat", {
+      rrules: nextRules,
+    });
+    syncRecurrenceStateFromRules(nextRules);
   };
 
   const handleSave = async () => {
@@ -160,7 +244,27 @@ export function CalendarEventEdit({
 
   const onChangeBeginDate = (value: Dayjs | null) => {
     if (!value) return;
-    updateField("begin", value.unix() * 1000);
+
+    const nextBegin = value.unix() * 1000;
+    updateField("begin", nextBegin);
+
+    if (recurrenceEndMode === "until" && recurrenceUntilDate) {
+      const beginDay = value.startOf("day");
+      const boundedUntil = recurrenceUntilDate.isBefore(beginDay, "day")
+        ? beginDay
+        : recurrenceUntilDate;
+
+      if (boundedUntil !== recurrenceUntilDate) {
+        setRecurrenceUntilDate(boundedUntil);
+      }
+
+      applyRecurrenceEndMode(
+        recurrenceEndMode,
+        recurrenceCount,
+        boundedUntil,
+        nextBegin,
+      );
+    }
   };
 
   const onChangeEndDate = (value: Dayjs | null) => {
@@ -170,10 +274,52 @@ export function CalendarEventEdit({
 
   const setRecurrenceRules = (rules: string[]) => {
     const normalizedRules = getEventRRules({ rrules: rules });
+    const normalizedWithEndMode = getEventRRules({
+      rrules: withRecurrenceEndMode(
+        normalizedRules,
+        recurrenceEndMode,
+        recurrenceCount,
+        recurrenceUntilDate,
+      ),
+    });
 
     updateField("repeat", {
-      rrules: normalizedRules,
+      rrules: normalizedWithEndMode,
     });
+    syncRecurrenceStateFromRules(normalizedWithEndMode);
+  };
+
+  const handleRecurrenceEndModeChange = (event: SelectChangeEvent<string>) => {
+    const nextMode = event.target.value as RecurrenceEndMode;
+    let nextCount = recurrenceCount;
+    let nextUntilDate = recurrenceUntilDate;
+
+    if (nextMode === "count" && nextCount < 1) {
+      nextCount = 1;
+      setRecurrenceCount(1);
+    }
+
+    if (nextMode === "until" && !nextUntilDate) {
+      nextUntilDate = dayjs(eventDetails.begin).startOf("day");
+      setRecurrenceUntilDate(nextUntilDate);
+    }
+
+    setRecurrenceEndMode(nextMode);
+    applyRecurrenceEndMode(nextMode, nextCount, nextUntilDate);
+  };
+
+  const handleRecurrenceCountChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const parsed = Number.parseInt(event.target.value, 10);
+    const nextCount = Number.isFinite(parsed) ? parsed : 0;
+    setRecurrenceCount(nextCount);
+    applyRecurrenceEndMode(recurrenceEndMode, nextCount, recurrenceUntilDate);
+  };
+
+  const handleRecurrenceUntilDateChange = (value: Dayjs | null) => {
+    setRecurrenceUntilDate(value);
+    applyRecurrenceEndMode(recurrenceEndMode, recurrenceCount, value);
   };
 
   const buttonDisabled = !(
@@ -189,6 +335,9 @@ export function CalendarEventEdit({
   }
 
   const recurrenceRules = getEventRRules(eventDetails.repeat);
+  const primaryRecurrence = parseRecurrenceRule(recurrenceRules[0] ?? null);
+  const showRecurrenceEndControls =
+    recurrenceRules.length === 1 && primaryRecurrence.frequency !== null;
 
   const titleBar = (
     <Box
@@ -282,10 +431,66 @@ export function CalendarEventEdit({
       {/* Recurrence */}
       <EventAttributeEditContainer sx={{ alignItems: "flex-start" }}>
         <EventRepeatIcon />
-        <RecurrenceEditor
-          rules={recurrenceRules}
-          onChange={setRecurrenceRules}
-        />
+        <Box
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            width: "100%",
+          }}
+        >
+          <RecurrenceEditor
+            rules={recurrenceRules}
+            onChange={setRecurrenceRules}
+          />
+          {showRecurrenceEndControls && (
+            <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>
+                  {intl.formatMessage({ id: "event.recurrenceEnds" })}
+                </InputLabel>
+                <Select
+                  value={recurrenceEndMode}
+                  label={intl.formatMessage({ id: "event.recurrenceEnds" })}
+                  onChange={handleRecurrenceEndModeChange}
+                >
+                  <MenuItem value="never">
+                    {intl.formatMessage({ id: "event.recurrenceEndsNever" })}
+                  </MenuItem>
+                  <MenuItem value="count">
+                    {intl.formatMessage({ id: "event.recurrenceEndsAfter" })}
+                  </MenuItem>
+                  <MenuItem value="until">
+                    {intl.formatMessage({ id: "event.recurrenceEndsOnDate" })}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {recurrenceEndMode === "count" && (
+                <TextField
+                  size="small"
+                  type="number"
+                  inputProps={{ min: 1 }}
+                  label={intl.formatMessage({
+                    id: "event.recurrenceOccurrences",
+                  })}
+                  value={recurrenceCount}
+                  onChange={handleRecurrenceCountChange}
+                />
+              )}
+
+              {recurrenceEndMode === "until" && (
+                <DatePicker
+                  label={intl.formatMessage({ id: "event.recurrenceEndDate" })}
+                  value={recurrenceUntilDate}
+                  minDate={dayjs(eventDetails.begin).startOf("day")}
+                  onChange={handleRecurrenceUntilDateChange}
+                  slotProps={{ textField: { size: "small" } }}
+                />
+              )}
+            </Box>
+          )}
+        </Box>
       </EventAttributeEditContainer>
       <Divider />
       {/* Participants */}
