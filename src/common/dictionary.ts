@@ -80,6 +80,8 @@ const dictionary: NestedObject = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
+      preserveRecurrenceHistoryPrompt:
+        "Keep past occurrences? Click OK to preserve historical events",
       recurrenceEnds: "Ends",
       recurrenceEndsNever: "Never",
       recurrenceEndsAfter: "After",
@@ -273,6 +275,8 @@ const dictionary: NestedObject = {
       monthly: "Monatlich",
       quarterly: "Vierteljährlich",
       yearly: "Jährlich",
+      preserveRecurrenceHistoryPrompt:
+        "Vergangene Vorkommen beibehalten? Klicken Sie auf OK, um historische Termine zu erhalten.",
       recurrenceEnds: "Endet",
       recurrenceEndsNever: "Nie",
       recurrenceEndsAfter: "Nach",

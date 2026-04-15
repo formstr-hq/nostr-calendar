@@ -1,6 +1,6 @@
+import { RRule } from "rrule";
 import type { ICalendarEvent } from "./types";
 import { RepeatingFrequency } from "./types";
-import { RRule } from "rrule";
 
 const RRULE_PREFIX = /^RRULE:/i;
 const WEEKDAY_RULE = "MO,TU,WE,TH,FR";
@@ -189,6 +189,72 @@ export function frequencyToRRule(freq: RepeatingFrequency): string | null {
   return FREQUENCY_TO_RRULE[freq] ?? null;
 }
 
+export function normalizeRRule(rule: string): string {
+  return rule.replace(/^RRULE:/i, "").trim();
+}
+
+export function formatRRuleUntil(timestampMs: number): string {
+  return new Date(timestampMs)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .split(".")[0] + "Z";
+}
+
+export function addUntilToRRule(rule: string, untilTimestampMs: number): string {
+  const normalized = normalizeRRule(rule);
+  if (!normalized) {
+    return "";
+  }
+
+  const fragments = normalized
+    .split(";")
+    .map((fragment) => fragment.trim())
+    .filter((fragment) => {
+      const upperFragment = fragment.toUpperCase();
+      return (
+        fragment &&
+        !upperFragment.startsWith("UNTIL=") &&
+        !upperFragment.startsWith("COUNT=")
+      );
+    });
+
+  fragments.push(`UNTIL=${formatRRuleUntil(untilTimestampMs)}`);
+  return fragments.join(";");
+}
+
+export function getEventRRules(
+  repeat: ICalendarEvent["repeat"] | undefined,
+): string[] {
+  if (!repeat) {
+    return [];
+  }
+
+  const rules: string[] = [];
+
+  const addRule = (rule: string | null | undefined) => {
+    if (!rule) {
+      return;
+    }
+
+    const normalized = normalizeRRule(rule);
+    if (!normalized || rules.includes(normalized)) {
+      return;
+    }
+
+    rules.push(normalized);
+  };
+
+  if (Array.isArray((repeat as { rrules?: string[] }).rrules)) {
+    repeat.rrules.forEach(addRule);
+  }
+
+  // Backward-compatibility for cached events that may still include repeat.rrule.
+  const legacyRule = (repeat as { rrule?: string | null }).rrule;
+  addRule(legacyRule);
+
+  return rules;
+}
+
 export function rruleToFrequency(rule: string): RepeatingFrequency | null {
   return parseRecurrenceRule(rule).frequency;
 }
@@ -269,10 +335,27 @@ export function buildRecurrenceRule({
   return ruleParts.join(";");
 }
 
-function parseRRule(rruleStr: string, dtstart: Date): RRule {
+function parseRRule(rruleStr: string, dtstart: Date): RRule | null {
   const normalized = normalizeRule(rruleStr);
-  return RRule.fromString(
-    `DTSTART:${dtstart.toISOString().replace(/[-:]/g, "").split(".")[0]}Z\nRRULE:${normalized}`,
+  try {
+    return RRule.fromString(
+      `DTSTART:${dtstart.toISOString().replace(/[-:]/g, "").split(".")[0]}Z\nRRULE:${normalized}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function eventOverlapsRange(
+  begin: number,
+  end: number,
+  rangeStart: number,
+  rangeEnd: number,
+): boolean {
+  return (
+    (begin >= rangeStart && begin <= rangeEnd) ||
+    (end >= rangeStart && end <= rangeEnd) ||
+    (begin <= rangeStart && end >= rangeEnd)
   );
 }
 
@@ -283,32 +366,44 @@ export function isEventInDateRange(
 ): boolean {
   const { begin, end, repeat } = event;
   const duration = end - begin;
+  const recurrenceRules = getEventRRules(repeat);
 
   // Non-repeating: simple overlap check
-  if (!repeat?.rrule) {
-    return (
-      (begin >= rangeStart && begin <= rangeEnd) ||
-      (end >= rangeStart && end <= rangeEnd) ||
-      (begin <= rangeStart && end >= rangeEnd)
-    );
+  if (recurrenceRules.length === 0) {
+    return eventOverlapsRange(begin, end, rangeStart, rangeEnd);
   }
 
   const dtstart = new Date(begin);
-  const rule = parseRRule(repeat.rrule, dtstart);
-
-  // Search for occurrences that could overlap with the range.
-  // An occurrence overlaps if its start <= rangeEnd and its end >= rangeStart.
-  // So we need occurrences starting between (rangeStart - duration) and rangeEnd.
   const searchStart = new Date(Math.max(begin, rangeStart - duration));
   const searchEnd = new Date(rangeEnd);
+  let hasValidRule = false;
 
-  const occurrences = rule.between(searchStart, searchEnd, true);
+  for (const recurrenceRule of recurrenceRules) {
+    const rule = parseRRule(recurrenceRule, dtstart);
+    if (!rule) {
+      continue;
+    }
 
-  return occurrences.some((occ) => {
-    const occStart = occ.getTime();
-    const occEnd = occStart + duration;
-    return occStart <= rangeEnd && occEnd >= rangeStart;
-  });
+    hasValidRule = true;
+    const occurrences = rule.between(searchStart, searchEnd, true);
+
+    const hasOverlap = occurrences.some((occ) => {
+      const occStart = occ.getTime();
+      const occEnd = occStart + duration;
+      return occStart <= rangeEnd && occEnd >= rangeStart;
+    });
+
+    if (hasOverlap) {
+      return true;
+    }
+  }
+
+  // Fallback to base event overlap if recurrence tags are present but invalid.
+  if (!hasValidRule) {
+    return eventOverlapsRange(begin, end, rangeStart, rangeEnd);
+  }
+
+  return false;
 }
 
 /**
@@ -321,8 +416,9 @@ export function getNextOccurrenceInRange(
   rangeEnd: number,
 ): number | null {
   const { begin, repeat } = event;
+  const recurrenceRules = getEventRRules(repeat);
 
-  if (!repeat?.rrule) {
+  if (recurrenceRules.length === 0) {
     // Non-repeating: return begin if it's in range
     if (begin >= rangeStart && begin <= rangeEnd) {
       return begin;
@@ -331,15 +427,36 @@ export function getNextOccurrenceInRange(
   }
 
   const dtstart = new Date(begin);
-  const rule = parseRRule(repeat.rrule, dtstart);
-
   const searchStart = new Date(Math.max(begin, rangeStart));
   const searchEnd = new Date(rangeEnd);
+  let hasValidRule = false;
+  let nextOccurrence: number | null = null;
 
-  const occurrences = rule.between(searchStart, searchEnd, true);
+  for (const recurrenceRule of recurrenceRules) {
+    const rule = parseRRule(recurrenceRule, dtstart);
+    if (!rule) {
+      continue;
+    }
 
-  if (occurrences.length > 0) {
-    return occurrences[0].getTime();
+    hasValidRule = true;
+    const occurrences = rule.between(searchStart, searchEnd, true);
+    if (occurrences.length === 0) {
+      continue;
+    }
+
+    const candidate = occurrences[0].getTime();
+    if (nextOccurrence === null || candidate < nextOccurrence) {
+      nextOccurrence = candidate;
+    }
+  }
+
+  if (hasValidRule) {
+    return nextOccurrence;
+  }
+
+  // Fallback to base event timing if recurrence tags are present but invalid.
+  if (begin >= rangeStart && begin <= rangeEnd) {
+    return begin;
   }
 
   return null;
