@@ -95,12 +95,10 @@ export async function scheduleEventNotifications(
   const baseId = hashToNumber(notificationKey);
   const tenMinBefore = occurrenceStart - 10 * 60 * 1000;
 
-  // const locationSuffix =
-  //   event.location?.length > 0 && event.location[0]
-  //     ? ` at ${event.location[0]}`
-  //     : "";
-
-  const locationSuffix = "";
+  const firstLocation = event.location
+    ?.map((location) => location?.trim?.())
+    .find((location) => location);
+  const locationSuffix = firstLocation ? ` at ${firstLocation}` : "";
 
   const notifications: Array<{
     id: number;

@@ -99,8 +99,8 @@ export class EventStore {
       if (existingEventId) {
         const existingEvent = this.eventsById.get(existingEventId);
         if (existingEvent && !shouldReplaceEvent(event, existingEvent)) {
-          // Existing event is newer, don't add but return true
-          return true;
+          // Existing event is newer, so reject the older replacement.
+          return false;
         }
 
         // Remove old event

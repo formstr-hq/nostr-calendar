@@ -261,6 +261,11 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       eventDTag: invitation.eventId,
       relayUrl: invitation.relayHint,
       viewKey: invitation.viewKey,
+      beginTimeSecs: invitation.event
+        ? Math.floor(invitation.event.begin / 1000)
+        : 0,
+      endTimeSecs: invitation.event ? Math.floor(invitation.event.end / 1000) : 0,
+      isRecurring: !!invitation.event?.repeat?.rrule,
     });
 
     // Add to the selected calendar

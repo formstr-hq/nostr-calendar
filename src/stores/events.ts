@@ -298,6 +298,20 @@ export const useTimeBasedEvents = create<{
     for (const ref of visibleRefs) {
       const parsed = parseEventRef(ref);
 
+      const hasTimeMetadata =
+        parsed.beginTimeSecs > 0 && parsed.endTimeSecs >= parsed.beginTimeSecs;
+      const isInRequestedRange =
+        !hasTimeMetadata ||
+        !(
+          parsed.endTimeSecs < timeRange.since ||
+          parsed.beginTimeSecs > timeRange.until
+        );
+
+      // Recurring refs are always fetched; non-recurring refs are range-filtered.
+      if (!parsed.isRecurring && !isInRequestedRange) {
+        continue;
+      }
+
       // Skip already-processed events
       if (processedEventIds.has(parsed.eventDTag)) continue;
 
