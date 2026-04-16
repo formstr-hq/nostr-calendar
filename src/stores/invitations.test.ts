@@ -65,7 +65,7 @@ vi.mock("../utils/parser", () => ({
     website: "",
     user: "test-pubkey",
     isPrivateEvent: true,
-    repeat: { rrule: null },
+    repeat: { rrules: [] },
   }),
 }));
 
@@ -149,7 +149,7 @@ describe("useInvitations store", () => {
             website: "",
             user: "test-pubkey",
             isPrivateEvent: true,
-            repeat: { rrule: null },
+            repeat: { rrules: [] },
           },
         },
       ],
@@ -251,7 +251,7 @@ describe("useInvitations store", () => {
             website: "",
             user: "test-pubkey",
             isPrivateEvent: true,
-            repeat: { rrule: "FREQ=WEEKLY" },
+            repeat: { rrules: ["FREQ=WEEKLY"] },
           },
         },
       ],

@@ -142,24 +142,53 @@ describe("nostrEventToCalendar", () => {
       ],
     });
     const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBe("FREQ=WEEKLY");
+    expect(result.repeat.rrules).toEqual(["FREQ=WEEKLY"]);
   });
 
-  it("preserves COUNT and UNTIL in recurring rules", () => {
+  it("parses multiple recurring rules from multiple L/l pairs", () => {
     const event = makeNostrEvent({
       tags: [
         ["L", "rrule"],
-        ["l", "FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z"],
+        ["l", "FREQ=WEEKLY"],
+        ["L", "rrule"],
+        ["l", "FREQ=MONTHLY"],
       ],
     });
     const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBe("FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z");
+
+    expect(result.repeat.rrules).toEqual(["FREQ=WEEKLY", "FREQ=MONTHLY"]);
   });
 
-  it("sets repeat.rrule to null for non-recurring events", () => {
+  it("does not treat distant unlabeled l tags as rrule labels", () => {
+    const event = makeNostrEvent({
+      tags: [
+        ["L", "rrule"],
+        ["title", "Intervening tag"],
+        ["l", "FREQ=WEEKLY"],
+      ],
+    });
+    const result = nostrEventToCalendar(event);
+
+    expect(result.repeat.rrules).toEqual([]);
+  });
+
+  it("ignores namespaced rrule labels when not adjacent to L tag", () => {
+    const event = makeNostrEvent({
+      tags: [
+        ["L", "status"],
+        ["title", "Intervening tag"],
+        ["l", "FREQ=MONTHLY", "rrule"],
+      ],
+    });
+    const result = nostrEventToCalendar(event);
+
+    expect(result.repeat.rrules).toEqual([]);
+  });
+
+  it("sets repeat.rrules to empty for non-recurring events", () => {
     const event = makeNostrEvent({ tags: [] });
     const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBeNull();
+    expect(result.repeat.rrules).toEqual([]);
   });
 
   it("sets isPrivateEvent from options", () => {
@@ -232,6 +261,6 @@ describe("nostrEventToCalendar", () => {
     expect(result.participants).toEqual(["alice", "bob"]);
     expect(result.reference).toEqual(["https://nostr.com"]);
     expect(result.image).toBe("https://img.com/pic.png");
-    expect(result.repeat.rrule).toBe("FREQ=DAILY");
+    expect(result.repeat.rrules).toEqual(["FREQ=DAILY"]);
   });
 });

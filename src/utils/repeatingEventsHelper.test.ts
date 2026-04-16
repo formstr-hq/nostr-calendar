@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildRecurrenceRule,
   isEventInDateRange,
   getNextOccurrenceInRange,
   frequencyToRRule,
-  parseRecurrenceRule,
+  getEventRRules,
   rruleToFrequency,
 } from "./repeatingEventsHelper";
 import { RepeatingFrequency, ICalendarEvent } from "./types";
@@ -32,7 +31,7 @@ function makeEvent(
     website: "",
     user: "test-user",
     isPrivateEvent: false,
-    repeat: { rrule: null },
+    repeat: { rrules: [] },
     ...overrides,
   };
 }
@@ -74,105 +73,32 @@ describe("rruleToFrequency", () => {
     );
   });
 
-  it("detects the base frequency when COUNT is present", () => {
-    expect(rruleToFrequency("FREQ=DAILY;COUNT=5")).toBe(
-      RepeatingFrequency.Daily,
-    );
-    expect(rruleToFrequency("FREQ=MONTHLY;INTERVAL=3;COUNT=4")).toBe(
-      RepeatingFrequency.Quarterly,
-    );
-  });
-
-  it("detects the base frequency when UNTIL is present", () => {
-    expect(rruleToFrequency("FREQ=WEEKLY;UNTIL=20250131T100000Z")).toBe(
-      RepeatingFrequency.Weekly,
-    );
-    expect(
-      rruleToFrequency("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20250131T100000Z"),
-    ).toBe(RepeatingFrequency.Weekday);
-  });
-
   it("handles RRULE: prefix", () => {
     expect(rruleToFrequency("RRULE:FREQ=DAILY")).toBe(RepeatingFrequency.Daily);
   });
 
   it("returns null for unknown rules", () => {
     expect(rruleToFrequency("FREQ=SECONDLY")).toBeNull();
-    expect(rruleToFrequency("FREQ=DAILY;BYHOUR=10")).toBeNull();
     expect(rruleToFrequency("")).toBeNull();
   });
 });
 
-// ─── parseRecurrenceRule / buildRecurrenceRule ─────────────────────
-
-describe("parseRecurrenceRule", () => {
-  it("parses count-limited recurrence rules", () => {
-    expect(parseRecurrenceRule("FREQ=DAILY;COUNT=5")).toEqual({
-      frequency: RepeatingFrequency.Daily,
-      endMode: "count",
-      count: 5,
-      untilDate: null,
+describe("getEventRRules", () => {
+  it("returns de-duplicated normalized recurrence rules", () => {
+    const rules = getEventRRules({
+      rrules: ["FREQ=WEEKLY", "RRULE:FREQ=MONTHLY", "FREQ=WEEKLY"],
     });
+
+    expect(rules).toEqual(["FREQ=WEEKLY", "FREQ=MONTHLY"]);
   });
 
-  it("parses until-limited recurrence rules", () => {
-    const until = Date.UTC(2025, 0, 31, 10, 0, 0);
+  it("supports legacy cached repeat objects that still include rrule", () => {
+    const rules = getEventRRules({
+      rrules: ["FREQ=WEEKLY"],
+      rrule: "RRULE:FREQ=MONTHLY",
+    } as ICalendarEvent["repeat"] & { rrule?: string });
 
-    expect(parseRecurrenceRule("FREQ=WEEKLY;UNTIL=20250131T100000Z")).toEqual({
-      frequency: RepeatingFrequency.Weekly,
-      endMode: "until",
-      count: null,
-      untilDate: until,
-    });
-  });
-
-  it("falls back safely for malformed or unsupported rules", () => {
-    expect(parseRecurrenceRule("FREQ=DAILY;BYHOUR=10")).toEqual({
-      frequency: null,
-      endMode: "never",
-      count: null,
-      untilDate: null,
-    });
-    expect(parseRecurrenceRule("")).toEqual({
-      frequency: null,
-      endMode: "never",
-      count: null,
-      untilDate: null,
-    });
-  });
-});
-
-describe("buildRecurrenceRule", () => {
-  it("builds count-limited recurrence rules", () => {
-    const jan1 = Date.UTC(2025, 0, 1, 10);
-
-    expect(
-      buildRecurrenceRule({
-        frequency: RepeatingFrequency.Daily,
-        endMode: "count",
-        count: 5,
-        eventStart: jan1,
-      }),
-    ).toBe("FREQ=DAILY;COUNT=5");
-  });
-
-  it("builds date-only until-limited rules using the event start time", () => {
-    const eventStart = new Date(2026, 3, 15, 14, 30, 0).getTime();
-    const untilDate = new Date(2026, 3, 18).getTime();
-    const expectedUntil =
-      new Date(2026, 3, 18, 14, 30, 0)
-        .toISOString()
-        .replace(/[-:]/g, "")
-        .split(".")[0] + "Z";
-
-    expect(
-      buildRecurrenceRule({
-        frequency: RepeatingFrequency.Daily,
-        endMode: "until",
-        untilDate,
-        eventStart,
-      }),
-    ).toBe(`FREQ=DAILY;UNTIL=${expectedUntil}`);
+    expect(rules).toEqual(["FREQ=WEEKLY", "FREQ=MONTHLY"]);
   });
 });
 
@@ -211,7 +137,7 @@ describe("isEventInDateRange – non-repeating events", () => {
   it("handles null rrule the same as no recurrence", () => {
     const event = makeEvent({
       begin: jan1,
-      repeat: { rrule: null },
+      repeat: { rrules: [] },
     });
     expect(isEventInDateRange(event, jan1 - DAY, jan1 + DAY)).toBe(true);
     expect(isEventInDateRange(event, jan1 + 2 * DAY, jan1 + 3 * DAY)).toBe(
@@ -226,7 +152,7 @@ describe("isEventInDateRange – daily recurrence", () => {
   const jan1 = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: jan1,
-    repeat: { rrule: "FREQ=DAILY" },
+    repeat: { rrules: ["FREQ=DAILY"] },
   });
 
   it("matches on the original day", () => {
@@ -250,18 +176,6 @@ describe("isEventInDateRange – daily recurrence", () => {
   it("does not match before the event starts", () => {
     expect(isEventInDateRange(event, jan1 - 2 * DAY, jan1 - DAY)).toBe(false);
   });
-
-  it("stops matching after the last occurrence when COUNT is present", () => {
-    const limitedEvent = makeEvent({
-      begin: jan1,
-      repeat: { rrule: "FREQ=DAILY;COUNT=3" },
-    });
-    const day3 = jan1 + 3 * DAY;
-
-    expect(isEventInDateRange(limitedEvent, day3 - HOUR, day3 + 2 * HOUR)).toBe(
-      false,
-    );
-  });
 });
 
 // ─── isEventInDateRange: weekly recurrence ──────────────────────────
@@ -271,7 +185,7 @@ describe("isEventInDateRange – weekly recurrence", () => {
   const wed = Date.UTC(2025, 0, 1, 10); // Jan 1 2025 is Wednesday
   const event = makeEvent({
     begin: wed,
-    repeat: { rrule: "FREQ=WEEKLY" },
+    repeat: { rrules: ["FREQ=WEEKLY"] },
   });
 
   it("matches on the same day of week, 3 weeks later", () => {
@@ -297,7 +211,7 @@ describe("isEventInDateRange – monthly recurrence", () => {
   const jan15 = Date.UTC(2025, 0, 15, 10);
   const event = makeEvent({
     begin: jan15,
-    repeat: { rrule: "FREQ=MONTHLY" },
+    repeat: { rrules: ["FREQ=MONTHLY"] },
   });
 
   it("matches on Feb 15", () => {
@@ -326,7 +240,7 @@ describe("isEventInDateRange – yearly recurrence", () => {
   const jan1_2025 = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: jan1_2025,
-    repeat: { rrule: "FREQ=YEARLY" },
+    repeat: { rrules: ["FREQ=YEARLY"] },
   });
 
   it("matches on Jan 1 2026", () => {
@@ -350,7 +264,7 @@ describe("isEventInDateRange – quarterly recurrence", () => {
   const jan1 = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: jan1,
-    repeat: { rrule: "FREQ=MONTHLY;INTERVAL=3" },
+    repeat: { rrules: ["FREQ=MONTHLY;INTERVAL=3"] },
   });
 
   it("matches 3 months later (April 1)", () => {
@@ -371,7 +285,7 @@ describe("isEventInDateRange – weekday recurrence", () => {
   const mon = Date.UTC(2025, 0, 6, 10);
   const event = makeEvent({
     begin: mon,
-    repeat: { rrule: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+    repeat: { rrules: ["FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"] },
   });
 
   it("matches on the next weekday (Tuesday)", () => {
@@ -387,6 +301,21 @@ describe("isEventInDateRange – weekday recurrence", () => {
   it("does not match on a Sunday", () => {
     const sun = Date.UTC(2025, 0, 12, 10);
     expect(isEventInDateRange(event, sun, sun + HOUR)).toBe(false);
+  });
+});
+
+describe("isEventInDateRange – multiple recurrence rules", () => {
+  const jan1 = Date.UTC(2025, 0, 1, 10);
+  const event = makeEvent({
+    begin: jan1,
+    repeat: {
+      rrules: ["FREQ=WEEKLY", "FREQ=MONTHLY"],
+    },
+  });
+
+  it("matches when any recurrence rule has an occurrence in range", () => {
+    const feb1 = Date.UTC(2025, 1, 1, 10);
+    expect(isEventInDateRange(event, feb1 - HOUR, feb1 + HOUR)).toBe(true);
   });
 });
 
@@ -412,7 +341,7 @@ describe("getNextOccurrenceInRange – non-repeating", () => {
   it("returns null for null rrule when out of range", () => {
     const event = makeEvent({
       begin: jan1,
-      repeat: { rrule: null },
+      repeat: { rrules: [] },
     });
     expect(
       getNextOccurrenceInRange(event, jan1 + 2 * DAY, jan1 + 3 * DAY),
@@ -424,7 +353,7 @@ describe("getNextOccurrenceInRange – daily recurrence", () => {
   const jan1 = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: jan1,
-    repeat: { rrule: "FREQ=DAILY" },
+    repeat: { rrules: ["FREQ=DAILY"] },
   });
 
   it("returns the correct occurrence start for day 5", () => {
@@ -448,25 +377,13 @@ describe("getNextOccurrenceInRange – daily recurrence", () => {
       getNextOccurrenceInRange(event, jan1 - 2 * DAY, jan1 - DAY),
     ).toBeNull();
   });
-
-  it("returns null after the final counted occurrence", () => {
-    const limitedEvent = makeEvent({
-      begin: jan1,
-      repeat: { rrule: "FREQ=DAILY;COUNT=3" },
-    });
-    const day3 = jan1 + 3 * DAY;
-
-    expect(
-      getNextOccurrenceInRange(limitedEvent, day3 - HOUR, day3 + HOUR),
-    ).toBeNull();
-  });
 });
 
 describe("getNextOccurrenceInRange – weekly recurrence", () => {
   const wed = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: wed,
-    repeat: { rrule: "FREQ=WEEKLY" },
+    repeat: { rrules: ["FREQ=WEEKLY"] },
   });
 
   it("returns the occurrence 2 weeks out", () => {
@@ -488,28 +405,13 @@ describe("getNextOccurrenceInRange – weekly recurrence", () => {
     );
     expect(result).toBe(nextWed);
   });
-
-  it("returns null after the UNTIL date has passed", () => {
-    const limitedEvent = makeEvent({
-      begin: wed,
-      repeat: { rrule: "FREQ=WEEKLY;UNTIL=20250115T100000Z" },
-    });
-    const jan22 = Date.UTC(2025, 0, 22, 10);
-
-    expect(
-      getNextOccurrenceInRange(limitedEvent, jan22 - HOUR, jan22 + HOUR),
-    ).toBeNull();
-    expect(
-      isEventInDateRange(limitedEvent, jan22 - HOUR, jan22 + 2 * HOUR),
-    ).toBe(false);
-  });
 });
 
 describe("getNextOccurrenceInRange – monthly recurrence", () => {
   const jan15 = Date.UTC(2025, 0, 15, 10);
   const event = makeEvent({
     begin: jan15,
-    repeat: { rrule: "FREQ=MONTHLY" },
+    repeat: { rrules: ["FREQ=MONTHLY"] },
   });
 
   it("returns the March 15 occurrence", () => {
@@ -529,7 +431,7 @@ describe("getNextOccurrenceInRange – yearly recurrence", () => {
   const jan1_2025 = Date.UTC(2025, 0, 1, 10);
   const event = makeEvent({
     begin: jan1_2025,
-    repeat: { rrule: "FREQ=YEARLY" },
+    repeat: { rrules: ["FREQ=YEARLY"] },
   });
 
   it("returns the 2027 occurrence", () => {
@@ -548,7 +450,7 @@ describe("getNextOccurrenceInRange – weekday recurrence", () => {
   const mon = Date.UTC(2025, 0, 6, 10);
   const event = makeEvent({
     begin: mon,
-    repeat: { rrule: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+    repeat: { rrules: ["FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"] },
   });
 
   it("finds the Wednesday occurrence", () => {
@@ -561,5 +463,23 @@ describe("getNextOccurrenceInRange – weekday recurrence", () => {
     const sat = Date.UTC(2025, 0, 11, 10);
     const result = getNextOccurrenceInRange(event, sat, sat + HOUR);
     expect(result).toBeNull();
+  });
+});
+
+describe("getNextOccurrenceInRange – multiple recurrence rules", () => {
+  const jan1 = Date.UTC(2025, 0, 1, 10); // Wednesday
+  const event = makeEvent({
+    begin: jan1,
+    repeat: {
+      rrules: ["FREQ=WEEKLY", "FREQ=MONTHLY"],
+    },
+  });
+
+  it("returns the earliest occurrence across all rules", () => {
+    const jan29 = Date.UTC(2025, 0, 29, 10); // weekly
+    const feb1 = Date.UTC(2025, 1, 1, 10); // monthly
+
+    const result = getNextOccurrenceInRange(event, jan29 - HOUR, feb1 + HOUR);
+    expect(result).toBe(jan29);
   });
 });

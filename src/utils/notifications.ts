@@ -1,7 +1,10 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
-import { getNextOccurrenceInRange } from "./repeatingEventsHelper";
+import {
+  getEventRRules,
+  getNextOccurrenceInRange,
+} from "./repeatingEventsHelper";
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
@@ -64,7 +67,7 @@ export async function scheduleEventNotifications(
   const now = Date.now();
   const nDaysFromNow = now + 5 * 24 * 60 * 60 * 1000;
 
-  const isRepeating = !!event.repeat?.rrule;
+  const isRepeating = getEventRRules(event.repeat).length > 0;
 
   // Determine the occurrence start time to schedule for
   let occurrenceStart: number;

@@ -54,7 +54,7 @@ export interface ICalendarEvent {
   isPrivateEvent: boolean;
   viewKey?: string;
   repeat: {
-    rrule: string | null;
+    rrules: string[];
   };
   calendarId?: string;
   isInvitation?: boolean;
