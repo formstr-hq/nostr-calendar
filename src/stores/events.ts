@@ -91,29 +91,6 @@ const getTimeRange = (customConfig?: {
 };
 
 /**
- * Processes a public calendar event found in a user's calendar list.
- * No decryption is needed — just parse and attach the calendarId so the
- * event is associated with the correct calendar in the UI. Uses updateEvent
- * so the entry is upserted correctly whether or not it is already in the store.
- */
-const processPublicCalendarListEvent = (
-  event: Event,
-  calendarId: string,
-  relayHint?: string,
-) => {
-  const parsedEvent = nostrEventToCalendar(event, { relayHint });
-  if (parsedEvent.begin === 0 || parsedEvent.end === 0) return;
-  if (
-    !isValid(new Date(parsedEvent.begin)) ||
-    !isValid(new Date(parsedEvent.end))
-  ) {
-    console.warn("invalid date on public calendar list event", parsedEvent);
-    return;
-  }
-  useTimeBasedEvents.getState().updateEvent({ ...parsedEvent, calendarId });
-};
-
-/**
  * Processes a decrypted private event and adds it to the store.
  * Handles deduplication by keeping the newer version if the event already exists.
  */
@@ -359,12 +336,6 @@ export const useTimeBasedEvents = create<{
               decrypted,
               timeRange,
               meta.viewKey,
-              meta.calendarId,
-              meta.relayUrl,
-            );
-          } else {
-            processPublicCalendarListEvent(
-              event,
               meta.calendarId,
               meta.relayUrl,
             );

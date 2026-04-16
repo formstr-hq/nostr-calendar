@@ -548,11 +548,10 @@ export const fetchCalendarEvents = (
 
 export const publishPublicCalendarEvent = async (
   event: ICalendarEvent,
-  calendarId?: string,
   onAcceptedRelays?: (url: string) => void,
 ) => {
   const pubKey = await getUserPublicKey();
-  const id = event.id && event.id !== TEMP_CALENDAR_ID ? event.id : uuid();
+  const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();
   const tags = [
     ["name", event.title],
     ["d", id],
@@ -585,18 +584,6 @@ export const publishPublicCalendarEvent = async (
   const fullEvent = await signer.signEvent(baseEvent);
   fullEvent.id = getEventHash(baseEvent);
   const result = await publishToRelays(fullEvent, onAcceptedRelays);
-
-  // Add the event reference to the creator's calendar list so the event
-  // is associated with a specific calendar and visible via fetchPrivateEvents.
-  if (calendarId) {
-    const eventRef = buildEventRef({
-      kind: EventKinds.PublicCalendarEvent,
-      authorPubkey: pubKey,
-      eventDTag: id,
-      viewKey: "",
-    });
-    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
-  }
 
   return { result, id, pubKey };
 };

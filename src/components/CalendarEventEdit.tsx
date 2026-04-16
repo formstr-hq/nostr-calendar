@@ -171,13 +171,12 @@ export function CalendarEventEdit({
           await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
         }
       } else {
-        const { id: savedId, pubKey } = await publishPublicCalendarEvent(eventToSave, selectedCalendarId);
+        const { id: savedId, pubKey } = await publishPublicCalendarEvent(eventToSave);
         useTimeBasedEvents.getState().updateEvent({
           ...eventToSave,
           id: savedId,
           kind: EventKinds.PublicCalendarEvent,
           user: pubKey,
-          calendarId: selectedCalendarId,
           isPrivateEvent: false,
         });
       }
