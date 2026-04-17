@@ -1,4 +1,8 @@
 import type { ICalendarEvent } from "./types";
+import type { NotificationPreference } from "./types";
+
+export const DEFAULT_NOTIFICATION_PREFERENCE: NotificationPreference =
+  "enabled";
 
 /**
  * Represents a private calendar list (kind 32123).
@@ -19,6 +23,11 @@ export interface ICalendarList {
   description: string;
   /** Hex color string for theming event cards, e.g. "#4285f4" */
   color: string;
+  /**
+   * Calendar-level notification preference.
+   * Used when an event does not define its own preference.
+   */
+  notificationPreference?: NotificationPreference;
   /**
    * References to calendar events as standard NIP a-tag arrays:
    * ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
@@ -62,6 +71,8 @@ export interface IInvitation {
   eventId: string;
   /** nsec-encoded view key for decrypting the event */
   viewKey: string;
+  /** Relay hint indicating where the main event is published */
+  relayHint?: string;
   /** Resolved event data (populated after fetching and decrypting) */
   event?: ICalendarEvent;
   /** Timestamp when the invitation was received */

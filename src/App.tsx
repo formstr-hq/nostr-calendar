@@ -148,8 +148,14 @@ function Application() {
     title: string;
     description: string;
     color: string;
+    notificationPreference: "enabled" | "disabled";
   }) => {
-    await createCalendar(data.title, data.description, data.color);
+    await createCalendar(
+      data.title,
+      data.description,
+      data.color,
+      data.notificationPreference,
+    );
     setShowOnboardingDialog(false);
   };
 

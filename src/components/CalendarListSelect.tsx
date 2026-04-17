@@ -49,11 +49,13 @@ export function CalendarListSelect({
     title: string;
     description: string;
     color: string;
+    notificationPreference: "enabled" | "disabled";
   }) => {
     const newCalendar = await createCalendar(
       data.title,
       data.description,
       data.color,
+      data.notificationPreference,
     );
     if (newCalendar) {
       onChange(newCalendar.id);

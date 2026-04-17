@@ -137,6 +137,10 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "e.g., Work, Personal, Travel",
       optionalDescription: "Optional description",
       color: "Color",
+      notifications: "Notifications",
+      notificationsOn: "Enabled for this calendar",
+      notificationsOff: "Disabled for this calendar",
+      notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
@@ -158,6 +162,11 @@ const dictionary: NestedObject = {
       dismiss: "Dismiss",
       acceptInvitation: "Add to Calendar",
       invitedBy: "You have been invited by {participant} to this event",
+      createdBy: "Shared by {participant}",
+      loginToAdd: "Log in to add this event to your calendar",
+      addedToCalendar: "Event added to your calendar",
+      viewInCalendar: "View in Calendar",
+      stayHere: "Stay Here",
     },
     login: {
       signInToFormstr: "Sign in to Formstr",
@@ -338,6 +347,10 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "z.B. Arbeit, Persönlich, Reise",
       optionalDescription: "Optionale Beschreibung",
       color: "Farbe",
+      notifications: "Benachrichtigungen",
+      notificationsOn: "Für diesen Kalender aktiviert",
+      notificationsOff: "Für diesen Kalender deaktiviert",
+      notificationsAppOnly: "Benachrichtigungen sind nur in der App verfügbar.",
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
@@ -359,6 +372,11 @@ const dictionary: NestedObject = {
       dismiss: "Verwerfen",
       acceptInvitation: "Zum Kalender hinzufügen",
       invitedBy: "Sie wurden von {participant} zu diesem Termin eingeladen",
+      createdBy: "Geteilt von {participant}",
+      loginToAdd: "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
+      addedToCalendar: "Termin wurde Ihrem Kalender hinzugefügt",
+      viewInCalendar: "Im Kalender anzeigen",
+      stayHere: "Hier bleiben",
     },
     login: {
       signInToFormstr: "Bei Formstr anmelden",
@@ -402,3 +420,7 @@ const dictionary: NestedObject = {
   },
 };
 export default dictionary;
+
+
+
+

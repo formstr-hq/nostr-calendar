@@ -33,6 +33,8 @@ export interface IScheduledNotification {
   scheduledAt: number;
 }
 
+export type NotificationPreference = "enabled" | "disabled";
+
 export interface ICalendarEvent {
   begin: number;
   description: string;
@@ -56,6 +58,12 @@ export interface ICalendarEvent {
   repeat: {
     rrules: string[];
   };
+  /**
+   * Event-level notification preference.
+   * If undefined, calendar-list preference should be used as fallback.
+   */
+  notificationPreference?: NotificationPreference;
   calendarId?: string;
   isInvitation?: boolean;
+  relayHint?: string;
 }

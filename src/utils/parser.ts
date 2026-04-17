@@ -6,7 +6,8 @@ export const nostrEventToCalendar = (
   {
     viewKey,
     isPrivateEvent,
-  }: { viewKey?: string; isPrivateEvent?: boolean } = {},
+    relayHint,
+  }: { viewKey?: string; isPrivateEvent?: boolean; relayHint?: string } = {},
 ): ICalendarEvent => {
   const parsedEvent: ICalendarEvent = {
     description: event.content,
@@ -26,6 +27,7 @@ export const nostrEventToCalendar = (
     participants: [],
     viewKey: viewKey,
     isPrivateEvent: !!isPrivateEvent,
+    relayHint: relayHint,
     repeat: {
       rrules: [],
     },
@@ -68,6 +70,11 @@ export const nostrEventToCalendar = (
         break;
       case "g":
         parsedEvent.geoHash.push(value);
+        break;
+      case "notification":
+        if (value === "enabled" || value === "disabled") {
+          parsedEvent.notificationPreference = value;
+        }
         break;
       case "l": {
         const previousTag = event.tags[index - 1];

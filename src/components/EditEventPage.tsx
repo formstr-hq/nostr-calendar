@@ -45,16 +45,17 @@ export const EditEventPage = () => {
     if (!naddr) return;
     setLoadState({ event: null, fetchState: "loading" });
     fetchCalendarEvent(naddr as NAddr)
-      .then((event) => {
+      .then(({ event, relayHint }) => {
         let parsedEvent: ICalendarEvent;
         if (viewKey) {
           const privateEvent = viewPrivateEvent(event, viewKey);
           parsedEvent = nostrEventToCalendar(privateEvent, {
             viewKey,
             isPrivateEvent: true,
+            relayHint,
           });
         } else {
-          parsedEvent = nostrEventToCalendar(event);
+          parsedEvent = nostrEventToCalendar(event, { relayHint });
         }
         setLoadState({ event: parsedEvent, fetchState: "fetched" });
       })

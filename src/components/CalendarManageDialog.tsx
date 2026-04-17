@@ -9,14 +9,22 @@ import {
   Box,
   Typography,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
-import type { ICalendarList } from "../utils/calendarListTypes";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCE,
+  type ICalendarList,
+} from "../utils/calendarListTypes";
 import { useIntl } from "react-intl";
+import type { NotificationPreference } from "../utils/types";
 
 const PRESET_COLORS = [
   "#4285f4", // Blue
@@ -35,7 +43,12 @@ interface CalendarManageDialogProps {
   open: boolean;
   onClose: () => void;
   calendar?: ICalendarList;
-  onSave: (data: { title: string; description: string; color: string }) => void;
+  onSave: (data: {
+    title: string;
+    description: string;
+    color: string;
+    notificationPreference: NotificationPreference;
+  }) => void;
   onDelete?: () => void;
   /** When true, the dialog cannot be dismissed — used for onboarding when no calendars exist. */
   blocking?: boolean;
@@ -55,13 +68,22 @@ export function CalendarManageDialog({
   const [title, setTitle] = useState(calendar?.title || "");
   const [description, setDescription] = useState(calendar?.description || "");
   const [color, setColor] = useState(calendar?.color || PRESET_COLORS[0]);
+  const [notificationPreference, setNotificationPreference] =
+    useState<NotificationPreference>(
+      calendar?.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
+    );
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleSave = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), color });
+    onSave({
+      title: title.trim(),
+      description: description.trim(),
+      color,
+      notificationPreference,
+    });
     onClose();
   };
 
@@ -162,6 +184,29 @@ export function CalendarManageDialog({
               ))}
             </Box>
           </Box>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="calendar-notifications-label">
+              {intl.formatMessage({ id: "calendarManage.notifications" })}
+            </InputLabel>
+            <Select
+              labelId="calendar-notifications-label"
+              label={intl.formatMessage({ id: "calendarManage.notifications" })}
+              value={notificationPreference}
+              onChange={(e) =>
+                setNotificationPreference(
+                  e.target.value as NotificationPreference,
+                )
+              }
+            >
+              <MenuItem value="enabled">
+                {intl.formatMessage({ id: "calendarManage.notificationsOn" })}
+              </MenuItem>
+              <MenuItem value="disabled">
+                {intl.formatMessage({ id: "calendarManage.notificationsOff" })}
+              </MenuItem>
+            </Select>
+          </FormControl>
         </Box>
       </DialogContent>
 
