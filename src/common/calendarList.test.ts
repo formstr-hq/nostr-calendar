@@ -16,6 +16,7 @@ const { mockEncrypt, mockDecrypt, mockSignEvent } = vi.hoisted(() => ({
       ["title", "Test Calendar"],
       ["content", "A test calendar"],
       ["color", "#d50000"],
+      ["notifications", "disabled"],
       [
         "a",
         "32678:testpubkey:event-1",
@@ -96,6 +97,7 @@ describe("calendarList protocol layer", () => {
       expect(tags).toContainEqual(["title", "My Calendar"]);
       expect(tags).toContainEqual(["content", "Personal events"]);
       expect(tags).toContainEqual(["color", "#4285f4"]);
+      expect(tags).not.toContainEqual(["notifications", "enabled"]);
       expect(tags).toContainEqual([
         "a",
         "32678:testpubkey:event-1",
@@ -129,6 +131,14 @@ describe("calendarList protocol layer", () => {
       expect(aTags).toHaveLength(3);
     });
 
+    it("stores notification preference only when non-default", async () => {
+      const cal = makeCalendar({ notificationPreference: "disabled" });
+      await encryptCalendarList(cal);
+
+      const tags = JSON.parse(mockEncrypt.mock.calls[0][1]);
+      expect(tags).toContainEqual(["notifications", "disabled"]);
+    });
+
     it("handles empty eventRefs", async () => {
       const cal = makeCalendar({ eventRefs: [] });
       await encryptCalendarList(cal);
@@ -157,6 +167,7 @@ describe("calendarList protocol layer", () => {
       expect(result.title).toBe("Test Calendar");
       expect(result.description).toBe("A test calendar");
       expect(result.color).toBe("#d50000");
+      expect(result.notificationPreference).toBe("disabled");
       expect(result.eventRefs).toEqual([
         [
           "32678:testpubkey:event-1",
@@ -190,6 +201,7 @@ describe("calendarList protocol layer", () => {
       expect(result.title).toBe("Minimal");
       expect(result.description).toBe("");
       expect(result.color).toBe("#4285f4"); // default color
+      expect(result.notificationPreference).toBeUndefined();
       expect(result.eventRefs).toEqual([]);
     });
 

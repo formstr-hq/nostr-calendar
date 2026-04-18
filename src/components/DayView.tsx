@@ -3,29 +3,25 @@ import dayjs from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
-import { getTimeFromCell, layoutDayEvents } from "../common/calendarEngine";
+import {
+  getEventSegmentsForDay,
+  getTimeFromCell,
+  layoutDayEvents,
+} from "../common/calendarEngine";
 import { CalendarEventCard } from "./CalendarEvent";
 import { DndContext } from "@dnd-kit/core";
 import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
-import { isEventInDateRange } from "../utils/repeatingEventsHelper";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export function DayView({ events, date }: ViewProps) {
-  const dayEvents = layoutDayEvents(
-    events.filter((e) =>
-      isEventInDateRange(
-        e,
-        date.unix() * 1000,
-        date.unix() * 1000 + 24 * 60 * 60 * 1000,
-      ),
-    ),
-  );
+  const dayStart = date.startOf("day").valueOf();
+  const dayEvents = layoutDayEvents(getEventSegmentsForDay(events, dayStart));
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clickedDateTime, setClickedDateTime] = useState<number | undefined>();
@@ -71,7 +67,7 @@ export function DayView({ events, date }: ViewProps) {
               ))}
             </Box>
             {dayEvents.map((e) => (
-              <CalendarEventCard key={e.id} event={e} />
+              <CalendarEventCard key={e.renderKey} event={e} />
             ))}
           </Box>
         </Box>

@@ -4,4 +4,5 @@
     <string name="title_activity_main">Calendar by Form*</string>
     <string name="package_name">app.formstr.calendar</string>
     <string name="custom_url_scheme">app.formstr.calendar</string>
+    <string name="widget_description">Shows your upcoming Nostr calendar events</string>
 </resources>

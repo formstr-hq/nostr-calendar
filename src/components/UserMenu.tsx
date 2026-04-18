@@ -1,11 +1,13 @@
-import UserIcon from "@mui/icons-material/Person";
 import { IconButton, Menu } from "@mui/material";
 import { useState } from "react";
 import { Auth } from "./Auth";
+import { useUser } from "../stores/user";
+import { NostrAvatar } from "./NostrAvatar";
 
 export const UserMenu = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const { user } = useUser((state) => state);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -17,7 +19,7 @@ export const UserMenu = () => {
   return (
     <>
       <IconButton onClick={handleClick}>
-        <UserIcon />
+        <NostrAvatar user={user} />
       </IconButton>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
         <Auth />

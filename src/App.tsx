@@ -1,18 +1,9 @@
-import ModeSelectionModal from "./components/ModeSelectionModal";
-import {
-  ThemeProvider,
-  CssBaseline,
-  Box,
-  Typography,
-  Toolbar,
-  Dialog,
-  DialogContent,
-} from "@mui/material";
+import { ThemeProvider, CssBaseline, Box, Toolbar } from "@mui/material";
 import { theme } from "./theme";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
-import { IntlProvider, useIntl } from "react-intl";
+import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
 import dictionary from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
@@ -33,6 +24,9 @@ import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
+import { AppLoadingBar } from "./components/AppLoadingBar";
+import { AppStatusMessage } from "./components/AppStatusMessage";
+import { useAppStartup } from "./hooks/useAppStartup";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -44,7 +38,6 @@ const _locale = ~Object.keys(dictionary).indexOf(browserLocale)
   : "en-US";
 
 function Application() {
-  const intl = useIntl();
   const {
     user,
     isInitialized,
@@ -52,8 +45,6 @@ function Application() {
     showLoginModal,
     updateLoginModal,
   } = useUser();
-  const [appMode, setAppMode] = useState<"login" | "guest" | null>(null);
-  const [showModeSelection, setShowModeSelection] = useState(false);
   const [importedEvent, setImportedEvent] = useState<ICalendarEvent | null>(
     null,
   );
@@ -65,6 +56,9 @@ function Application() {
     fetchCalendars,
   } = useCalendarLists();
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
+
+  // Startup state machine: drives the loading bar + status message
+  const { stage, statusMessage, retry } = useAppStartup();
 
   useEffect(() => {
     initializeUser();
@@ -110,7 +104,10 @@ function Application() {
     import("@capacitor/app").then(({ App: CapApp }) => {
       const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
-          setSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME, Math.floor(Date.now() / 1000));
+          setSecureItem(
+            BG_KEY_LAST_INVITATION_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         }
       });
       cleanup = () => {
@@ -137,10 +134,10 @@ function Application() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!user && !appMode && isInitialized) {
-      setShowModeSelection(true);
+    if (!user && isInitialized) {
+      updateLoginModal(true);
     }
-  }, [user, isInitialized, appMode]);
+  }, [user, isInitialized, updateLoginModal]);
 
   // Show onboarding dialog when user is logged in but has no calendars
   useEffect(() => {
@@ -155,59 +152,31 @@ function Application() {
     title: string;
     description: string;
     color: string;
+    notificationPreference: "enabled" | "disabled";
   }) => {
-    await createCalendar(data.title, data.description, data.color);
+    await createCalendar(
+      data.title,
+      data.description,
+      data.color,
+      data.notificationPreference,
+    );
     setShowOnboardingDialog(false);
-  };
-
-  useEffect(() => {
-    if (appMode === "login" && isInitialized && !user) {
-      const handleLogin = async () => {
-        try {
-          updateLoginModal(true);
-        } catch (error) {
-          console.error("Login failed:", error);
-        }
-      };
-
-      handleLogin();
-    }
-  }, [appMode, user, isInitialized, updateLoginModal]);
-
-  const handleModeSelection = (mode: "login" | "guest") => {
-    setAppMode(mode);
-    setShowModeSelection(false);
   };
 
   return (
     <>
       <Header onImportEvent={setImportedEvent} />
+
       <ICSListener
         importedEvent={importedEvent}
         onClose={() => setImportedEvent(null)}
         onImportEvent={setImportedEvent}
       />
-      {/* Mode Selection Modal */}
-      <ModeSelectionModal
-        isOpen={showModeSelection}
-        onModeSelect={handleModeSelection}
-      />
-      {/* Loading State */}
-      {!showModeSelection && !appMode && !user && (
-        <Dialog open>
-          <DialogContent>
-            <Box display="flex" justifyContent="center" alignItems="center">
-              <Typography>
-                {intl.formatMessage({ id: "message.loggingIn" })}
-              </Typography>
-            </Box>
-          </DialogContent>
-        </Dialog>
-      )}
       <LoginModal
         open={showLoginModal}
         onClose={() => updateLoginModal(false)}
       />
+
       {showOnboardingDialog && (
         <CalendarManageDialog
           open={showOnboardingDialog}
@@ -217,9 +186,26 @@ function Application() {
           blocking
         />
       )}
+
       <RelayManager />
       <Toolbar />
-      <Box>{user && isInitialized && <Routing />}</Box>
+
+      {/* Startup indicators float inside normal flow, positioned straight under toolbar */}
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <AppLoadingBar stage={stage} />
+        <AppStatusMessage
+          stage={stage}
+          statusMessage={statusMessage}
+          onRetry={retry}
+        />
+      </Box>
+
+      <Box>{isInitialized && <Routing />}</Box>
     </>
   );
 }

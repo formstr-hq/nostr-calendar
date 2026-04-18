@@ -1,8 +1,8 @@
 import dayjs, { Dayjs } from "dayjs";
-import utc from "dayjs/plugin/utc";
+import weekOfYear from "dayjs/plugin/weekOfYear";
 import type { Layout } from "../hooks/useLayout";
 
-dayjs.extend(utc);
+dayjs.extend(weekOfYear);
 
 type DayRouteParams = {
   year: string;
@@ -41,9 +41,8 @@ export function getDateFromRoute(params: CalendarRouteParams): Dayjs {
 
   // Week route: /w/:year/:weekNumber
   if (year && "weekNumber" in params) {
-    // ISO week → Monday
+    // Use local week boundaries so rendered days line up with local midnight.
     return dayjs()
-      .utc()
       .year(Number(year))
       .week(Number(params.weekNumber))
       .startOf("week");

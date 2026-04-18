@@ -30,7 +30,10 @@ import {
 } from "../common/calendarList";
 import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
-import type { ICalendarList } from "../utils/calendarListTypes";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCE,
+  type ICalendarList,
+} from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { isNative } from "../utils/platform";
 
@@ -54,6 +57,18 @@ const saveVisibilityToStorage = (visibility: Record<string, boolean>) => {
 
 let subscriptionHandle: SubscriptionHandle | undefined;
 
+const withNotificationPreference = (calendar: ICalendarList): ICalendarList => ({
+  ...calendar,
+  notificationPreference:
+    calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
+});
+
+const normalizePreferenceForPublish = (
+  preference?: "enabled" | "disabled",
+): "disabled" | undefined => {
+  return preference === "disabled" ? "disabled" : undefined;
+};
+
 interface CalendarListsState {
   calendars: ICalendarList[];
   isLoaded: boolean;
@@ -64,6 +79,7 @@ interface CalendarListsState {
     title: string,
     description?: string,
     color?: string,
+    notificationPreference?: "enabled" | "disabled",
   ) => Promise<ICalendarList>;
   updateCalendar: (calendar: ICalendarList) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;
@@ -105,10 +121,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     );
 
     // Restore visibility state from separate storage
-    const calendarsWithVisibility = cached.map((cal) => ({
-      ...cal,
-      isVisible: visibility[cal.id] !== undefined ? visibility[cal.id] : true,
-    }));
+    const calendarsWithVisibility = cached.map((cal) =>
+      withNotificationPreference({
+        ...cal,
+        isVisible: visibility[cal.id] !== undefined ? visibility[cal.id] : true,
+      }),
+    );
 
     if (calendarsWithVisibility.length > 0) {
       set({ calendars: calendarsWithVisibility, isLoaded: true });
@@ -144,6 +162,8 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
         // Preserve client-side visibility state
         list.isVisible =
           visibility[list.id] !== undefined ? visibility[list.id] : true;
+        list.notificationPreference =
+          list.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE;
         fetchedCalendars.push(list);
 
         // Merge with existing: replace if newer, add if new
@@ -193,39 +213,54 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   /**
    * Creates a new calendar with the given properties and publishes it.
    */
-  createCalendar: async (title, description = "", color = "#4285f4") => {
+  createCalendar: async (
+    title,
+    description = "",
+    color = "#4285f4",
+    notificationPreference = DEFAULT_NOTIFICATION_PREFERENCE,
+  ) => {
     const newCalendar = await createCalendar({
       title,
       description,
       color,
+      notificationPreference: normalizePreferenceForPublish(
+        notificationPreference,
+      ),
       eventId: "",
       eventRefs: [],
       isVisible: true,
     });
+    const calendarWithDefaults = withNotificationPreference(newCalendar);
 
     set((state) => {
-      const updated = [...state.calendars, newCalendar];
+      const updated = [...state.calendars, calendarWithDefaults];
       saveCalendarsToStorage(updated);
       return { calendars: updated };
     });
 
-    return newCalendar;
+    return calendarWithDefaults;
   },
 
   /**
    * Updates calendar metadata (title, description, color) and republishes.
    */
   updateCalendar: async (calendar) => {
-    const updated = {
+    const updatedForPublish = {
       ...calendar,
+      notificationPreference: normalizePreferenceForPublish(
+        calendar.notificationPreference,
+      ),
       createdAt: Math.floor(Date.now() / 1000),
     };
-    const publishedEvent = await publishCalendarList(updated);
-    updated.eventId = publishedEvent.id;
+    const publishedEvent = await publishCalendarList(updatedForPublish);
+    const updatedForState = withNotificationPreference({
+      ...updatedForPublish,
+      eventId: publishedEvent.id,
+    });
 
     set((state) => {
       const calendars = state.calendars.map((c) =>
-        c.id === calendar.id ? updated : c,
+        c.id === calendar.id ? updatedForState : c,
       );
       saveCalendarsToStorage(calendars);
       return { calendars };

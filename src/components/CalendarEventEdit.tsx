@@ -21,8 +21,9 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
 import {
-  frequencyToRRule,
-  rruleToFrequency,
+  buildRecurrenceRule,
+  parseRecurrenceRule,
+  type RecurrenceEndMode,
 } from "../utils/repeatingEventsHelper";
 import { ParticipantAdd } from "./ParticipantAdd";
 import { useIntl } from "react-intl";
@@ -33,7 +34,9 @@ import {
   publishPrivateCalendarEvent,
   publishPublicCalendarEvent,
 } from "../common/nostr";
+import { EventKinds } from "../common/EventConfigs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
@@ -69,6 +72,7 @@ export function CalendarEventEdit({
   display = "modal",
 }: CalendarEventEditProps) {
   const intl = useIntl();
+  const initialRecurrence = parseRecurrenceRule(initialEvent?.repeat.rrule);
   const [processing, setProcessing] = useState(false);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
@@ -109,6 +113,18 @@ export function CalendarEventEdit({
       },
     } as ICalendarEvent;
   });
+  const [recurrenceFrequency, setRecurrenceFrequency] =
+    useState<RepeatingFrequency>(
+      initialRecurrence.frequency ?? RepeatingFrequency.None,
+    );
+  const [recurrenceEndMode, setRecurrenceEndMode] =
+    useState<RecurrenceEndMode>(initialRecurrence.endMode);
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(
+    initialRecurrence.count ?? 1,
+  );
+  const [recurrenceUntilDate, setRecurrenceUntilDate] = useState<Dayjs | null>(
+    initialRecurrence.untilDate ? dayjs(initialRecurrence.untilDate) : null,
+  );
 
   const handleClose = () => {
     onClose();
@@ -128,7 +144,18 @@ export function CalendarEventEdit({
   const handleSave = async () => {
     setProcessing(true);
     try {
-      const eventToSave = { ...eventDetails, isPrivateEvent: isPrivate };
+      const rrule = buildRecurrenceRule({
+        frequency: recurrenceFrequency,
+        endMode: recurrenceEndMode,
+        count: recurrenceCount,
+        untilDate: recurrenceUntilDate?.valueOf() ?? null,
+        eventStart: eventDetails.begin,
+      });
+      const eventToSave = {
+        ...eventDetails,
+        isPrivateEvent: isPrivate,
+        repeat: { rrule },
+      };
 
       if (isPrivate) {
         if (mode === "edit") {
@@ -144,7 +171,14 @@ export function CalendarEventEdit({
           await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
         }
       } else {
-        await publishPublicCalendarEvent(eventToSave);
+        const { id: savedId, pubKey } = await publishPublicCalendarEvent(eventToSave);
+        useTimeBasedEvents.getState().updateEvent({
+          ...eventToSave,
+          id: savedId,
+          kind: EventKinds.PublicCalendarEvent,
+          user: pubKey,
+          isPrivateEvent: false,
+        });
       }
 
       if (onSave) {
@@ -162,6 +196,15 @@ export function CalendarEventEdit({
   const onChangeBeginDate = (value: Dayjs | null) => {
     if (!value) return;
     updateField("begin", value.unix() * 1000);
+
+    const beginDay = value.startOf("day");
+    if (
+      recurrenceEndMode === "until" &&
+      recurrenceUntilDate &&
+      recurrenceUntilDate.isBefore(beginDay, "day")
+    ) {
+      setRecurrenceUntilDate(beginDay);
+    }
   };
 
   const onChangeEndDate = (value: Dayjs | null) => {
@@ -171,17 +214,47 @@ export function CalendarEventEdit({
 
   const handleFrequencyChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as RepeatingFrequency;
-    updateField("repeat", {
-      rrule: value !== RepeatingFrequency.None ? frequencyToRRule(value) : null,
-    });
+    setRecurrenceFrequency(value);
   };
+
+  const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
+    const value = e.target.value as RecurrenceEndMode;
+    setRecurrenceEndMode(value);
+
+    if (value === "count" && recurrenceCount < 1) {
+      setRecurrenceCount(1);
+    }
+
+    if (value === "until" && !recurrenceUntilDate) {
+      setRecurrenceUntilDate(dayjs(eventDetails.begin).startOf("day"));
+    }
+  };
+
+  const handleRecurrenceCountChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const parsed = Number.parseInt(e.target.value, 10);
+    setRecurrenceCount(Number.isFinite(parsed) ? parsed : 0);
+  };
+
+  const recurrenceEnabled = recurrenceFrequency !== RepeatingFrequency.None;
+  const recurrenceValid =
+    !recurrenceEnabled ||
+    recurrenceEndMode === "never" ||
+    (recurrenceEndMode === "count" &&
+      Number.isInteger(recurrenceCount) &&
+      recurrenceCount >= 1) ||
+    (recurrenceEndMode === "until" &&
+      !!recurrenceUntilDate &&
+      !recurrenceUntilDate.isBefore(dayjs(eventDetails.begin).startOf("day")));
 
   const buttonDisabled = !(
     !processing &&
     eventDetails.title &&
     eventDetails.begin &&
     eventDetails.end &&
-    eventDetails.begin < eventDetails.end
+    eventDetails.begin < eventDetails.end &&
+    recurrenceValid
   );
 
   if (!open || !eventDetails) {
@@ -280,42 +353,108 @@ export function CalendarEventEdit({
       {/* Recurrence */}
       <EventAttributeEditContainer>
         <EventRepeatIcon />
-        <FormControl fullWidth size="small">
-          <InputLabel>
-            {intl.formatMessage({ id: "event.selectRecurrence" })}
-          </InputLabel>
-          <Select
-            value={
-              (eventDetails.repeat.rrule
-                ? rruleToFrequency(eventDetails.repeat.rrule)
-                : null) || RepeatingFrequency.None
-            }
-            label={intl.formatMessage({ id: "event.selectRecurrence" })}
-            onChange={handleFrequencyChange}
-          >
-            <MenuItem value={RepeatingFrequency.None}>
-              {intl.formatMessage({ id: "event.doesNotRepeat" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Daily}>
-              {intl.formatMessage({ id: "event.daily" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Weekly}>
-              {intl.formatMessage({ id: "event.weekly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Weekday}>
-              {intl.formatMessage({ id: "event.weekdays" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Monthly}>
-              {intl.formatMessage({ id: "event.monthly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Quarterly}>
-              {intl.formatMessage({ id: "event.quarterly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Yearly}>
-              {intl.formatMessage({ id: "event.yearly" })}
-            </MenuItem>
-          </Select>
-        </FormControl>
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <FormControl fullWidth size="small">
+            <InputLabel>
+              {intl.formatMessage({ id: "event.selectRecurrence" })}
+            </InputLabel>
+            <Select
+              value={recurrenceFrequency}
+              label={intl.formatMessage({ id: "event.selectRecurrence" })}
+              onChange={handleFrequencyChange}
+            >
+              <MenuItem value={RepeatingFrequency.None}>
+                {intl.formatMessage({ id: "event.doesNotRepeat" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Daily}>
+                {intl.formatMessage({ id: "event.daily" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Weekly}>
+                {intl.formatMessage({ id: "event.weekly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Weekday}>
+                {intl.formatMessage({ id: "event.weekdays" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Monthly}>
+                {intl.formatMessage({ id: "event.monthly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Quarterly}>
+                {intl.formatMessage({ id: "event.quarterly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Yearly}>
+                {intl.formatMessage({ id: "event.yearly" })}
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          {recurrenceEnabled && (
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <FormControl size="small" sx={{ minWidth: { sm: 180 } }}>
+                <InputLabel>
+                  {intl.formatMessage({ id: "event.recurrenceEnds" })}
+                </InputLabel>
+                <Select
+                  value={recurrenceEndMode}
+                  label={intl.formatMessage({ id: "event.recurrenceEnds" })}
+                  onChange={handleRecurrenceEndModeChange}
+                >
+                  <MenuItem value="never">
+                    {intl.formatMessage({ id: "event.recurrenceEndsNever" })}
+                  </MenuItem>
+                  <MenuItem value="count">
+                    {intl.formatMessage({ id: "event.recurrenceEndsAfter" })}
+                  </MenuItem>
+                  <MenuItem value="until">
+                    {intl.formatMessage({ id: "event.recurrenceEndsOnDate" })}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {recurrenceEndMode === "count" && (
+                <TextField
+                  size="small"
+                  type="number"
+                  label={intl.formatMessage({ id: "event.recurrenceOccurrences" })}
+                  value={recurrenceCount}
+                  onChange={handleRecurrenceCountChange}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                />
+              )}
+
+              {recurrenceEndMode === "until" && (
+                <DatePicker
+                  sx={{ flex: 1 }}
+                  label={intl.formatMessage({ id: "event.recurrenceEndDate" })}
+                  value={recurrenceUntilDate}
+                  onChange={(value) =>
+                    setRecurrenceUntilDate(value ? value.startOf("day") : null)
+                  }
+                  minDate={dayjs(eventDetails.begin).startOf("day")}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                    },
+                  }}
+                />
+              )}
+            </Box>
+          )}
+        </Box>
       </EventAttributeEditContainer>
       <Divider />
       {/* Participants */}
@@ -381,16 +520,14 @@ export function CalendarEventEdit({
         />
       </Box>
 
-      {/* Calendar Selector — only shown for private events */}
-      {isPrivate && (
-        <Box>
-          <CalendarListSelect
-            value={selectedCalendarId}
-            onChange={setSelectedCalendarId}
-            label={intl.formatMessage({ id: "event.calendar" })}
-          />
-        </Box>
-      )}
+      {/* Calendar Selector */}
+      <Box>
+        <CalendarListSelect
+          value={selectedCalendarId}
+          onChange={setSelectedCalendarId}
+          label={intl.formatMessage({ id: "event.calendar" })}
+        />
+      </Box>
       <Divider />
 
       {/* Privacy Toggle */}

@@ -3,8 +3,12 @@ import dayjs, { Dayjs } from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
-import { DndContext, DragEndEvent } from "@dnd-kit/core";
-import { getTimeFromCell, layoutDayEvents } from "../common/calendarEngine";
+import { DndContext } from "@dnd-kit/core";
+import {
+  getEventSegmentsForDay,
+  getTimeFromCell,
+  layoutDayEvents,
+} from "../common/calendarEngine";
 import { CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
@@ -13,7 +17,6 @@ import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
-import { isEventInDateRange } from "../utils/repeatingEventsHelper";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -89,13 +92,7 @@ export function WeekView({ events, date }: ViewProps) {
         <Box flex={1} display="grid" gridTemplateColumns="repeat(7, 1fr)">
           {days.map((day) => {
             const laidOut = layoutDayEvents(
-              events.filter((e) =>
-                isEventInDateRange(
-                  e,
-                  day.unix() * 1000,
-                  day.unix() * 1000 + 24 * 60 * 60 * 1000,
-                ),
-              ),
+              getEventSegmentsForDay(events, day.startOf("day").valueOf()),
             );
 
             return (
@@ -126,7 +123,7 @@ export function WeekView({ events, date }: ViewProps) {
                   </Box>
                 ))}
                 {laidOut.map((e) => (
-                  <CalendarEventCard key={e.id} event={e} />
+                  <CalendarEventCard key={e.renderKey} event={e} />
                 ))}
               </Box>
             );

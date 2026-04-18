@@ -13,14 +13,7 @@ interface NotificationsState {
 }
 
 export const useNotifications = create<NotificationsState>((set) => ({
-  byEventId: {
-    f2786e14bf9893e6a29e38f015774b: [
-      {
-        scheduledAt: 1774720069595,
-        label: "test",
-      },
-    ],
-  },
+  byEventId: {},
 
   setNotifications: (eventId, notifications) => {
     if (notifications.length === 0) return;
