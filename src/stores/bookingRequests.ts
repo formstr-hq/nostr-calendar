@@ -14,7 +14,7 @@
  */
 
 import { create } from "zustand";
-import { getSecureItem, setSecureItem } from "../common/localStorage";
+import { getItem, setItem } from "../common/localStorage";
 import {
   getUserPublicKey,
   publishPrivateCalendarEvent,
@@ -160,11 +160,11 @@ const INCOMING_STORAGE_KEY = "cal:booking_requests_incoming";
 const OUTGOING_STORAGE_KEY = "cal:booking_requests_outgoing";
 
 const saveIncomingToStorage = (requests: IBookingRequest[]) => {
-  setSecureItem(INCOMING_STORAGE_KEY, requests);
+  setItem(INCOMING_STORAGE_KEY, requests);
 };
 
 const saveOutgoingToStorage = (bookings: IOutgoingBooking[]) => {
-  setSecureItem(OUTGOING_STORAGE_KEY, bookings);
+  setItem(OUTGOING_STORAGE_KEY, bookings);
 };
 
 let incomingSubHandle: SubscriptionHandle | undefined;
@@ -199,14 +199,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   isLoaded: false,
 
   loadCached: async () => {
-    const incoming = await getSecureItem<IBookingRequest[]>(
-      INCOMING_STORAGE_KEY,
-      [],
-    );
-    const outgoing = await getSecureItem<IOutgoingBooking[]>(
-      OUTGOING_STORAGE_KEY,
-      [],
-    );
+    const incoming = getItem<IBookingRequest[]>(INCOMING_STORAGE_KEY, []);
+    const outgoing = getItem<IOutgoingBooking[]>(OUTGOING_STORAGE_KEY, []);
 
     const pendingIncoming = incoming.filter((r) => r.status === "pending");
     const pendingOutgoing = outgoing.filter((b) => b.status === "pending");
@@ -382,20 +376,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       request.dTag || undefined,
     );
 
-    // Send a booking response so the booker's outgoing bookings
-    // update from "pending" to "approved".
-    const eventRef = `${calendarEvent.kind}:${calendarEvent.pubkey}:${request.dTag || ""}`;
-    await sendBookingResponse({
-      schedulingPageRef: request.schedulingPageRef,
-      bookerPubkey: request.bookerPubkey,
-      start: request.start,
-      end: request.end,
-      status: "approved",
-      eventRef,
-      viewKey,
-    });
-
-    // Update request status
+    // Update request status immediately so the UI reflects the approval
+    // without waiting for the booking response relay round-trip.
     set((state) => {
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
@@ -408,21 +390,29 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       saveIncomingToStorage(incomingRequests);
       return { incomingRequests, incomingUnreadCount };
     });
+
+    // Send a booking response so the booker's outgoing bookings
+    // update from "pending" to "approved". Fire-and-forget: the
+    // local status is already updated above regardless of relay success.
+    const eventRef = `${calendarEvent.kind}:${calendarEvent.pubkey}:${request.dTag || ""}`;
+    sendBookingResponse({
+      schedulingPageRef: request.schedulingPageRef,
+      bookerPubkey: request.bookerPubkey,
+      start: request.start,
+      end: request.end,
+      status: "approved",
+      eventRef,
+      viewKey,
+    }).catch((err) => {
+      console.error("Failed to send booking approval response:", err);
+    });
   },
 
   declineRequest: async (requestId, reason) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
 
-    await sendBookingResponse({
-      schedulingPageRef: request.schedulingPageRef,
-      bookerPubkey: request.bookerPubkey,
-      start: request.start,
-      end: request.end,
-      status: "declined",
-      reason,
-    });
-
+    // Update status immediately for responsive UI.
     set((state) => {
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
@@ -439,6 +429,18 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       ).length;
       saveIncomingToStorage(incomingRequests);
       return { incomingRequests, incomingUnreadCount };
+    });
+
+    // Fire-and-forget: notify the booker via relay.
+    sendBookingResponse({
+      schedulingPageRef: request.schedulingPageRef,
+      bookerPubkey: request.bookerPubkey,
+      start: request.start,
+      end: request.end,
+      status: "declined",
+      reason,
+    }).catch((err) => {
+      console.error("Failed to send booking decline response:", err);
     });
   },
 
@@ -494,6 +496,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
 
   clearCached: async () => {
     get().stopSubscriptions();
+    // Clear persisted storage so a different user logging in
+    // doesn't see stale booking data.
+    setItem(INCOMING_STORAGE_KEY, []);
+    setItem(OUTGOING_STORAGE_KEY, []);
     set({
       incomingRequests: [],
       outgoingBookings: [],
