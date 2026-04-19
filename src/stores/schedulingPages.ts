@@ -14,19 +14,100 @@
 import { create } from "zustand";
 import { getSecureItem, setSecureItem } from "../common/localStorage";
 import {
-  publishSchedulingPage,
-  fetchUserSchedulingPages,
-  deleteSchedulingPage as deleteSchedulingPageNostr,
   getUserPublicKey,
-  encodeNAddr,
+  getRelays,
+  publishToRelays,
+  publishDeletionEvent,
 } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
-import { nostrEventToSchedulingPage } from "../utils/parser";
+import { naddrEncode } from "nostr-tools/nip19";
+import {
+  nostrEventToSchedulingPage,
+  schedulingPageToTags,
+} from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
+import { nostrRuntime } from "../common/nostrRuntime";
+import { signerManager } from "../common/signer";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { isNative } from "../utils/platform";
+import type { Event, UnsignedEvent, Filter } from "nostr-tools";
+import {
+  generateSecretKey,
+  getEventHash,
+  getPublicKey,
+  nip44,
+} from "nostr-tools";
+
+async function publishSchedulingPage(page: ISchedulingPage): Promise<{
+  event: Event;
+  viewKey?: string;
+}> {
+  const pubKey = await getUserPublicKey();
+  const tags = schedulingPageToTags(page);
+
+  let content = page.description;
+  let publishTags = tags;
+  let viewKeyHex: string | undefined;
+
+  if (page.isPrivate) {
+    const viewSecretKey = generateSecretKey();
+    const viewPublicKey = getPublicKey(viewSecretKey);
+    viewKeyHex = bytesToHex(viewSecretKey);
+    const conversationKey = nip44.getConversationKey(
+      viewSecretKey,
+      viewPublicKey,
+    );
+    content = nip44.encrypt(JSON.stringify(tags), conversationKey);
+    publishTags = [["d", page.id]];
+  }
+
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.SchedulingPage,
+    pubkey: pubKey,
+    tags: publishTags,
+    content,
+    created_at: Math.floor(Date.now() / 1000),
+  };
+
+  const signer = await signerManager.getSigner();
+  const signedEvent = await signer.signEvent(baseEvent);
+  signedEvent.id = getEventHash(baseEvent);
+
+  await publishToRelays(signedEvent);
+  nostrRuntime.addEvent(signedEvent);
+
+  return { event: signedEvent, viewKey: viewKeyHex };
+}
+
+function fetchUserSchedulingPages(
+  pubkey: string,
+  onEvent: (event: Event) => void,
+  onEose?: () => void,
+) {
+  const relayList = getRelays();
+  const filter: Filter = {
+    kinds: [EventKinds.SchedulingPage],
+    authors: [pubkey],
+  };
+
+  return nostrRuntime.subscribe(relayList, [filter], {
+    onEvent,
+    onEose,
+  });
+}
+
+async function deleteSchedulingPageNostr(
+  page: ISchedulingPage,
+): Promise<Event> {
+  return publishDeletionEvent({
+    kinds: [EventKinds.SchedulingPage],
+    coordinates: [`${EventKinds.SchedulingPage}:${page.user}:${page.id}`],
+    eventIds: page.eventId ? [page.eventId] : [],
+    reason: "",
+  });
+}
 
 const STORAGE_KEY = "cal:scheduling_pages";
 
@@ -49,6 +130,7 @@ interface SchedulingPagesState {
   deletePage: (pageId: string) => Promise<void>;
   getPageById: (pageId: string) => ISchedulingPage | undefined;
   getNAddr: (page: ISchedulingPage) => string;
+  getPageUrl: (page: ISchedulingPage) => string;
   clearCachedPages: () => Promise<void>;
 }
 
@@ -67,9 +149,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
   },
 
   fetchPages: async () => {
-    if (subscriptionHandle) {
-      subscriptionHandle.unsubscribe();
-    }
+    if (subscriptionHandle) return;
 
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
@@ -112,8 +192,9 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
       createdAt: Math.floor(Date.now() / 1000),
     };
 
-    const signedEvent = await publishSchedulingPage(page);
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
     page.eventId = signedEvent.id;
+    if (viewKey) page.viewKey = viewKey;
 
     set((state) => {
       const pages = [...state.pages, page];
@@ -125,10 +206,11 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
   },
 
   updatePage: async (page) => {
-    const signedEvent = await publishSchedulingPage(page);
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
     const updated = {
       ...page,
       eventId: signedEvent.id,
+      ...(viewKey ? { viewKey } : {}),
       createdAt: Math.floor(Date.now() / 1000),
     };
 
@@ -159,11 +241,18 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
   },
 
   getNAddr: (page) => {
-    return encodeNAddr({
+    return naddrEncode({
       kind: EventKinds.SchedulingPage,
       pubkey: page.user,
       identifier: page.id,
+      relays: getRelays(),
     });
+  },
+
+  getPageUrl: (page) => {
+    const naddr = get().getNAddr(page);
+    const base = `${window.location.origin}/schedule/${naddr}`;
+    return page.viewKey ? `${base}?viewKey=${page.viewKey}` : base;
   },
 
   clearCachedPages: async () => {
