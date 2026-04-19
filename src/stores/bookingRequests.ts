@@ -150,6 +150,7 @@ async function sendBookingResponse({
     },
     bookerPubkey,
     EventKinds.BookingResponseGiftWrap,
+    true,
   );
   await publishToRelays(giftWrap);
   return giftWrap;

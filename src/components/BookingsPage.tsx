@@ -56,24 +56,18 @@ export const BookingsPage = () => {
     outgoingBookings,
     isLoaded,
     loadCached,
-    fetchIncomingRequests,
-    fetchOutgoingBookings,
   } = useBookingRequests();
 
   const { pages } = useSchedulingPages();
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
 
-  // Load cached data on mount. Network fetching is handled by App.tsx.
+  // Load cached data on mount. Network fetching is handled by App.tsx
+  // which calls fetchIncomingRequests/fetchOutgoingBookings at login.
+  // Those are persistent WebSocket subscriptions — new events are
+  // automatically pushed to the store without polling.
   useEffect(() => {
     loadCached();
   }, [loadCached]);
-
-  // Ensure subscriptions are active. Since these are websocket connections,
-  // new events are automatically pushed to the store — no polling needed.
-  useEffect(() => {
-    fetchIncomingRequests();
-    fetchOutgoingBookings();
-  }, [fetchIncomingRequests, fetchOutgoingBookings]);
 
   // Sort by receivedAt descending (latest first)
   const sortedIncoming = [...incomingRequests].sort(
