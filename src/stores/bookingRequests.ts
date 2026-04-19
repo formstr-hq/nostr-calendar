@@ -376,11 +376,24 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // publishPrivateCalendarEvent already sends invitation gift wraps
     // with viewKey to all participants (including booker), so the
     // booker's calendar will pick it up automatically.
-    await publishPrivateCalendarEvent(
+    const { calendarEvent, viewKey } = await publishPrivateCalendarEvent(
       event,
       calendarId,
       request.dTag || undefined,
     );
+
+    // Send a booking response so the booker's outgoing bookings
+    // update from "pending" to "approved".
+    const eventRef = `${calendarEvent.kind}:${calendarEvent.pubkey}:${request.dTag || ""}`;
+    await sendBookingResponse({
+      schedulingPageRef: request.schedulingPageRef,
+      bookerPubkey: request.bookerPubkey,
+      start: request.start,
+      end: request.end,
+      status: "approved",
+      eventRef,
+      viewKey,
+    });
 
     // Update request status
     set((state) => {

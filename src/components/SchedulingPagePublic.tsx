@@ -248,8 +248,7 @@ export const SchedulingPagePublic = () => {
       const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
 
       // Extract relay hints from the scheduling page event tags
-      const relayHints = (page as ISchedulingPage & { relayHints?: string[] })
-        .relayHints;
+      const relayHints = page.relayHints;
 
       const giftWrap = await sendBookingRequest({
         schedulingPageRef,

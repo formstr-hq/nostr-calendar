@@ -245,6 +245,8 @@ export async function publishPrivateCalendarEvent(
   return {
     calendarEvent: signedEvent,
     giftWraps: giftWraps.map(({ giftWrap }) => giftWrap),
+    dTag,
+    viewKey: nip19.nsecEncode(viewSecretKey),
   };
 }
 
