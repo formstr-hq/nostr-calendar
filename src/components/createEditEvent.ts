@@ -68,7 +68,7 @@ export default async function createEditEvent({
     user: "",
     isPrivateEvent: true,
     repeat: {
-      rrules: [],
+      frequency: null,
     },
   };
 }

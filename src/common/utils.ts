@@ -3,7 +3,6 @@ import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { ICalendarEvent } from "../stores/events";
 import { NestedObject } from "./dictionary";
-import { getEventRRules } from "../utils/repeatingEventsHelper";
 
 export function flattenMessages(
   nestedMessages: NestedObject,
@@ -71,9 +70,8 @@ DESCRIPTION:${calendarEvent.description || ""}
     icsContent += `ATTACH;FMTTYPE=image/jpeg:${calendarEvent.image}\n`;
   }
 
-  const recurrenceRules = getEventRRules(calendarEvent.repeat);
-  for (const recurrenceRule of recurrenceRules) {
-    icsContent += `RRULE:${recurrenceRule}\n`;
+  if (calendarEvent.repeat?.rrule) {
+    icsContent += `RRULE:${calendarEvent.repeat.rrule}\n`;
   }
 
   icsContent += `END:VEVENT
@@ -122,7 +120,7 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
   let begin = 0;
   let end = 0;
   let location: string[] = [];
-  const rrules: string[] = [];
+  let rrule: string | null = null;
   let image: string | undefined;
 
   for (const line of lines) {
@@ -164,12 +162,7 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
           .filter(Boolean);
         break;
       case "RRULE":
-        {
-          const normalizedRule = value.trim();
-          if (normalizedRule && !rrules.includes(normalizedRule)) {
-            rrules.push(normalizedRule);
-          }
-        }
+        rrule = value;
         break;
       case "ATTACH":
         if (!image) image = value;
@@ -199,9 +192,7 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
     user: "",
     isPrivateEvent: true,
     image,
-    repeat: {
-      rrules,
-    },
+    repeat: { rrule },
   };
   const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
   const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);

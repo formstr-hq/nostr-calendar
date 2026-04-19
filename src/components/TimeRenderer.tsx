@@ -1,37 +1,28 @@
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import { Box, Typography } from "@mui/material";
-import type { ICalendarEvent } from "../utils/types";
+import { ICalendarEvent } from "../stores/events";
 import dayjs from "dayjs";
 import { RRule } from "rrule";
 import { useIntl } from "react-intl";
-import { getEventRRules } from "../utils/repeatingEventsHelper";
 
 const Repeat = ({ repeat }: { repeat: ICalendarEvent["repeat"] }) => {
   const intl = useIntl();
-  const recurrenceRules = getEventRRules(repeat);
-  if (recurrenceRules.length === 0) {
+  if (!repeat.rrule) {
     return null;
   }
-
-  const labels = recurrenceRules.map((rule) => {
-    try {
-      return RRule.fromString(`RRULE:${rule}`).toText();
-    } catch {
-      return rule;
-    }
-  });
-
+  let label: string;
+  try {
+    label = RRule.fromString(`RRULE:${repeat.rrule}`).toText();
+  } catch {
+    label = repeat.rrule;
+  }
   return (
     <>
       <EventRepeatIcon />
-      <Box sx={{ display: "flex", flexDirection: "column" }}>
-        {labels.map((label, index) => (
-          <Typography key={`${label}-${index}`}>
-            {intl.formatMessage({ id: "event.repeats" }, { label })}
-          </Typography>
-        ))}
-      </Box>
+      <Typography>
+        {intl.formatMessage({ id: "event.repeats" }, { label })}
+      </Typography>
     </>
   );
 };
@@ -54,7 +45,7 @@ export const TimeRenderer = ({
           {dayjs(end).format("HH:mm")}
         </Typography>
       </Box>
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <Repeat repeat={repeat} />
       </Box>
     </Box>

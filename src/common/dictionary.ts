@@ -73,7 +73,6 @@ const dictionary: NestedObject = {
       imageUrlPlaceholder: "Image URL eg. https://example.com/image.jpg",
       enterLocation: "Enter location",
       selectRecurrence: "Select recurrence pattern",
-      selectRecurrenceRule: "Select recurrence rule",
       doesNotRepeat: "Does not repeat",
       daily: "Daily",
       weekly: "Weekly",
@@ -81,7 +80,7 @@ const dictionary: NestedObject = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
-      customRecurrence: "Custom...",
+      customRecurrence: "Custom Rule",
       customRecurrenceTitle: "Custom recurrence",
       repeatEvery: "Repeat every",
       repeatOn: "Repeat on",
@@ -91,7 +90,6 @@ const dictionary: NestedObject = {
       recurrenceEndsOnDate: "On date",
       recurrenceOccurrences: "Occurrences",
       recurrenceEndDate: "End date",
-      addMoreRecurrenceRules: "Add more recurrence rules",
       addDescription: "Add event description...",
       calendar: "Calendar",
       selectCalendar: "Select calendar",
@@ -282,7 +280,6 @@ const dictionary: NestedObject = {
       imageUrlPlaceholder: "Bild-URL z.B. https://example.com/image.jpg",
       enterLocation: "Ort eingeben",
       selectRecurrence: "Wiederholungsmuster auswählen",
-      selectRecurrenceRule: "Wiederholungsregel auswählen",
       doesNotRepeat: "Wiederholt sich nicht",
       daily: "Täglich",
       weekly: "Wöchentlich",
@@ -290,7 +287,7 @@ const dictionary: NestedObject = {
       monthly: "Monatlich",
       quarterly: "Vierteljährlich",
       yearly: "Jährlich",
-      customRecurrence: "Benutzerdefiniert...",
+      customRecurrence: "Benutzerdefinierte Regel",
       customRecurrenceTitle: "Benutzerdefinierte Wiederholung",
       repeatEvery: "Wiederhole alle",
       repeatOn: "Wiederholen an",
@@ -300,7 +297,6 @@ const dictionary: NestedObject = {
       recurrenceEndsOnDate: "Am Datum",
       recurrenceOccurrences: "Vorkommen",
       recurrenceEndDate: "Enddatum",
-      addMoreRecurrenceRules: "Weitere Wiederholungsregeln hinzufügen",
       addDescription: "Beschreibung hinzufügen...",
       calendar: "Kalender",
       selectCalendar: "Kalender auswählen",
@@ -373,7 +369,8 @@ const dictionary: NestedObject = {
       acceptInvitation: "Zum Kalender hinzufügen",
       invitedBy: "Sie wurden von {participant} zu diesem Termin eingeladen",
       createdBy: "Geteilt von {participant}",
-      loginToAdd: "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
+      loginToAdd:
+        "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
       addedToCalendar: "Termin wurde Ihrem Kalender hinzugefügt",
       viewInCalendar: "Im Kalender anzeigen",
       stayHere: "Hier bleiben",
@@ -420,7 +417,3 @@ const dictionary: NestedObject = {
   },
 };
 export default dictionary;
-
-
-
-

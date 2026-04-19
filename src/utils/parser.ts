@@ -29,12 +29,10 @@ export const nostrEventToCalendar = (
     isPrivateEvent: !!isPrivateEvent,
     relayHint: relayHint,
     repeat: {
-      rrules: [],
+      rrule: null,
     },
     rsvpResponses: [],
   };
-  const recurrenceRules: string[] = [];
-
   event.tags.forEach(([key, value], index) => {
     switch (key) {
       case "description":
@@ -76,28 +74,16 @@ export const nostrEventToCalendar = (
           parsedEvent.notificationPreference = value;
         }
         break;
-      case "l": {
-        const previousTag = event.tags[index - 1];
-        const followsRRuleLabel =
-          previousTag?.[0] === "L" && previousTag?.[1] === "rrule";
-
-        if (!followsRRuleLabel || !value) {
-          break;
+      case "L":
+        switch (value) {
+          case "rrule":
+            parsedEvent.repeat = {
+              rrule: event.tags[index + 1]?.[1] || null,
+            };
+            break;
         }
-
-        const normalizedRule = value.trim();
-        if (normalizedRule && !recurrenceRules.includes(normalizedRule)) {
-          recurrenceRules.push(normalizedRule);
-        }
-
         break;
-      }
     }
   });
-
-  parsedEvent.repeat = {
-    rrules: recurrenceRules,
-  };
-
   return parsedEvent;
 };

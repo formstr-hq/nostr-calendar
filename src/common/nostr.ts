@@ -29,7 +29,6 @@ import { nostrRuntime } from "./nostrRuntime";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
-import { getEventRRules } from "../utils/repeatingEventsHelper";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
@@ -126,11 +125,9 @@ async function preparePrivateCalendarEvent(
     ["image", event.image ?? ""],
     ["d", dTag],
   ];
-
-  const recurrenceRules = getEventRRules(event.repeat);
-  for (const recurrenceRule of recurrenceRules) {
+  if (event.repeat?.rrule) {
     eventData.push(["L", "rrule"]);
-    eventData.push(["l", recurrenceRule]);
+    eventData.push(["l", event.repeat.rrule]);
   }
   if (event.notificationPreference) {
     eventData.push(["notification", event.notificationPreference]);
@@ -579,13 +576,6 @@ export const publishPublicCalendarEvent = async (
       tags.push(["p", participant]);
     });
   }
-
-  const recurrenceRules = getEventRRules(event.repeat);
-  for (const recurrenceRule of recurrenceRules) {
-    tags.push(["L", "rrule"]);
-    tags.push(["l", recurrenceRule]);
-  }
-
   const baseEvent: UnsignedEvent = {
     kind: EventKinds.PublicCalendarEvent,
     pubkey: pubKey,

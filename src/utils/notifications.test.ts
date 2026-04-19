@@ -55,7 +55,7 @@ function makeEvent(
     website: "",
     user: "test-user",
     isPrivateEvent: false,
-    repeat: { rrules: [] },
+    repeat: { rrule: null },
     ...overrides,
   };
 }
@@ -203,7 +203,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       id: "daily-evt",
-      repeat: { rrules: ["FREQ=DAILY"] },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);
@@ -223,7 +223,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startDate,
       id: "weekly-far",
-      repeat: { rrules: ["FREQ=WEEKLY"] },
+      repeat: { rrule: "FREQ=WEEKLY" },
     });
 
     await scheduleEventNotifications(event);
@@ -237,7 +237,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: oneWeekAgo,
       id: "weekly-soon",
-      repeat: { rrules: ["FREQ=WEEKLY"] },
+      repeat: { rrule: "FREQ=WEEKLY" },
     });
 
     await scheduleEventNotifications(event);
@@ -250,7 +250,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       id: "daily-dedup",
-      repeat: { rrules: ["FREQ=DAILY"] },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);
@@ -265,12 +265,12 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event1 = makeEvent({
       begin: startTime,
       id: "evt-a",
-      repeat: { rrules: ["FREQ=DAILY"] },
+      repeat: { rrule: "FREQ=DAILY" },
     });
     const event2 = makeEvent({
       begin: startTime,
       id: "evt-b",
-      repeat: { rrules: ["FREQ=DAILY"] },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event1);
@@ -294,7 +294,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     const event = makeEvent({
       begin: startTime,
       id: "recurring-key-test",
-      repeat: { rrules: ["FREQ=DAILY"] },
+      repeat: { rrule: "FREQ=DAILY" },
     });
 
     await scheduleEventNotifications(event);

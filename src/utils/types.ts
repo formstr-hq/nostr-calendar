@@ -56,7 +56,7 @@ export interface ICalendarEvent {
   isPrivateEvent: boolean;
   viewKey?: string;
   repeat: {
-    rrules: string[];
+    rrule: string | null;
   };
   /**
    * Event-level notification preference.
