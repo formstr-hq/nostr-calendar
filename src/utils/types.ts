@@ -118,6 +118,14 @@ export interface ISchedulingPage {
   location: string;
   /** Optional image URL */
   image?: string;
+  /** Optional pre-defined event title for appointments */
+  eventTitle?: string;
+  /** Relay hints from the scheduling page event */
+  relayHints?: string[];
+  /** Whether this is a private (encrypted) scheduling page */
+  isPrivate?: boolean;
+  /** View key for decrypting private scheduling pages */
+  viewKey?: string;
   /** Nostr event created_at */
   createdAt: number;
 }
@@ -146,6 +154,8 @@ export interface IBookingRequest {
   title: string;
   /** Optional note from booker */
   note: string;
+  /** Pre-generated d-tag for the calendar event */
+  dTag: string;
   /** When this request was received (ms) */
   receivedAt: number;
   /** Current status */

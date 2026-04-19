@@ -5,6 +5,7 @@ import type {
   IAvailabilityWindow,
   DurationMode,
 } from "./types";
+import { getRelays } from "../common/nostr";
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -114,6 +115,7 @@ export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
     expiry: 172800,
     location: "",
     image: undefined,
+    relayHints: [],
     createdAt: event.created_at,
   };
 
@@ -173,6 +175,12 @@ export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
       case "image":
         page.image = values[0];
         break;
+      case "event_title":
+        page.eventTitle = values[0];
+        break;
+      case "relay":
+        page.relayHints!.push(values[0]);
+        break;
     }
   });
 
@@ -228,6 +236,16 @@ export const schedulingPageToTags = (page: ISchedulingPage): string[][] => {
 
   if (page.image) {
     tags.push(["image", page.image]);
+  }
+
+  if (page.eventTitle) {
+    tags.push(["event_title", page.eventTitle]);
+  }
+
+  // Add relay hints so consumers know where to find this event
+  // and where to publish booking requests
+  for (const relay of getRelays()) {
+    tags.push(["relay", relay]);
   }
 
   return tags;

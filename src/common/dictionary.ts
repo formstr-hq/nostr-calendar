@@ -236,6 +236,9 @@ const dictionary: NestedObject = {
       selectDuration: "Select duration",
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
+      eventTitle: "Event Title",
+      eventTitleHelp: "Title for calendar events created from bookings",
+      eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
       fixedDuration: "Fixed duration options",
@@ -263,6 +266,7 @@ const dictionary: NestedObject = {
       shareLinkMessage:
         "Your scheduling page is live! Share the link for others to book appointments.",
       linkCopied: "Link copied to clipboard!",
+      privatePage: "Private scheduling page",
       pageNotFound: "Scheduling page not found. It may have been deleted.",
       loadError:
         "Could not load scheduling page. It may have been deleted or is temporarily unavailable.",
@@ -506,6 +510,10 @@ const dictionary: NestedObject = {
       selectDuration: "Dauer auswählen",
       noSlotsThisWeek:
         "Keine verfügbaren Zeitfenster diese Woche. Versuchen Sie eine andere Woche.",
+      eventTitle: "Ereignistitel",
+      eventTitleHelp:
+        "Titel für Kalendereinträge, die aus Buchungen erstellt werden",
+      eventTitlePlaceholder: "z.B. Besprechung mit {name}",
       basicInformation: "Grundinformationen",
       appointmentDuration: "Termindauer",
       fixedDuration: "Feste Daueroptionen",
@@ -533,6 +541,7 @@ const dictionary: NestedObject = {
       shareLinkMessage:
         "Ihre Terminseite ist live! Teilen Sie den Link, damit andere Termine buchen können.",
       linkCopied: "Link in die Zwischenablage kopiert!",
+      privatePage: "Private Terminseite",
       pageNotFound:
         "Terminseite nicht gefunden. Sie wurde möglicherweise gelöscht.",
       loadError:
