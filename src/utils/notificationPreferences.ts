@@ -3,6 +3,8 @@ import {
   removeDeviceItem,
   setDeviceItem,
 } from "../common/localStorage";
+import { DEFAULT_NOTIFICATION_PREFERENCE } from "./calendarListTypes";
+import type { NotificationPreference } from "./types";
 
 export interface EventNotificationPreference {
   offsetsMinutes: number[];
@@ -135,4 +137,33 @@ export async function clearNotificationPreference(eventId: string) {
 
 export function resetNotificationPreferencesCache() {
   preferenceCache = null;
+}
+
+export function normalizeNotificationPreference(
+  value: unknown,
+): NotificationPreference | undefined {
+  if (value === "enabled" || value === "disabled") {
+    return value;
+  }
+  return undefined;
+}
+
+export function resolveNotificationPreference(
+  eventPreference?: NotificationPreference,
+  listPreference?: NotificationPreference,
+): NotificationPreference {
+  return (
+    normalizeNotificationPreference(eventPreference) ??
+    normalizeNotificationPreference(listPreference) ??
+    DEFAULT_NOTIFICATION_PREFERENCE
+  );
+}
+
+export function shouldScheduleNotifications(
+  eventPreference?: NotificationPreference,
+  listPreference?: NotificationPreference,
+): boolean {
+  return (
+    resolveNotificationPreference(eventPreference, listPreference) === "enabled"
+  );
 }

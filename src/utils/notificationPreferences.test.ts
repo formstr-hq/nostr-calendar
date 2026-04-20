@@ -21,8 +21,11 @@ const {
   getNotificationOffsetsForEvent,
   getNotificationPreference,
   normalizeNotificationOffsets,
+  normalizeNotificationPreference,
   resetNotificationPreferencesCache,
+  resolveNotificationPreference,
   setNotificationPreference,
+  shouldScheduleNotifications,
 } = await import("./notificationPreferences");
 
 describe("notificationPreferences", () => {
@@ -68,5 +71,32 @@ describe("notificationPreferences", () => {
     await expect(getNotificationOffsetsForEvent("event-1")).resolves.toEqual(
       DEFAULT_NOTIFICATION_OFFSETS,
     );
+  });
+});
+
+describe("notification preference resolution", () => {
+  it("normalizes only supported list-level preference values", () => {
+    expect(normalizeNotificationPreference("enabled")).toBe("enabled");
+    expect(normalizeNotificationPreference("disabled")).toBe("disabled");
+    expect(normalizeNotificationPreference("maybe")).toBeUndefined();
+  });
+
+  it("uses event preference when set", () => {
+    expect(resolveNotificationPreference("disabled", "enabled")).toBe(
+      "disabled",
+    );
+    expect(shouldScheduleNotifications("disabled", "enabled")).toBe(false);
+  });
+
+  it("falls back to list preference when event preference is undefined", () => {
+    expect(resolveNotificationPreference(undefined, "disabled")).toBe(
+      "disabled",
+    );
+    expect(shouldScheduleNotifications(undefined, "disabled")).toBe(false);
+  });
+
+  it("defaults to enabled when neither preference is set", () => {
+    expect(resolveNotificationPreference(undefined, undefined)).toBe("enabled");
+    expect(shouldScheduleNotifications(undefined, undefined)).toBe(true);
   });
 });

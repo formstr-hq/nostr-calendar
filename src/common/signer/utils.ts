@@ -1,5 +1,5 @@
 import { generateSecretKey } from "nostr-tools";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { IUser } from "../../stores/user";
 import { USER_DATA_TTL_HOURS } from "../../utils/constants";
 

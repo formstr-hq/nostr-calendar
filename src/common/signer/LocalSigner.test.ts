@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateSecretKey, verifyEvent, getPublicKey } from "nostr-tools";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { createLocalSigner } from "./LocalSigner";
 
 // Use a fixed test keypair for deterministic tests

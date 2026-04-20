@@ -69,6 +69,7 @@ vi.mock("../utils/parser", () => ({
 // Mock notifications
 vi.mock("../utils/notifications", () => ({
   scheduleEventNotifications: vi.fn(),
+  cancelEventNotifications: vi.fn(),
 }));
 
 describe("parseEventRef", () => {

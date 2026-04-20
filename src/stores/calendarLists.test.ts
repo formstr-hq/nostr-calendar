@@ -6,17 +6,40 @@ vi.mock("../common/localStorage", () => ({
   getSecureItem: vi.fn().mockResolvedValue([]),
   setSecureItem: vi.fn(),
   removeSecureItem: vi.fn(),
+  setItem: vi.fn(),
+  getItem: vi.fn().mockReturnValue({}),
 }));
 
 // Mock calendarList protocol layer
 vi.mock("../common/calendarList", () => ({
   fetchCalendarLists: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
   publishCalendarList: vi.fn().mockResolvedValue({}),
+  createCalendar: vi
+    .fn()
+    .mockImplementation(
+      async ({
+        title,
+        description,
+        color,
+        notificationPreference = "enabled",
+      }) => ({
+        id: `cal-${title.toLowerCase()}`,
+        eventId: "event-id",
+        title,
+        description,
+        color,
+        notificationPreference,
+        eventRefs: [],
+        createdAt: Math.floor(Date.now() / 1000),
+        isVisible: true,
+      }),
+    ),
   createDefaultCalendar: vi.fn().mockResolvedValue({
     id: "default-cal-id",
     title: "My Calendar",
     description: "",
     color: "#4285f4",
+    notificationPreference: "enabled",
     eventRefs: [],
     createdAt: 1700000000,
     isVisible: true,
@@ -39,6 +62,7 @@ vi.mock("../common/nostr", () => ({
   getUserPublicKey: vi.fn().mockResolvedValue("test-pubkey-" + "0".repeat(50)),
   getRelays: vi.fn().mockReturnValue(["wss://relay.test"]),
   publishToRelays: vi.fn().mockResolvedValue("ok"),
+  publishDeletionEvent: vi.fn().mockResolvedValue({}),
 }));
 
 describe("useCalendarLists store", () => {
@@ -68,6 +92,7 @@ describe("useCalendarLists store", () => {
     expect(calendars[0].color).toBe("#d50000");
     expect(calendars[0].isVisible).toBe(true);
     expect(calendars[0].eventRefs).toEqual([]);
+    expect(calendars[0].notificationPreference).toBe("enabled");
     expect(calendars[0].id).toBeTruthy();
   });
 

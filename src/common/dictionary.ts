@@ -57,6 +57,14 @@ const dictionary: NestedObject = {
       login_error: "Login failed",
       loggingIn: "Logging in...",
     },
+    startup: {
+      loadingCache: "Retrieving login data from cache...",
+      welcomeBack: "Welcome back, {user}!",
+      welcomeBackGeneric: "Welcome back!",
+      fetchingEvents: "Fetching your calendar lists and events...",
+      noLogin: "No saved login found.",
+      error: "Could not load your data. Check your connection.",
+    },
     event: {
       editEvent: "Edit Event",
       deleteEvent: "Delete Event",
@@ -76,6 +84,12 @@ const dictionary: NestedObject = {
       reminderMinutesBefore: "Minutes before start",
       addReminder: "Add reminder",
       noNotifications: "No notifications for this event",
+      recurrenceEnds: "Ends",
+      recurrenceEndsNever: "Never",
+      recurrenceEndsAfter: "After",
+      recurrenceEndsOnDate: "On date",
+      recurrenceOccurrences: "Occurrences",
+      recurrenceEndDate: "End date",
       addDescription: "Add event description...",
       calendar: "Calendar",
       selectCalendar: "Select calendar",
@@ -93,6 +107,8 @@ const dictionary: NestedObject = {
       eventNotFound: "Event not found. It may not have loaded yet.",
       loadError:
         "We could not load the event. It may be a temporary error. Please refresh the page to try again",
+      calendarMoveError:
+        "We could not move the event to the selected calendar. Please try again.",
       notAuthorized: "You are not allowed to edit this event.",
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
@@ -119,6 +135,10 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "e.g., Work, Personal, Travel",
       optionalDescription: "Optional description",
       color: "Color",
+      notifications: "Notifications",
+      notificationsOn: "Enabled for this calendar",
+      notificationsOff: "Disabled for this calendar",
+      notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
@@ -140,6 +160,11 @@ const dictionary: NestedObject = {
       dismiss: "Dismiss",
       acceptInvitation: "Add to Calendar",
       invitedBy: "You have been invited by {participant} to this event",
+      createdBy: "Shared by {participant}",
+      loginToAdd: "Log in to add this event to your calendar",
+      addedToCalendar: "Event added to your calendar",
+      viewInCalendar: "View in Calendar",
+      stayHere: "Stay Here",
     },
     login: {
       signInToFormstr: "Sign in to Formstr",
@@ -238,6 +263,14 @@ const dictionary: NestedObject = {
       login_error: "Anmeldung fehlgeschlagen",
       loggingIn: "Anmeldung läuft...",
     },
+    startup: {
+      loadingCache: "Anmeldedaten aus dem Cache abrufen...",
+      welcomeBack: "Willkommen zurück, {user}!",
+      welcomeBackGeneric: "Willkommen zurück!",
+      fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
+      noLogin: "Keine gespeicherte Anmeldung gefunden.",
+      error: "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
+    },
     event: {
       editEvent: "Termin bearbeiten",
       deleteEvent: "Termin löschen",
@@ -257,6 +290,12 @@ const dictionary: NestedObject = {
       reminderMinutesBefore: "Minuten vor Beginn",
       addReminder: "Erinnerung hinzufügen",
       noNotifications: "Keine Benachrichtigungen für diesen Termin",
+      recurrenceEnds: "Endet",
+      recurrenceEndsNever: "Nie",
+      recurrenceEndsAfter: "Nach",
+      recurrenceEndsOnDate: "Am Datum",
+      recurrenceOccurrences: "Vorkommen",
+      recurrenceEndDate: "Enddatum",
       addDescription: "Beschreibung hinzufügen...",
       calendar: "Kalender",
       selectCalendar: "Kalender auswählen",
@@ -275,6 +314,8 @@ const dictionary: NestedObject = {
         "Termin nicht gefunden. Er wurde möglicherweise noch nicht geladen.",
       loadError:
         "Der Termin konnte nicht geladen werden. Es kann sich um einen vorübergehenden Fehler handeln. Bitte aktualisieren Sie die Seite, um es erneut zu versuchen",
+      calendarMoveError:
+        "Der Termin konnte nicht in den ausgewählten Kalender verschoben werden. Bitte versuchen Sie es erneut.",
       notAuthorized: "Sie sind nicht berechtigt, diesen Termin zu bearbeiten.",
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
@@ -301,6 +342,10 @@ const dictionary: NestedObject = {
       calendarNamePlaceholder: "z.B. Arbeit, Persönlich, Reise",
       optionalDescription: "Optionale Beschreibung",
       color: "Farbe",
+      notifications: "Benachrichtigungen",
+      notificationsOn: "Für diesen Kalender aktiviert",
+      notificationsOff: "Für diesen Kalender deaktiviert",
+      notificationsAppOnly: "Benachrichtigungen sind nur in der App verfügbar.",
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
@@ -322,6 +367,11 @@ const dictionary: NestedObject = {
       dismiss: "Verwerfen",
       acceptInvitation: "Zum Kalender hinzufügen",
       invitedBy: "Sie wurden von {participant} zu diesem Termin eingeladen",
+      createdBy: "Geteilt von {participant}",
+      loginToAdd: "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
+      addedToCalendar: "Termin wurde Ihrem Kalender hinzugefügt",
+      viewInCalendar: "Im Kalender anzeigen",
+      stayHere: "Hier bleiben",
     },
     login: {
       signInToFormstr: "Bei Formstr anmelden",
@@ -365,3 +415,6 @@ const dictionary: NestedObject = {
   },
 };
 export default dictionary;
+
+
+

@@ -24,7 +24,7 @@
 
 import { Event, UnsignedEvent, getEventHash, Filter } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 import { signerManager } from "./signer";
 import { EventKinds } from "./EventConfigs";
@@ -52,6 +52,11 @@ export async function encryptCalendarList(
     ["content", calendarList.description],
     ["color", calendarList.color],
   ];
+
+  // Persist only non-default notification preference to minimize relay payload.
+  if (calendarList.notificationPreference === "disabled") {
+    tags.push(["notifications", "disabled"]);
+  }
 
   // Add event references as "a" tags: ["a", coordinate, metadata]
   for (const ref of calendarList.eventRefs) {
@@ -91,6 +96,7 @@ export async function decryptCalendarList(
   let title = DEFAULT_CALENDAR_TITLE;
   let description = "";
   let color = DEFAULT_CALENDAR_COLOR;
+  let notificationPreference: "enabled" | "disabled" | undefined;
   const eventRefs: string[][] = [];
 
   for (const tag of tags) {
@@ -103,6 +109,9 @@ export async function decryptCalendarList(
         break;
       case "color":
         color = tag[1] || DEFAULT_CALENDAR_COLOR;
+        break;
+      case "notifications":
+        notificationPreference = tag[1] === "disabled" ? "disabled" : "enabled";
         break;
       case "a":
         // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
@@ -120,6 +129,7 @@ export async function decryptCalendarList(
     title,
     description,
     color,
+    notificationPreference,
     eventRefs,
     createdAt: event.created_at,
     isVisible: true, // Default to visible; client-side state
@@ -194,7 +204,7 @@ export function fetchCalendarLists(
 export async function createCalendar(
   calendarData: Omit<ICalendarList, "id" | "createdAt">,
 ): Promise<ICalendarList> {
-  const idRoot = `${JSON.stringify(calendarData)}-${Date.now}`;
+  const idRoot = `${JSON.stringify(calendarData)}-${Date.now()}`;
   const id = bytesToHex(sha256(utf8ToBytes(idRoot))).substring(0, 30);
   const calendar: ICalendarList = {
     ...calendarData,

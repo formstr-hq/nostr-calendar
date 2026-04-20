@@ -33,6 +33,7 @@ vi.mock("../utils/notifications", () => ({
 
 vi.mock("../utils/notificationPreferences", () => ({
   clearNotificationPreference: vi.fn(),
+  shouldScheduleNotifications: vi.fn(() => true),
 }));
 
 describe("event notification lifecycle", () => {

@@ -1,15 +1,19 @@
 // import { useDraggable } from "@dnd-kit/core";
 import {
   alpha,
+  Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
   IconButton,
   Link,
   Paper,
+  Snackbar,
   Stack,
   Theme,
   Tooltip,
@@ -20,7 +24,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,11 +43,20 @@ import { useNavigate } from "react-router";
 import { isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
+import { useTimeBasedEvents } from "../stores/events";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import {
+  buildEventRef,
+  getCalendarEventCoordinate,
+} from "../utils/calendarListTypes";
+import { EventCalendarListManagement } from "./EventCalendarListManagement";
+import { signerManager } from "../common/signer";
+import { generateSecretKey } from "nostr-tools";
+import { bytesToHex } from "nostr-tools/utils";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -259,11 +272,14 @@ function ActionButtons({
 }) {
   const intl = useIntl();
   const linkToEvent = getEventPage(
-    encodeNAddr({
-      pubkey: event.user,
-      identifier: event.id,
-      kind: event.kind,
-    }),
+    encodeNAddr(
+      {
+        pubkey: event.user,
+        identifier: event.id,
+        kind: event.kind,
+      },
+      event.relayHint ? [event.relayHint] : undefined,
+    ),
     event.viewKey,
   );
   const copyLinkToEvent = () => {
@@ -276,11 +292,14 @@ function ActionButtons({
 
   const editEvent = () => {
     const editLink = getEditEventPage(
-      encodeNAddr({
-        pubkey: event.user,
-        identifier: event.id,
-        kind: event.kind,
-      }),
+      encodeNAddr(
+        {
+          pubkey: event.user,
+          identifier: event.id,
+          kind: event.kind,
+        },
+        event.relayHint ? [event.relayHint] : undefined,
+      ),
       event.viewKey,
     );
     closeModal();
@@ -357,10 +376,47 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const locations = event.location.filter((location) => !!location?.trim?.());
-  const calendars = useCalendarLists.getState().calendars;
+  const { calendars, moveEventToCalendar } = useCalendarLists();
+  const { updateEvent } = useTimeBasedEvents();
+  const eventCoordinate = getCalendarEventCoordinate(event);
+
   const calendar = event.calendarId
     ? calendars.find((c) => c.id === event.calendarId)
     : undefined;
+
+  const handleCalendarUpdate = async (nextCalendarId: string) => {
+    const sourceCalendarId = event.calendarId;
+    if (!sourceCalendarId) {
+      throw new Error("Event is not in any calendar");
+    }
+
+    const sourceCalendar = calendars.find((c) => c.id === sourceCalendarId);
+    const currentEventRef = sourceCalendar?.eventRefs.find(
+      (ref) => ref[0] === eventCoordinate,
+    );
+
+    const eventRef =
+      currentEventRef ||
+      (event.viewKey
+        ? buildEventRef({
+            kind: event.kind,
+            authorPubkey: event.user,
+            eventDTag: event.id,
+            viewKey: event.viewKey,
+          })
+        : undefined);
+
+    if (!eventRef) {
+      throw new Error("Event reference not found");
+    }
+
+    await moveEventToCalendar(nextCalendarId, eventCoordinate, eventRef);
+    updateEvent({
+      ...event,
+      calendarId: nextCalendarId,
+    });
+  };
+
   return (
     <Box
       sx={{
@@ -437,18 +493,10 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
           {calendar ? (
             <>
               <Divider />
-              <Box display="flex" alignItems="center" gap={1}>
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: calendar.color,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography variant="body2">{calendar.title}</Typography>
-              </Box>
+              <EventCalendarListManagement
+                calendarId={event.calendarId || ""}
+                onCalendarUpdate={handleCalendarUpdate}
+              />
             </>
           ) : (
             <>
@@ -500,69 +548,227 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
 
 function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const intl = useIntl();
-  const { calendars } = useCalendarLists();
-  const { acceptInvitation } = useInvitations();
+  const navigate = useNavigate();
+  const { user, updateLoginModal } = useUser();
+  const { calendars, addEventToCalendar, isLoaded: calendarsLoaded, fetchCalendars } = useCalendarLists();
+  const { invitations, acceptInvitation } = useInvitations();
+  const { updateEvent } = useTimeBasedEvents();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     calendars[0]?.id || "",
   );
   const [accepting, setAccepting] = useState(false);
+  const [creatingGuest, setCreatingGuest] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+
+  // Sync selected calendar once calendars load (e.g. right after login)
+  useEffect(() => {
+    if (!selectedCalendarId && calendars[0]?.id) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars, selectedCalendarId]);
+
+  // On ViewEventPage the Calendar component is never mounted, so
+  // fetchCalendars() is never called. Trigger it here when needed.
+  useEffect(() => {
+    if (user && !calendarsLoaded) {
+      fetchCalendars();
+    }
+  }, [user, calendarsLoaded, fetchCalendars]);
 
   const handleAccept = async () => {
     if (!selectedCalendarId) return;
     setAccepting(true);
-    await acceptInvitation(event.id, selectedCalendarId);
-    setAccepting(false);
+    try {
+      // If there is a matching gift-wrap invitation in the store, use the full
+      // invitation flow so the record is removed from the notifications panel.
+      // Otherwise (shared-link context) build the event reference directly.
+      const matchingInvitation = invitations.find(
+        (inv) => inv.eventId === event.id && inv.pubkey === event.user,
+      );
+      if (matchingInvitation) {
+        await acceptInvitation(matchingInvitation.giftWrapId, selectedCalendarId);
+      } else {
+        const eventRef = buildEventRef({
+          kind: event.kind,
+          authorPubkey: event.user,
+          eventDTag: event.id,
+          viewKey: event.viewKey || "",
+        });
+        await addEventToCalendar(selectedCalendarId, eventRef);
+        updateEvent({ ...event, calendarId: selectedCalendarId, isInvitation: false });
+      }
+      setSuccessDialogOpen(true);
+    } catch {
+      setErrorOpen(true);
+    } finally {
+      setAccepting(false);
+    }
   };
 
-  return (
-    <Stack
-      spacing={1.5}
-      sx={{
-        backgroundColor: "action.hover",
-        borderRadius: 1,
-        p: 1.5,
-      }}
-    >
-      <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
-        <Typography
-          variant="body1"
-          color="text.primary"
-          sx={{
-            display: "flex",
-            gap: "4px",
-            alignItems: "center",
-          }}
-          component="span"
+  const handleContinueAsGuest = async () => {
+    setCreatingGuest(true);
+    try {
+      await signerManager.createGuestAccount(bytesToHex(generateSecretKey()), {});
+    } catch {
+      setErrorOpen(true);
+    } finally {
+      setCreatingGuest(false);
+    }
+  };
+
+  const handleViewInCalendar = () => {
+    setSuccessDialogOpen(false);
+    const d = dayjs(event.begin);
+    navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
+  };
+
+  // ── Login gate ─────────────────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <>
+        <Stack
+          spacing={1.5}
+          sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
         >
-          <FormattedMessage
-            id="invitation.invitedBy"
-            values={{
-              participant: <Participant pubKey={event.user} isAuthor={false} />,
-            }}
-          />
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {intl.formatMessage({ id: "event.notInCalendar" })}
-        </Typography>
-      </Box>
-      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-        <Box maxWidth={500} flex={1} minWidth={150}>
-          <CalendarListSelect
-            value={selectedCalendarId}
-            onChange={setSelectedCalendarId}
-            size="small"
-          />
+          <Typography variant="body2" color="text.secondary">
+            {intl.formatMessage({ id: "invitation.loginToAdd" })}
+          </Typography>
+          <Box display="flex" gap={1} flexWrap="wrap">
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => updateLoginModal(true)}
+            >
+              {intl.formatMessage({ id: "message.modeSelection_loginButton" })}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={creatingGuest}
+              onClick={handleContinueAsGuest}
+              startIcon={
+                creatingGuest ? <CircularProgress size={14} color="inherit" /> : undefined
+              }
+            >
+              {intl.formatMessage({ id: "message.modeSelection_guestButton" })}
+            </Button>
+          </Box>
+        </Stack>
+        <Snackbar
+          open={errorOpen}
+          autoHideDuration={4000}
+          onClose={() => setErrorOpen(false)}
+        >
+          <Alert severity="error" onClose={() => setErrorOpen(false)}>
+            {intl.formatMessage({ id: "event.calendarMoveError" })}
+          </Alert>
+        </Snackbar>
+      </>
+    );
+  }
+
+  // ── Calendars still loading after login ────────────────────────────────────
+  if (calendars.length === 0) {
+    return (
+      <Stack
+        spacing={1.5}
+        sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
+      >
+        <Box display="flex" alignItems="center" gap={1}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">
+            {intl.formatMessage({ id: "startup.fetchingEvents" })}
+          </Typography>
         </Box>
-        <Button
-          variant="contained"
-          size="small"
-          disabled={!selectedCalendarId || accepting}
-          onClick={handleAccept}
-          sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
-        >
-          {intl.formatMessage({ id: "invitation.acceptInvitation" })}
-        </Button>
-      </Box>
-    </Stack>
+      </Stack>
+    );
+  }
+
+  return (
+    <>
+      <Stack
+        spacing={1.5}
+        sx={{
+          backgroundColor: "action.hover",
+          borderRadius: 1,
+          p: 1.5,
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+          <Typography
+            variant="body1"
+            color="text.primary"
+            sx={{
+              display: "flex",
+              gap: "4px",
+              alignItems: "center",
+            }}
+            component="span"
+          >
+            <FormattedMessage
+              id={event.isInvitation ? "invitation.invitedBy" : "invitation.createdBy"}
+              values={{
+                participant: <Participant pubKey={event.user} isAuthor={false} />,
+              }}
+            />
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {intl.formatMessage({ id: "event.notInCalendar" })}
+          </Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+          <Box maxWidth={500} flex={1} minWidth={150}>
+            <CalendarListSelect
+              value={selectedCalendarId}
+              onChange={setSelectedCalendarId}
+              size="small"
+            />
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!selectedCalendarId || accepting}
+            onClick={handleAccept}
+            sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+            startIcon={
+              accepting ? <CircularProgress size={14} color="inherit" /> : undefined
+            }
+          >
+            {intl.formatMessage({ id: "invitation.acceptInvitation" })}
+          </Button>
+        </Box>
+      </Stack>
+
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={4000}
+        onClose={() => setErrorOpen(false)}
+      >
+        <Alert severity="error" onClose={() => setErrorOpen(false)}>
+          {intl.formatMessage({ id: "event.calendarMoveError" })}
+        </Alert>
+      </Snackbar>
+
+      {/* Success: stay here or navigate to calendar day view */}
+      <Dialog
+        open={successDialogOpen}
+        onClose={() => setSuccessDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {intl.formatMessage({ id: "invitation.addedToCalendar" })}
+        </DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setSuccessDialogOpen(false)}>
+            {intl.formatMessage({ id: "invitation.stayHere" })}
+          </Button>
+          <Button variant="contained" onClick={handleViewInCalendar}>
+            {intl.formatMessage({ id: "invitation.viewInCalendar" })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

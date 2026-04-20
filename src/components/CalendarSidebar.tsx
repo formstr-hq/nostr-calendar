@@ -17,17 +17,23 @@ import {
   Typography,
   IconButton,
   Button,
+  Tooltip,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import CircleIcon from "@mui/icons-material/Circle";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DatePicker } from "./DatePicker";
 import { useCalendarLists } from "../stores/calendarLists";
 import { CalendarManageDialog } from "./CalendarManageDialog";
-import type { ICalendarList } from "../utils/calendarListTypes";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCE,
+  type ICalendarList,
+} from "../utils/calendarListTypes";
 import { useIntl } from "react-intl";
+import { useTimeBasedEvents } from "../stores/events";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -64,11 +70,27 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
     title: string;
     description: string;
     color: string;
+    notificationPreference: "enabled" | "disabled";
   }) => {
     if (editingCalendar) {
+      const preferenceChanged =
+        (editingCalendar.notificationPreference ??
+          DEFAULT_NOTIFICATION_PREFERENCE) !==
+        data.notificationPreference;
+
       await updateCalendar({ ...editingCalendar, ...data });
+      if (preferenceChanged) {
+        useTimeBasedEvents
+          .getState()
+          .refreshNotificationPreferencesForCalendar(editingCalendar.id);
+      }
     } else {
-      await createCalendar(data.title, data.description, data.color);
+      await createCalendar(
+        data.title,
+        data.description,
+        data.color,
+        data.notificationPreference,
+      );
     }
   };
 
@@ -99,9 +121,21 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           alignItems="center"
           mb={1}
         >
-          <Typography variant="subtitle2" fontWeight={600}>
-            {intl.formatMessage({ id: "sidebar.calendars" })}
-          </Typography>
+          <Box display="flex" alignItems="center" gap={0.5}>
+            <Typography variant="subtitle2" fontWeight={600}>
+              {intl.formatMessage({ id: "sidebar.calendars" })}
+            </Typography>
+            <Tooltip
+              title={intl.formatMessage({
+                id: "calendarManage.notificationsAppOnly",
+              })}
+              arrow
+            >
+              <InfoOutlinedIcon
+                sx={{ fontSize: 16, color: "text.secondary", cursor: "help" }}
+              />
+            </Tooltip>
+          </Box>
           <IconButton size="small" onClick={handleCreateCalendar}>
             <AddIcon fontSize="small" />
           </IconButton>

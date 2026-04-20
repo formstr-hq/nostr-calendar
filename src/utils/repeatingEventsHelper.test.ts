@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildRecurrenceRule,
   isEventInDateRange,
   getNextOccurrenceInRange,
   frequencyToRRule,
+  parseRecurrenceRule,
   rruleToFrequency,
 } from "./repeatingEventsHelper";
 import { RepeatingFrequency, ICalendarEvent } from "./types";
@@ -72,13 +74,105 @@ describe("rruleToFrequency", () => {
     );
   });
 
+  it("detects the base frequency when COUNT is present", () => {
+    expect(rruleToFrequency("FREQ=DAILY;COUNT=5")).toBe(
+      RepeatingFrequency.Daily,
+    );
+    expect(rruleToFrequency("FREQ=MONTHLY;INTERVAL=3;COUNT=4")).toBe(
+      RepeatingFrequency.Quarterly,
+    );
+  });
+
+  it("detects the base frequency when UNTIL is present", () => {
+    expect(rruleToFrequency("FREQ=WEEKLY;UNTIL=20250131T100000Z")).toBe(
+      RepeatingFrequency.Weekly,
+    );
+    expect(
+      rruleToFrequency("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20250131T100000Z"),
+    ).toBe(RepeatingFrequency.Weekday);
+  });
+
   it("handles RRULE: prefix", () => {
     expect(rruleToFrequency("RRULE:FREQ=DAILY")).toBe(RepeatingFrequency.Daily);
   });
 
   it("returns null for unknown rules", () => {
     expect(rruleToFrequency("FREQ=SECONDLY")).toBeNull();
+    expect(rruleToFrequency("FREQ=DAILY;BYHOUR=10")).toBeNull();
     expect(rruleToFrequency("")).toBeNull();
+  });
+});
+
+// ─── parseRecurrenceRule / buildRecurrenceRule ─────────────────────
+
+describe("parseRecurrenceRule", () => {
+  it("parses count-limited recurrence rules", () => {
+    expect(parseRecurrenceRule("FREQ=DAILY;COUNT=5")).toEqual({
+      frequency: RepeatingFrequency.Daily,
+      endMode: "count",
+      count: 5,
+      untilDate: null,
+    });
+  });
+
+  it("parses until-limited recurrence rules", () => {
+    const until = Date.UTC(2025, 0, 31, 10, 0, 0);
+
+    expect(parseRecurrenceRule("FREQ=WEEKLY;UNTIL=20250131T100000Z")).toEqual({
+      frequency: RepeatingFrequency.Weekly,
+      endMode: "until",
+      count: null,
+      untilDate: until,
+    });
+  });
+
+  it("falls back safely for malformed or unsupported rules", () => {
+    expect(parseRecurrenceRule("FREQ=DAILY;BYHOUR=10")).toEqual({
+      frequency: null,
+      endMode: "never",
+      count: null,
+      untilDate: null,
+    });
+    expect(parseRecurrenceRule("")).toEqual({
+      frequency: null,
+      endMode: "never",
+      count: null,
+      untilDate: null,
+    });
+  });
+});
+
+describe("buildRecurrenceRule", () => {
+  it("builds count-limited recurrence rules", () => {
+    const jan1 = Date.UTC(2025, 0, 1, 10);
+
+    expect(
+      buildRecurrenceRule({
+        frequency: RepeatingFrequency.Daily,
+        endMode: "count",
+        count: 5,
+        eventStart: jan1,
+      }),
+    ).toBe("FREQ=DAILY;COUNT=5");
+  });
+
+  it("builds date-only until-limited rules using the event start time", () => {
+    const eventStart = new Date(2026, 3, 15, 14, 30, 0).getTime();
+    const untilDate = new Date(2026, 3, 18).getTime();
+    const expectedUntil =
+      new Date(2026, 3, 18, 14, 30, 0)
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .split(".")[0] + "Z";
+
+    expect(
+      buildRecurrenceRule({
+        frequency: RepeatingFrequency.Daily,
+        endMode: "until",
+        untilDate,
+        eventStart,
+      }),
+    ).toBe(`FREQ=DAILY;UNTIL=${expectedUntil}`);
   });
 });
 
@@ -155,6 +249,18 @@ describe("isEventInDateRange – daily recurrence", () => {
 
   it("does not match before the event starts", () => {
     expect(isEventInDateRange(event, jan1 - 2 * DAY, jan1 - DAY)).toBe(false);
+  });
+
+  it("stops matching after the last occurrence when COUNT is present", () => {
+    const limitedEvent = makeEvent({
+      begin: jan1,
+      repeat: { rrule: "FREQ=DAILY;COUNT=3" },
+    });
+    const day3 = jan1 + 3 * DAY;
+
+    expect(isEventInDateRange(limitedEvent, day3 - HOUR, day3 + 2 * HOUR)).toBe(
+      false,
+    );
   });
 });
 
@@ -342,6 +448,18 @@ describe("getNextOccurrenceInRange – daily recurrence", () => {
       getNextOccurrenceInRange(event, jan1 - 2 * DAY, jan1 - DAY),
     ).toBeNull();
   });
+
+  it("returns null after the final counted occurrence", () => {
+    const limitedEvent = makeEvent({
+      begin: jan1,
+      repeat: { rrule: "FREQ=DAILY;COUNT=3" },
+    });
+    const day3 = jan1 + 3 * DAY;
+
+    expect(
+      getNextOccurrenceInRange(limitedEvent, day3 - HOUR, day3 + HOUR),
+    ).toBeNull();
+  });
 });
 
 describe("getNextOccurrenceInRange – weekly recurrence", () => {
@@ -369,6 +487,21 @@ describe("getNextOccurrenceInRange – weekly recurrence", () => {
       nextWed + DAY,
     );
     expect(result).toBe(nextWed);
+  });
+
+  it("returns null after the UNTIL date has passed", () => {
+    const limitedEvent = makeEvent({
+      begin: wed,
+      repeat: { rrule: "FREQ=WEEKLY;UNTIL=20250115T100000Z" },
+    });
+    const jan22 = Date.UTC(2025, 0, 22, 10);
+
+    expect(
+      getNextOccurrenceInRange(limitedEvent, jan22 - HOUR, jan22 + HOUR),
+    ).toBeNull();
+    expect(
+      isEventInDateRange(limitedEvent, jan22 - HOUR, jan22 + 2 * HOUR),
+    ).toBe(false);
   });
 });
 
