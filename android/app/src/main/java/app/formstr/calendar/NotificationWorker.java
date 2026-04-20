@@ -209,7 +209,8 @@ public class NotificationWorker extends Worker {
         for (int i = 0; i < str.length(); i++) {
             hash = (hash * 31 + str.charAt(i));
         }
-        return (Math.abs(hash) >> 1) * 2;
+        int positiveHash = Math.abs(hash);
+        return positiveHash != 0 ? positiveHash : 1;
     }
 
     /**
@@ -225,8 +226,6 @@ public class NotificationWorker extends Worker {
         String freq = null;
         int interval = 1;
         String byDay = null;
-        Integer count = null;
-        long until = -1L;
 
         for (String part : normalized.split(";")) {
             String[] kv = part.split("=", 2);
@@ -241,42 +240,24 @@ public class NotificationWorker extends Worker {
                 case "BYDAY":
                     byDay = kv[1].toUpperCase();
                     break;
-                case "COUNT":
-                    try {
-                        count = Integer.parseInt(kv[1]);
-                    } catch (NumberFormatException ignored) {
-                        count = null;
-                    }
-                    break;
-                case "UNTIL":
-                    until = parseRRuleDate(kv[1]);
-                    break;
             }
         }
 
         if (freq == null) return -1;
-        if (count != null && count < 1) return -1;
-        if (until >= 0 && begin > until) return -1;
 
         // For WEEKLY with BYDAY (weekdays), use special handling
         if ("WEEKLY".equals(freq) && byDay != null) {
-            return getNextWeekdayOccurrence(begin, byDay, rangeStart, rangeEnd, count, until);
+            return getNextWeekdayOccurrence(begin, byDay, rangeStart, rangeEnd);
         }
 
         // Step through occurrences from the event start date
         // using the frequency until we pass rangeEnd
         long current = begin;
-        int occurrenceNumber = 1;
         while (current <= rangeEnd) {
-            if ((count != null && occurrenceNumber > count)
-                    || (until >= 0 && current > until)) {
-                break;
-            }
             if (current >= rangeStart && current <= rangeEnd) {
                 return current;
             }
             current = advanceByFrequency(current, freq, interval);
-            occurrenceNumber++;
             if (current <= begin) break; // overflow protection
         }
 
@@ -312,8 +293,7 @@ public class NotificationWorker extends Worker {
      * Steps day-by-day from begin, checking if the day matches the BYDAY set.
      */
     private long getNextWeekdayOccurrence(long begin, String byDay,
-                                           long rangeStart, long rangeEnd,
-                                           Integer count, long until) {
+                                           long rangeStart, long rangeEnd) {
         Set<Integer> allowedDays = new HashSet<>();
         for (String day : byDay.split(",")) {
             switch (day.trim()) {
@@ -325,32 +305,6 @@ public class NotificationWorker extends Worker {
                 case "SA": allowedDays.add(Calendar.SATURDAY); break;
                 case "SU": allowedDays.add(Calendar.SUNDAY); break;
             }
-        }
-
-        if (count != null) {
-            Calendar cal = Calendar.getInstance();
-            cal.setTimeInMillis(begin);
-            int occurrenceNumber = 0;
-
-            while (cal.getTimeInMillis() <= rangeEnd) {
-                long current = cal.getTimeInMillis();
-                if (until >= 0 && current > until) {
-                    return -1;
-                }
-
-                if (allowedDays.contains(cal.get(Calendar.DAY_OF_WEEK))
-                        && current >= begin) {
-                    occurrenceNumber++;
-                    if (count != null && occurrenceNumber > count) {
-                        return -1;
-                    }
-                    if (current >= rangeStart) {
-                        return current;
-                    }
-                }
-                cal.add(Calendar.DAY_OF_MONTH, 1);
-            }
-            return -1;
         }
 
         Calendar cal = Calendar.getInstance();
@@ -376,48 +330,11 @@ public class NotificationWorker extends Worker {
         // Search up to rangeEnd day by day
         while (cal.getTimeInMillis() <= rangeEnd) {
             long current = cal.getTimeInMillis();
-            if (until >= 0 && current > until) {
-                return -1;
-            }
             if (allowedDays.contains(cal.get(Calendar.DAY_OF_WEEK))
                     && current >= rangeStart) {
                 return current;
             }
             cal.add(Calendar.DAY_OF_MONTH, 1);
-        }
-
-        return -1;
-    }
-
-    private long parseRRuleDate(String value) {
-        String clean = value.trim().toUpperCase();
-
-        try {
-            if (clean.matches("\\d{8}T\\d{6}Z")) {
-                Calendar cal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
-                cal.set(Calendar.YEAR, Integer.parseInt(clean.substring(0, 4)));
-                cal.set(Calendar.MONTH, Integer.parseInt(clean.substring(4, 6)) - 1);
-                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(clean.substring(6, 8)));
-                cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(clean.substring(9, 11)));
-                cal.set(Calendar.MINUTE, Integer.parseInt(clean.substring(11, 13)));
-                cal.set(Calendar.SECOND, Integer.parseInt(clean.substring(13, 15)));
-                cal.set(Calendar.MILLISECOND, 0);
-                return cal.getTimeInMillis();
-            }
-
-            if (clean.matches("\\d{8}T\\d{6}")) {
-                Calendar cal = Calendar.getInstance();
-                cal.set(Calendar.YEAR, Integer.parseInt(clean.substring(0, 4)));
-                cal.set(Calendar.MONTH, Integer.parseInt(clean.substring(4, 6)) - 1);
-                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(clean.substring(6, 8)));
-                cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(clean.substring(9, 11)));
-                cal.set(Calendar.MINUTE, Integer.parseInt(clean.substring(11, 13)));
-                cal.set(Calendar.SECOND, Integer.parseInt(clean.substring(13, 15)));
-                cal.set(Calendar.MILLISECOND, 0);
-                return cal.getTimeInMillis();
-            }
-        } catch (NumberFormatException ignored) {
-            return -1;
         }
 
         return -1;

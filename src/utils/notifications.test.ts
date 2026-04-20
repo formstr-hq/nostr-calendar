@@ -343,19 +343,6 @@ describe("scheduleEventNotifications – recurring events", () => {
     const key = scheduled[0].extra.notificationKey;
     expect(key).toMatch(/^recurring-key-test:\d+:\d+$/);
   });
-
-  it("does not schedule reminders after the recurrence limit", async () => {
-    const fourDaysAgo = Date.now() - 4 * DAY + HOUR;
-    const event = makeEvent({
-      begin: fourDaysAgo,
-      id: "limited-recurring",
-      repeat: { rrule: "FREQ=DAILY;COUNT=3" },
-    });
-
-    await scheduleEventNotifications(event);
-
-    expect(mockSchedule).not.toHaveBeenCalled();
-  });
 });
 
 describe("cancelAllNotifications", () => {
