@@ -36,6 +36,7 @@ import {
   cancelEventNotifications,
 } from "../utils/notifications";
 import { useNotifications } from "./notifications";
+import { clearNotificationPreference } from "../utils/notificationPreferences";
 import {
   getSecureItem,
   setSecureItem,
@@ -210,8 +211,9 @@ export const useTimeBasedEvents = create<{
         events: updatedEvents,
       };
     });
-    cancelEventNotifications(id);
+    void cancelEventNotifications(id);
     useNotifications.getState().removeNotifications(id);
+    void clearNotificationPreference(id);
   },
   resetPrivateEvents: () => {
     set(({ events }) => {
@@ -384,7 +386,11 @@ export const useTimeBasedEvents = create<{
           } else {
             store = appendOne(store, parsedEvent.id, parsedEvent);
           }
-          scheduleEventNotifications(parsedEvent);
+          scheduleEventNotifications(parsedEvent).then((notifications) => {
+            useNotifications
+              .getState()
+              .setNotifications(parsedEvent.id, notifications);
+          });
           const updatedEvents = denormalize(store);
           saveEventsToStorage(updatedEvents);
           return {

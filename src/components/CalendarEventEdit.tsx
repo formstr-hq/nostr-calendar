@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -21,8 +21,9 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
 import {
-  frequencyToRRule,
-  rruleToFrequency,
+  buildRecurrenceRule,
+  parseRecurrenceRule,
+  type RecurrenceEndMode,
 } from "../utils/repeatingEventsHelper";
 import { ParticipantAdd } from "./ParticipantAdd";
 import { useIntl } from "react-intl";
@@ -34,11 +35,15 @@ import {
   publishPublicCalendarEvent,
 } from "../common/nostr";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
@@ -48,6 +53,20 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { v4 as uuid } from "uuid";
+import {
+  areNotificationOffsetsEqual,
+  clearNotificationPreference,
+  DEFAULT_NOTIFICATION_OFFSETS,
+  getNotificationPreference,
+  normalizeNotificationOffsets,
+  setNotificationPreference,
+} from "../utils/notificationPreferences";
+import {
+  cancelEventNotifications,
+  scheduleEventNotifications,
+} from "../utils/notifications";
+import { useNotifications } from "../stores/notifications";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -69,6 +88,7 @@ export function CalendarEventEdit({
   display = "modal",
 }: CalendarEventEditProps) {
   const intl = useIntl();
+  const initialRecurrence = parseRecurrenceRule(initialEvent?.repeat.rrule);
   const [processing, setProcessing] = useState(false);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
@@ -109,6 +129,24 @@ export function CalendarEventEdit({
       },
     } as ICalendarEvent;
   });
+  const [recurrenceFrequency, setRecurrenceFrequency] =
+    useState<RepeatingFrequency>(
+      initialRecurrence.frequency ?? RepeatingFrequency.None,
+    );
+  const [recurrenceEndMode, setRecurrenceEndMode] = useState<RecurrenceEndMode>(
+    initialRecurrence.endMode,
+  );
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(
+    initialRecurrence.count ?? 1,
+  );
+  const [recurrenceUntilDate, setRecurrenceUntilDate] = useState<Dayjs | null>(
+    initialRecurrence.untilDate ? dayjs(initialRecurrence.untilDate) : null,
+  );
+  const [notificationOffsets, setNotificationOffsets] = useState<number[]>(
+    DEFAULT_NOTIFICATION_OFFSETS,
+  );
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] =
+    useState(!initialEvent?.id);
 
   const handleClose = () => {
     onClose();
@@ -125,10 +163,107 @@ export function CalendarEventEdit({
     setEventDetails((prev) => ({ ...prev, [key]: value }));
   };
 
+  useEffect(() => {
+    let active = true;
+
+    if (!open) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!initialEvent?.id) {
+      setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+      setNotificationPreferencesLoaded(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setNotificationPreferencesLoaded(false);
+    getNotificationPreference(initialEvent.id)
+      .then((preference) => {
+        if (!active) {
+          return;
+        }
+
+        if (preference) {
+          setNotificationOffsets(preference.offsetsMinutes);
+        } else {
+          setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        }
+        setNotificationPreferencesLoaded(true);
+      })
+      .catch((error) => {
+        console.warn("Failed to load notification preferences", error);
+        if (!active) {
+          return;
+        }
+        setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        setNotificationPreferencesLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialEvent?.id, open]);
+
+  const handleNotificationOffsetChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const parsed = Number.parseInt(e.target.value, 10);
+    setNotificationOffsets((previousOffsets) =>
+      previousOffsets.map((offset, currentIndex) =>
+        currentIndex === index
+          ? Number.isFinite(parsed)
+            ? Math.max(0, parsed)
+            : 0
+          : offset,
+      ),
+    );
+  };
+
+  const addNotificationOffset = () => {
+    setNotificationOffsets((previousOffsets) => [...previousOffsets, 0]);
+  };
+
+  const removeNotificationOffset = (index: number) => {
+    setNotificationOffsets((previousOffsets) =>
+      previousOffsets.filter((_, currentIndex) => currentIndex !== index),
+    );
+  };
+
   const handleSave = async () => {
     setProcessing(true);
     try {
-      const eventToSave = { ...eventDetails, isPrivateEvent: isPrivate };
+      const normalizedNotificationOffsets =
+        normalizeNotificationOffsets(notificationOffsets);
+      const rrule = buildRecurrenceRule({
+        frequency: recurrenceFrequency,
+        endMode: recurrenceEndMode,
+        count: recurrenceCount,
+        untilDate: recurrenceUntilDate?.valueOf() ?? null,
+        eventStart: eventDetails.begin,
+      });
+      const eventId = eventDetails.id || uuid();
+      const eventToSave = {
+        ...eventDetails,
+        id: eventId,
+        isPrivateEvent: isPrivate,
+        repeat: { rrule },
+      };
+
+      if (
+        areNotificationOffsetsEqual(
+          normalizedNotificationOffsets,
+          DEFAULT_NOTIFICATION_OFFSETS,
+        )
+      ) {
+        await clearNotificationPreference(eventId);
+      } else {
+        await setNotificationPreference(eventId, normalizedNotificationOffsets);
+      }
 
       if (isPrivate) {
         if (mode === "edit") {
@@ -147,6 +282,13 @@ export function CalendarEventEdit({
         await publishPublicCalendarEvent(eventToSave);
       }
 
+      if (mode === "create" || !isPrivate) {
+        await cancelEventNotifications(eventId);
+        useNotifications.getState().removeNotifications(eventId);
+        const notifications = await scheduleEventNotifications(eventToSave);
+        useNotifications.getState().setNotifications(eventId, notifications);
+      }
+
       if (onSave) {
         onSave(eventToSave);
       }
@@ -162,6 +304,15 @@ export function CalendarEventEdit({
   const onChangeBeginDate = (value: Dayjs | null) => {
     if (!value) return;
     updateField("begin", value.unix() * 1000);
+
+    const beginDay = value.startOf("day");
+    if (
+      recurrenceEndMode === "until" &&
+      recurrenceUntilDate &&
+      recurrenceUntilDate.isBefore(beginDay, "day")
+    ) {
+      setRecurrenceUntilDate(beginDay);
+    }
   };
 
   const onChangeEndDate = (value: Dayjs | null) => {
@@ -171,17 +322,54 @@ export function CalendarEventEdit({
 
   const handleFrequencyChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as RepeatingFrequency;
-    updateField("repeat", {
-      rrule: value !== RepeatingFrequency.None ? frequencyToRRule(value) : null,
-    });
+    setRecurrenceFrequency(value);
   };
+
+  const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
+    const value = e.target.value as RecurrenceEndMode;
+    setRecurrenceEndMode(value);
+
+    if (value === "count" && recurrenceCount < 1) {
+      setRecurrenceCount(1);
+    }
+
+    if (value === "until" && !recurrenceUntilDate) {
+      setRecurrenceUntilDate(dayjs(eventDetails.begin).startOf("day"));
+    }
+  };
+
+  const handleRecurrenceCountChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const parsed = Number.parseInt(e.target.value, 10);
+    setRecurrenceCount(Number.isFinite(parsed) ? parsed : 0);
+  };
+
+  const recurrenceEnabled = recurrenceFrequency !== RepeatingFrequency.None;
+  const recurrenceValid =
+    !recurrenceEnabled ||
+    recurrenceEndMode === "never" ||
+    (recurrenceEndMode === "count" &&
+      Number.isInteger(recurrenceCount) &&
+      recurrenceCount >= 1) ||
+    (recurrenceEndMode === "until" &&
+      !!recurrenceUntilDate &&
+      !recurrenceUntilDate.isBefore(dayjs(eventDetails.begin).startOf("day")));
+  const notificationsValid =
+    notificationPreferencesLoaded &&
+    notificationOffsets.every(
+      (offset) =>
+        Number.isInteger(offset) && Number.isFinite(offset) && offset >= 0,
+    );
 
   const buttonDisabled = !(
     !processing &&
     eventDetails.title &&
     eventDetails.begin &&
     eventDetails.end &&
-    eventDetails.begin < eventDetails.end
+    eventDetails.begin < eventDetails.end &&
+    recurrenceValid &&
+    notificationsValid
   );
 
   if (!open || !eventDetails) {
@@ -280,42 +468,173 @@ export function CalendarEventEdit({
       {/* Recurrence */}
       <EventAttributeEditContainer>
         <EventRepeatIcon />
-        <FormControl fullWidth size="small">
-          <InputLabel>
-            {intl.formatMessage({ id: "event.selectRecurrence" })}
-          </InputLabel>
-          <Select
-            value={
-              (eventDetails.repeat.rrule
-                ? rruleToFrequency(eventDetails.repeat.rrule)
-                : null) || RepeatingFrequency.None
-            }
-            label={intl.formatMessage({ id: "event.selectRecurrence" })}
-            onChange={handleFrequencyChange}
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <FormControl fullWidth size="small">
+            <InputLabel>
+              {intl.formatMessage({ id: "event.selectRecurrence" })}
+            </InputLabel>
+            <Select
+              value={recurrenceFrequency}
+              label={intl.formatMessage({ id: "event.selectRecurrence" })}
+              onChange={handleFrequencyChange}
+            >
+              <MenuItem value={RepeatingFrequency.None}>
+                {intl.formatMessage({ id: "event.doesNotRepeat" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Daily}>
+                {intl.formatMessage({ id: "event.daily" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Weekly}>
+                {intl.formatMessage({ id: "event.weekly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Weekday}>
+                {intl.formatMessage({ id: "event.weekdays" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Monthly}>
+                {intl.formatMessage({ id: "event.monthly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Quarterly}>
+                {intl.formatMessage({ id: "event.quarterly" })}
+              </MenuItem>
+              <MenuItem value={RepeatingFrequency.Yearly}>
+                {intl.formatMessage({ id: "event.yearly" })}
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          {recurrenceEnabled && (
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <FormControl size="small" sx={{ minWidth: { sm: 180 } }}>
+                <InputLabel>
+                  {intl.formatMessage({ id: "event.recurrenceEnds" })}
+                </InputLabel>
+                <Select
+                  value={recurrenceEndMode}
+                  label={intl.formatMessage({ id: "event.recurrenceEnds" })}
+                  onChange={handleRecurrenceEndModeChange}
+                >
+                  <MenuItem value="never">
+                    {intl.formatMessage({ id: "event.recurrenceEndsNever" })}
+                  </MenuItem>
+                  <MenuItem value="count">
+                    {intl.formatMessage({ id: "event.recurrenceEndsAfter" })}
+                  </MenuItem>
+                  <MenuItem value="until">
+                    {intl.formatMessage({ id: "event.recurrenceEndsOnDate" })}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {recurrenceEndMode === "count" && (
+                <TextField
+                  size="small"
+                  type="number"
+                  label={intl.formatMessage({
+                    id: "event.recurrenceOccurrences",
+                  })}
+                  value={recurrenceCount}
+                  onChange={handleRecurrenceCountChange}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                />
+              )}
+
+              {recurrenceEndMode === "until" && (
+                <DatePicker
+                  sx={{ flex: 1 }}
+                  label={intl.formatMessage({ id: "event.recurrenceEndDate" })}
+                  value={recurrenceUntilDate}
+                  onChange={(value) =>
+                    setRecurrenceUntilDate(value ? value.startOf("day") : null)
+                  }
+                  minDate={dayjs(eventDetails.begin).startOf("day")}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                    },
+                  }}
+                />
+              )}
+            </Box>
+          )}
+        </Box>
+      </EventAttributeEditContainer>
+      <Divider />
+      <EventAttributeEditContainer>
+        <NotificationsActiveIcon />
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Typography variant="subtitle2">
+            {intl.formatMessage({ id: "event.notifications" })}
+          </Typography>
+
+          {notificationOffsets.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({ id: "event.noNotifications" })}
+            </Typography>
+          ) : (
+            notificationOffsets.map((offset, index) => (
+              <Box
+                key={`notification-offset-${index}`}
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  alignItems: "center",
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label={intl.formatMessage({
+                    id: "event.reminderMinutesBefore",
+                  })}
+                  value={offset}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    handleNotificationOffsetChange(index, e)
+                  }
+                  inputProps={{ min: 0 }}
+                />
+                <IconButton
+                  aria-label={intl.formatMessage({ id: "navigation.remove" })}
+                  onClick={() => removeNotificationOffset(index)}
+                  size="small"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))
+          )}
+
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={addNotificationOffset}
+            sx={{ alignSelf: "flex-start" }}
           >
-            <MenuItem value={RepeatingFrequency.None}>
-              {intl.formatMessage({ id: "event.doesNotRepeat" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Daily}>
-              {intl.formatMessage({ id: "event.daily" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Weekly}>
-              {intl.formatMessage({ id: "event.weekly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Weekday}>
-              {intl.formatMessage({ id: "event.weekdays" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Monthly}>
-              {intl.formatMessage({ id: "event.monthly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Quarterly}>
-              {intl.formatMessage({ id: "event.quarterly" })}
-            </MenuItem>
-            <MenuItem value={RepeatingFrequency.Yearly}>
-              {intl.formatMessage({ id: "event.yearly" })}
-            </MenuItem>
-          </Select>
-        </FormControl>
+            {intl.formatMessage({ id: "event.addReminder" })}
+          </Button>
+        </Box>
       </EventAttributeEditContainer>
       <Divider />
       {/* Participants */}

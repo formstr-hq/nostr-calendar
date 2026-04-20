@@ -18,8 +18,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -32,8 +34,9 @@ public class NotificationWorker extends Worker {
     private static final String TAG = "NotificationWorker";
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
+    private static final String NOTIFICATION_PREFERENCES_KEY = "cal:notification-preferences";
     private static final long SCHEDULE_WINDOW_MS = 5L * 24 * 60 * 60 * 1000;
-    private static final long TEN_MINUTES_MS = 10L * 60 * 1000;
+    private static final int[] DEFAULT_REMINDER_OFFSETS_MINUTES = new int[]{10, 0};
 
     public NotificationWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -48,6 +51,8 @@ public class NotificationWorker extends Worker {
             SharedPreferences prefs = getApplicationContext()
                     .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String eventsJson = prefs.getString(EVENTS_KEY, null);
+            String notificationPreferencesJson =
+                    prefs.getString(NOTIFICATION_PREFERENCES_KEY, null);
 
             if (eventsJson == null || eventsJson.isEmpty()) {
                 Log.d(TAG, "No cached events found");
@@ -55,6 +60,10 @@ public class NotificationWorker extends Worker {
             }
 
             JSONArray events = new JSONArray(eventsJson);
+            JSONObject notificationPreferences = notificationPreferencesJson == null
+                    || notificationPreferencesJson.isEmpty()
+                    ? new JSONObject()
+                    : new JSONObject(notificationPreferencesJson);
             Set<Integer> existingNotificationIds = getExistingNotificationIds();
             long now = System.currentTimeMillis();
             long twoDaysFromNow = now + SCHEDULE_WINDOW_MS;
@@ -62,7 +71,13 @@ public class NotificationWorker extends Worker {
 
             for (int i = 0; i < events.length(); i++) {
                 JSONObject event = events.getJSONObject(i);
-                scheduled += processEvent(event, now, twoDaysFromNow, existingNotificationIds);
+                scheduled += processEvent(
+                        event,
+                        notificationPreferences,
+                        now,
+                        twoDaysFromNow,
+                        existingNotificationIds
+                );
             }
 
             Log.d(TAG, "NotificationWorker finished. Scheduled " + scheduled + " notifications.");
@@ -76,15 +91,23 @@ public class NotificationWorker extends Worker {
         }
     }
 
-    private String getNotificationBody(int timeToBegin, String location){
-        if(timeToBegin <= 0){
-            return "Starting now";
+    private String getNotificationBody(int offsetMinutes, String location){
+        String body;
+        if(offsetMinutes <= 0){
+            body = "Starting now";
         } else {
-            return "Starting in " + timeToBegin + " minutes";
+            body = "Starts in " + offsetMinutes + " minute" + (offsetMinutes == 1 ? "" : "s");
         }
+
+        if (location != null && !location.isEmpty()) {
+            return body + " at " + location;
+        }
+
+        return body;
     }
 
-    private int processEvent(JSONObject event, long now, long twoDaysFromNow,
+    private int processEvent(JSONObject event, JSONObject notificationPreferences,
+                              long now, long twoDaysFromNow,
                               Set<Integer> existingNotificationIds) {
         try {
             JSONObject repeat = event.optJSONObject("repeat");
@@ -100,6 +123,7 @@ public class NotificationWorker extends Worker {
             long end = event.getLong("end");
             String eventId = event.getString("id");
             String title = event.getString("title");
+            List<Integer> reminderOffsets = getReminderOffsets(notificationPreferences, eventId);
 
             // Build location string from location array
             String location = buildLocationString(event);
@@ -110,24 +134,22 @@ public class NotificationWorker extends Worker {
                 return 0;
             }
 
-            // Build notification key matching the JS side
-            String notificationKey = eventId + ":" + nextOccurrence;
-            int baseId = hashToNumber(notificationKey);
-
             int count = 0;
+            for (int offsetMinutes : reminderOffsets) {
+                long scheduledAt = nextOccurrence - offsetMinutes * 60L * 1000L;
+                if (scheduledAt <= now) {
+                    continue;
+                }
 
-            // Schedule "10 minutes before" notification
-            long tenMinBefore = nextOccurrence - TEN_MINUTES_MS;
-            if (tenMinBefore > now && !existingNotificationIds.contains(baseId)) {
-                String body = getNotificationBody(10, location);
-                scheduleAlarm(baseId, "Upcoming: " + title, body, eventId, tenMinBefore);
-                count++;
-            }
+                String notificationKey = eventId + ":" + nextOccurrence + ":" + offsetMinutes;
+                int notificationId = hashToNumber(notificationKey);
+                if (existingNotificationIds.contains(notificationId)) {
+                    continue;
+                }
 
-            // Schedule "starting now" notification
-            if (nextOccurrence > now && !existingNotificationIds.contains(baseId + 1)) {
-                String body =  getNotificationBody(0, location);
-                scheduleAlarm(baseId + 1, title, body, eventId, nextOccurrence);
+                String body = getNotificationBody(offsetMinutes, location);
+                String notificationTitle = offsetMinutes <= 0 ? title : "Upcoming: " + title;
+                scheduleAlarm(notificationId, notificationTitle, body, eventId, scheduledAt);
                 count++;
             }
 
@@ -155,6 +177,30 @@ public class NotificationWorker extends Worker {
         }
     }
 
+    private List<Integer> getReminderOffsets(JSONObject notificationPreferences, String eventId) {
+        List<Integer> offsets = new ArrayList<>();
+        JSONObject eventPreference = notificationPreferences.optJSONObject(eventId);
+        JSONArray offsetsArray = eventPreference != null
+                ? eventPreference.optJSONArray("offsetsMinutes")
+                : null;
+
+        if (offsetsArray == null) {
+            for (int offset : DEFAULT_REMINDER_OFFSETS_MINUTES) {
+                offsets.add(offset);
+            }
+            return offsets;
+        }
+
+        for (int i = 0; i < offsetsArray.length(); i++) {
+            int offset = offsetsArray.optInt(i, -1);
+            if (offset >= 0 && !offsets.contains(offset)) {
+                offsets.add(offset);
+            }
+        }
+
+        return offsets;
+    }
+
     /**
      * Hash function matching the JS side's hashToNumber for consistent notification IDs.
      */
@@ -175,13 +221,12 @@ public class NotificationWorker extends Worker {
                                            long rangeStart, long rangeEnd) {
         String normalized = rrule.replaceFirst("(?i)^RRULE:", "").trim();
 
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(begin);
-
         // Parse FREQ and INTERVAL from the rrule string
         String freq = null;
         int interval = 1;
         String byDay = null;
+        Integer count = null;
+        long until = -1L;
 
         for (String part : normalized.split(";")) {
             String[] kv = part.split("=", 2);
@@ -196,24 +241,42 @@ public class NotificationWorker extends Worker {
                 case "BYDAY":
                     byDay = kv[1].toUpperCase();
                     break;
+                case "COUNT":
+                    try {
+                        count = Integer.parseInt(kv[1]);
+                    } catch (NumberFormatException ignored) {
+                        count = null;
+                    }
+                    break;
+                case "UNTIL":
+                    until = parseRRuleDate(kv[1]);
+                    break;
             }
         }
 
         if (freq == null) return -1;
+        if (count != null && count < 1) return -1;
+        if (until >= 0 && begin > until) return -1;
 
         // For WEEKLY with BYDAY (weekdays), use special handling
         if ("WEEKLY".equals(freq) && byDay != null) {
-            return getNextWeekdayOccurrence(begin, byDay, rangeStart, rangeEnd);
+            return getNextWeekdayOccurrence(begin, byDay, rangeStart, rangeEnd, count, until);
         }
 
         // Step through occurrences from the event start date
         // using the frequency until we pass rangeEnd
         long current = begin;
+        int occurrenceNumber = 1;
         while (current <= rangeEnd) {
+            if ((count != null && occurrenceNumber > count)
+                    || (until >= 0 && current > until)) {
+                break;
+            }
             if (current >= rangeStart && current <= rangeEnd) {
                 return current;
             }
             current = advanceByFrequency(current, freq, interval);
+            occurrenceNumber++;
             if (current <= begin) break; // overflow protection
         }
 
@@ -249,7 +312,8 @@ public class NotificationWorker extends Worker {
      * Steps day-by-day from begin, checking if the day matches the BYDAY set.
      */
     private long getNextWeekdayOccurrence(long begin, String byDay,
-                                           long rangeStart, long rangeEnd) {
+                                           long rangeStart, long rangeEnd,
+                                           Integer count, long until) {
         Set<Integer> allowedDays = new HashSet<>();
         for (String day : byDay.split(",")) {
             switch (day.trim()) {
@@ -261,6 +325,32 @@ public class NotificationWorker extends Worker {
                 case "SA": allowedDays.add(Calendar.SATURDAY); break;
                 case "SU": allowedDays.add(Calendar.SUNDAY); break;
             }
+        }
+
+        if (count != null) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(begin);
+            int occurrenceNumber = 0;
+
+            while (cal.getTimeInMillis() <= rangeEnd) {
+                long current = cal.getTimeInMillis();
+                if (until >= 0 && current > until) {
+                    return -1;
+                }
+
+                if (allowedDays.contains(cal.get(Calendar.DAY_OF_WEEK))
+                        && current >= begin) {
+                    occurrenceNumber++;
+                    if (count != null && occurrenceNumber > count) {
+                        return -1;
+                    }
+                    if (current >= rangeStart) {
+                        return current;
+                    }
+                }
+                cal.add(Calendar.DAY_OF_MONTH, 1);
+            }
+            return -1;
         }
 
         Calendar cal = Calendar.getInstance();
@@ -285,11 +375,49 @@ public class NotificationWorker extends Worker {
 
         // Search up to rangeEnd day by day
         while (cal.getTimeInMillis() <= rangeEnd) {
+            long current = cal.getTimeInMillis();
+            if (until >= 0 && current > until) {
+                return -1;
+            }
             if (allowedDays.contains(cal.get(Calendar.DAY_OF_WEEK))
-                    && cal.getTimeInMillis() >= rangeStart) {
-                return cal.getTimeInMillis();
+                    && current >= rangeStart) {
+                return current;
             }
             cal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        return -1;
+    }
+
+    private long parseRRuleDate(String value) {
+        String clean = value.trim().toUpperCase();
+
+        try {
+            if (clean.matches("\\d{8}T\\d{6}Z")) {
+                Calendar cal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+                cal.set(Calendar.YEAR, Integer.parseInt(clean.substring(0, 4)));
+                cal.set(Calendar.MONTH, Integer.parseInt(clean.substring(4, 6)) - 1);
+                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(clean.substring(6, 8)));
+                cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(clean.substring(9, 11)));
+                cal.set(Calendar.MINUTE, Integer.parseInt(clean.substring(11, 13)));
+                cal.set(Calendar.SECOND, Integer.parseInt(clean.substring(13, 15)));
+                cal.set(Calendar.MILLISECOND, 0);
+                return cal.getTimeInMillis();
+            }
+
+            if (clean.matches("\\d{8}T\\d{6}")) {
+                Calendar cal = Calendar.getInstance();
+                cal.set(Calendar.YEAR, Integer.parseInt(clean.substring(0, 4)));
+                cal.set(Calendar.MONTH, Integer.parseInt(clean.substring(4, 6)) - 1);
+                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(clean.substring(6, 8)));
+                cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(clean.substring(9, 11)));
+                cal.set(Calendar.MINUTE, Integer.parseInt(clean.substring(11, 13)));
+                cal.set(Calendar.SECOND, Integer.parseInt(clean.substring(13, 15)));
+                cal.set(Calendar.MILLISECOND, 0);
+                return cal.getTimeInMillis();
+            }
+        } catch (NumberFormatException ignored) {
+            return -1;
         }
 
         return -1;
