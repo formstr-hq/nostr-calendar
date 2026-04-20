@@ -1,13 +1,12 @@
 import { Preferences } from "@capacitor/preferences";
-import { getSecureKeyStoragePlugin } from "../plugins/secureKeyStorage";
+import SecureKeyStorage from "@khadarvsk/capacitor-secure-storage";
 import { isAndroidNative } from "./platform";
 
 const NSEC_KEY = "nostr_nsec";
-const secureStorage = getSecureKeyStoragePlugin();
 
 async function setNsecValue(nsec: string) {
   if (isAndroidNative()) {
-    await secureStorage.set({ key: NSEC_KEY, value: nsec });
+    await SecureKeyStorage.set({ key: NSEC_KEY, value: nsec });
     return;
   }
 
@@ -19,7 +18,7 @@ async function setNsecValue(nsec: string) {
 
 async function getNsecValue(): Promise<string | null> {
   if (isAndroidNative()) {
-    const { value } = await secureStorage.get({ key: NSEC_KEY });
+    const { value } = await SecureKeyStorage.get({ key: NSEC_KEY });
     return value;
   }
 
@@ -29,7 +28,7 @@ async function getNsecValue(): Promise<string | null> {
 
 async function removeNsecValue() {
   if (isAndroidNative()) {
-    await secureStorage.remove({ key: NSEC_KEY });
+    await SecureKeyStorage.remove({ key: NSEC_KEY });
     return;
   }
 

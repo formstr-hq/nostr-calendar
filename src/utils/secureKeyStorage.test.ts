@@ -17,12 +17,12 @@ vi.mock("@capacitor/preferences", () => ({
   },
 }));
 
-vi.mock("../plugins/secureKeyStorage", () => ({
-  getSecureKeyStoragePlugin: () => ({
+vi.mock("@khadarvsk/capacitor-secure-storage", () => ({
+  default: {
     get: (...args: unknown[]) => mockSecureGet(...args),
     set: (...args: unknown[]) => mockSecureSet(...args),
     remove: (...args: unknown[]) => mockSecureRemove(...args),
-  }),
+  },
 }));
 
 vi.mock("./platform", () => ({

@@ -28,7 +28,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        registerPlugin(SecureKeyStoragePlugin.class);
         super.onCreate(savedInstanceState);
 
         View contentView = findViewById(android.R.id.content);
