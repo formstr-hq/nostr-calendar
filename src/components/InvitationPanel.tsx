@@ -164,7 +164,7 @@ export function InvitationPanel() {
             <Button
               size="small"
               variant="contained"
-              disabled={!invitation.event}
+              disabled={!invitation.event?.user}
               onClick={() =>
                 handleAccept(invitation.giftWrapId, invitation.event)
               }
