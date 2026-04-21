@@ -6,6 +6,7 @@ import { getPublicKey, generateSecretKey } from "nostr-tools";
 import { createNostrConnectURI, Nip46Relays } from "../common/signer/nip46";
 import {
   Button,
+  CircularProgress,
   Dialog,
   Tabs,
   Tab,
@@ -40,6 +41,7 @@ const Nip46Section: React.FC<{
   const [activeTab, setActiveTab] = useState("manual");
   const [bunkerUri, setBunkerUri] = useState("");
   const [loadingConnect, setLoadingConnect] = useState(false);
+  const [loadingQr, setLoadingQr] = useState(false);
 
   const [qrPayload] = useState(() => {
     const clientSecretKey = getAppSecretKeyFromLocalStorage();
@@ -88,9 +90,12 @@ const Nip46Section: React.FC<{
         onChange={(_e, val) => {
           setActiveTab(val);
           if (val === "qr") {
-            void connectToBunkerUri(qrPayload).catch(() => {
-              onError(intl.formatMessage({ id: "login.connectionFailed" }));
-            });
+            setLoadingQr(true);
+            void connectToBunkerUri(qrPayload)
+              .catch(() => {
+                onError(intl.formatMessage({ id: "login.connectionFailed" }));
+              })
+              .finally(() => setLoadingQr(false));
           }
         }}
         sx={{ mb: 1 }}
@@ -98,8 +103,13 @@ const Nip46Section: React.FC<{
         <Tab
           label={intl.formatMessage({ id: "login.pasteUri" })}
           value="manual"
+          disabled={loadingConnect || loadingQr}
         />
-        <Tab label={intl.formatMessage({ id: "login.qrCode" })} value="qr" />
+        <Tab
+          label={intl.formatMessage({ id: "login.qrCode" })}
+          value="qr"
+          disabled={loadingConnect || loadingQr}
+        />
       </Tabs>
 
       {activeTab === "manual" && (
@@ -112,6 +122,7 @@ const Nip46Section: React.FC<{
             })}
             value={bunkerUri}
             onChange={(e) => setBunkerUri(e.target.value)}
+            disabled={loadingConnect}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 void handleConnectManual();
@@ -122,9 +133,13 @@ const Nip46Section: React.FC<{
             variant="contained"
             onClick={() => void handleConnectManual()}
             disabled={loadingConnect || !bunkerUri}
-            sx={{ flexShrink: 0 }}
+            sx={{ flexShrink: 0, minWidth: 90 }}
           >
-            {intl.formatMessage({ id: "login.connect" })}
+            {loadingConnect ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : (
+              intl.formatMessage({ id: "login.connect" })
+            )}
           </Button>
         </Stack>
       )}
@@ -132,16 +147,33 @@ const Nip46Section: React.FC<{
       {activeTab === "qr" && (
         <Box textAlign="center">
           <QRCodeCanvas value={qrPayload} size={160} />
-          <Box display="flex" justifyContent="center" alignItems="center" mt={1}>
-            <IconButton
-              size="small"
-              onClick={() => void navigator.clipboard.writeText(qrPayload)}
-            >
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
-            <Typography variant="caption" color="text.secondary">
-              {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
-            </Typography>
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            mt={1}
+            gap={0.5}
+          >
+            {loadingQr ? (
+              <>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="text.secondary">
+                  {intl.formatMessage({ id: "login.waitingForConnection" })}
+                </Typography>
+              </>
+            ) : (
+              <>
+                <IconButton
+                  size="small"
+                  onClick={() => void navigator.clipboard.writeText(qrPayload)}
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+                <Typography variant="caption" color="text.secondary">
+                  {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
+                </Typography>
+              </>
+            )}
           </Box>
           <Typography variant="caption" color="text.secondary">
             {intl.formatMessage(
@@ -170,6 +202,7 @@ function Nip55Section({
   const [installedSigners, setInstalledSigners] = useState<{
     apps: { packageName: string; name: string; iconUrl?: string }[];
   }>();
+  const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -200,13 +233,18 @@ function Nip55Section({
           }
           title={app.name}
           description="Sign with external Android signer"
+          loading={loadingPackage === app.packageName}
+          disabled={loadingPackage !== null}
           onClick={() => {
             void (async () => {
+              setLoadingPackage(app.packageName);
               try {
                 await signerManager.loginWithNip55(app.packageName);
                 onClose();
               } catch {
                 onError(intl.formatMessage({ id: "login.couldNotLogin" }));
+              } finally {
+                setLoadingPackage(null);
               }
             })();
           }}
@@ -310,6 +348,8 @@ function OptionButton({
   onClick,
   showChevron = false,
   chevronRotated = false,
+  loading = false,
+  disabled = false,
 }: {
   icon: ReactNode;
   title: string;
@@ -317,6 +357,8 @@ function OptionButton({
   onClick: () => void;
   showChevron?: boolean;
   chevronRotated?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
 }) {
   const theme = useTheme();
   const accent = theme.palette.primary.main;
@@ -325,6 +367,7 @@ function OptionButton({
   return (
     <ButtonBase
       onClick={onClick}
+      disabled={disabled || loading}
       sx={{
         width: "100%",
         display: "flex",
@@ -334,7 +377,8 @@ function OptionButton({
         py: 1.75,
         textAlign: "left",
         transition: "background 0.15s",
-        "&:hover": { bgcolor: `${accent}${alpha}` },
+        "&:hover:not(:disabled)": { bgcolor: `${accent}${alpha}` },
+        "&.Mui-disabled": { opacity: 0.6 },
       }}
     >
       <Box
@@ -350,7 +394,7 @@ function OptionButton({
           flexShrink: 0,
         }}
       >
-        {icon}
+        {loading ? <CircularProgress size={20} color="inherit" /> : icon}
       </Box>
       <Box flex={1} minWidth={0}>
         <Typography variant="body1" fontWeight={600} lineHeight={1.3}>
@@ -386,6 +430,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const [showNip46, setShowNip46] = useState(false);
   const [showNsecLogin, setShowNsecLogin] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState<"nip07" | "guest" | null>(null);
 
   const handleNip07 = async () => {
     if (!window.nostr) {
@@ -393,22 +438,28 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       return;
     }
     setError("");
+    setLoading("nip07");
     try {
       await signerManager.loginWithNip07();
       onClose();
     } catch {
       setError(intl.formatMessage({ id: "login.loginFailed" }));
+    } finally {
+      setLoading(null);
     }
   };
 
   const handleGuest = async () => {
     setError("");
+    setLoading("guest");
     try {
       const key = bytesToHex(generateSecretKey());
       await signerManager.createGuestAccount(key, {});
       onClose();
     } catch {
       setError(intl.formatMessage({ id: "login.loginFailed" }));
+    } finally {
+      setLoading(null);
     }
   };
 
@@ -463,6 +514,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             icon={<VpnKeyOutlinedIcon />}
             title={intl.formatMessage({ id: "login.signInWithExtension" })}
             description="Alby, nos2x, Flamingo"
+            loading={loading === "nip07"}
+            disabled={loading !== null}
             onClick={() => void handleNip07()}
           />
         )}
@@ -513,6 +566,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
           icon={<PersonOutlinedIcon />}
           title="Temporary Account"
           description="Quick access, no keys needed"
+          loading={loading === "guest"}
+          disabled={loading !== null}
           onClick={() => void handleGuest()}
         />
       </Stack>

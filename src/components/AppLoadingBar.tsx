@@ -1,15 +1,11 @@
 import { LinearProgress, Box, Typography } from "@mui/material";
 import { useIntl } from "react-intl";
-import type { StartupStage } from "../hooks/useAppStartup";
-
-interface AppLoadingBarProps {
-  stage: StartupStage;
-}
+import { useUser } from "../stores/user";
 
 const TRANSITION = "opacity 400ms ease";
 
-export function AppLoadingBar({ stage }: AppLoadingBarProps) {
-  const visible = stage !== "ready" && stage !== "no_login";
+export function AppLoadingBar() {
+  const visible = !useUser((state) => state.isInitialized);
   const intl = useIntl();
 
   return (

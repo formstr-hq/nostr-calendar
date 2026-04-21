@@ -58,13 +58,9 @@ const dictionary: NestedObject = {
       loggingIn: "Logging in...",
     },
     startup: {
-      loadingCache: "Restoring login from secure storage...",
-      welcomeBack: "Welcome back, {user}!",
-      welcomeBackGeneric: "Welcome back!",
       fetchingEvents: "Fetching your calendar lists and events...",
-      noLogin: "No saved login found.",
-      error: "Could not load your data. Check your connection.",
-      loadingNotice: "Some features may be unavailable while the app is loading…",
+      loadingNotice:
+        "Some features may be unavailable while the app is loading…",
     },
     event: {
       editEvent: "Edit Event",
@@ -180,6 +176,7 @@ const dictionary: NestedObject = {
       hideNsec: "Hide nsec",
       enterBunkerUri: "Please enter a bunker URI.",
       connectionFailed: "Connection failed.",
+      waitingForConnection: "Waiting for connection...",
       pasteUri: "Paste URI",
       qrCode: "QR Code",
       enterNsecPlaceholder: "Enter nsec",
@@ -272,13 +269,7 @@ const dictionary: NestedObject = {
       loggingIn: "Anmeldung läuft...",
     },
     startup: {
-      loadingCache: "Anmeldung aus sicherem Speicher wiederherstellen...",
-      welcomeBack: "Willkommen zurück, {user}!",
-      welcomeBackGeneric: "Willkommen zurück!",
       fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
-      noLogin: "Keine gespeicherte Anmeldung gefunden.",
-      error:
-        "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
     },
     event: {
       editEvent: "Termin bearbeiten",
@@ -396,6 +387,7 @@ const dictionary: NestedObject = {
       hideNsec: "nsec ausblenden",
       enterBunkerUri: "Bitte geben Sie eine Bunker-URI ein.",
       connectionFailed: "Verbindung fehlgeschlagen.",
+      waitingForConnection: "Warte auf Verbindung...",
       pasteUri: "URI einfügen",
       qrCode: "QR-Code",
       enterNsecPlaceholder: "nsec eingeben",

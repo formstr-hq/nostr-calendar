@@ -25,8 +25,6 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-import { AppStatusMessage } from "./components/AppStatusMessage";
-import { useAppStartup } from "./hooks/useAppStartup";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -56,9 +54,6 @@ function Application() {
     fetchCalendars,
   } = useCalendarLists();
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
-
-  // Startup state machine: drives the loading bar + status message
-  const { stage, statusMessage, retry } = useAppStartup();
 
   useEffect(() => {
     initializeUser();
@@ -146,7 +141,7 @@ function Application() {
     } else {
       setShowOnboardingDialog(false);
     }
-  }, [user, calendarsLoaded, calendars.length]);
+  }, [user, calendarsLoaded, calendars.length, isInitialized]);
 
   const handleOnboardingSave = async (data: {
     title: string;
@@ -190,20 +185,7 @@ function Application() {
       <RelayManager />
       <Toolbar />
 
-      {/* Startup indicators float inside normal flow, positioned straight under toolbar */}
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-        }}
-      >
-        <AppLoadingBar stage={stage} />
-        <AppStatusMessage
-          stage={stage}
-          statusMessage={statusMessage}
-          onRetry={retry}
-        />
-      </Box>
+      <AppLoadingBar />
 
       <Box>{user && <Routing />}</Box>
     </>
