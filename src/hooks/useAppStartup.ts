@@ -141,7 +141,7 @@ function getStatusMessage(
     case "loading_cache":
       return intl.formatMessage(
         { id: "startup.loadingCache" },
-        { defaultMessage: "Retrieving login data from cache…" },
+        { defaultMessage: "Restoring login from secure storage…" },
       );
     case "user_loaded":
       return userLabel
