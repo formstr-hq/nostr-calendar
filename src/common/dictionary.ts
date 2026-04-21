@@ -80,6 +80,10 @@ const dictionary: NestedObject = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
+      customRecurrence: "Custom Rule",
+      customRecurrenceTitle: "Custom recurrence",
+      repeatEvery: "Repeat every",
+      repeatOn: "Repeat on",
       recurrenceEnds: "Ends",
       recurrenceEndsNever: "Never",
       recurrenceEndsAfter: "After",
@@ -265,7 +269,8 @@ const dictionary: NestedObject = {
       welcomeBackGeneric: "Willkommen zurück!",
       fetchingEvents: "Ihre Kalenderlisten und Termine abrufen...",
       noLogin: "Keine gespeicherte Anmeldung gefunden.",
-      error: "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
+      error:
+        "Ihre Daten konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung.",
     },
     event: {
       editEvent: "Termin bearbeiten",
@@ -282,6 +287,10 @@ const dictionary: NestedObject = {
       monthly: "Monatlich",
       quarterly: "Vierteljährlich",
       yearly: "Jährlich",
+      customRecurrence: "Benutzerdefinierte Regel",
+      customRecurrenceTitle: "Benutzerdefinierte Wiederholung",
+      repeatEvery: "Wiederhole alle",
+      repeatOn: "Wiederholen an",
       recurrenceEnds: "Endet",
       recurrenceEndsNever: "Nie",
       recurrenceEndsAfter: "Nach",
@@ -360,7 +369,8 @@ const dictionary: NestedObject = {
       acceptInvitation: "Zum Kalender hinzufügen",
       invitedBy: "Sie wurden von {participant} zu diesem Termin eingeladen",
       createdBy: "Geteilt von {participant}",
-      loginToAdd: "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
+      loginToAdd:
+        "Melden Sie sich an, um diesen Termin zu Ihrem Kalender hinzuzufügen",
       addedToCalendar: "Termin wurde Ihrem Kalender hinzugefügt",
       viewInCalendar: "Im Kalender anzeigen",
       stayHere: "Hier bleiben",
@@ -407,7 +417,3 @@ const dictionary: NestedObject = {
   },
 };
 export default dictionary;
-
-
-
-
