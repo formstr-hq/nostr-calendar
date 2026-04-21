@@ -141,7 +141,7 @@ function Application() {
 
   // Show onboarding dialog when user is logged in but has no calendars
   useEffect(() => {
-    if (user && calendarsLoaded && calendars.length === 0) {
+    if (isInitialized && calendarsLoaded && calendars.length === 0) {
       setShowOnboardingDialog(true);
     } else {
       setShowOnboardingDialog(false);
@@ -205,7 +205,7 @@ function Application() {
         />
       </Box>
 
-      <Box>{isInitialized && <Routing />}</Box>
+      <Box>{user && <Routing />}</Box>
     </>
   );
 }

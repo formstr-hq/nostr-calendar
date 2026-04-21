@@ -1,12 +1,5 @@
-/**
- * AppLoadingBar
- *
- * An indeterminate LinearProgress bar pinned directly below the AppBar.
- * Visible during all non-ready startup stages. Fades out smoothly when
- * the stage reaches "ready".
- */
-
-import { LinearProgress, Box, useTheme } from "@mui/material";
+import { LinearProgress, Box, Typography } from "@mui/material";
+import { useIntl } from "react-intl";
 import type { StartupStage } from "../hooks/useAppStartup";
 
 interface AppLoadingBarProps {
@@ -17,18 +10,19 @@ const TRANSITION = "opacity 400ms ease";
 
 export function AppLoadingBar({ stage }: AppLoadingBarProps) {
   const visible = stage !== "ready" && stage !== "no_login";
-  const theme = useTheme()
-  
+  const intl = useIntl();
+
   return (
     <Box
       sx={{
-        position: "absolute",
+        position: "fixed",
         top: 0,
         left: 0,
         right: 0,
         opacity: visible ? 1 : 0,
         transition: TRANSITION,
         pointerEvents: "none",
+        zIndex: (theme) => theme.zIndex.appBar + 1,
       }}
     >
       <LinearProgress
@@ -39,6 +33,21 @@ export function AppLoadingBar({ stage }: AppLoadingBarProps) {
           },
         }}
       />
+      <Box
+        sx={{
+          bgcolor: "rgba(255,255,255,0.88)",
+          backdropFilter: "blur(6px)",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          px: 2,
+          py: 0.5,
+          textAlign: "center",
+        }}
+      >
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          {intl.formatMessage({ id: "startup.loadingNotice" })}
+        </Typography>
+      </Box>
     </Box>
   );
 }

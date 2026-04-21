@@ -64,6 +64,7 @@ const dictionary: NestedObject = {
       fetchingEvents: "Fetching your calendar lists and events...",
       noLogin: "No saved login found.",
       error: "Could not load your data. Check your connection.",
+      loadingNotice: "Some features may be unavailable while the app is loading…",
     },
     event: {
       editEvent: "Edit Event",

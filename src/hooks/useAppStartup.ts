@@ -1,14 +1,3 @@
-/**
- * useAppStartup
- *
- * Owns the startup state machine for the application. Drives the flow:
- *   loading_cache → user_loaded → fetching_events → ready | error
- *
- * Consumers receive a reactive { stage, statusMessage, retry } tuple.
- * They should render loading UI based on `stage` and call `retry` when
- * the error state is displayed.
- */
-
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "../stores/user";
 import { useCalendarLists } from "../stores/calendarLists";
@@ -43,14 +32,12 @@ export function useAppStartup(): AppStartupState {
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
 
-  // Derive a human-readable message from the current stage
   const statusMessage = getStatusMessage(
     stage,
     user?.name ?? user?.pubkey?.slice(0, 8),
     intl,
   );
 
-  // Clears the fetch timeout if one is running
   const clearFetchTimeout = () => {
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
@@ -58,7 +45,6 @@ export function useAppStartup(): AppStartupState {
     }
   };
 
-  // Retry: restart from loading_cache so the app re-attempts initialisation
   const retry = () => {
     retryCountRef.current += 1;
     clearFetchTimeout();
@@ -66,28 +52,22 @@ export function useAppStartup(): AppStartupState {
     useUser.getState().initializeUser();
   };
 
-  // --- State transitions ---
-
   useEffect(() => {
     if (!isInitialized) {
-      // Still reading from cache – stay on loading_cache
       setStage("loading_cache");
       return;
     }
 
     if (!user) {
-      // Cache read complete, no user found
       setStage("no_login");
       return;
     }
 
-    // User found in cache/store
     if (stage === "loading_cache" || stage === "no_login") {
       setStage("user_loaded");
     }
   }, [isInitialized, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // After briefly showing "Welcome back!", advance to fetching_events
   useEffect(() => {
     if (stage !== "user_loaded") return;
 
@@ -106,7 +86,6 @@ export function useAppStartup(): AppStartupState {
     };
   }, [stage]);
 
-  // Once we start fetching, start the safety timeout
   useEffect(() => {
     if (stage !== "fetching_events") return;
 
@@ -117,7 +96,6 @@ export function useAppStartup(): AppStartupState {
     return clearFetchTimeout;
   }, [stage]);
 
-  // Watch calendarsLoaded to advance to ready
   useEffect(() => {
     if (calendarsLoaded && stage === "fetching_events") {
       clearFetchTimeout();
@@ -127,10 +105,6 @@ export function useAppStartup(): AppStartupState {
 
   return { stage, statusMessage, retry };
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function getStatusMessage(
   stage: StartupStage,

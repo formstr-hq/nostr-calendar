@@ -1,12 +1,3 @@
-/**
- * AppStatusMessage
- *
- * A non-blocking floating status row that appears below the loading bar.
- * Shows step-based messages keyed to the current StartupStage.
- * Renders a retry button when the stage is "error".
- * Invisible (opacity 0) once the stage reaches "ready" — no layout shifts.
- */
-
 import { Box, Typography, Button, Fade } from "@mui/material";
 import type { StartupStage } from "../hooks/useAppStartup";
 
@@ -38,12 +29,10 @@ export function AppStatusMessage({
           gap: 1,
           px: 2,
           py: 0.75,
-          // Subtle background so text is readable over calendar content
           bgcolor: "rgba(255,255,255,0.88)",
           backdropFilter: "blur(6px)",
           borderBottom: "1px solid",
           borderColor: "divider",
-          // When not visible, don't capture clicks
           pointerEvents: visible ? "auto" : "none",
         }}
       >

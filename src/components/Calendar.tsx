@@ -12,7 +12,7 @@ import { useInvitations } from "../stores/invitations";
 import { useEffect } from "react";
 
 function Calendar() {
-  const { user } = useUser();
+  const { user, isInitialized } = useUser();
   const events = useTimeBasedEvents((state) => state);
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
   const { fetchInvitations, stopInvitations, invitations } = useInvitations();
@@ -20,10 +20,10 @@ function Calendar() {
   // When user is logged in, fetch calendar lists and invitations.
   // Private events are fetched reactively when calendars are loaded.
   useEffect(() => {
-    if (user) {
+    if (isInitialized && user) {
       useCalendarLists.getState().fetchCalendars();
     }
-  }, [user]);
+  }, [isInitialized, user]);
 
   // Fetch private events whenever visible calendars change.
   // This ensures events update when calendars load from network
