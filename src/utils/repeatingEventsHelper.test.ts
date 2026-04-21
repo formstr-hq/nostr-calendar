@@ -103,6 +103,27 @@ describe("rruleToFrequency", () => {
   });
 });
 
+describe("parseRRuleDate", () => {
+  it("parses UTC dates correctly", () => {
+    const rrule = "FREQ=DAILY;UNTIL=20250101T120000Z";
+    const parsed = parseRecurrenceRule(rrule);
+    expect(parsed.untilDate).toBe(Date.UTC(2025, 0, 1, 12, 0, 0));
+  });
+
+  it("parses floating dates (without Z) as UTC to ensure timezone independence", () => {
+    const rrule = "FREQ=DAILY;UNTIL=20250101T120000";
+    const parsed = parseRecurrenceRule(rrule);
+    // Should be UTC per RFC 5545 floating time requirement for this app's logic
+    expect(parsed.untilDate).toBe(Date.UTC(2025, 0, 1, 12, 0, 0));
+  });
+
+  it("parses date-only strings as UTC to ensure timezone independence", () => {
+    const rrule = "FREQ=DAILY;UNTIL=20250101";
+    const parsed = parseRecurrenceRule(rrule);
+    expect(parsed.untilDate).toBe(Date.UTC(2025, 0, 1, 0, 0, 0));
+  });
+});
+
 // ─── parseRecurrenceRule / buildRecurrenceRule ─────────────────────
 
 describe("parseRecurrenceRule", () => {

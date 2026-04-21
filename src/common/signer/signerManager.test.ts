@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NostrSigner } from "./types";
+import { nip19 } from "nostr-tools";
 
 // ─── Mocks ───────────────────────────────────────────────────────
 
 const mockCreateLocalSigner = vi.fn();
+let mockIsNative = false;
 
 vi.mock("./utils", () => ({
   getBunkerUriInLocalStorage: vi.fn(() => ({})),
@@ -48,7 +50,9 @@ vi.mock("../../utils/secureKeyStorage", () => ({
 }));
 
 vi.mock("../../utils/platform", () => ({
-  isNative: false,
+  get isNative() {
+    return mockIsNative;
+  },
 }));
 
 vi.mock("../../utils/constants", () => ({
@@ -75,6 +79,7 @@ function makeMockSigner(pubkey = "a".repeat(64)): NostrSigner {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mockIsNative = false;
   // Reset signer state via logout
   await signerManager.logout();
 });
@@ -231,6 +236,33 @@ describe("signerManager.logout", () => {
 });
 
 // ─── createGuestAccount ──────────────────────────────────────────
+
+describe("signerManager.loginWithNsec", () => {
+  it("creates a local signer, saves the nsec, and loads the user on native", async () => {
+    mockIsNative = true;
+    const mockSigner = makeMockSigner("nsec-pubkey");
+    mockCreateLocalSigner.mockReturnValue(mockSigner);
+
+    const { saveNsec } = await import("../../utils/secureKeyStorage");
+    const { setUserDataInLocalStorage } = await import("./utils");
+
+    const nsec = nip19.nsecEncode(new Uint8Array(32).fill(1));
+    await signerManager.loginWithNsec(nsec);
+
+    expect(mockCreateLocalSigner).toHaveBeenCalledWith("01".repeat(32));
+    expect(saveNsec).toHaveBeenCalledWith(nsec);
+    expect(setUserDataInLocalStorage).toHaveBeenCalled();
+    expect(signerManager.getUser()!.pubkey).toBe("nsec-pubkey");
+  });
+
+  it("rejects invalid nsec values cleanly", async () => {
+    mockIsNative = true;
+
+    await expect(signerManager.loginWithNsec("not-an-nsec")).rejects.toThrow(
+      "Invalid nsec",
+    );
+  });
+});
 
 describe("signerManager.createGuestAccount", () => {
   it("creates a local signer with the provided private key", async () => {

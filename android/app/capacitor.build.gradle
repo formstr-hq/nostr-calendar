@@ -12,6 +12,7 @@ dependencies {
     implementation project(':capacitor-app')
     implementation project(':capacitor-local-notifications')
     implementation project(':capacitor-preferences')
+    implementation project(':khadarvsk-capacitor-secure-storage')
     implementation project(':nostr-signer-capacitor-plugin')
 
 }

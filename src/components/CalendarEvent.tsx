@@ -40,7 +40,7 @@ import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
 import { getEditEventPage, getEventPage } from "../utils/routingHelper";
 import { useNavigate } from "react-router";
-import { isNative } from "../utils/platform";
+import { getAppBaseUrl, isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
@@ -282,8 +282,9 @@ function ActionButtons({
     ),
     event.viewKey,
   );
+  const eventUrl = `${getAppBaseUrl()}${linkToEvent}`;
   const copyLinkToEvent = () => {
-    navigator.clipboard.writeText(`${window.location.origin}${linkToEvent}`);
+    navigator.clipboard.writeText(eventUrl);
   };
   const { user } = useUser();
   const navigate = useNavigate();

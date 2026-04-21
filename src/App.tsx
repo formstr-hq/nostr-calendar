@@ -23,6 +23,7 @@ import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
+import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
 import { AppStatusMessage } from "./components/AppStatusMessage";
 import { useAppStartup } from "./hooks/useAppStartup";
@@ -126,6 +127,9 @@ function Application() {
       if (route) navigate(route);
     };
     window.addEventListener("openRoute", handler);
+    if (isNative) {
+      void notifyAppReady();
+    }
     return () => window.removeEventListener("openRoute", handler);
   }, [navigate]);
 
