@@ -3,7 +3,6 @@ import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import {
   Box,
   IconButton,
@@ -11,7 +10,6 @@ import {
   Menu,
   MenuItem,
   Button,
-  Badge,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -22,7 +20,6 @@ import { useNavigate } from "react-router";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { StyledSecondaryHeader } from "./StyledComponents";
 import { WeekHeader } from "./WeekView";
-import { useInvitations } from "../stores/invitations";
 import { useIntl } from "react-intl";
 
 export function CalendarHeader() {
@@ -41,8 +38,6 @@ export function CalendarHeader() {
   };
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const move = (dir: number) => setDate(date.add(dir, layout), layout);
-
-  const { unreadCount } = useInvitations();
 
   return (
     <>
@@ -76,21 +71,7 @@ export function CalendarHeader() {
           </Typography>
         </Box>
         <Box display="flex" gap={theme.spacing(2)} alignItems="center">
-          {/* Notification bell for pending invitations */}
-          <IconButton
-            onClick={() => {
-              if (isMobile) {
-                navigate("/notifications");
-              } else {
-                navigate("/notifications");
-              }
-            }}
-          >
-            <Badge badgeContent={unreadCount} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-          <IconButton
+<IconButton
             onClick={() => {
               const route = getRouteFromDate(dayjs(), layout);
               if (route !== location.pathname) {

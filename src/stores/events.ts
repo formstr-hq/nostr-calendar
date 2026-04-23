@@ -67,7 +67,9 @@ const syncEventNotifications = async (
   event: ICalendarEvent,
   { cancelExisting = false }: { cancelExisting?: boolean } = {},
 ): Promise<void> => {
-  const calendarPreference = getCalendarNotificationPreference(event.calendarId);
+  const calendarPreference = getCalendarNotificationPreference(
+    event.calendarId,
+  );
   const shouldSchedule = shouldScheduleNotifications(
     event.notificationPreference,
     calendarPreference,
@@ -175,7 +177,6 @@ const processPrivateEvent = (
       store = appendOne(store, parsedEvent.id, parsedEvent);
     }
   }
-  console.log(parsedEvent);
   void syncEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
   saveEventsToStorage(updatedEvents);
@@ -283,7 +284,9 @@ export const useTimeBasedEvents = create<{
   },
   refreshNotificationPreferencesForCalendar: (calendarId) => {
     const { events } = useTimeBasedEvents.getState();
-    const relevantEvents = events.filter((event) => event.calendarId === calendarId);
+    const relevantEvents = events.filter(
+      (event) => event.calendarId === calendarId,
+    );
 
     void (async () => {
       const batchSize = 5;

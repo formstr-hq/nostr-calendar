@@ -29,12 +29,11 @@ function Calendar() {
   // This ensures events update when calendars load from network
   // or when the user toggles calendar visibility.
   useEffect(() => {
-    if (user && calendarsLoaded) {
-      console.log(calendars.length);
-      fetchInvitations();
+    if (user && isInitialized && calendarsLoaded) {
       events.fetchPrivateEvents();
+      fetchInvitations();
     }
-  }, [user, calendarsLoaded, calendars]);
+  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
 
   // Cleanup invitation listener on unmount
   useEffect(() => {
