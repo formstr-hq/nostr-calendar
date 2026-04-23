@@ -205,6 +205,7 @@ export const useTimeBasedEvents = create<{
     daysBefore?: number;
     daysAfter?: number;
   }) => void;
+  addEvent: (event: ICalendarEvent) => void;
   updateEvent: (event: ICalendarEvent) => void;
   removeEvent: (id: string) => void;
   resetPrivateEvents: () => void;
@@ -215,6 +216,18 @@ export const useTimeBasedEvents = create<{
   }) => void;
   refreshNotificationPreferencesForCalendar: (calendarId: string) => void;
 }>((set) => ({
+  addEvent: (newEvent) => {
+    set(({ events }) => {
+      const store = normalize(events);
+      if (store.allKeys.includes(newEvent.id))
+        return { events, eventById: store.byKey };
+      const updated = appendOne(store, newEvent.id, newEvent);
+      const updatedEvents = denormalize(updated);
+      saveEventsToStorage(updatedEvents);
+      return { eventById: updated.byKey, events: updatedEvents };
+    });
+    void syncEventNotifications(newEvent);
+  },
   updateEvent: (updatedEvent) => {
     set(({ events }) => {
       let store = normalize(events);

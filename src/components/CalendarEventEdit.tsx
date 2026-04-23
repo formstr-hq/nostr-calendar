@@ -51,6 +51,7 @@ import { getRelays } from "../common/nostr";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
+import { parseEventRef } from "../utils/calendarListTypes";
 import { CalendarListSelect } from "./CalendarListSelect";
 
 interface CalendarEventEditProps {
@@ -279,7 +280,7 @@ export function CalendarEventEdit({
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
-  const { calendars } = useCalendarLists();
+  const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
     initialEvent?.calendarId || calendars[0]?.id || "",
   );
@@ -411,7 +412,17 @@ export function CalendarEventEdit({
             .getState()
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
-          await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
+          const { eventRef, authorPubkey } =
+            await publishPrivateCalendarEvent(eventToSave);
+          await addEventToCalendar(selectedCalendarId, eventRef);
+          const { eventDTag, viewKey } = parseEventRef(eventRef);
+          useTimeBasedEvents.getState().addEvent({
+            ...eventToSave,
+            id: eventDTag,
+            viewKey,
+            user: authorPubkey,
+            calendarId: selectedCalendarId,
+          });
         }
       } else {
         const { id: savedId, pubKey } =

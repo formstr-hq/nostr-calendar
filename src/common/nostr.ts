@@ -170,10 +170,7 @@ async function preparePrivateCalendarEvent(
   };
 }
 
-export async function publishPrivateCalendarEvent(
-  event: ICalendarEvent,
-  calendarId: string,
-) {
+export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
   const viewSecretKey = generateSecretKey();
   const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
   const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
@@ -235,9 +232,10 @@ export async function publishPrivateCalendarEvent(
     relayUrl: publishedRelayHint,
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
-  await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
 
   return {
+    eventRef,
+    authorPubkey: userPublicKey,
     calendarEvent: signedEvent,
     giftWraps: giftWraps.map(({ giftWrap }) => giftWrap),
   };
