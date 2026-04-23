@@ -46,7 +46,7 @@ public class InvitationWorker extends Worker {
     private static final int NOTIFICATION_ID = 0x1052;
     private static final int MAX_RELAYS = 3;
     private static final long RELAY_TIMEOUT_SECONDS = 15;
-    private static final long THREE_DAYS_SECONDS = 3 * 24 * 60 * 60;
+    private static final long OFFSET = 0;
 
     public InvitationWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -76,15 +76,11 @@ public class InvitationWorker extends Worker {
                 return Result.success();
             }
             
-            // TODO: if the notification is still shown then increase the count
-            // Use lastLoginTime - 2 days so we catch invitations whose created_at
-            // was backdated by up to 2 days (NIP-59 randomises timestamps).
-            // Fall back to 7 days ago if no login time is stored.
             long since = System.currentTimeMillis() / 1000 - 7 * 24 * 60 * 60;
             if (lastLoginRaw != null) {
                 try {
                     long lastLoginTime = Long.parseLong(lastLoginRaw.replace("\"", ""));
-                    since = lastLoginTime - THREE_DAYS_SECONDS;
+                    since = lastLoginTime - OFFSET;
                 } catch (NumberFormatException e) {
                     Log.w(TAG, "Failed to parse lastLoginTime", e);
                 }
