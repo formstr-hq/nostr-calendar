@@ -293,6 +293,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
     authorPubkey,
     kind,
     relayHint,
+    createdAt: rumor.created_at,
   };
 }
 
@@ -316,6 +317,7 @@ export const fetchCalendarGiftWraps = (
     kind: number;
     relayHint: string;
     originalInvitationId: string;
+    createdAt: number;
   }) => void,
   onEose: () => void,
 ) => {

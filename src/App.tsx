@@ -15,7 +15,6 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
-import { useRelayStore } from "./stores/relays";
 import { isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
 import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "./utils/constants";
@@ -25,6 +24,7 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
+import { useInvitations } from "./stores/invitations";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -47,6 +47,7 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
+  const events = useTimeBasedEvents((state) => state);
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -57,8 +58,31 @@ function Application() {
 
   useEffect(() => {
     initializeUser();
-    useTimeBasedEvents.getState().loadCachedEvents();
-    useRelayStore.getState().loadCachedRelays();
+  }, []);
+
+  const { fetchInvitations, stopInvitations } = useInvitations();
+
+  // When user is logged in, fetch calendar lists and invitations.
+  // Private events are fetched reactively when calendars are loaded.
+  useEffect(() => {
+    if (isInitialized && user) {
+      useCalendarLists.getState().fetchCalendars();
+    }
+  }, [isInitialized, user]);
+
+  // Fetch private events whenever visible calendars change.
+  // This ensures events update when calendars load from network
+  // or when the user toggles calendar visibility.
+  useEffect(() => {
+    if (user && isInitialized && calendarsLoaded) {
+      events.fetchPrivateEvents();
+      fetchInvitations();
+    }
+  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+
+  // Cleanup invitation listener on unmount
+  useEffect(() => {
+    return () => stopInvitations();
   }, []);
 
   useEffect(() => {

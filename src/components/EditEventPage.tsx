@@ -2,7 +2,6 @@ import React from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { NAddr } from "nostr-tools/nip19";
 import { Alert, Box, CircularProgress, Toolbar } from "@mui/material";
-import { Header } from "./Header";
 import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import type { ICalendarEvent } from "../utils/types";
@@ -23,24 +22,12 @@ export const EditEventPage = () => {
   const navigate = useNavigate();
   const intl = useIntl();
   const { user } = useUser();
-  const {
-    calendars,
-    isLoaded: calendarsLoaded,
-    fetchCalendars,
-  } = useCalendarLists();
+  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
 
   const [loadState, setLoadState] = React.useState<ILoadState>({
     event: null,
     fetchState: "loading",
   });
-
-  // Ensure calendar lists are fetched
-  React.useEffect(() => {
-    if (!calendarsLoaded) {
-      fetchCalendars();
-    }
-  }, [calendarsLoaded, fetchCalendars]);
-
   React.useEffect(() => {
     if (!naddr) return;
     setLoadState({ event: null, fetchState: "loading" });

@@ -313,11 +313,6 @@ export const useTimeBasedEvents = create<{
    *   because old recurring events may have occurrences in the current window
    */
   fetchPrivateEvents(customTimeRange) {
-    if (privateSubscription) {
-      privateSubscription.unsubscribe();
-      privateSubscription = undefined;
-    }
-
     const timeRange = getTimeRange(customTimeRange);
     const visibleRefs = useCalendarLists.getState().getVisibleEventRefs();
 
