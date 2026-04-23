@@ -1,5 +1,5 @@
 import React from "react";
-import { Toolbar, IconButton, Drawer, Badge } from "@mui/material";
+import { Toolbar, IconButton, Drawer, Badge, Stack } from "@mui/material";
 import AppBar from "@mui/material/AppBar";
 import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
@@ -62,12 +62,17 @@ export const Header = ({ onImportEvent }: HeaderProps) => {
             </Link>
             <ICSUpload onImportEvent={onImportEvent} />
           </div>
-          <IconButton onClick={() => navigate("/notifications")}>
-            <Badge badgeContent={unreadCount} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-          <UserMenu />
+          <Stack direction={"row"}>
+            <IconButton
+              sx={{ width: "56px" }}
+              onClick={() => navigate("/notifications")}
+            >
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+            <UserMenu />
+          </Stack>
         </Toolbar>
       </AppBar>
       <Drawer open={drawerOpen} onClose={closeDrawer}>

@@ -36,11 +36,7 @@ export function InvitationPanel() {
   const navigate = useNavigate();
   const { invitations, acceptInvitation, dismissInvitation, fetchInvitations } =
     useInvitations();
-  const {
-    calendars,
-    isLoaded: calendarsLoaded,
-    fetchCalendars,
-  } = useCalendarLists();
+  const { isLoaded: calendarsLoaded, fetchCalendars } = useCalendarLists();
 
   useEffect(() => {
     fetchCalendars();
@@ -50,15 +46,15 @@ export function InvitationPanel() {
     if (calendarsLoaded) {
       fetchInvitations();
     }
-  }, [calendarsLoaded, calendars]);
+  }, [calendarsLoaded, fetchInvitations]);
   const [addDialogEvent, setAddDialogEvent] = useState<ICalendarEvent | null>(
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
 
-  const pendingInvitations = invitations.filter(
-    (inv) => inv.status === "pending",
-  );
+  const pendingInvitations = invitations
+    .filter((inv) => inv.status === "pending")
+    .sort((a, b) => b.receivedAt - a.receivedAt);
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
