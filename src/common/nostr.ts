@@ -175,8 +175,11 @@ export async function publishPrivateCalendarEvent(
   calendarId: string,
 ) {
   const viewSecretKey = generateSecretKey();
-  const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
-  const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
+  const dTag =
+    event.id ||
+    bytesToHex(
+      sha256(utf8ToBytes(`${JSON.stringify(event)}-${Date.now()}`)),
+    ).substring(0, 30);
   const { signedEvent, eventKind, userPublicKey } =
     await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
@@ -556,7 +559,7 @@ export const publishPublicCalendarEvent = async (
   onAcceptedRelays?: (url: string) => void,
 ) => {
   const pubKey = await getUserPublicKey();
-  const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();
+  const id = event.id && event.id !== TEMP_CALENDAR_ID ? event.id : uuid();
   const tags = [
     ["name", event.title],
     ["d", id],

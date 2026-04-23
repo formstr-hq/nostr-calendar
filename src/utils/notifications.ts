@@ -2,6 +2,10 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
 import { getNextOccurrenceInRange } from "./repeatingEventsHelper";
+import {
+  formatNotificationOffsetLabel,
+  getNotificationOffsetsForEvent,
+} from "./notificationPreferences";
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
@@ -13,10 +17,11 @@ let initialized = false;
 async function initScheduledIds(): Promise<void> {
   if (initialized) return;
   initialized = true;
+
   try {
     const { notifications } = await LocalNotifications.getPending();
-    for (const n of notifications) {
-      const key = (n.extra as Record<string, string> | undefined)
+    for (const notification of notifications) {
+      const key = (notification.extra as Record<string, string> | undefined)
         ?.notificationKey;
       if (key) {
         scheduledNotificationKeys.add(key);
@@ -27,31 +32,53 @@ async function initScheduledIds(): Promise<void> {
   }
 }
 
-/**
- * Generate a stable numeric ID from a string key.
- * Uses two IDs per occurrence: base for "10 min before", base+1 for "at event time".
- */
 function hashToNumber(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 31 + str.charCodeAt(i)) | 0;
   }
-  // Ensure positive and leave room for +1 (at-time notification)
-  return (Math.abs(hash) >> 1) * 2;
+
+  return Math.abs(hash) || 1;
 }
 
-/**
- * Build a unique key for a specific occurrence of an event.
- * For non-repeating events, this is just the eventId.
- * For repeating events, it includes the occurrence start time.
- */
 function buildNotificationKey(
-  id: string,
+  eventId: string,
   occurrenceStart: number,
-  isRepeating: boolean,
+  offsetMinutes: number,
 ): string {
-  if (!isRepeating) return id;
-  return `${id}:${occurrenceStart}`;
+  return `${eventId}:${occurrenceStart}:${offsetMinutes}`;
+}
+
+function getLocationSuffix(event: ICalendarEvent): string {
+  const firstLocation = event.location.find((location) => !!location);
+  return firstLocation ? ` at ${firstLocation}` : "";
+}
+
+function buildNotificationContent(
+  event: ICalendarEvent,
+  offsetMinutes: number,
+): { title: string; body: string } {
+  const locationSuffix = getLocationSuffix(event);
+
+  if (offsetMinutes === 0) {
+    return {
+      title: event.title,
+      body: `Starting now${locationSuffix}`,
+    };
+  }
+
+  return {
+    title: `Upcoming: ${event.title}`,
+    body: `Starts in ${offsetMinutes} minute${offsetMinutes === 1 ? "" : "s"}${locationSuffix}`,
+  };
+}
+
+function sortNotifications(
+  notifications: IScheduledNotification[],
+): IScheduledNotification[] {
+  return [...notifications].sort(
+    (left, right) => left.scheduledAt - right.scheduledAt,
+  );
 }
 
 export async function scheduleEventNotifications(
@@ -63,10 +90,13 @@ export async function scheduleEventNotifications(
 
   const now = Date.now();
   const nDaysFromNow = now + 5 * 24 * 60 * 60 * 1000;
-
   const isRepeating = !!event.repeat?.rrule;
+  const reminderOffsets = await getNotificationOffsetsForEvent(event.id);
 
-  // Determine the occurrence start time to schedule for
+  if (reminderOffsets.length === 0) {
+    return [];
+  }
+
   let occurrenceStart: number;
 
   if (isRepeating) {
@@ -74,33 +104,10 @@ export async function scheduleEventNotifications(
     if (nextOccurrence === null) return [];
     occurrenceStart = nextOccurrence;
   } else {
-    // Non-repeating: skip if already started
     if (event.begin <= now) return [];
-    // Skip if more than 2 days away
     if (event.begin > nDaysFromNow) return [];
     occurrenceStart = event.begin;
   }
-
-  const notificationKey = buildNotificationKey(
-    event.id,
-    occurrenceStart,
-    isRepeating,
-  );
-
-  // Already scheduled for this specific occurrence — return existing info
-  if (scheduledNotificationKeys.has(notificationKey)) {
-    return buildNotificationInfo(occurrenceStart, now);
-  }
-
-  const baseId = hashToNumber(notificationKey);
-  const tenMinBefore = occurrenceStart - 10 * 60 * 1000;
-
-  // const locationSuffix =
-  //   event.location?.length > 0 && event.location[0]
-  //     ? ` at ${event.location[0]}`
-  //     : "";
-
-  const locationSuffix = "";
 
   const notifications: Array<{
     id: number;
@@ -109,63 +116,64 @@ export async function scheduleEventNotifications(
     schedule: { at: Date; allowWhileIdle: boolean };
     extra: { eventId: string; notificationKey: string };
   }> = [];
+  const scheduledInfo: IScheduledNotification[] = [];
 
-  if (tenMinBefore > now) {
+  for (const offsetMinutes of reminderOffsets) {
+    const scheduledAt = occurrenceStart - offsetMinutes * 60 * 1000;
+    if (scheduledAt <= now) {
+      continue;
+    }
+
+    const notificationKey = buildNotificationKey(
+      event.id,
+      occurrenceStart,
+      offsetMinutes,
+    );
+
+    scheduledInfo.push({
+      label: formatNotificationOffsetLabel(offsetMinutes),
+      scheduledAt,
+    });
+
+    if (scheduledNotificationKeys.has(notificationKey)) {
+      continue;
+    }
+
+    const { title, body } = buildNotificationContent(event, offsetMinutes);
     notifications.push({
-      id: baseId,
-      title: `Upcoming: ${event.title}`,
-      body: `Starts in 10 minutes${locationSuffix}`,
-      schedule: { at: new Date(tenMinBefore), allowWhileIdle: true },
+      id: hashToNumber(notificationKey),
+      title,
+      body,
+      schedule: { at: new Date(scheduledAt), allowWhileIdle: true },
       extra: { eventId: event.id, notificationKey },
     });
   }
 
-  if (occurrenceStart > now) {
-    notifications.push({
-      id: baseId + 1,
-      title: event.title,
-      body: `Starting now${locationSuffix}`,
-      schedule: { at: new Date(occurrenceStart), allowWhileIdle: true },
-      extra: { eventId: event.id, notificationKey },
-    });
+  if (scheduledInfo.length === 0) {
+    return [];
   }
 
-  if (notifications.length === 0) return [];
+  if (notifications.length === 0) {
+    return sortNotifications(scheduledInfo);
+  }
 
   try {
     const permResult = await LocalNotifications.requestPermissions();
     if (permResult.display !== "granted") return [];
 
     await LocalNotifications.schedule({ notifications });
-    scheduledNotificationKeys.add(notificationKey);
+    notifications.forEach((notification) => {
+      scheduledNotificationKeys.add(notification.extra.notificationKey);
+    });
+
     console.log(
       `Scheduled notifications for ${event.id} (occurrence: ${new Date(occurrenceStart).toISOString()})`,
     );
-    return buildNotificationInfo(occurrenceStart, now);
+    return sortNotifications(scheduledInfo);
   } catch (err) {
     console.warn("Failed to schedule notification", err);
     return [];
   }
-}
-
-/**
- * Build notification info entries for the two scheduled notifications
- * (10 min before and at event time).
- */
-function buildNotificationInfo(
-  occurrenceStart: number,
-  now: number,
-): IScheduledNotification[] {
-  const result: IScheduledNotification[] = [];
-  const tenMinBefore = occurrenceStart - 10 * 60 * 1000;
-
-  if (tenMinBefore > now) {
-    result.push({ label: "10 minutes before", scheduledAt: tenMinBefore });
-  }
-  if (occurrenceStart > now) {
-    result.push({ label: "At event start", scheduledAt: occurrenceStart });
-  }
-  return result;
 }
 
 export function addNotificationClickListener(
@@ -192,6 +200,7 @@ export function addNotificationClickListener(
 
 export async function cancelAllNotifications(): Promise<void> {
   if (!isNative) return;
+
   try {
     const { notifications } = await LocalNotifications.getPending();
     if (notifications.length > 0) {
@@ -206,12 +215,10 @@ export async function cancelAllNotifications(): Promise<void> {
 export async function cancelEventNotifications(eventId: string): Promise<void> {
   if (!isNative) return;
 
-  // Find and cancel all notifications belonging to this event
-  // (covers all occurrences for recurring events)
   try {
     const { notifications } = await LocalNotifications.getPending();
-    const toCancel = notifications.filter((n) => {
-      const extra = n.extra as Record<string, string> | undefined;
+    const toCancel = notifications.filter((notification) => {
+      const extra = notification.extra as Record<string, string> | undefined;
       return extra?.eventId === eventId;
     });
 
@@ -219,7 +226,6 @@ export async function cancelEventNotifications(eventId: string): Promise<void> {
       await LocalNotifications.cancel({ notifications: toCancel });
     }
 
-    // Remove all keys for this event from the tracking set
     for (const key of scheduledNotificationKeys) {
       if (key === eventId || key.startsWith(`${eventId}:`)) {
         scheduledNotificationKeys.delete(key);

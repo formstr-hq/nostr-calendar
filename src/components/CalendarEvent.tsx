@@ -533,10 +533,11 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
         <Stack spacing={0.5}>
           {notifications?.map((n) => (
             <Typography
-              key={n.scheduledAt}
+              key={`${n.label}-${n.scheduledAt}`}
               variant="body2"
               color="text.secondary"
             >
+              {n.label} ·{" "}
               {dayjs(n.scheduledAt).format("ddd, DD MMM YYYY ⋅ HH:mm")}
             </Typography>
           ))}

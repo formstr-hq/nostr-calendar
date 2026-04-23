@@ -16,10 +16,16 @@ export const useNotifications = create<NotificationsState>((set) => ({
   byEventId: {},
 
   setNotifications: (eventId, notifications) => {
-    if (notifications.length === 0) return;
-    set((state) => ({
-      byEventId: { ...state.byEventId, [eventId]: notifications },
-    }));
+    set((state) => {
+      if (notifications.length === 0) {
+        const { [eventId]: _removed, ...rest } = state.byEventId;
+        return { byEventId: rest };
+      }
+
+      return {
+        byEventId: { ...state.byEventId, [eventId]: notifications },
+      };
+    });
   },
 
   removeNotifications: (eventId) => {
