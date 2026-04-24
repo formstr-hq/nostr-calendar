@@ -94,6 +94,11 @@ const dictionary: NestedObject = {
       private: "Private",
       public: "Public",
       publishingToRelays: "Publishing to {count} relay(s)",
+      publishingEvent: "Publishing Event",
+      relaysPublishStatus: "Relays{complete}",
+      eventSaved: "Your event has been saved",
+      noRelaysAccepted:
+        "No relays accepted the event. Please check your relay configuration and try again.",
       saving: "Saving...",
       saveEvent: "Save Event",
       copyLink: "Copy link to this event",
@@ -303,6 +308,11 @@ const dictionary: NestedObject = {
       private: "Privat",
       public: "Öffentlich",
       publishingToRelays: "Veröffentlichung an {count} Relay(s)",
+      publishingEvent: "Termin veröffentlichen",
+      relaysPublishStatus: "Relays{complete}",
+      eventSaved: "Ihr Termin wurde gespeichert",
+      noRelaysAccepted:
+        "Kein Relay hat den Termin akzeptiert. Bitte überprüfen Sie Ihre Relay-Konfiguration und versuchen Sie es erneut.",
       saving: "Speichern...",
       saveEvent: "Termin speichern",
       copyLink: "Link zu diesem Termin kopieren",

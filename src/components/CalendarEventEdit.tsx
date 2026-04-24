@@ -52,6 +52,8 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { normalizeURL } from "nostr-tools/utils";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -276,6 +278,10 @@ export function CalendarEventEdit({
   const initialRecurrence = parseRecurrenceRule(initialRule);
   const initialIsCustom = !!initialRule && initialRecurrence.frequency === null;
   const [processing, setProcessing] = useState(false);
+  const [relayPublishOpen, setRelayPublishOpen] = useState(false);
+  const [publishingRelays, setPublishingRelays] = useState<string[]>([]);
+  const [acceptedRelays, setAcceptedRelays] = useState<string[]>([]);
+  const [publishFailed, setPublishFailed] = useState(false);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
@@ -382,8 +388,24 @@ export function CalendarEventEdit({
     setCustomDialogOpen(false);
   };
 
+  const handleAcceptedRelay = (url: string) => {
+    setAcceptedRelays((prev) => (prev.includes(url) ? prev : [...prev, url]));
+  };
+
   const handleSave = async () => {
+    const relaysToPublish = Array.from(new Set(getRelays().map(normalizeURL)));
+    const acceptedRelayUrls = new Set<string>();
+    const trackAcceptedRelay = (url: string) => {
+      const normalizedUrl = normalizeURL(url);
+      acceptedRelayUrls.add(normalizedUrl);
+      handleAcceptedRelay(normalizedUrl);
+    };
+
     setProcessing(true);
+    setPublishingRelays(relaysToPublish);
+    setAcceptedRelays([]);
+    setPublishFailed(false);
+    setRelayPublishOpen(true);
     try {
       const rrule = isCustomRecurrence
         ? customRule
@@ -405,17 +427,24 @@ export function CalendarEventEdit({
           const updates = await editPrivateCalendarEvent(
             eventToSave,
             selectedCalendarId,
+            trackAcceptedRelay,
           );
 
           useTimeBasedEvents
             .getState()
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
-          await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
+          await publishPrivateCalendarEvent(
+            eventToSave,
+            selectedCalendarId,
+            trackAcceptedRelay,
+          );
         }
       } else {
-        const { id: savedId, pubKey } =
-          await publishPublicCalendarEvent(eventToSave);
+        const { id: savedId, pubKey } = await publishPublicCalendarEvent(
+          eventToSave,
+          trackAcceptedRelay,
+        );
         useTimeBasedEvents.getState().updateEvent({
           ...eventToSave,
           id: savedId,
@@ -430,10 +459,20 @@ export function CalendarEventEdit({
       }
 
       setProcessing(false);
-      onClose();
+      if (acceptedRelayUrls.size < relaysToPublish.length) {
+        setPublishFailed(true);
+      }
     } catch (e) {
       console.error(e instanceof Error ? e.message : "Unknown error");
+      setPublishFailed(true);
       setProcessing(false);
+    }
+  };
+
+  const handlePublishDialogClose = () => {
+    setRelayPublishOpen(false);
+    if (!publishFailed) {
+      onClose();
     }
   };
 
@@ -1140,42 +1179,60 @@ export function CalendarEventEdit({
 
   if (display === "page") {
     return (
-      <Box
-        style={{
-          maxWidth: 900,
-          margin: "0 auto",
-          padding: 24,
-        }}
-      >
-        <Box style={{ marginBottom: 24 }}>{titleBar}</Box>
-        <Box style={{ marginBottom: 24 }}>{formContent}</Box>
+      <>
         <Box
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 8,
-            padding: "16px 0",
+            maxWidth: 900,
+            margin: "0 auto",
+            padding: 24,
           }}
         >
-          {actions}
+          <Box style={{ marginBottom: 24 }}>{titleBar}</Box>
+          <Box style={{ marginBottom: 24 }}>{formContent}</Box>
+          <Box
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 8,
+              padding: "16px 0",
+            }}
+          >
+            {actions}
+          </Box>
         </Box>
-      </Box>
+        <RelayPublishDialog
+          open={relayPublishOpen}
+          relays={publishingRelays}
+          acceptedRelays={acceptedRelays}
+          publishFailed={publishFailed}
+          onClose={handlePublishDialogClose}
+        />
+      </>
     );
   }
 
   return (
-    <Dialog
-      fullScreen={isMobile}
-      open={open}
-      onClose={handleClose}
-      maxWidth="md"
-      fullWidth
-    >
-      <DialogTitle>{titleBar}</DialogTitle>
-      <DialogContent dividers>{formContent}</DialogContent>
-      <DialogActions style={{ padding: 16 }}>{actions}</DialogActions>
-    </Dialog>
+    <>
+      <Dialog
+        fullScreen={isMobile}
+        open={open}
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>{titleBar}</DialogTitle>
+        <DialogContent dividers>{formContent}</DialogContent>
+        <DialogActions style={{ padding: 16 }}>{actions}</DialogActions>
+      </Dialog>
+      <RelayPublishDialog
+        open={relayPublishOpen}
+        relays={publishingRelays}
+        acceptedRelays={acceptedRelays}
+        publishFailed={publishFailed}
+        onClose={handlePublishDialogClose}
+      />
+    </>
   );
 }
 
