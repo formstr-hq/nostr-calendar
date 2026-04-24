@@ -57,7 +57,9 @@ const saveVisibilityToStorage = (visibility: Record<string, boolean>) => {
 
 let subscriptionHandle: SubscriptionHandle | undefined;
 
-const withNotificationPreference = (calendar: ICalendarList): ICalendarList => ({
+const withNotificationPreference = (
+  calendar: ICalendarList,
+): ICalendarList => ({
   ...calendar,
   notificationPreference:
     calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
@@ -141,10 +143,6 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
    * Auto-creates a default calendar if user has no calendars after fetch.
    */
   fetchCalendars: async () => {
-    if (subscriptionHandle) {
-      subscriptionHandle.unsubscribe();
-    }
-
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 

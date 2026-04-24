@@ -34,31 +34,21 @@ export function InvitationPanel() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
-  const { invitations, acceptInvitation, dismissInvitation, fetchInvitations } =
-    useInvitations();
-  const {
-    calendars,
-    isLoaded: calendarsLoaded,
-    fetchCalendars,
-  } = useCalendarLists();
+  const { invitations, acceptInvitation, dismissInvitation } = useInvitations();
+  const { fetchCalendars } = useCalendarLists();
 
   useEffect(() => {
     fetchCalendars();
   }, []);
 
-  useEffect(() => {
-    if (calendarsLoaded) {
-      fetchInvitations();
-    }
-  }, [calendarsLoaded, calendars]);
   const [addDialogEvent, setAddDialogEvent] = useState<ICalendarEvent | null>(
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
-
-  const pendingInvitations = invitations.filter(
-    (inv) => inv.status === "pending",
-  );
+  const pendingInvitations = invitations
+    .filter((inv) => inv.status === "pending")
+    .sort((a, b) => b.receivedAt - a.receivedAt);
+  console.log(pendingInvitations);
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {

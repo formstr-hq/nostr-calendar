@@ -215,7 +215,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           eventId: rumor.eventId,
           viewKey: rumor.viewKey,
           relayHint: rumor.relayHint,
-          receivedAt: Date.now(),
+          receivedAt: rumor.createdAt,
           status: "pending",
           pubkey: rumor.authorPubkey,
           kind: rumor.kind,

@@ -167,7 +167,6 @@ async function preparePrivateCalendarEvent(
 
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
-  calendarId: string,
   onAcceptedRelays?: (url: string) => void,
 ) {
   const viewSecretKey = generateSecretKey();
@@ -237,9 +236,10 @@ export async function publishPrivateCalendarEvent(
     relayUrl: publishedRelayHint,
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
-  await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
 
   return {
+    eventRef,
+    authorPubkey: userPublicKey,
     calendarEvent: signedEvent,
     giftWraps: giftWraps.map(({ giftWrap }) => giftWrap),
   };
@@ -298,6 +298,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
     authorPubkey,
     kind,
     relayHint,
+    createdAt: rumor.created_at,
   };
 }
 
@@ -321,6 +322,7 @@ export const fetchCalendarGiftWraps = (
     kind: number;
     relayHint: string;
     originalInvitationId: string;
+    createdAt: number;
   }) => void,
   onEose: () => void,
 ) => {
