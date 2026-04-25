@@ -13,75 +13,63 @@ import ErrorIcon from "@mui/icons-material/Error";
 import { normalizeURL } from "nostr-tools/utils";
 import { useIntl } from "react-intl";
 
+type RelayKeyStatus = "pending" | "ok" | "error";
+
 interface RelayPublishDialogProps {
   open: boolean;
   relays: string[];
-  acceptedRelays: string[];
-  publishFailed?: boolean;
-  onClose?: () => void;
+  /** Keys must be normalizeURL(relay) */
+  relayStatus: Record<string, RelayKeyStatus | undefined>;
+  onClose: () => void;
+  /** Re-publish only to relays that did not accept */
+  onRetry?: () => void | Promise<void>;
+  retrying?: boolean;
+  showRetry?: boolean;
+}
+
+function statusForUrl(
+  url: string,
+  relayStatus: Record<string, RelayKeyStatus | undefined>,
+): RelayKeyStatus {
+  const n = normalizeURL(url);
+  return relayStatus[n] ?? "pending";
 }
 
 export function RelayPublishDialog({
   open,
   relays,
-  acceptedRelays,
-  publishFailed = false,
+  relayStatus,
   onClose,
+  onRetry,
+  retrying = false,
+  showRetry = false,
 }: RelayPublishDialogProps) {
   const intl = useIntl();
-  const normalizedAcceptedRelays = new Set(acceptedRelays.map(normalizeURL));
   const normalizedRelays = Array.from(new Set(relays.map(normalizeURL)));
-  const allRelaysAccepted =
-    normalizedRelays.length > 0 &&
-    normalizedRelays.every((url) => normalizedAcceptedRelays.has(url));
-  const canClose = allRelaysAccepted || publishFailed;
 
   return (
-    <Dialog
-      open={open}
-      onClose={canClose ? onClose : undefined}
-      maxWidth="sm"
-      fullWidth
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         {intl.formatMessage({ id: "event.publishingEvent" })}
       </DialogTitle>
       <DialogContent dividers>
-        {allRelaysAccepted && (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1.5,
-              py: 3,
-            }}
-          >
-            <CheckCircleIcon sx={{ color: "success.main", fontSize: 96 }} />
-            <Typography variant="h6" fontWeight={600} textAlign="center">
-              {intl.formatMessage({ id: "event.eventSaved" })}
-            </Typography>
-          </Box>
-        )}
         <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
           {intl.formatMessage(
             { id: "event.relaysPublishStatus" },
-            { complete: allRelaysAccepted ? " (Complete)" : "" },
+            { complete: "" },
           )}
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
           {normalizedRelays.map((url) => {
-            const isAccepted = normalizedAcceptedRelays.has(url);
-            const showFailed = publishFailed && !isAccepted;
-
+            const st = statusForUrl(url, relayStatus);
             return (
               <Box
                 key={url}
                 sx={{ display: "flex", alignItems: "center", gap: 1 }}
               >
-                {isAccepted ? (
+                {st === "ok" ? (
                   <CheckCircleIcon sx={{ color: "success.main" }} />
-                ) : showFailed ? (
+                ) : st === "error" ? (
                   <ErrorIcon sx={{ color: "error.main" }} />
                 ) : (
                   <CircularProgress size={20} />
@@ -91,19 +79,30 @@ export function RelayPublishDialog({
             );
           })}
         </Box>
-        {publishFailed && normalizedAcceptedRelays.size === 0 && (
+        {showRetry && (
           <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-            {intl.formatMessage({ id: "event.noRelaysAccepted" })}
+            {intl.formatMessage({ id: "event.relayPartialFailure" })}
           </Typography>
         )}
       </DialogContent>
-      {canClose && (
-        <DialogActions>
-          <Button onClick={onClose} variant="contained">
-            {intl.formatMessage({ id: "navigation.close" })}
+      <DialogActions sx={{ gap: 1, pr: 2, pb: 2 }}>
+        {showRetry && onRetry && (
+          <Button
+            onClick={onRetry}
+            variant="contained"
+            color="primary"
+            disabled={retrying}
+            startIcon={
+              retrying ? <CircularProgress size={16} color="inherit" /> : null
+            }
+          >
+            {intl.formatMessage({ id: "event.retryFailedRelays" })}
           </Button>
-        </DialogActions>
-      )}
+        )}
+        <Button onClick={onClose} variant="outlined" disabled={retrying}>
+          {intl.formatMessage({ id: "navigation.close" })}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }

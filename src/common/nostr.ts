@@ -168,6 +168,7 @@ async function preparePrivateCalendarEvent(
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
   onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
 ) {
   const viewSecretKey = generateSecretKey();
   const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
@@ -185,7 +186,7 @@ export async function publishPrivateCalendarEvent(
       onAcceptedRelays?.(url);
     },
     undefined,
-    { waitForAll: true },
+    { waitForAll: true, onRelayComplete },
   );
 
   // Gift-wrap the event keys to each participant (including the creator).
@@ -249,6 +250,7 @@ export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
   onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
 ) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
@@ -257,6 +259,7 @@ export async function editPrivateCalendarEvent(
 
   await publishToRelays(signedEvent, onAcceptedRelays, undefined, {
     waitForAll: true,
+    onRelayComplete,
   });
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
@@ -274,6 +277,7 @@ export async function editPrivateCalendarEvent(
   return {
     event,
     calendarId,
+    signedEvent,
   };
 }
 
@@ -509,8 +513,12 @@ export const publishToRelays = (
   event: Event,
   onAcceptedRelays: (url: string) => void = _onAcceptedRelays,
   relays?: string[],
-  options: { waitForAll?: boolean } = {},
+  options: {
+    waitForAll?: boolean;
+    onRelayComplete?: (url: string, success: boolean) => void;
+  } = {},
 ) => {
+  const { onRelayComplete } = options;
   const relayList = Array.from(
     new Set((relays ?? getRelays()).map(normalizeURL)),
   );
@@ -518,15 +526,20 @@ export const publishToRelays = (
     let relay: AbstractRelay | null = null;
     try {
       relay = await ensureRelay(url, { connectionTimeout: 5000 });
-      return await Promise.race<string>([
-        relay.publish(event).then((reason) => {
+      const reason = await Promise.race<string>([
+        relay.publish(event).then((r) => {
           onAcceptedRelays(url);
-          return reason;
+          return r;
         }),
         new Promise<string>((_, reject) =>
           setTimeout(() => reject("timeout"), 5000),
         ),
       ]);
+      onRelayComplete?.(url, true);
+      return reason;
+    } catch (e) {
+      onRelayComplete?.(url, false);
+      throw e;
     } finally {
       if (relay) {
         try {
@@ -558,6 +571,18 @@ export const publishToRelays = (
   return Promise.any(publishPromises);
 };
 
+/** Re-publish a signed event to a subset of relays (e.g. retry after partial failure). */
+export const republishEventToRelays = (
+  event: Event,
+  relayUrls: string[],
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
+) =>
+  publishToRelays(event, onAcceptedRelays ?? (() => {}), relayUrls, {
+    waitForAll: true,
+    onRelayComplete,
+  });
+
 export const fetchCalendarEvents = (
   { since, until }: { since?: number; until?: number },
   onEvent: (event: Event) => void,
@@ -579,6 +604,7 @@ export const fetchCalendarEvents = (
 export const publishPublicCalendarEvent = async (
   event: ICalendarEvent,
   onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
 ) => {
   const pubKey = await getUserPublicKey();
   const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();
@@ -615,9 +641,10 @@ export const publishPublicCalendarEvent = async (
   fullEvent.id = getEventHash(baseEvent);
   const result = await publishToRelays(fullEvent, onAcceptedRelays, undefined, {
     waitForAll: true,
+    onRelayComplete,
   });
 
-  return { result, id, pubKey };
+  return { result, id, pubKey, signedEvent: fullEvent };
 };
 
 /**

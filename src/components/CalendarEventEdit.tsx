@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, type Dispatch, type SetStateAction } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,6 +17,8 @@ import {
   Divider,
   useMediaQuery,
   useTheme,
+  Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
@@ -29,10 +31,13 @@ import { ParticipantAdd } from "./ParticipantAdd";
 import { useIntl } from "react-intl";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import { Participant } from "./Participant";
+import type { Event } from "nostr-tools";
 import {
   editPrivateCalendarEvent,
+  getRelays,
   publishPrivateCalendarEvent,
   publishPublicCalendarEvent,
+  republishEventToRelays,
 } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
@@ -47,7 +52,6 @@ import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
-import { getRelays } from "../common/nostr";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
@@ -64,6 +68,31 @@ interface CalendarEventEditProps {
   onSave?: (event: ICalendarEvent) => void;
   mode?: "create" | "edit";
   display?: "modal" | "page";
+}
+
+type RelayLineStatus = "pending" | "ok" | "error";
+
+type RelayStatusMap = Record<string, RelayLineStatus>;
+
+function createRelayCompletionHandler(
+  outcomes: Record<string, boolean>,
+  setRelayStatus: Dispatch<SetStateAction<RelayStatusMap>>,
+) {
+  return (url: string, ok: boolean) => {
+    const n = normalizeURL(url);
+    outcomes[n] = ok;
+    setRelayStatus((prev) => ({ ...prev, [n]: ok ? "ok" : "error" }));
+  };
+}
+
+const PARTIAL_PUBLISH_NOTE_SX = {
+  pt: 2,
+  borderTop: 1,
+  borderColor: "divider" as const,
+};
+
+function normalizedRelayList(): string[] {
+  return Array.from(new Set(getRelays().map(normalizeURL)));
 }
 
 const CUSTOM_RECURRENCE_VALUE = "__custom_rule__";
@@ -279,10 +308,13 @@ export function CalendarEventEdit({
   const initialRecurrence = parseRecurrenceRule(initialRule);
   const initialIsCustom = !!initialRule && initialRecurrence.frequency === null;
   const [processing, setProcessing] = useState(false);
-  const [relayPublishOpen, setRelayPublishOpen] = useState(false);
   const [publishingRelays, setPublishingRelays] = useState<string[]>([]);
-  const [acceptedRelays, setAcceptedRelays] = useState<string[]>([]);
-  const [publishFailed, setPublishFailed] = useState(false);
+  const [relayStatus, setRelayStatus] = useState<RelayStatusMap>({});
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const [signedEventForRetry, setSignedEventForRetry] = useState<Event | null>(
+    null,
+  );
+  const [retryingRelays, setRetryingRelays] = useState(false);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
@@ -349,9 +381,7 @@ export function CalendarEventEdit({
       : createDefaultCustomDraft(dayjs(eventDetails.begin)),
   );
 
-  const handleClose = () => {
-    onClose();
-  };
+  const handleClose = onClose;
 
   const theme = useTheme();
 
@@ -389,24 +419,24 @@ export function CalendarEventEdit({
     setCustomDialogOpen(false);
   };
 
-  const handleAcceptedRelay = (url: string) => {
-    setAcceptedRelays((prev) => (prev.includes(url) ? prev : [...prev, url]));
-  };
-
   const handleSave = async () => {
-    const relaysToPublish = Array.from(new Set(getRelays().map(normalizeURL)));
-    const acceptedRelayUrls = new Set<string>();
-    const trackAcceptedRelay = (url: string) => {
-      const normalizedUrl = normalizeURL(url);
-      acceptedRelayUrls.add(normalizedUrl);
-      handleAcceptedRelay(normalizedUrl);
-    };
+    const relaysToPublish = normalizedRelayList();
+    const relayOutcomes: Record<string, boolean> = {};
+    const onRelayComplete = createRelayCompletionHandler(
+      relayOutcomes,
+      setRelayStatus,
+    );
+
+    setRelayStatus(
+      Object.fromEntries(
+        relaysToPublish.map((u) => [u, "pending" as const]),
+      ) as RelayStatusMap,
+    );
+    setPublishingRelays(relaysToPublish);
+    setSignedEventForRetry(null);
+    setRelayDetailsOpen(false);
 
     setProcessing(true);
-    setPublishingRelays(relaysToPublish);
-    setAcceptedRelays([]);
-    setPublishFailed(false);
-    setRelayPublishOpen(true);
     try {
       const rrule = isCustomRecurrence
         ? customRule
@@ -428,17 +458,22 @@ export function CalendarEventEdit({
           const updates = await editPrivateCalendarEvent(
             eventToSave,
             selectedCalendarId,
-            trackAcceptedRelay,
+            undefined,
+            onRelayComplete,
           );
+          setSignedEventForRetry(updates.signedEvent);
 
           useTimeBasedEvents
             .getState()
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
-          const { eventRef, authorPubkey } = await publishPrivateCalendarEvent(
-            eventToSave,
-            trackAcceptedRelay,
-          );
+          const { eventRef, authorPubkey, calendarEvent } =
+            await publishPrivateCalendarEvent(
+              eventToSave,
+              undefined,
+              onRelayComplete,
+            );
+          setSignedEventForRetry(calendarEvent);
           await addEventToCalendar(selectedCalendarId, eventRef);
           const { eventDTag, viewKey } = parseEventRef(eventRef);
           useTimeBasedEvents.getState().addEvent({
@@ -450,10 +485,16 @@ export function CalendarEventEdit({
           });
         }
       } else {
-        const { id: savedId, pubKey } = await publishPublicCalendarEvent(
+        const {
+          id: savedId,
+          pubKey,
+          signedEvent,
+        } = await publishPublicCalendarEvent(
           eventToSave,
-          trackAcceptedRelay,
+          undefined,
+          onRelayComplete,
         );
+        setSignedEventForRetry(signedEvent);
         useTimeBasedEvents.getState().updateEvent({
           ...eventToSave,
           id: savedId,
@@ -467,20 +508,62 @@ export function CalendarEventEdit({
         onSave(eventToSave);
       }
 
+      const allOk = relaysToPublish.every((u) => relayOutcomes[u] === true);
       setProcessing(false);
-      if (acceptedRelayUrls.size < relaysToPublish.length) {
-        setPublishFailed(true);
+      if (allOk) {
+        onClose();
       }
     } catch (e) {
       console.error(e instanceof Error ? e.message : "Unknown error");
-      setPublishFailed(true);
+      setRelayStatus((prev) => {
+        const next = { ...prev };
+        for (const u of relaysToPublish) {
+          if (next[u] === "pending") {
+            next[u] = "error";
+          }
+        }
+        return next;
+      });
       setProcessing(false);
     }
   };
 
-  const handlePublishDialogClose = () => {
-    setRelayPublishOpen(false);
-    if (!publishFailed) {
+  const handleRetryFailedRelays = async () => {
+    if (!signedEventForRetry) {
+      return;
+    }
+    const failed = publishingRelays.filter(
+      (u) => relayStatus[normalizeURL(u)] === "error",
+    );
+    if (failed.length === 0) {
+      return;
+    }
+    setRetryingRelays(true);
+    setRelayStatus((prev) => {
+      const next = { ...prev };
+      for (const u of failed) {
+        const n = normalizeURL(u);
+        next[n] = "pending";
+      }
+      return next;
+    });
+    const outcomes: Record<string, boolean> = {};
+    const onComplete = createRelayCompletionHandler(outcomes, setRelayStatus);
+    try {
+      await republishEventToRelays(
+        signedEventForRetry,
+        failed,
+        undefined,
+        onComplete,
+      );
+    } catch {
+      // per-relay outcomes already set via onComplete where applicable
+    } finally {
+      setRetryingRelays(false);
+    }
+    const retriedOk = failed.every((u) => outcomes[normalizeURL(u)] === true);
+    if (retriedOk) {
+      setRelayDetailsOpen(false);
       onClose();
     }
   };
@@ -583,6 +666,18 @@ export function CalendarEventEdit({
     eventDetails.begin < eventDetails.end &&
     recurrenceValid
   );
+
+  const hasRelayErrors = publishingRelays.some(
+    (u) => relayStatus[normalizeURL(u)] === "error",
+  );
+  const showRelayDetailsButton =
+    hasRelayErrors && !processing && publishingRelays.length > 0;
+  /** Save succeeded for the network, but at least one relay failed (event is already on the calendar). */
+  const partialSaveRelayIssues =
+    !processing &&
+    publishingRelays.length > 0 &&
+    hasRelayErrors &&
+    publishingRelays.some((u) => relayStatus[normalizeURL(u)] === "ok");
 
   if (!open || !eventDetails) {
     return null;
@@ -1074,7 +1169,10 @@ export function CalendarEventEdit({
                     borderRadius: 4,
                   }}
                 >
-                  <Participant pubKey={participant} />
+                  <Participant
+                    pubKey={participant}
+                    isAuthor={participant === eventDetails.user}
+                  />
                   <Button
                     size="small"
                     color="error"
@@ -1155,35 +1253,158 @@ export function CalendarEventEdit({
         style={{
           flex: 1,
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 4,
+          minWidth: 0,
         }}
       >
-        <IconButton
-          size="small"
-          onClick={() => useRelayStore.getState().updateRelayModal(true)}
+        <Box
+          style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}
         >
-          <SettingsInputAntennaIcon fontSize="small" />
-        </IconButton>
-        <Typography variant="caption" color="textSecondary">
-          {intl.formatMessage(
-            { id: "event.publishingToRelays" },
-            { count: getRelays().length },
+          <IconButton
+            size="small"
+            onClick={() => useRelayStore.getState().updateRelayModal(true)}
+          >
+            <SettingsInputAntennaIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="caption" color="textSecondary">
+            {intl.formatMessage(
+              { id: "event.publishingToRelays" },
+              { count: getRelays().length },
+            )}
+          </Typography>
+          {showRelayDetailsButton && !partialSaveRelayIssues && (
+            <Button
+              size="small"
+              sx={{ ml: 0.5, minWidth: "auto", p: 0.5, textTransform: "none" }}
+              onClick={() => setRelayDetailsOpen(true)}
+            >
+              {intl.formatMessage({ id: "event.relayDetails" })}
+            </Button>
           )}
-        </Typography>
+        </Box>
+        {publishingRelays.length > 0 && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 0.5,
+              pl: 0.5,
+            }}
+          >
+            {publishingRelays.map((relayUrl) => {
+              const st = relayStatus[normalizeURL(relayUrl)] ?? "pending";
+              return (
+                <Tooltip key={relayUrl} title={relayUrl} arrow>
+                  <span>
+                    {st === "pending" && (
+                      <Box
+                        sx={{ display: "inline-flex", alignItems: "center" }}
+                      >
+                        <CircularProgress
+                          size={8}
+                          thickness={6}
+                          color="inherit"
+                        />
+                      </Box>
+                    )}
+                    {st === "ok" && (
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: "success.main",
+                        }}
+                      />
+                    )}
+                    {st === "error" && (
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: "error.main",
+                        }}
+                      />
+                    )}
+                  </span>
+                </Tooltip>
+              );
+            })}
+          </Box>
+        )}
       </Box>
-      <Button onClick={handleClose} color="inherit">
-        {intl.formatMessage({ id: "navigation.cancel" })}
-      </Button>
-      <Button
-        onClick={handleSave}
-        variant="contained"
-        disabled={buttonDisabled}
-      >
-        {processing
-          ? intl.formatMessage({ id: "event.saving" })
-          : intl.formatMessage({ id: "event.saveEvent" })}
-      </Button>
+      {partialSaveRelayIssues ? (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Button
+            variant="contained"
+            onClick={() => setRelayDetailsOpen(true)}
+            disabled={!signedEventForRetry}
+            color="primary"
+          >
+            {intl.formatMessage({ id: "event.relayDetails" })}
+          </Button>
+          <Button variant="outlined" onClick={onClose} color="primary">
+            {intl.formatMessage({ id: "event.closeEditor" })}
+          </Button>
+        </Box>
+      ) : (
+        <>
+          <Button onClick={handleClose} color="inherit">
+            {intl.formatMessage({ id: "navigation.cancel" })}
+          </Button>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={buttonDisabled}
+          >
+            {processing
+              ? intl.formatMessage({ id: "event.saving" })
+              : intl.formatMessage({ id: "event.saveEvent" })}
+          </Button>
+        </>
+      )}
     </>
+  );
+
+  const partialPublishNote = partialSaveRelayIssues ? (
+    <Box sx={PARTIAL_PUBLISH_NOTE_SX}>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ lineHeight: 1.5 }}
+      >
+        <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
+          {intl.formatMessage({ id: "event.note" })}:{" "}
+        </Box>
+        {intl.formatMessage({ id: "event.partialPublishHint" })}
+      </Typography>
+    </Box>
+  ) : null;
+
+  const canShowRelayRetry =
+    hasRelayErrors && !!signedEventForRetry && publishingRelays.length > 0;
+  const relayPublishDialog = (
+    <RelayPublishDialog
+      open={relayDetailsOpen}
+      relays={publishingRelays}
+      relayStatus={relayStatus}
+      onClose={() => setRelayDetailsOpen(false)}
+      onRetry={handleRetryFailedRelays}
+      retrying={retryingRelays}
+      showRetry={canShowRelayRetry}
+    />
   );
 
   if (display === "page") {
@@ -1198,6 +1419,7 @@ export function CalendarEventEdit({
         >
           <Box style={{ marginBottom: 24 }}>{titleBar}</Box>
           <Box style={{ marginBottom: 24 }}>{formContent}</Box>
+          {partialPublishNote}
           <Box
             style={{
               display: "flex",
@@ -1210,13 +1432,7 @@ export function CalendarEventEdit({
             {actions}
           </Box>
         </Box>
-        <RelayPublishDialog
-          open={relayPublishOpen}
-          relays={publishingRelays}
-          acceptedRelays={acceptedRelays}
-          publishFailed={publishFailed}
-          onClose={handlePublishDialogClose}
-        />
+        {relayPublishDialog}
       </>
     );
   }
@@ -1231,16 +1447,13 @@ export function CalendarEventEdit({
         fullWidth
       >
         <DialogTitle>{titleBar}</DialogTitle>
-        <DialogContent dividers>{formContent}</DialogContent>
+        <DialogContent dividers>
+          {formContent}
+          {partialPublishNote}
+        </DialogContent>
         <DialogActions style={{ padding: 16 }}>{actions}</DialogActions>
       </Dialog>
-      <RelayPublishDialog
-        open={relayPublishOpen}
-        relays={publishingRelays}
-        acceptedRelays={acceptedRelays}
-        publishFailed={publishFailed}
-        onClose={handlePublishDialogClose}
-      />
+      {relayPublishDialog}
     </>
   );
 }
