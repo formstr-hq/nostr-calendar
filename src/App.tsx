@@ -24,8 +24,6 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-import { AppStatusMessage } from "./components/AppStatusMessage";
-import { useAppStartup } from "./hooks/useAppStartup";
 import { useSchedulingPages } from "./stores/schedulingPages";
 import { useBookingRequests } from "./stores/bookingRequests";
 import { useInvitations } from "./stores/invitations";

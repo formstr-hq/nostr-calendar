@@ -26,6 +26,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import dayjs, { Dayjs } from "dayjs";
+import { useIntl } from "react-intl";
 import { NAddr, decode } from "nostr-tools/nip19";
 import {
   getUserPublicKey,
@@ -105,7 +106,6 @@ async function sendBookingRequest({
     },
     creatorPubkey,
     EventKinds.BookingRequestGiftWrap,
-    true,
   );
   const targetRelays = relayHints
     ? [...new Set([...relayHints, ...getRelays()])]
@@ -123,6 +123,7 @@ export const SchedulingPagePublic = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user, updateLoginModal } = useUser();
+  const intl = useIntl();
 
   const [page, setPage] = useState<ISchedulingPage | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>("loading");
@@ -288,6 +289,7 @@ export const SchedulingPagePublic = () => {
         note: bookingNote,
         sentAt: Date.now(),
         status: "pending",
+        dTag,
       };
       useBookingRequests.getState().addOutgoingBooking(outgoing);
 
@@ -297,7 +299,7 @@ export const SchedulingPagePublic = () => {
       setBookingNote("");
       setSnackbar({
         open: true,
-        message: "Booking request sent! You'll be notified when it's approved.",
+        message: intl.formatMessage({ id: "scheduling.bookingRequestSent" }),
         severity: "success",
       });
     } catch (e) {
@@ -313,13 +315,13 @@ export const SchedulingPagePublic = () => {
     }
   };
 
-  const formatTime = (ms: number) => {
+  const formatTime = (value: number | Date) => {
     if (!page) return "";
     return new Intl.DateTimeFormat(undefined, {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: page.timezone,
-    }).format(ms);
+    }).format(value);
   };
 
   if (fetchState === "loading") {
@@ -348,8 +350,7 @@ export const SchedulingPagePublic = () => {
         <Toolbar />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
-            Could not load scheduling page. It may have been deleted or is
-            temporarily unavailable.
+            {intl.formatMessage({ id: "scheduling.loadError" })}
           </Alert>
         </Box>
       </>
@@ -395,7 +396,7 @@ export const SchedulingPagePublic = () => {
         {page.durationMode === "fixed" && page.slotDurations.length > 1 && (
           <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Select duration
+              {intl.formatMessage({ id: "scheduling.selectDuration" })}
             </Typography>
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               {page.slotDurations.map((mins) => (
@@ -516,7 +517,7 @@ export const SchedulingPagePublic = () => {
         {slots.length === 0 && (
           <Box sx={{ textAlign: "center", py: 4 }}>
             <Typography color="text.secondary">
-              No available slots this week. Try navigating to a different week.
+              {intl.formatMessage({ id: "scheduling.noSlotsThisWeek" })}
             </Typography>
           </Box>
         )}
@@ -529,7 +530,9 @@ export const SchedulingPagePublic = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Confirm Booking</DialogTitle>
+        <DialogTitle>
+          {intl.formatMessage({ id: "scheduling.confirmBooking" })}
+        </DialogTitle>
         <DialogContent>
           {selectedSlot && page && (
             <Box
@@ -573,14 +576,16 @@ export const SchedulingPagePublic = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBookingDialogOpen(false)} color="inherit">
-            Cancel
+            {intl.formatMessage({ id: "navigation.cancel" })}
           </Button>
           <Button
             variant="contained"
             onClick={handleBookingSubmit}
             disabled={submitting}
           >
-            {submitting ? "Sending..." : "Request Booking"}
+            {submitting
+              ? intl.formatMessage({ id: "scheduling.sending" })
+              : intl.formatMessage({ id: "scheduling.requestBooking" })}
           </Button>
         </DialogActions>
       </Dialog>

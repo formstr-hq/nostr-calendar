@@ -193,6 +193,8 @@ export interface IOutgoingBooking {
   declineReason?: string;
   /** Reference to created private event (on approval) */
   eventRef?: string;
+  /** Pre-generated d-tag the host will reuse when publishing the event */
+  dTag?: string;
   /** View key for created private event (on approval) */
   viewKey?: string;
 }

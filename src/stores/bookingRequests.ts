@@ -32,6 +32,9 @@ import type {
 import { TEMP_CALENDAR_ID } from "./eventDetails";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { useSchedulingPages } from "./schedulingPages";
+import { useCalendarLists } from "./calendarLists";
+import { useTimeBasedEvents } from "./events";
+import { parseEventRef } from "../utils/calendarListTypes";
 import { Event } from "nostr-tools";
 
 function subscribeBookingRequests(
@@ -150,7 +153,6 @@ async function sendBookingResponse({
     },
     bookerPubkey,
     EventKinds.BookingResponseGiftWrap,
-    true,
   );
   await publishToRelays(giftWrap);
   return giftWrap;
@@ -186,6 +188,7 @@ interface BookingRequestsState {
   addOutgoingBooking: (booking: IOutgoingBooking) => void;
   approveRequest: (requestId: string, calendarId: string) => Promise<void>;
   declineRequest: (requestId: string, reason?: string) => Promise<void>;
+  markOutgoingApprovedByDTag: (dTag: string, viewKey: string) => void;
   checkExpiry: () => void;
   stopSubscriptions: () => void;
   clearCached: () => Promise<void>;
@@ -370,11 +373,26 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // publishPrivateCalendarEvent already sends invitation gift wraps
     // with viewKey to all participants (including booker), so the
     // booker's calendar will pick it up automatically.
-    const { calendarEvent, viewKey } = await publishPrivateCalendarEvent(
+    const { eventRef, authorPubkey } = await publishPrivateCalendarEvent(
       event,
-      calendarId,
       request.dTag || undefined,
     );
+
+    // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
+    // event to the host's calendar list. Add it explicitly here so the
+    // approved booking shows up on the host's calendar without waiting
+    // for a relay round-trip.
+    await useCalendarLists
+      .getState()
+      .addEventToCalendar(calendarId, eventRef);
+    const { eventDTag, viewKey } = parseEventRef(eventRef);
+    useTimeBasedEvents.getState().addEvent({
+      ...event,
+      id: eventDTag,
+      viewKey,
+      user: authorPubkey,
+      calendarId,
+    });
 
     // Update request status immediately so the UI reflects the approval
     // without waiting for the booking response relay round-trip.
@@ -391,21 +409,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       return { incomingRequests, incomingUnreadCount };
     });
 
-    // Send a booking response so the booker's outgoing bookings
-    // update from "pending" to "approved". Fire-and-forget: the
-    // local status is already updated above regardless of relay success.
-    const eventRef = `${calendarEvent.kind}:${calendarEvent.pubkey}:${request.dTag || ""}`;
-    sendBookingResponse({
-      schedulingPageRef: request.schedulingPageRef,
-      bookerPubkey: request.bookerPubkey,
-      start: request.start,
-      end: request.end,
-      status: "approved",
-      eventRef,
-      viewKey,
-    }).catch((err) => {
-      console.error("Failed to send booking approval response:", err);
-    });
+    // No booking-response gift wrap is sent: the published calendar event
+    // arrives at the booker via the existing CalendarEventGiftWrap (kind
+    // 1052) flow, which carries the viewKey and triggers the booker's
+    // outgoing-booking status flip in `useInvitations`.
   },
 
   declineRequest: async (requestId, reason) => {
@@ -441,6 +448,36 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       reason,
     }).catch((err) => {
       console.error("Failed to send booking decline response:", err);
+    });
+  },
+
+  /**
+   * Flips an outgoing booking from "pending" to "approved" when the
+   * matching invitation gift wrap arrives (the booker's auto-approval
+   * path that replaces the legacy BookingResponse round-trip).
+   */
+  markOutgoingApprovedByDTag: (dTag, viewKey) => {
+    set((state) => {
+      let changed = false;
+      const outgoingBookings = state.outgoingBookings.map((booking) => {
+        if (booking.status !== "pending") return booking;
+        // The booking's pre-generated d-tag was sent in the request rumor
+        // and reused by the host when publishing the calendar event.
+        if (booking.dTag !== dTag) return booking;
+        changed = true;
+        return {
+          ...booking,
+          status: "approved" as const,
+          respondedAt: Date.now(),
+          viewKey,
+        };
+      });
+      if (!changed) return state;
+      const outgoingUnreadCount = outgoingBookings.filter(
+        (b) => b.status === "pending",
+      ).length;
+      saveOutgoingToStorage(outgoingBookings);
+      return { outgoingBookings, outgoingUnreadCount };
     });
   },
 

@@ -30,6 +30,7 @@ import {
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
+import { useBookingRequests } from "./bookingRequests";
 import { buildEventRef } from "../utils/calendarListTypes";
 import type { IInvitation } from "../utils/calendarListTypes";
 import { EventKinds } from "../common/EventConfigs";
@@ -212,6 +213,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
             useCalendarLists
               .getState()
               .updateEventViewKey(rumor.eventId, rumor.viewKey);
+            // The placeholder ref was created by the booking flow when the
+            // user submitted a request. The host has now approved by
+            // publishing the calendar event with the booker's d-tag, so
+            // flip the matching outgoing booking to "approved" without
+            // requiring a separate booking-response gift wrap.
+            useBookingRequests
+              .getState()
+              .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
           }
           return;
         }

@@ -172,7 +172,6 @@ async function preparePrivateCalendarEvent(
 
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
-  calendarId: string,
   /** Optional pre-generated d-tag (e.g. from a booking request) */
   existingDTag?: string,
 ) {
