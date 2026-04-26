@@ -231,7 +231,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           eventId: rumor.eventId,
           viewKey: rumor.viewKey,
           relayHint: rumor.relayHint,
-          receivedAt: Date.now(),
+          receivedAt: rumor.createdAt,
           status: "pending",
           pubkey: rumor.authorPubkey,
           kind: rumor.kind,
@@ -269,11 +269,19 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     const invitation = invitations.find((i) => i.giftWrapId === giftWrapId);
     if (!invitation) return;
 
+    // Guard: don't accept until the private event has been resolved,
+    // otherwise the author pubkey is missing and the event coordinate
+    // becomes malformed (e.g. "32678::dTag" instead of "32678:pubkey:dTag").
+    if (!invitation.event?.user) {
+      console.warn("Cannot accept invitation: event not yet resolved");
+      return;
+    }
+
     // Build the event reference for the calendar list, including the relay hint
     // so the event can be fetched from the correct relay after acceptance.
     const eventRef = buildEventRef({
       kind: invitation.kind,
-      authorPubkey: invitation.event?.user || "",
+      authorPubkey: invitation.event.user,
       eventDTag: invitation.eventId,
       relayUrl: invitation.relayHint,
       viewKey: invitation.viewKey,

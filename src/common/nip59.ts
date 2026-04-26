@@ -12,10 +12,7 @@ import { signerManager } from "./signer";
 
 type Rumor = UnsignedEvent & { id: string };
 
-const TWO_DAYS = 2 * 24 * 60 * 60;
-
 const now = () => Math.round(Date.now() / 1000);
-const randomNow = () => Math.round(now() - Math.random() * TWO_DAYS);
 
 const nip44ConversationKey = (privateKey: Uint8Array, publicKey: string) =>
   getConversationKey(privateKey, publicKey);
@@ -70,7 +67,7 @@ export async function createSeal(rumor: Rumor, recipientPublicKey: string) {
   return signer.signEvent({
     kind: Seal,
     content,
-    created_at: randomNow(),
+    created_at: now(),
     tags: [],
   });
 }

@@ -11,5 +11,8 @@ project(':capacitor-local-notifications').projectDir = new File('../node_modules
 include ':capacitor-preferences'
 project(':capacitor-preferences').projectDir = new File('../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.0/node_modules/@capacitor/preferences/android')
 
+include ':khadarvsk-capacitor-secure-storage'
+project(':khadarvsk-capacitor-secure-storage').projectDir = new File('../node_modules/.pnpm/@khadarvsk+capacitor-secure-storage@0.0.1_@capacitor+core@8.0.0/node_modules/@khadarvsk/capacitor-secure-storage/android')
+
 include ':nostr-signer-capacitor-plugin'
 project(':nostr-signer-capacitor-plugin').projectDir = new File('../node_modules/.pnpm/nostr-signer-capacitor-plugin@0.0.5_@capacitor+core@8.0.0/node_modules/nostr-signer-capacitor-plugin/android')

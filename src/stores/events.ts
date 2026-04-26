@@ -67,7 +67,9 @@ const syncEventNotifications = async (
   event: ICalendarEvent,
   { cancelExisting = false }: { cancelExisting?: boolean } = {},
 ): Promise<void> => {
-  const calendarPreference = getCalendarNotificationPreference(event.calendarId);
+  const calendarPreference = getCalendarNotificationPreference(
+    event.calendarId,
+  );
   const shouldSchedule = shouldScheduleNotifications(
     event.notificationPreference,
     calendarPreference,
@@ -175,7 +177,6 @@ const processPrivateEvent = (
       store = appendOne(store, parsedEvent.id, parsedEvent);
     }
   }
-  console.log(parsedEvent);
   void syncEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
   saveEventsToStorage(updatedEvents);
@@ -204,6 +205,7 @@ export const useTimeBasedEvents = create<{
     daysBefore?: number;
     daysAfter?: number;
   }) => void;
+  addEvent: (event: ICalendarEvent) => void;
   updateEvent: (event: ICalendarEvent) => void;
   removeEvent: (id: string) => void;
   resetPrivateEvents: () => void;
@@ -214,6 +216,18 @@ export const useTimeBasedEvents = create<{
   }) => void;
   refreshNotificationPreferencesForCalendar: (calendarId: string) => void;
 }>((set) => ({
+  addEvent: (newEvent) => {
+    set(({ events }) => {
+      const store = normalize(events);
+      if (store.allKeys.includes(newEvent.id))
+        return { events, eventById: store.byKey };
+      const updated = appendOne(store, newEvent.id, newEvent);
+      const updatedEvents = denormalize(updated);
+      saveEventsToStorage(updatedEvents);
+      return { eventById: updated.byKey, events: updatedEvents };
+    });
+    void syncEventNotifications(newEvent);
+  },
   updateEvent: (updatedEvent) => {
     set(({ events }) => {
       let store = normalize(events);
@@ -283,7 +297,9 @@ export const useTimeBasedEvents = create<{
   },
   refreshNotificationPreferencesForCalendar: (calendarId) => {
     const { events } = useTimeBasedEvents.getState();
-    const relevantEvents = events.filter((event) => event.calendarId === calendarId);
+    const relevantEvents = events.filter(
+      (event) => event.calendarId === calendarId,
+    );
 
     void (async () => {
       const batchSize = 5;
@@ -310,11 +326,6 @@ export const useTimeBasedEvents = create<{
    *   because old recurring events may have occurrences in the current window
    */
   fetchPrivateEvents(customTimeRange) {
-    if (privateSubscription) {
-      privateSubscription.unsubscribe();
-      privateSubscription = undefined;
-    }
-
     const timeRange = getTimeRange(customTimeRange);
     const visibleRefs = useCalendarLists.getState().getVisibleEventRefs();
 

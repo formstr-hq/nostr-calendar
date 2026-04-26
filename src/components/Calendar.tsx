@@ -1,5 +1,4 @@
 import { useTimeBasedEvents } from "../stores/events";
-import { useUser } from "../stores/user";
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
@@ -9,10 +8,8 @@ import { Box } from "@mui/material";
 import { SwipeableView } from "./SwipeableView";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
-import { useEffect } from "react";
 
 function Calendar() {
-  const { user } = useUser();
   const events = useTimeBasedEvents((state) => state);
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
   const { fetchInvitations, stopInvitations, invitations } = useInvitations();
@@ -38,6 +35,7 @@ function Calendar() {
   const visibleEvents = events.events.filter((evt) =>
     visibileCalendars.has(evt.calendarId ?? ""),
   );
+
   const allEvents = [
     ...visibleEvents,
     ...invitations.filter((inv) => inv.event).map((inv) => inv.event!),

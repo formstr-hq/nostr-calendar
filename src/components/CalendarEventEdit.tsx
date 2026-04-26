@@ -38,6 +38,7 @@ import { EventKinds } from "../common/EventConfigs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
+import { RRule } from "rrule";
 import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
@@ -50,6 +51,7 @@ import { getRelays } from "../common/nostr";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
+import { parseEventRef } from "../utils/calendarListTypes";
 import { CalendarListSelect } from "./CalendarListSelect";
 
 interface CalendarEventEditProps {
@@ -62,6 +64,205 @@ interface CalendarEventEditProps {
   display?: "modal" | "page";
 }
 
+const CUSTOM_RECURRENCE_VALUE = "__custom_rule__";
+
+type CustomUnit = "day" | "week";
+type CustomEndMode = "never" | "until" | "count";
+
+interface CustomRecurrenceDraft {
+  interval: number;
+  unit: CustomUnit;
+  weekDays: string[];
+  endMode: CustomEndMode;
+  endDate: Dayjs | null;
+  count: number;
+}
+
+const WEEKDAY_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: "SU", label: "S" },
+  { code: "MO", label: "M" },
+  { code: "TU", label: "T" },
+  { code: "WE", label: "W" },
+  { code: "TH", label: "T" },
+  { code: "FR", label: "F" },
+  { code: "SA", label: "S" },
+];
+
+function toRRuleBody(rule: string): string {
+  const trimmed = rule.trim();
+  if (trimmed.toUpperCase().startsWith("RRULE:")) {
+    return trimmed.slice(6).trim();
+  }
+
+  return trimmed;
+}
+
+function summarizeRecurrenceRule(rule: string): string {
+  const normalizedRule = toRRuleBody(rule);
+  if (!normalizedRule) {
+    return rule;
+  }
+
+  try {
+    const semanticLabel = RRule.fromString(`RRULE:${normalizedRule}`).toText();
+    if (!semanticLabel) {
+      return normalizedRule;
+    }
+
+    return semanticLabel.charAt(0).toUpperCase() + semanticLabel.slice(1);
+  } catch {
+    return normalizedRule;
+  }
+}
+
+function parseRuleParts(rule: string): Record<string, string> {
+  const parsed: Record<string, string> = {};
+
+  for (const part of toRRuleBody(rule).split(";")) {
+    const [rawKey, rawValue] = part.split("=", 2);
+    if (!rawKey || !rawValue) {
+      continue;
+    }
+
+    parsed[rawKey.toUpperCase()] = rawValue.toUpperCase();
+  }
+
+  return parsed;
+}
+
+function parseUntilDate(untilValue?: string): Dayjs | null {
+  if (!untilValue) {
+    return null;
+  }
+
+  const value = untilValue.trim().toUpperCase();
+
+  if (/^\d{8}T\d{6}Z$/.test(value)) {
+    return dayjs(
+      new Date(
+        Date.UTC(
+          Number.parseInt(value.slice(0, 4), 10),
+          Number.parseInt(value.slice(4, 6), 10) - 1,
+          Number.parseInt(value.slice(6, 8), 10),
+          Number.parseInt(value.slice(9, 11), 10),
+          Number.parseInt(value.slice(11, 13), 10),
+          Number.parseInt(value.slice(13, 15), 10),
+        ),
+      ),
+    ).startOf("day");
+  }
+
+  if (/^\d{8}T\d{6}$/.test(value)) {
+    return dayjs(
+      new Date(
+        Number.parseInt(value.slice(0, 4), 10),
+        Number.parseInt(value.slice(4, 6), 10) - 1,
+        Number.parseInt(value.slice(6, 8), 10),
+        Number.parseInt(value.slice(9, 11), 10),
+        Number.parseInt(value.slice(11, 13), 10),
+        Number.parseInt(value.slice(13, 15), 10),
+      ),
+    ).startOf("day");
+  }
+
+  if (/^\d{8}$/.test(value)) {
+    return dayjs(
+      new Date(
+        Number.parseInt(value.slice(0, 4), 10),
+        Number.parseInt(value.slice(4, 6), 10) - 1,
+        Number.parseInt(value.slice(6, 8), 10),
+      ),
+    ).startOf("day");
+  }
+
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.startOf("day") : null;
+}
+
+function formatUntilDate(date: Dayjs): string {
+  return `${
+    date.endOf("day").toDate().toISOString().replace(/[-:]/g, "").split(".")[0]
+  }Z`;
+}
+
+function createDefaultCustomDraft(baseDate: Dayjs): CustomRecurrenceDraft {
+  return {
+    interval: 1,
+    unit: "week",
+    weekDays: ["MO"],
+    endMode: "never",
+    endDate: baseDate.startOf("day"),
+    count: 1,
+  };
+}
+
+function getCustomDraftFromRule(
+  rule: string,
+  fallbackDate: Dayjs,
+): CustomRecurrenceDraft {
+  const draft = createDefaultCustomDraft(fallbackDate);
+  const parsed = parseRuleParts(rule);
+
+  if (parsed.FREQ === "DAILY") {
+    draft.unit = "day";
+  } else if (parsed.FREQ === "WEEKLY") {
+    draft.unit = "week";
+  }
+
+  const interval = Number.parseInt(parsed.INTERVAL ?? "1", 10);
+  draft.interval = Number.isFinite(interval) && interval > 0 ? interval : 1;
+
+  if (draft.unit === "week") {
+    const weekDays = (parsed.BYDAY ?? "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) =>
+        WEEKDAY_OPTIONS.some((weekday) => weekday.code === part),
+      );
+
+    if (weekDays.length > 0) {
+      draft.weekDays = Array.from(new Set(weekDays));
+    }
+  }
+
+  const count = Number.parseInt(parsed.COUNT ?? "", 10);
+  if (Number.isFinite(count) && count > 0) {
+    draft.endMode = "count";
+    draft.count = count;
+  } else {
+    const untilDate = parseUntilDate(parsed.UNTIL);
+    if (untilDate) {
+      draft.endMode = "until";
+      draft.endDate = untilDate;
+    }
+  }
+
+  return draft;
+}
+
+function buildCustomRecurrenceRule(draft: CustomRecurrenceDraft): string {
+  const parts = [draft.unit === "day" ? "FREQ=DAILY" : "FREQ=WEEKLY"];
+
+  if (draft.interval > 1) {
+    parts.push(`INTERVAL=${draft.interval}`);
+  }
+
+  if (draft.unit === "week") {
+    const weekDays = (draft.weekDays.length > 0 ? draft.weekDays : ["MO"]).join(
+      ",",
+    );
+    parts.push(`BYDAY=${weekDays}`);
+  }
+
+  if (draft.endMode === "count") {
+    parts.push(`COUNT=${Math.max(1, draft.count)}`);
+  } else if (draft.endMode === "until" && draft.endDate) {
+    parts.push(`UNTIL=${formatUntilDate(draft.endDate)}`);
+  }
+
+  return parts.join(";");
+}
+
 export function CalendarEventEdit({
   open,
   event: initialEvent,
@@ -72,12 +273,14 @@ export function CalendarEventEdit({
   display = "modal",
 }: CalendarEventEditProps) {
   const intl = useIntl();
-  const initialRecurrence = parseRecurrenceRule(initialEvent?.repeat.rrule);
+  const initialRule = initialEvent?.repeat.rrule ?? null;
+  const initialRecurrence = parseRecurrenceRule(initialRule);
+  const initialIsCustom = !!initialRule && initialRecurrence.frequency === null;
   const [processing, setProcessing] = useState(false);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
-  const { calendars } = useCalendarLists();
+  const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
     initialEvent?.calendarId || calendars[0]?.id || "",
   );
@@ -115,15 +318,29 @@ export function CalendarEventEdit({
   });
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RepeatingFrequency>(
-      initialRecurrence.frequency ?? RepeatingFrequency.None,
+      initialIsCustom
+        ? RepeatingFrequency.None
+        : (initialRecurrence.frequency ?? RepeatingFrequency.None),
     );
-  const [recurrenceEndMode, setRecurrenceEndMode] =
-    useState<RecurrenceEndMode>(initialRecurrence.endMode);
+  const [recurrenceEndMode, setRecurrenceEndMode] = useState<RecurrenceEndMode>(
+    initialRecurrence.endMode,
+  );
   const [recurrenceCount, setRecurrenceCount] = useState<number>(
     initialRecurrence.count ?? 1,
   );
   const [recurrenceUntilDate, setRecurrenceUntilDate] = useState<Dayjs | null>(
     initialRecurrence.untilDate ? dayjs(initialRecurrence.untilDate) : null,
+  );
+  const [isCustomRecurrence, setIsCustomRecurrence] =
+    useState<boolean>(initialIsCustom);
+  const [customRule, setCustomRule] = useState<string | null>(
+    initialIsCustom && initialRule ? toRRuleBody(initialRule) : null,
+  );
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState<CustomRecurrenceDraft>(() =>
+    initialIsCustom && initialRule
+      ? getCustomDraftFromRule(initialRule, dayjs(eventDetails.begin))
+      : createDefaultCustomDraft(dayjs(eventDetails.begin)),
   );
 
   const handleClose = () => {
@@ -141,16 +358,43 @@ export function CalendarEventEdit({
     setEventDetails((prev) => ({ ...prev, [key]: value }));
   };
 
+  const openCustomDialog = () => {
+    setCustomDraft(
+      customRule
+        ? getCustomDraftFromRule(customRule, dayjs(eventDetails.begin))
+        : createDefaultCustomDraft(dayjs(eventDetails.begin)),
+    );
+    setCustomDialogOpen(true);
+  };
+
+  const closeCustomDialog = () => {
+    setCustomDialogOpen(false);
+    if (!customRule) {
+      setIsCustomRecurrence(false);
+      setRecurrenceFrequency(RepeatingFrequency.None);
+    }
+  };
+
+  const applyCustomRule = () => {
+    const nextRule = buildCustomRecurrenceRule(customDraft);
+    setCustomRule(nextRule);
+    setIsCustomRecurrence(true);
+    setRecurrenceFrequency(RepeatingFrequency.None);
+    setCustomDialogOpen(false);
+  };
+
   const handleSave = async () => {
     setProcessing(true);
     try {
-      const rrule = buildRecurrenceRule({
-        frequency: recurrenceFrequency,
-        endMode: recurrenceEndMode,
-        count: recurrenceCount,
-        untilDate: recurrenceUntilDate?.valueOf() ?? null,
-        eventStart: eventDetails.begin,
-      });
+      const rrule = isCustomRecurrence
+        ? customRule
+        : buildRecurrenceRule({
+            frequency: recurrenceFrequency,
+            endMode: recurrenceEndMode,
+            count: recurrenceCount,
+            untilDate: recurrenceUntilDate?.valueOf() ?? null,
+            eventStart: eventDetails.begin,
+          });
       const eventToSave = {
         ...eventDetails,
         isPrivateEvent: isPrivate,
@@ -168,10 +412,21 @@ export function CalendarEventEdit({
             .getState()
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
-          await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
+          const { eventRef, authorPubkey } =
+            await publishPrivateCalendarEvent(eventToSave);
+          await addEventToCalendar(selectedCalendarId, eventRef);
+          const { eventDTag, viewKey } = parseEventRef(eventRef);
+          useTimeBasedEvents.getState().addEvent({
+            ...eventToSave,
+            id: eventDTag,
+            viewKey,
+            user: authorPubkey,
+            calendarId: selectedCalendarId,
+          });
         }
       } else {
-        const { id: savedId, pubKey } = await publishPublicCalendarEvent(eventToSave);
+        const { id: savedId, pubKey } =
+          await publishPublicCalendarEvent(eventToSave);
         useTimeBasedEvents.getState().updateEvent({
           ...eventToSave,
           id: savedId,
@@ -205,6 +460,19 @@ export function CalendarEventEdit({
     ) {
       setRecurrenceUntilDate(beginDay);
     }
+
+    if (isCustomRecurrence && customDraft.endMode === "until") {
+      setCustomDraft((prev) => {
+        if (!prev.endDate || !prev.endDate.isBefore(beginDay, "day")) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          endDate: beginDay,
+        };
+      });
+    }
   };
 
   const onChangeEndDate = (value: Dayjs | null) => {
@@ -212,9 +480,17 @@ export function CalendarEventEdit({
     updateField("end", value.unix() * 1000);
   };
 
-  const handleFrequencyChange = (e: SelectChangeEvent<string>) => {
-    const value = e.target.value as RepeatingFrequency;
-    setRecurrenceFrequency(value);
+  const handleFrequencyChange = (event: SelectChangeEvent<string>) => {
+    const value = event.target.value;
+
+    if (value === CUSTOM_RECURRENCE_VALUE) {
+      setIsCustomRecurrence(true);
+      openCustomDialog();
+      return;
+    }
+
+    setIsCustomRecurrence(false);
+    setRecurrenceFrequency(value as RepeatingFrequency);
   };
 
   const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
@@ -237,16 +513,30 @@ export function CalendarEventEdit({
     setRecurrenceCount(Number.isFinite(parsed) ? parsed : 0);
   };
 
-  const recurrenceEnabled = recurrenceFrequency !== RepeatingFrequency.None;
+  const recurrenceEnabled = isCustomRecurrence
+    ? !!customRule
+    : recurrenceFrequency !== RepeatingFrequency.None;
   const recurrenceValid =
     !recurrenceEnabled ||
-    recurrenceEndMode === "never" ||
-    (recurrenceEndMode === "count" &&
-      Number.isInteger(recurrenceCount) &&
-      recurrenceCount >= 1) ||
-    (recurrenceEndMode === "until" &&
-      !!recurrenceUntilDate &&
-      !recurrenceUntilDate.isBefore(dayjs(eventDetails.begin).startOf("day")));
+    (isCustomRecurrence
+      ? !!customRule
+      : recurrenceEndMode === "never" ||
+        (recurrenceEndMode === "count" &&
+          Number.isInteger(recurrenceCount) &&
+          recurrenceCount >= 1) ||
+        (recurrenceEndMode === "until" &&
+          !!recurrenceUntilDate &&
+          !recurrenceUntilDate.isBefore(
+            dayjs(eventDetails.begin).startOf("day"),
+          )));
+  const recurrenceSelectValue = isCustomRecurrence
+    ? CUSTOM_RECURRENCE_VALUE
+    : recurrenceFrequency;
+  const customDraftValid =
+    customDraft.interval >= 1 &&
+    (customDraft.unit !== "week" || customDraft.weekDays.length > 0) &&
+    (customDraft.endMode !== "until" || !!customDraft.endDate) &&
+    (customDraft.endMode !== "count" || customDraft.count >= 1);
 
   const buttonDisabled = !(
     !processing &&
@@ -332,6 +622,213 @@ export function CalendarEventEdit({
           value={dayjs(eventDetails.end)}
         />
       </EventAttributeEditContainer>
+
+      <Dialog
+        open={customDialogOpen}
+        onClose={closeCustomDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          {intl.formatMessage({ id: "event.customRecurrenceTitle" })}
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            pt: "8px !important",
+          }}
+        >
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({ id: "event.repeatEvery" })}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <TextField
+                size="small"
+                type="number"
+                value={customDraft.interval}
+                onChange={(event) => {
+                  const parsed = Number.parseInt(event.target.value, 10);
+                  setCustomDraft((prev) => ({
+                    ...prev,
+                    interval:
+                      Number.isFinite(parsed) && parsed > 0 ? parsed : 1,
+                  }));
+                }}
+                inputProps={{ min: 1 }}
+                sx={{ width: 84 }}
+              />
+              <FormControl size="small" sx={{ minWidth: 116 }}>
+                <Select
+                  value={customDraft.unit}
+                  onChange={(event) => {
+                    const nextUnit = event.target.value as CustomUnit;
+                    setCustomDraft((prev) => ({
+                      ...prev,
+                      unit: nextUnit,
+                      weekDays:
+                        nextUnit === "week" && prev.weekDays.length === 0
+                          ? ["MO"]
+                          : prev.weekDays,
+                    }));
+                  }}
+                >
+                  <MenuItem value="day">
+                    {intl.formatMessage({ id: "navigation.day" })}
+                  </MenuItem>
+                  <MenuItem value="week">
+                    {intl.formatMessage({ id: "navigation.week" })}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+
+          {customDraft.unit === "week" && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {intl.formatMessage({ id: "event.repeatOn" })}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {WEEKDAY_OPTIONS.map((weekday) => {
+                  const selected = customDraft.weekDays.includes(weekday.code);
+
+                  return (
+                    <Button
+                      key={weekday.code}
+                      variant={selected ? "contained" : "outlined"}
+                      onClick={() => {
+                        setCustomDraft((prev) => {
+                          const hasDay = prev.weekDays.includes(weekday.code);
+                          const nextDays = hasDay
+                            ? prev.weekDays.filter(
+                                (day) => day !== weekday.code,
+                              )
+                            : [...prev.weekDays, weekday.code];
+
+                          return {
+                            ...prev,
+                            weekDays: nextDays,
+                          };
+                        });
+                      }}
+                      sx={{
+                        minWidth: 34,
+                        width: 34,
+                        height: 34,
+                        borderRadius: "999px",
+                        p: 0,
+                        textTransform: "none",
+                      }}
+                    >
+                      {weekday.label}
+                    </Button>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({ id: "event.recurrenceEnds" })}
+            </Typography>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Button
+                variant={
+                  customDraft.endMode === "never" ? "contained" : "outlined"
+                }
+                size="small"
+                onClick={() => {
+                  setCustomDraft((prev) => ({ ...prev, endMode: "never" }));
+                }}
+              >
+                {intl.formatMessage({ id: "event.recurrenceEndsNever" })}
+              </Button>
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Button
+                variant={
+                  customDraft.endMode === "until" ? "contained" : "outlined"
+                }
+                size="small"
+                onClick={() => {
+                  setCustomDraft((prev) => ({ ...prev, endMode: "until" }));
+                }}
+              >
+                {intl.formatMessage({ id: "event.recurrenceEndsOnDate" })}
+              </Button>
+              <DatePicker
+                value={customDraft.endDate}
+                disabled={customDraft.endMode !== "until"}
+                minDate={dayjs(eventDetails.begin).startOf("day")}
+                onChange={(value) => {
+                  setCustomDraft((prev) => ({
+                    ...prev,
+                    endMode: "until",
+                    endDate: value ? value.startOf("day") : prev.endDate,
+                  }));
+                }}
+                slotProps={{
+                  textField: {
+                    size: "small",
+                    sx: { width: 152 },
+                  },
+                }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Button
+                variant={
+                  customDraft.endMode === "count" ? "contained" : "outlined"
+                }
+                size="small"
+                onClick={() => {
+                  setCustomDraft((prev) => ({ ...prev, endMode: "count" }));
+                }}
+              >
+                {intl.formatMessage({ id: "event.recurrenceEndsAfter" })}
+              </Button>
+              <TextField
+                size="small"
+                type="number"
+                value={customDraft.count}
+                disabled={customDraft.endMode !== "count"}
+                onChange={(event) => {
+                  const parsed = Number.parseInt(event.target.value, 10);
+                  setCustomDraft((prev) => ({
+                    ...prev,
+                    endMode: "count",
+                    count: Number.isFinite(parsed) && parsed > 0 ? parsed : 1,
+                  }));
+                }}
+                inputProps={{ min: 1 }}
+                sx={{ width: 86 }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {intl.formatMessage({ id: "event.recurrenceOccurrences" })}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeCustomDialog}>
+            {intl.formatMessage({ id: "navigation.cancel" })}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={applyCustomRule}
+            disabled={!customDraftValid}
+          >
+            {intl.formatMessage({ id: "navigation.save" })}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Divider />
       {/* Location */}
       <EventAttributeEditContainer>
@@ -366,9 +863,42 @@ export function CalendarEventEdit({
               {intl.formatMessage({ id: "event.selectRecurrence" })}
             </InputLabel>
             <Select
-              value={recurrenceFrequency}
+              value={recurrenceSelectValue}
               label={intl.formatMessage({ id: "event.selectRecurrence" })}
               onChange={handleFrequencyChange}
+              renderValue={(selected) => {
+                if (selected === CUSTOM_RECURRENCE_VALUE) {
+                  return customRule
+                    ? summarizeRecurrenceRule(customRule)
+                    : intl.formatMessage({ id: "event.customRecurrence" });
+                }
+
+                const labels: Record<string, string> = {
+                  [RepeatingFrequency.None]: intl.formatMessage({
+                    id: "event.doesNotRepeat",
+                  }),
+                  [RepeatingFrequency.Daily]: intl.formatMessage({
+                    id: "event.daily",
+                  }),
+                  [RepeatingFrequency.Weekly]: intl.formatMessage({
+                    id: "event.weekly",
+                  }),
+                  [RepeatingFrequency.Weekday]: intl.formatMessage({
+                    id: "event.weekdays",
+                  }),
+                  [RepeatingFrequency.Monthly]: intl.formatMessage({
+                    id: "event.monthly",
+                  }),
+                  [RepeatingFrequency.Quarterly]: intl.formatMessage({
+                    id: "event.quarterly",
+                  }),
+                  [RepeatingFrequency.Yearly]: intl.formatMessage({
+                    id: "event.yearly",
+                  }),
+                };
+
+                return labels[selected] ?? String(selected);
+              }}
             >
               <MenuItem value={RepeatingFrequency.None}>
                 {intl.formatMessage({ id: "event.doesNotRepeat" })}
@@ -391,10 +921,31 @@ export function CalendarEventEdit({
               <MenuItem value={RepeatingFrequency.Yearly}>
                 {intl.formatMessage({ id: "event.yearly" })}
               </MenuItem>
+              <MenuItem value={CUSTOM_RECURRENCE_VALUE}>
+                {intl.formatMessage({ id: "event.customRecurrence" })}
+              </MenuItem>
             </Select>
           </FormControl>
 
-          {recurrenceEnabled && (
+          {isCustomRecurrence && customRule && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                {summarizeRecurrenceRule(customRule)}
+              </Typography>
+              <Button size="small" onClick={openCustomDialog}>
+                {intl.formatMessage({ id: "event.customRecurrence" })}
+              </Button>
+            </Box>
+          )}
+
+          {recurrenceEnabled && !isCustomRecurrence && (
             <Box
               sx={{
                 display: "flex",
@@ -427,7 +978,9 @@ export function CalendarEventEdit({
                 <TextField
                   size="small"
                   type="number"
-                  label={intl.formatMessage({ id: "event.recurrenceOccurrences" })}
+                  label={intl.formatMessage({
+                    id: "event.recurrenceOccurrences",
+                  })}
                   value={recurrenceCount}
                   onChange={handleRecurrenceCountChange}
                   inputProps={{ min: 1 }}

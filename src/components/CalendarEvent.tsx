@@ -40,7 +40,7 @@ import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
 import { getEditEventPage, getEventPage } from "../utils/routingHelper";
 import { useNavigate } from "react-router";
-import { isNative } from "../utils/platform";
+import { getAppBaseUrl, isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
@@ -282,8 +282,9 @@ function ActionButtons({
     ),
     event.viewKey,
   );
+  const eventUrl = `${getAppBaseUrl()}${linkToEvent}`;
   const copyLinkToEvent = () => {
-    navigator.clipboard.writeText(`${window.location.origin}${linkToEvent}`);
+    navigator.clipboard.writeText(eventUrl);
   };
   const { user } = useUser();
   const navigate = useNavigate();
@@ -313,14 +314,13 @@ function ActionButtons({
       minWidth={isMobile ? "inherit" : "160px"}
       sx={{ whiteSpace: "nowrap" }}
     >
+      <IconButton size={iconSize} onClick={copyLinkToEvent}>
+        <Tooltip title={intl.formatMessage({ id: "event.copyLink" })}>
+          <ContentCopy fontSize={iconSize} />
+        </Tooltip>
+      </IconButton>
       {!isMobile && (
         <>
-          <IconButton size={iconSize} onClick={copyLinkToEvent}>
-            <Tooltip title={intl.formatMessage({ id: "event.copyLink" })}>
-              <ContentCopy fontSize={iconSize} />
-            </Tooltip>
-          </IconButton>
-
           {showOpenInNew && (
             <IconButton size={iconSize} component={Link} href={linkToEvent}>
               <Tooltip title={intl.formatMessage({ id: "event.openNewTab" })}>
@@ -549,7 +549,12 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const intl = useIntl();
   const navigate = useNavigate();
   const { user, updateLoginModal } = useUser();
-  const { calendars, addEventToCalendar, isLoaded: calendarsLoaded, fetchCalendars } = useCalendarLists();
+  const {
+    calendars,
+    addEventToCalendar,
+    isLoaded: calendarsLoaded,
+    fetchCalendars,
+  } = useCalendarLists();
   const { invitations, acceptInvitation } = useInvitations();
   const { updateEvent } = useTimeBasedEvents();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
@@ -586,7 +591,10 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
         (inv) => inv.eventId === event.id && inv.pubkey === event.user,
       );
       if (matchingInvitation) {
-        await acceptInvitation(matchingInvitation.giftWrapId, selectedCalendarId);
+        await acceptInvitation(
+          matchingInvitation.giftWrapId,
+          selectedCalendarId,
+        );
       } else {
         const eventRef = buildEventRef({
           kind: event.kind,
@@ -595,7 +603,11 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           viewKey: event.viewKey || "",
         });
         await addEventToCalendar(selectedCalendarId, eventRef);
-        updateEvent({ ...event, calendarId: selectedCalendarId, isInvitation: false });
+        updateEvent({
+          ...event,
+          calendarId: selectedCalendarId,
+          isInvitation: false,
+        });
       }
       setSuccessDialogOpen(true);
     } catch {
@@ -608,7 +620,10 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const handleContinueAsGuest = async () => {
     setCreatingGuest(true);
     try {
-      await signerManager.createGuestAccount(bytesToHex(generateSecretKey()), {});
+      await signerManager.createGuestAccount(
+        bytesToHex(generateSecretKey()),
+        {},
+      );
     } catch {
       setErrorOpen(true);
     } finally {
@@ -647,7 +662,9 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
               disabled={creatingGuest}
               onClick={handleContinueAsGuest}
               startIcon={
-                creatingGuest ? <CircularProgress size={14} color="inherit" /> : undefined
+                creatingGuest ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : undefined
               }
             >
               {intl.formatMessage({ id: "message.modeSelection_guestButton" })}
@@ -706,9 +723,15 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
             component="span"
           >
             <FormattedMessage
-              id={event.isInvitation ? "invitation.invitedBy" : "invitation.createdBy"}
+              id={
+                event.isInvitation
+                  ? "invitation.invitedBy"
+                  : "invitation.createdBy"
+              }
               values={{
-                participant: <Participant pubKey={event.user} isAuthor={false} />,
+                participant: (
+                  <Participant pubKey={event.user} isAuthor={false} />
+                ),
               }}
             />
           </Typography>
@@ -731,7 +754,9 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
             onClick={handleAccept}
             sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
             startIcon={
-              accepting ? <CircularProgress size={14} color="inherit" /> : undefined
+              accepting ? (
+                <CircularProgress size={14} color="inherit" />
+              ) : undefined
             }
           >
             {intl.formatMessage({ id: "invitation.acceptInvitation" })}

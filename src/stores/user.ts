@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("USER STORE");
 import {
   setItem,
   setSecureItem,
@@ -52,78 +55,105 @@ export const useUser = create<{
   isInitialized: false,
 
   updateUser: (user) => {
+    logger.log("updateUser", user.pubkey);
     set({ user });
     setItem(USER_STORAGE_KEY, user);
+    logger.log("updateUser: complete");
   },
   logout: async () => {
+    logger.log("logout: start");
     signerManager.logout();
+    logger.log("logout: signer logged out");
     cancelAllNotifications();
+    logger.log("logout: notifications cancelled");
     useRelayStore.getState().resetRelays();
+    logger.log("logout: relays reset");
     await useTimeBasedEvents.getState().clearCachedEvents();
+    logger.log("logout: cached events cleared");
     await useCalendarLists.getState().clearCachedCalendars();
+    logger.log("logout: cached calendars cleared");
     await useInvitations.getState().clearCachedInvitations();
     await useBookingRequests.getState().clearCached();
     await useSchedulingPages.getState().clearCachedPages();
     // Clear background worker keys
+    logger.log("logout: cached invitations cleared");
     await removeSecureItem(BG_KEY_USER_PUBKEY);
     await removeSecureItem(BG_KEY_RELAYS);
     await removeSecureItem(BG_KEY_LAST_LOGIN_TIME);
     await removeSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME);
-    set({ user: null });
+    logger.log("logout: background worker keys cleared");
+    set({ user: null, isInitialized: false });
     localStorage.removeItem(USER_STORAGE_KEY);
+    logger.log("logout: complete");
   },
 
   initializeUser: async () => {
     if (!isInitializing) {
+      logger.log("initializeUser: start");
       isInitializing = true;
       signerManager.onChange(onUserChange);
       signerManager.restoreFromStorage();
+      logger.log("initializeUser: signer restored from storage");
+    } else {
+      logger.log("initializeUser: already initializing, skipping");
     }
   },
 }));
 
 const onUserChange = async () => {
+  logger.log("onUserChange: triggered");
   const currentUser = useUser.getState().user;
   const cachedUser = signerManager.getUser();
-
+  if (cachedUser?.pubkey !== currentUser?.pubkey)
+    useUser.setState({
+      user: cachedUser,
+    });
   if (cachedUser) {
+    logger.log("onUserChange: cached user found", cachedUser.pubkey);
     if (currentUser?.pubkey !== cachedUser.pubkey) {
+      logger.log("onUserChange: new user detected, resetting private events");
       const eventManager = useTimeBasedEvents.getState();
       eventManager.resetPrivateEvents();
-      // Fetch user's relay list (NIP-65)
+      logger.log("onUserChange: loading cached calendars and invitations");
+      useCalendarLists.getState().loadCachedCalendars();
+      useInvitations.getState().loadCachedInvitations();
+      logger.log("onUserChange: fetching relay list");
       const relays = await fetchRelayList(cachedUser.pubkey);
       const userRelays = relays.length > 0 ? relays : defaultRelays;
+      logger.log("onUserChange: setting relays", userRelays.length, "relays");
       useRelayStore.getState().setRelays(userRelays);
-      // Persist pubkey, relays, and login time for the background invitation worker
+      logger.log("onUserChange: persisting background worker keys");
+      logger.log("onUserChange: fetching deletion events");
+      await nostrRuntime.fetchDeletionEvents(userRelays, cachedUser.pubkey);
+      logger.log("onUserChange: fetching participant removal events");
+      await nostrRuntime.fetchParticipantRemovalEvents(
+        userRelays,
+        cachedUser.pubkey,
+      );
       await setSecureItem(BG_KEY_USER_PUBKEY, cachedUser.pubkey);
       await setSecureItem(BG_KEY_RELAYS, userRelays);
       await setSecureItem(
         BG_KEY_LAST_LOGIN_TIME,
         Math.floor(Date.now() / 1000),
       );
-      // Fetch deletion events first so the EventStore knows which events
-      // to reject before calendar list events arrive.
-      await nostrRuntime.fetchDeletionEvents(userRelays, cachedUser.pubkey);
-      await nostrRuntime.fetchParticipantRemovalEvents(
-        userRelays,
-        cachedUser.pubkey,
-      );
-      // Initialize calendar lists and invitations for the new user
-      useCalendarLists.getState().loadCachedCalendars();
-      useInvitations.getState().loadCachedInvitations();
+      useUser.setState({
+        isInitialized: true,
+      });
+    } else {
+      logger.log("onUserChange: same user, no re-initialization needed");
     }
-    useUser.setState({
-      isInitialized: true,
-      user: cachedUser,
-    });
+    logger.log("onUserChange: setting initialized state");
   } else {
+    logger.log("onUserChange: no cached user, clearing state");
     useUser.setState({
       isInitialized: true,
       user: null,
     });
     if (currentUser?.pubkey !== undefined) {
+      logger.log("onUserChange: resetting private events for logged-out user");
       const eventManager = useTimeBasedEvents.getState();
       eventManager.resetPrivateEvents();
     }
   }
+  logger.log("onUserChange: complete");
 };

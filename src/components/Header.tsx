@@ -1,12 +1,14 @@
 import React from "react";
-import { Toolbar, IconButton, Drawer } from "@mui/material";
+import { Toolbar, IconButton, Drawer, Badge, Stack } from "@mui/material";
 import AppBar from "@mui/material/AppBar";
 import MenuIcon from "@mui/icons-material/Menu";
-import { Link } from "react-router";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import { Link, useNavigate } from "react-router";
 import { UserMenu } from "./UserMenu";
 import { ICSUpload } from "./ICSUpload";
 import { CalendarSidebar } from "./CalendarSidebar";
 import { ICalendarEvent } from "../utils/types";
+import { useInvitations } from "../stores/invitations";
 
 export const HEADER_HEIGHT = 56;
 
@@ -17,6 +19,8 @@ interface HeaderProps {
 export const Header = ({ onImportEvent }: HeaderProps) => {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const closeDrawer = () => setDrawerOpen(false);
+  const navigate = useNavigate();
+  const { unreadCount } = useInvitations();
 
   return (
     <>
@@ -58,7 +62,17 @@ export const Header = ({ onImportEvent }: HeaderProps) => {
             </Link>
             <ICSUpload onImportEvent={onImportEvent} />
           </div>
-          <UserMenu />
+          <Stack direction={"row"}>
+            <IconButton
+              sx={{ width: "56px" }}
+              onClick={() => navigate("/notifications")}
+            >
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+            <UserMenu />
+          </Stack>
         </Toolbar>
       </AppBar>
       <Drawer open={drawerOpen} onClose={closeDrawer}>

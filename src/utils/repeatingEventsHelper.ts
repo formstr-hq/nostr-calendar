@@ -140,22 +140,22 @@ function parseRRuleDate(value: string): number | null {
   }
 
   if (/^\d{8}T\d{6}$/.test(clean)) {
-    return new Date(
+    return Date.UTC(
       Number.parseInt(clean.slice(0, 4), 10),
       Number.parseInt(clean.slice(4, 6), 10) - 1,
       Number.parseInt(clean.slice(6, 8), 10),
       Number.parseInt(clean.slice(9, 11), 10),
       Number.parseInt(clean.slice(11, 13), 10),
       Number.parseInt(clean.slice(13, 15), 10),
-    ).getTime();
+    );
   }
 
   if (/^\d{8}$/.test(clean)) {
-    return new Date(
+    return Date.UTC(
       Number.parseInt(clean.slice(0, 4), 10),
       Number.parseInt(clean.slice(4, 6), 10) - 1,
       Number.parseInt(clean.slice(6, 8), 10),
-    ).getTime();
+    );
   }
 
   return null;
