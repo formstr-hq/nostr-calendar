@@ -11,22 +11,9 @@ import { useInvitations } from "../stores/invitations";
 
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
-  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
-  const { fetchInvitations, stopInvitations, invitations } = useInvitations();
+  const calendars = useCalendarLists((state) => state.calendars);
+  const {invitations} = useInvitations();
 
-  // Fetch private events and invitations whenever visible calendars change.
-  // Calendar list fetching is handled in App.tsx so it works on every route.
-  useEffect(() => {
-    if (user && calendarsLoaded) {
-      fetchInvitations();
-      events.fetchPrivateEvents();
-    }
-  }, [user, calendarsLoaded, calendars]);
-
-  // Cleanup invitation listener on unmount
-  useEffect(() => {
-    return () => stopInvitations();
-  }, []);
 
   const { layout } = useLayout();
   const visibileCalendars = new Set(
