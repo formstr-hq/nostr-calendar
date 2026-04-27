@@ -32,7 +32,7 @@ export enum EventKinds {
   BookingResponseRumor = 58,
 
   // Public Busy List (free/busy "I'm unavailable here" entries; one event per
-  // user per calendar month, replacement key = ["d", "MM-YYYY"]).
+  // user per calendar month, replacement key = ["d", "YYYY-MM"]).
   PublicBusyList = 31926,
 
   // Creator Self-Key Index (self-encrypted viewKey backup so the creator can

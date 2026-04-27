@@ -262,9 +262,9 @@ export const schedulingPageToTags = (page: ISchedulingPage): string[][] => {
 
 // --- Public Busy List (kind 31926) ---
 
-const MONTH_KEY_RE = /^\d{2}-\d{4}$/;
+const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
 
-/** d-tag for a busy list of a given month, e.g. `04-2026`. */
+/** d-tag for a busy list of a given month, e.g. `2026-04`. */
 export function busyListDTag(monthKey: string): string {
   return monthKey;
 }
@@ -279,8 +279,8 @@ export function busyListMonthKeyFromDTag(dTag: string): string | null {
  *
  * Wire format:
  *   tags: [
- *     ["d", "MM-YYYY"],         // replacement key (NIP-01 §16)
- *     ["t", "MM-YYYY"],         // queryable hashtag (NIP-12)
+ *     ["d", "YYYY-MM"],         // replacement key (NIP-01 §16)
+ *     ["t", "YYYY-MM"],         // queryable hashtag (NIP-12)
  *     ["t", "busy"],            // secondary hashtag
  *     ["block", "<startSec>", "<endSec>"], // repeatable
  *     ...

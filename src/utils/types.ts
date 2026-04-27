@@ -219,12 +219,12 @@ export interface IBusyRange {
  * A user's public busy list for one calendar month.
  *
  * One Nostr event per `(user, monthKey)`. Each event is parameterized-replaceable
- * with `["d", "MM-YYYY"]` so republishing replaces only that month.
+ * with `["d", "YYYY-MM"]` so republishing replaces only that month.
  */
 export interface IBusyList {
   /** Owner public key (event author). */
   user: string;
-  /** Month partition key, format `MM-YYYY` (e.g. `04-2026`). */
+  /** Month partition key, format `YYYY-MM` (e.g. `2026-04`). */
   monthKey: string;
   /** Blocked ranges (deduped, sorted). */
   ranges: IBusyRange[];

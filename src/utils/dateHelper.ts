@@ -11,17 +11,17 @@ export const formatDateTime = (timestamp: number) =>
 
 /**
  * Format a Date (or ms timestamp) as the busy-list month partition key
- * `MM-YYYY` (UTC). Example: `04-2026`.
+ * `YYYY-MM` (UTC). Example: `2026-04`.
  */
 export function busyListMonthKey(value: number | Date): string {
   const d = typeof value === "number" ? new Date(value) : value;
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
   const year = d.getUTCFullYear();
-  return `${month}-${year}`;
+  return `${year}-${month}`;
 }
 
 /**
- * Return the set of `MM-YYYY` partition keys that the given absolute time
+ * Return the set of `YYYY-MM` partition keys that the given absolute time
  * range `[startMs, endMs]` touches. Always at least one entry; multi-month
  * ranges (rare, e.g. last-day-of-month meetings spilling past midnight)
  * return every month inclusive.

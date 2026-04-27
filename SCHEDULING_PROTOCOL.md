@@ -66,13 +66,13 @@ A parameterized-replaceable record that exposes a user's already-committed time 
 ### Encoding
 
 - Event kind: `31926`
-- One event per (user, month). The month bucket is `MM-YYYY` in UTC.
+- One event per (user, month). The month bucket is `YYYY-MM` in UTC.
 - Tags:
 
 | Tag | Shape | Meaning |
 |---|---|---|
-| `d` | `["d", "MM-YYYY"]` | Identifier — UTC month bucket. |
-| `t` | `["t", "MM-YYYY"]`, `["t", "busy"]` | Hashtags for relay indexing/discovery. |
+| `d` | `["d", "YYYY-MM"]` | Identifier — UTC month bucket. |
+| `t` | `["t", "YYYY-MM"]`, `["t", "busy"]` | Hashtags for relay indexing/discovery. |
 | `block` | `["block", "<startSec>", "<endSec>"]` (repeatable) | Opaque busy range in unix seconds. |
 
 - Content is empty.

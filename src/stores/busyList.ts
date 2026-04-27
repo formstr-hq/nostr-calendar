@@ -3,12 +3,12 @@
  *
  * Tracks the current user's public free/busy entries and lets the booking
  * page consume other users' entries. One Nostr event per `(user, monthKey)`
- * (parameterized-replaceable, `["d", "MM-YYYY"]`).
+ * (parameterized-replaceable, `["d", "YYYY-MM"]`).
  *
  * - `addBusyRange` / `removeBusyRange` mutate the user's own lists and
  *   republish each touched month.
  * - `fetchBusyListsForUser` returns another user's lists for a given set
- *   of months (used by `SchedulingPagePublic` to grey out unavailable slots).
+ *   of months (used by `BookingPage` to grey out unavailable slots).
  *
  * The store does not persist to local storage — relays are the source of
  * truth and the data is cheap to refetch. The current user's lists are
@@ -53,7 +53,7 @@ export function setBusyListDefaultOptIn(value: boolean) {
 }
 
 interface BusyListState {
-  /** Current user's busy lists, keyed by `MM-YYYY`. */
+  /** Current user's busy lists, keyed by `YYYY-MM`. */
   ownLists: Record<string, IBusyList>;
   isLoaded: boolean;
 
