@@ -35,6 +35,9 @@ export interface IScheduledNotification {
 
 export type NotificationPreference = "enabled" | "disabled";
 
+export type RelayLineStatus = "pending" | "ok" | "error";
+export type RelayStatusMap = Record<string, RelayLineStatus>;
+
 export interface ICalendarEvent {
   begin: number;
   description: string;

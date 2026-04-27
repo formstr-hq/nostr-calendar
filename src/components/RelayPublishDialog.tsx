@@ -12,14 +12,13 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { normalizeURL } from "nostr-tools/utils";
 import { useIntl } from "react-intl";
-
-type RelayKeyStatus = "pending" | "ok" | "error";
+import type { RelayLineStatus, RelayStatusMap } from "../utils/types";
 
 interface RelayPublishDialogProps {
   open: boolean;
   relays: string[];
   /** Keys must be normalizeURL(relay) */
-  relayStatus: Record<string, RelayKeyStatus | undefined>;
+  relayStatus: RelayStatusMap;
   onClose: () => void;
   /** Re-publish only to relays that did not accept */
   onRetry?: () => void | Promise<void>;
@@ -29,8 +28,8 @@ interface RelayPublishDialogProps {
 
 function statusForUrl(
   url: string,
-  relayStatus: Record<string, RelayKeyStatus | undefined>,
-): RelayKeyStatus {
+  relayStatus: RelayStatusMap,
+): RelayLineStatus {
   const n = normalizeURL(url);
   return relayStatus[n] ?? "pending";
 }
