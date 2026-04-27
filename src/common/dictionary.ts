@@ -254,8 +254,9 @@ const dictionary: NestedObject = {
       freeDuration: "Booker picks any duration",
       weeklyAvailability: "Weekly Availability",
       additionalDateWindows: "Additional Date Windows",
-      noAdditionalWindows:
-        "No additional date windows. Use this for one-off availability outside your weekly schedule.",
+      additionalDateWindowsHelp:
+        "Use this for one-off availability outside your weekly schedule.",
+      noAdditionalWindows: "No additional date windows.",
       addDate: "Add Date",
       blockedDates: "Blocked Dates",
       blockedDatesHelp:
@@ -279,6 +280,11 @@ const dictionary: NestedObject = {
       pageNotFound: "Scheduling page not found. It may have been deleted.",
       loadError:
         "Could not load scheduling page. It may have been deleted or is temporarily unavailable.",
+      customDuration: "Custom (min)",
+      customDurationPlaceholder: "e.g. 45",
+      openLink: "Open link",
+      copyLink: "Copy link",
+      noBlockedDates: "No blocked dates. Add dates to block them from booking.",
     },
   },
   "de-DE": {
@@ -539,8 +545,9 @@ const dictionary: NestedObject = {
       freeDuration: "Bucher wählt beliebige Dauer",
       weeklyAvailability: "Wöchentliche Verfügbarkeit",
       additionalDateWindows: "Zusätzliche Zeitfenster",
-      noAdditionalWindows:
-        "Keine zusätzlichen Zeitfenster. Verwenden Sie dies für einmalige Verfügbarkeit außerhalb Ihres Wochenplans.",
+      additionalDateWindowsHelp:
+        "Verwenden Sie dies für einmalige Verfügbarkeit außerhalb Ihres Wochenplans.",
+      noAdditionalWindows: "Keine zusätzlichen Zeitfenster.",
       addDate: "Datum hinzufügen",
       blockedDates: "Gesperrte Tage",
       blockedDatesHelp:
@@ -565,6 +572,11 @@ const dictionary: NestedObject = {
         "Terminseite nicht gefunden. Sie wurde möglicherweise gelöscht.",
       loadError:
         "Terminseite konnte nicht geladen werden. Sie wurde möglicherweise gelöscht oder ist vorübergehend nicht verfügbar.",
+      customDuration: "Benutzerdefiniert (Min.)",
+      customDurationPlaceholder: "z.B. 45",
+      openLink: "Link öffnen",
+      copyLink: "Link kopieren",
+      noBlockedDates: "Keine gesperrten Tage. Fügen Sie Tage hinzu, um sie für Buchungen zu sperren.",
     },
   },
 };

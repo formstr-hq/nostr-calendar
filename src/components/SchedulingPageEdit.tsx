@@ -26,6 +26,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import { DatePicker as MuiDatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -37,23 +38,13 @@ import { Header } from "./Header";
 import type {
   ISchedulingPage,
   IAvailabilityWindow,
-  DurationMode,
 } from "../utils/types";
 import { ROUTES } from "../utils/routingHelper";
 import { useIntl } from "react-intl";
 
 const DAY_NAMES = dayjs.weekdays();
 
-const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
-
-const MIN_NOTICE_OPTIONS = [
-  { label: "1 hour", value: 3600 },
-  { label: "2 hours", value: 7200 },
-  { label: "4 hours", value: 14400 },
-  { label: "8 hours", value: 28800 },
-  { label: "24 hours", value: 86400 },
-  { label: "48 hours", value: 172800 },
-];
+const PRESET_DURATIONS = [15, 30, 60];
 
 const MAX_ADVANCE_OPTIONS = [
   { label: "7 days", value: 604800 },
@@ -99,16 +90,19 @@ interface OneOffWindow {
   endTime: string;
 }
 
+interface BlockedWindow {
+  date: string; // YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+}
+
 type SchedulingFormData = Pick<
   ISchedulingPage,
   | "title"
   | "description"
   | "location"
-  | "durationMode"
   | "slotDurations"
   | "blockedDates"
-  | "timezone"
-  | "minNotice"
   | "maxAdvance"
   | "buffer"
   | "expiry"
@@ -124,11 +118,8 @@ const DEFAULT_FORM_DATA: SchedulingFormData = {
   description: "",
   location: "",
   image: "",
-  durationMode: "fixed",
   slotDurations: [30],
   blockedDates: [],
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  minNotice: 3600,
   maxAdvance: 2592000,
   buffer: 900,
   expiry: 172800,
@@ -143,6 +134,25 @@ function timeStringToDayjs(time: string): Dayjs {
 function dayjsToTimeString(d: Dayjs | null): string {
   if (!d) return "09:00";
   return d.format("HH:mm");
+}
+
+function parseBlockedDateEntry(entry: string): BlockedWindow {
+  const [date, startTime, endTime] = entry.split("|");
+  if (date && startTime && endTime) {
+    return { date, startTime, endTime };
+  }
+  return {
+    date: entry,
+    startTime: "00:00",
+    endTime: "23:59",
+  };
+}
+
+function serializeBlockedWindow(window: BlockedWindow): string {
+  if (window.startTime === "00:00" && window.endTime === "23:59") {
+    return window.date;
+  }
+  return `${window.date}|${window.startTime}|${window.endTime}`;
 }
 
 export const SchedulingPageEdit = () => {
@@ -182,6 +192,7 @@ export const SchedulingPageEdit = () => {
 
   const [weekly, setWeekly] = useState<WeeklyAvailability>(DEFAULT_WEEKLY);
   const [oneOffWindows, setOneOffWindows] = useState<OneOffWindow[]>([]);
+  const [blockedWindows, setBlockedWindows] = useState<BlockedWindow[]>([]);
 
   const [processing, setProcessing] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -201,14 +212,11 @@ export const SchedulingPageEdit = () => {
       description: existingPage.description,
       location: existingPage.location,
       image: existingPage.image || "",
-      durationMode: existingPage.durationMode,
       slotDurations:
         existingPage.slotDurations.length > 0
           ? existingPage.slotDurations
           : [30],
       blockedDates: existingPage.blockedDates,
-      timezone: existingPage.timezone,
-      minNotice: existingPage.minNotice,
       maxAdvance: existingPage.maxAdvance,
       buffer: existingPage.buffer,
       expiry: existingPage.expiry,
@@ -241,6 +249,7 @@ export const SchedulingPageEdit = () => {
 
     setWeekly(newWeekly);
     setOneOffWindows(newOneOff);
+    setBlockedWindows(existingPage.blockedDates.map(parseBlockedDateEntry));
   }, [existingPage]);
 
   // Ensure pages are fetched
@@ -282,10 +291,13 @@ export const SchedulingPageEdit = () => {
         "id" | "eventId" | "user" | "createdAt"
       > = {
         ...formData,
+        blockedDates: blockedWindows.map(serializeBlockedWindow),
+        timezone: "UTC",
+        minNotice: 0,
+        durationMode: "fixed",
         eventTitle: formData.eventTitle || undefined,
         image: formData.image || undefined,
-        slotDurations:
-          formData.durationMode === "fixed" ? formData.slotDurations : [],
+        slotDurations: formData.slotDurations,
         availabilityWindows: buildAvailabilityWindows(),
       };
 
@@ -371,32 +383,53 @@ export const SchedulingPageEdit = () => {
     setOneOffWindows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addBlockedDate = (date: Dayjs | null) => {
-    if (!date) return;
-    const dateStr = date.format("YYYY-MM-DD");
-    setFormData((prev) => ({
+  const addBlockedWindow = () => {
+    setBlockedWindows((prev) => [
       ...prev,
-      blockedDates: prev.blockedDates.includes(dateStr)
-        ? prev.blockedDates
-        : [...prev.blockedDates, dateStr],
-    }));
+      {
+        date: dayjs().format("YYYY-MM-DD"),
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+    ]);
   };
 
-  const removeBlockedDate = (dateStr: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      blockedDates: prev.blockedDates.filter((d) => d !== dateStr),
-    }));
+  const updateBlockedWindow = (
+    index: number,
+    updates: Partial<BlockedWindow>,
+  ) => {
+    setBlockedWindows((prev) =>
+      prev.map((w, i) => (i === index ? { ...w, ...updates } : w)),
+    );
+  };
+
+  const removeBlockedWindow = (index: number) => {
+    setBlockedWindows((prev) => prev.filter((_, i) => i !== index));
   };
 
   const hasAvailability =
     weekly.some((d) => d.enabled) || oneOffWindows.length > 0;
 
+  const [customDuration, setCustomDuration] = useState("");
+
+  const addCustomDuration = () => {
+    const mins = parseInt(customDuration.trim(), 10);
+    if (!isNaN(mins) && mins > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        slotDurations: prev.slotDurations.includes(mins)
+          ? prev.slotDurations
+          : [...prev.slotDurations, mins].sort((a, b) => a - b),
+      }));
+      setCustomDuration("");
+    }
+  };
+
   const canSave =
     !processing &&
     formData.title.trim() !== "" &&
     hasAvailability &&
-    (formData.durationMode === "free" || formData.slotDurations.length > 0);
+    formData.slotDurations.length > 0;
 
   // Loading state for edit mode
   if (isEditMode && !isLoaded) {
@@ -531,47 +564,46 @@ export const SchedulingPageEdit = () => {
           <Typography variant="subtitle1" sx={{ mb: 2 }}>
             {intl.formatMessage({ id: "scheduling.appointmentDuration" })}
           </Typography>
-          <Box sx={{ display: "flex", gap: 2, mb: 2, alignItems: "center" }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.durationMode === "free"}
-                  onChange={(e) =>
-                    updateField(
-                      "durationMode",
-                      e.target.checked ? "free" : "fixed",
-                    )
-                  }
-                />
-              }
-              label={
-                formData.durationMode === "free"
-                  ? intl.formatMessage({ id: "scheduling.freeDuration" })
-                  : intl.formatMessage({ id: "scheduling.fixedDuration" })
-              }
-            />
-          </Box>
-          {formData.durationMode === "fixed" && (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {DURATION_OPTIONS.map((mins) => (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+            {PRESET_DURATIONS.map((mins) => (
+              <Chip
+                key={mins}
+                label={mins >= 60 ? `${mins / 60}h` : `${mins}m`}
+                color={formData.slotDurations.includes(mins) ? "primary" : "default"}
+                variant={formData.slotDurations.includes(mins) ? "filled" : "outlined"}
+                onClick={() => toggleDuration(mins)}
+              />
+            ))}
+            {formData.slotDurations
+              .filter((m) => !PRESET_DURATIONS.includes(m))
+              .map((mins) => (
                 <Chip
                   key={mins}
                   label={mins >= 60 ? `${mins / 60}h` : `${mins}m`}
-                  color={
-                    formData.slotDurations.includes(mins)
-                      ? "primary"
-                      : "default"
-                  }
-                  variant={
-                    formData.slotDurations.includes(mins)
-                      ? "filled"
-                      : "outlined"
-                  }
-                  onClick={() => toggleDuration(mins)}
+                  color="primary"
+                  onDelete={() => toggleDuration(mins)}
                 />
               ))}
-            </Box>
-          )}
+            <TextField
+              type="number"
+              size="small"
+              label={intl.formatMessage({ id: "scheduling.customDuration" })}
+              placeholder={intl.formatMessage({ id: "scheduling.customDurationPlaceholder" })}
+              value={customDuration}
+              onChange={(e) => setCustomDuration(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomDuration();
+                }
+              }}
+              sx={{ width: 150 }}
+              slotProps={{ htmlInput: { min: 1 } }}
+            />
+            <IconButton size="small" onClick={addCustomDuration} disabled={!customDuration}>
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Box>
         </Paper>
 
         {/* Weekly Availability */}
@@ -608,7 +640,7 @@ export const SchedulingPageEdit = () => {
                   }
                 />
                 {weekly[dayIndex].enabled && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 0, flexWrap: "wrap" }}>
                     <TimePicker
                       value={timeStringToDayjs(weekly[dayIndex].startTime)}
                       onChange={(v) =>
@@ -617,7 +649,7 @@ export const SchedulingPageEdit = () => {
                         })
                       }
                       slotProps={{
-                        textField: { size: "small", sx: { width: 130 } },
+                        textField: { size: "small", sx: { minWidth: 110, flex: 1 } },
                       }}
                     />
                     <Typography variant="body2">to</Typography>
@@ -629,7 +661,7 @@ export const SchedulingPageEdit = () => {
                         })
                       }
                       slotProps={{
-                        textField: { size: "small", sx: { width: 130 } },
+                        textField: { size: "small", sx: { minWidth: 110, flex: 1 } },
                       }}
                     />
                   </Box>
@@ -646,7 +678,7 @@ export const SchedulingPageEdit = () => {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              mb: 2,
+              mb: 1,
             }}
           >
             <Typography variant="subtitle1">
@@ -660,8 +692,11 @@ export const SchedulingPageEdit = () => {
               {intl.formatMessage({ id: "scheduling.addDate" })}
             </Button>
           </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: oneOffWindows.length > 0 ? 1.5 : 0 }}>
+            {intl.formatMessage({ id: "scheduling.additionalDateWindowsHelp" })}
+          </Typography>
           {oneOffWindows.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
               {intl.formatMessage({ id: "scheduling.noAdditionalWindows" })}
             </Typography>
           )}
@@ -722,33 +757,88 @@ export const SchedulingPageEdit = () => {
 
         {/* Blocked Dates */}
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ mb: 2 }}>
-            {intl.formatMessage({ id: "scheduling.blockedDates" })}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 1,
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1">
+                {intl.formatMessage({ id: "scheduling.blockedDates" })}
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={addBlockedWindow}
+            >
+              {intl.formatMessage({ id: "scheduling.addDate" })}
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: blockedWindows.length > 0 ? 1.5 : 0 }}>
             {intl.formatMessage({ id: "scheduling.blockedDatesHelp" })}
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <MuiDatePicker
-              label={intl.formatMessage({ id: "scheduling.addBlockedDate" })}
-              onChange={addBlockedDate}
-              slotProps={{
-                textField: { size: "small" },
-              }}
-            />
-          </Box>
-          {formData.blockedDates.length > 0 && (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {formData.blockedDates.map((dateStr) => (
-                <Chip
-                  key={dateStr}
-                  label={dateStr}
-                  onDelete={() => removeBlockedDate(dateStr)}
-                  variant="outlined"
-                />
-              ))}
-            </Box>
+          {blockedWindows.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({ id: "scheduling.noBlockedDates" })}
+            </Typography>
           )}
+          {blockedWindows.map((w, index) => (
+            <Box
+              key={`${w.date}-${index}`}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                mb: 1.5,
+                flexWrap: isMobile ? "wrap" : "nowrap",
+              }}
+            >
+              <MuiDatePicker
+                value={dayjs(w.date)}
+                onChange={(v) =>
+                  updateBlockedWindow(index, {
+                    date: v ? v.format("YYYY-MM-DD") : w.date,
+                  })
+                }
+                slotProps={{
+                  textField: { size: "small", sx: { width: 160 } },
+                }}
+              />
+              <TimePicker
+                value={timeStringToDayjs(w.startTime)}
+                onChange={(v) =>
+                  updateBlockedWindow(index, {
+                    startTime: dayjsToTimeString(v),
+                  })
+                }
+                slotProps={{
+                  textField: { size: "small", sx: { width: 130 } },
+                }}
+              />
+              <Typography variant="body2">to</Typography>
+              <TimePicker
+                value={timeStringToDayjs(w.endTime)}
+                onChange={(v) =>
+                  updateBlockedWindow(index, {
+                    endTime: dayjsToTimeString(v),
+                  })
+                }
+                slotProps={{
+                  textField: { size: "small", sx: { width: 130 } },
+                }}
+              />
+              <IconButton
+                size="small"
+                onClick={() => removeBlockedWindow(index)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
         </Paper>
 
         {/* Settings */}
@@ -763,32 +853,6 @@ export const SchedulingPageEdit = () => {
               gap: 2,
             }}
           >
-            <TextField
-              fullWidth
-              label={intl.formatMessage({ id: "scheduling.timezone" })}
-              value={formData.timezone}
-              onChange={(e) => updateField("timezone", e.target.value)}
-              size="small"
-              helperText={intl.formatMessage({ id: "scheduling.timezoneHelp" })}
-            />
-            <FormControl fullWidth size="small">
-              <InputLabel>
-                {intl.formatMessage({ id: "scheduling.minimumNotice" })}
-              </InputLabel>
-              <Select
-                value={formData.minNotice}
-                label={intl.formatMessage({ id: "scheduling.minimumNotice" })}
-                onChange={(e) =>
-                  updateField("minNotice", Number(e.target.value))
-                }
-              >
-                {MIN_NOTICE_OPTIONS.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
             <FormControl fullWidth size="small">
               <InputLabel>
                 {intl.formatMessage({ id: "scheduling.maxAdvanceBooking" })}
@@ -868,20 +932,50 @@ export const SchedulingPageEdit = () => {
           sx={{
             display: "flex",
             justifyContent: "flex-end",
-            gap: 2,
+            alignItems: "center",
+            gap: 1,
             pb: 4,
+            flexWrap: "wrap",
           }}
         >
+          {savedPageUrl && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: 1, minWidth: 200 }}>
+              <TextField
+                value={savedPageUrl}
+                size="small"
+                slotProps={{ input: { readOnly: true } }}
+                sx={{ flex: 1, "& .MuiInputBase-input": { fontSize: "0.75rem" } }}
+              />
+              <Tooltip title={intl.formatMessage({ id: "scheduling.copyLink" })}>
+                <IconButton size="small" onClick={handleCopyLink}>
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={intl.formatMessage({ id: "scheduling.openLink" })}>
+                <IconButton
+                  size="small"
+                  component="a"
+                  href={savedPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <OpenInNewIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
           <Button color="inherit" onClick={() => navigate(ROUTES.Bookings)}>
             Cancel
           </Button>
-          <Button variant="contained" disabled={!canSave} onClick={handleSave}>
-            {processing
-              ? intl.formatMessage({ id: "scheduling.saving" })
-              : isEditMode
-                ? intl.formatMessage({ id: "scheduling.updatePage" })
-                : intl.formatMessage({ id: "scheduling.createSchedulingPage" })}
-          </Button>
+          {(isEditMode || !savedNAddr) && (
+            <Button variant="contained" disabled={!canSave} onClick={handleSave}>
+              {processing
+                ? intl.formatMessage({ id: "scheduling.saving" })
+                : isEditMode
+                  ? intl.formatMessage({ id: "scheduling.updatePage" })
+                  : intl.formatMessage({ id: "scheduling.createSchedulingPage" })}
+            </Button>
+          )}
         </Box>
       </Box>
 

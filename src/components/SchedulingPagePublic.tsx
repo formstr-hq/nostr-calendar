@@ -23,7 +23,6 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import dayjs, { Dayjs } from "dayjs";
 import { useIntl } from "react-intl";
@@ -45,6 +44,7 @@ import { useBookingRequests } from "../stores/bookingRequests";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { Header } from "./Header";
+import { CalendarListSelect } from "./CalendarListSelect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { nip44, getPublicKey } from "nostr-tools";
@@ -139,6 +139,16 @@ export const SchedulingPagePublic = () => {
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+
+  const { calendars } = useCalendarLists();
+  const [selectedCalendarId, setSelectedCalendarId] = useState("");
+
+  // Initialize to first calendar once loaded
+  useEffect(() => {
+    if (calendars.length > 0 && !selectedCalendarId) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars, selectedCalendarId]);
 
   // Fetch scheduling page data
   useEffect(() => {
@@ -265,16 +275,15 @@ export const SchedulingPagePublic = () => {
       // Add a placeholder event reference to the booker's calendar list.
       // When the creator approves and publishes the event using this d-tag,
       // the invitation gift wrap will provide the viewKey for decryption.
-      const calendarLists = useCalendarLists.getState();
-      if (calendarLists.calendars.length > 0) {
-        const defaultCalendarId = calendarLists.calendars[0].id;
+      if (selectedCalendarId) {
+        const calendarLists = useCalendarLists.getState();
         const eventRef = buildEventRef({
           kind: EventKinds.PrivateCalendarEvent,
           authorPubkey: page.user,
           eventDTag: dTag,
           viewKey: "",
         });
-        await calendarLists.addEventToCalendar(defaultCalendarId, eventRef);
+        await calendarLists.addEventToCalendar(selectedCalendarId, eventRef);
       }
 
       // Store the outgoing booking locally so the Sent tab can display it
@@ -384,12 +393,6 @@ export const SchedulingPagePublic = () => {
               variant="outlined"
             />
           )}
-          <Chip
-            icon={<AccessTimeIcon />}
-            label={page.timezone}
-            size="small"
-            variant="outlined"
-          />
         </Box>
 
         {/* Duration selector (for fixed-duration mode) */}
@@ -571,6 +574,11 @@ export const SchedulingPagePublic = () => {
                 rows={2}
                 size="small"
               />
+              <CalendarListSelect
+                value={selectedCalendarId}
+                onChange={setSelectedCalendarId}
+                label={intl.formatMessage({ id: "scheduling.addToCalendar" })}
+              />
             </Box>
           )}
         </DialogContent>
@@ -581,7 +589,7 @@ export const SchedulingPagePublic = () => {
           <Button
             variant="contained"
             onClick={handleBookingSubmit}
-            disabled={submitting}
+            disabled={submitting || !selectedCalendarId}
           >
             {submitting
               ? intl.formatMessage({ id: "scheduling.sending" })

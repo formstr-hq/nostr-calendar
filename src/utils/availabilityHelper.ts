@@ -101,6 +101,107 @@ function getDatePartsInTimezone(
   return { year: get("year"), month: get("month") - 1, day: get("day") };
 }
 
+type BlockedTimeRange = {
+  startMinutes: number;
+  endMinutes: number;
+};
+
+function parseBlockedDates(entries: string[]): {
+  fullDay: Set<string>;
+  timedByDate: Map<string, BlockedTimeRange[]>;
+} {
+  const fullDay = new Set<string>();
+  const timedByDate = new Map<string, BlockedTimeRange[]>();
+
+  for (const entry of entries) {
+    const [date, startTime, endTime] = entry.split("|");
+    if (!date) continue;
+
+    if (!startTime || !endTime) {
+      fullDay.add(date);
+      continue;
+    }
+
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    const startMinutes = start.hours * 60 + start.minutes;
+    const endMinutes = end.hours * 60 + end.minutes;
+
+    if (endMinutes <= startMinutes) {
+      continue;
+    }
+
+    const list = timedByDate.get(date) ?? [];
+    list.push({ startMinutes, endMinutes });
+    timedByDate.set(date, list);
+  }
+
+  for (const [date, ranges] of timedByDate.entries()) {
+    ranges.sort((a, b) => a.startMinutes - b.startMinutes);
+    timedByDate.set(date, ranges);
+  }
+
+  return { fullDay, timedByDate };
+}
+
+function splitSlotByBlockedRanges(
+  slot: ITimeSlot,
+  blockedRanges: BlockedTimeRange[],
+  year: number,
+  month: number,
+  day: number,
+  timezone: string,
+): ITimeSlot[] {
+  if (blockedRanges.length === 0) return [slot];
+
+  let segments: ITimeSlot[] = [slot];
+
+  for (const range of blockedRanges) {
+    const startHours = Math.floor(range.startMinutes / 60);
+    const startMinutes = range.startMinutes % 60;
+    const endHours = Math.floor(range.endMinutes / 60);
+    const endMinutes = range.endMinutes % 60;
+
+    const rangeStart = dateInTimezone(
+      year,
+      month,
+      day,
+      startHours,
+      startMinutes,
+      timezone,
+    );
+    const rangeEnd = dateInTimezone(
+      year,
+      month,
+      day,
+      endHours,
+      endMinutes,
+      timezone,
+    );
+
+    const nextSegments: ITimeSlot[] = [];
+
+    for (const segment of segments) {
+      if (rangeEnd <= segment.start || rangeStart >= segment.end) {
+        nextSegments.push(segment);
+        continue;
+      }
+
+      if (rangeStart > segment.start) {
+        nextSegments.push({ start: segment.start, end: rangeStart });
+      }
+      if (rangeEnd < segment.end) {
+        nextSegments.push({ start: rangeEnd, end: segment.end });
+      }
+    }
+
+    segments = nextSegments;
+    if (segments.length === 0) break;
+  }
+
+  return segments.filter((s) => s.end > s.start);
+}
+
 /**
  * Expand a single availability window on a specific date into a time slot.
  * Returns null if the date is blocked or doesn't match the window.
@@ -169,7 +270,7 @@ export function expandAvailabilitySlots(
 ): ITimeSlot[] {
   const slots: ITimeSlot[] = [];
   const timezone = page.timezone || "UTC";
-  const blockedDates = new Set(page.blockedDates);
+  const parsedBlockedDates = parseBlockedDates(page.blockedDates);
 
   // Clamp the range based on maxAdvance
   const maxDate = new Date(now.getTime() + page.maxAdvance * 1000);
@@ -185,6 +286,15 @@ export function expandAvailabilitySlots(
   while (current <= effectiveTo) {
     const { year, month, day } = getDatePartsInTimezone(current, timezone);
     const dayOfWeek = getDayOfWeekInTimezone(current, timezone);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+
+    if (parsedBlockedDates.fullDay.has(dateStr)) {
+      current.setUTCDate(current.getUTCDate() + 1);
+      continue;
+    }
+
+    const blockedRanges = parsedBlockedDates.timedByDate.get(dateStr) ?? [];
 
     for (const window of page.availabilityWindows) {
       const slot = expandWindowForDate(
@@ -194,14 +304,31 @@ export function expandAvailabilitySlots(
         day,
         dayOfWeek,
         timezone,
-        blockedDates,
+        parsedBlockedDates.fullDay,
       );
-      if (slot && slot.end > earliestStart && slot.start < effectiveTo) {
-        // Clamp start to earliestStart if needed
-        const clampedStart =
-          slot.start < earliestStart ? earliestStart : slot.start;
-        if (clampedStart < slot.end) {
-          slots.push({ start: clampedStart, end: slot.end });
+      if (!slot) {
+        continue;
+      }
+
+      const unblockedSlots = splitSlotByBlockedRanges(
+        slot,
+        blockedRanges,
+        year,
+        month,
+        day,
+        timezone,
+      );
+
+      for (const unblockedSlot of unblockedSlots) {
+        if (unblockedSlot.end > earliestStart && unblockedSlot.start < effectiveTo) {
+          // Clamp start to earliestStart if needed
+          const clampedStart =
+            unblockedSlot.start < earliestStart
+              ? earliestStart
+              : unblockedSlot.start;
+          if (clampedStart < unblockedSlot.end) {
+            slots.push({ start: clampedStart, end: unblockedSlot.end });
+          }
         }
       }
     }
@@ -309,6 +436,18 @@ export function getBookableSlots(
     allSlots.push(...slots);
   }
 
-  // Filter out past slots
-  return allSlots.filter((slot) => !isSlotInPast(slot, now));
+  // Filter out past slots and dedupe exact overlaps produced by
+  // combining recurring and one-off windows on the same date/time.
+  const deduped = new Map<string, ITimeSlot>();
+  for (const slot of allSlots) {
+    if (isSlotInPast(slot, now)) continue;
+    const key = `${slot.start.getTime()}-${slot.end.getTime()}`;
+    if (!deduped.has(key)) {
+      deduped.set(key, slot);
+    }
+  }
+
+  return Array.from(deduped.values()).sort(
+    (a, b) => a.start.getTime() - b.start.getTime(),
+  );
 }
