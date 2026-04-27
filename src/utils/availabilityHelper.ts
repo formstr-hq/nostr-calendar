@@ -463,3 +463,124 @@ export function getBookableSlots(
     (a, b) => a.start.getTime() - b.start.getTime(),
   );
 }
+
+/**
+ * A slot intended for the booker UI grid. Unlike `ITimeSlot`, this carries
+ * an `unavailable` reason so the UI can render the slot greyed out instead
+ * of dropping it (which would shift surrounding times and mislead viewers).
+ */
+export type IDisplaySlot = ITimeSlot & {
+  unavailable?: "blocked" | "busy";
+};
+
+/**
+ * Return every slot that falls inside the host's availability windows for
+ * the given range, including ones overlapping blocked dates / blocked time
+ * ranges / public busy ranges. Each unavailable slot carries an
+ * `unavailable` reason so the UI can render it disabled.
+ *
+ * Slot grid alignment is identical to `getBookableSlots` so the two
+ * functions can be swapped in the booking UI without visual jumps. Slots
+ * before `now + minNotice` and after `maxAdvance` are still dropped.
+ */
+export function getDisplaySlots(
+  page: ISchedulingPage,
+  from: Date,
+  to: Date,
+  durationMinutes: number,
+  now: Date = new Date(),
+  busyRanges: { start: number; end: number }[] = [],
+): IDisplaySlot[] {
+  const timezone = page.timezone || "UTC";
+  const parsedBlockedDates = parseBlockedDates(page.blockedDates);
+  const bufferMinutes = page.buffer / 60;
+
+  const maxDate = new Date(now.getTime() + page.maxAdvance * 1000);
+  const effectiveTo = to > maxDate ? maxDate : to;
+  const earliestSlotStart = new Date(now.getTime() + page.minNotice * 1000);
+
+  const result: IDisplaySlot[] = [];
+  const seen = new Set<string>();
+
+  const current = new Date(from);
+  current.setUTCHours(0, 0, 0, 0);
+
+  while (current <= effectiveTo) {
+    const { year, month, day } = getDatePartsInTimezone(current, timezone);
+    const dayOfWeek = getDayOfWeekInTimezone(current, timezone);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+    const fullDayBlocked = parsedBlockedDates.fullDay.has(dateStr);
+    const blockedRanges = parsedBlockedDates.timedByDate.get(dateStr) ?? [];
+
+    // Resolve timed blocked ranges to absolute UTC instants for overlap checks.
+    const absoluteBlocked = blockedRanges.map((range) => {
+      const startHours = Math.floor(range.startMinutes / 60);
+      const startMin = range.startMinutes % 60;
+      const endHours = Math.floor(range.endMinutes / 60);
+      const endMin = range.endMinutes % 60;
+      return {
+        start: dateInTimezone(
+          year,
+          month,
+          day,
+          startHours,
+          startMin,
+          timezone,
+        ).getTime(),
+        end: dateInTimezone(year, month, day, endHours, endMin, timezone).getTime(),
+      };
+    });
+
+    for (const window of page.availabilityWindows) {
+      // Pass an empty fullDay set so we still get the window even on a
+      // fully blocked day; we'll mark the resulting slots as blocked below.
+      const fullWindow = expandWindowForDate(
+        window,
+        year,
+        month,
+        day,
+        dayOfWeek,
+        timezone,
+        new Set<string>(),
+      );
+      if (!fullWindow) continue;
+      if (fullWindow.end <= earliestSlotStart) continue;
+      if (fullWindow.start >= effectiveTo) continue;
+
+      const slots = splitIntoBookableSlots(
+        fullWindow,
+        durationMinutes,
+        bufferMinutes,
+      );
+      for (const slot of slots) {
+        if (slot.start < earliestSlotStart) continue;
+
+        const slotStart = slot.start.getTime();
+        const slotEnd = slot.end.getTime();
+        const key = `${slotStart}-${slotEnd}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        let unavailable: IDisplaySlot["unavailable"];
+        if (fullDayBlocked) {
+          unavailable = "blocked";
+        } else if (
+          absoluteBlocked.some((b) => slotStart < b.end && slotEnd > b.start)
+        ) {
+          unavailable = "blocked";
+        } else if (
+          busyRanges.some((b) => slotStart < b.end && slotEnd > b.start)
+        ) {
+          unavailable = "busy";
+        }
+
+        result.push(unavailable ? { ...slot, unavailable } : slot);
+      }
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return result.sort((a, b) => a.start.getTime() - b.start.getTime());
+}

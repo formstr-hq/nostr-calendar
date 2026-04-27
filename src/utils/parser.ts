@@ -105,7 +105,7 @@ export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
     eventId: event.id,
     user: event.pubkey,
     title: "",
-    description: event.content,
+    description: "",
     slotDurations: [],
     durationMode: "fixed",
     availabilityWindows: [],
@@ -128,6 +128,9 @@ export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
         break;
       case "title":
         page.title = values[0];
+        break;
+      case "description":
+        page.description = values[0];
         break;
       case "slot_duration":
         page.slotDurations.push(Number(values[0]));
@@ -203,6 +206,10 @@ export const schedulingPageToTags = (page: ISchedulingPage): string[][] => {
     ["buffer", String(page.buffer)],
     ["expiry", String(page.expiry)],
   ];
+
+  if (page.description) {
+    tags.push(["description", page.description]);
+  }
 
   for (const duration of page.slotDurations) {
     tags.push(["slot_duration", String(duration)]);

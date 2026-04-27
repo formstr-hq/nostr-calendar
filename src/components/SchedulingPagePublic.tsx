@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Toolbar,
   IconButton,
   useMediaQuery,
   useTheme,
@@ -37,7 +36,7 @@ import * as nip59 from "../common/nip59";
 import { nostrRuntime } from "../common/nostrRuntime";
 import { EventKinds } from "../common/EventConfigs";
 import { nostrEventToSchedulingPage } from "../utils/parser";
-import { getBookableSlots } from "../utils/availabilityHelper";
+import { getDisplaySlots, type IDisplaySlot } from "../utils/availabilityHelper";
 import { useBusyList, collectBusyRanges } from "../stores/busyList";
 import { busyListMonthKeysForRange } from "../utils/dateHelper";
 import type { IBusyList } from "../utils/types";
@@ -46,7 +45,7 @@ import { useUser } from "../stores/user";
 import { useBookingRequests } from "../stores/bookingRequests";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
-import { Header } from "./Header";
+import { Header, HEADER_HEIGHT } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
@@ -236,7 +235,7 @@ export const SchedulingPagePublic = () => {
       weekStart.valueOf(),
       weekEnd.valueOf(),
     );
-    return getBookableSlots(
+    return getDisplaySlots(
       page,
       weekStart.toDate(),
       weekEnd.toDate(),
@@ -248,7 +247,7 @@ export const SchedulingPagePublic = () => {
 
   // Group slots by date
   const slotsByDate = useMemo(() => {
-    const grouped: Record<string, ITimeSlot[]> = {};
+    const grouped: Record<string, IDisplaySlot[]> = {};
     for (const slot of slots) {
       const dateKey = dayjs(slot.start).format("YYYY-MM-DD");
       if (!grouped[dateKey]) grouped[dateKey] = [];
@@ -376,7 +375,7 @@ export const SchedulingPagePublic = () => {
     return (
       <>
         <Header />
-        <Toolbar />
+        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
         <Box
           sx={{
             display: "flex",
@@ -395,7 +394,7 @@ export const SchedulingPagePublic = () => {
     return (
       <>
         <Header />
-        <Toolbar />
+        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
             {!viewKey
@@ -410,12 +409,20 @@ export const SchedulingPagePublic = () => {
   return (
     <>
       <Header />
-      <Toolbar />
-      <Box sx={{ maxWidth: 900, mx: "auto", p: isMobile ? 2 : 3 }}>
+      <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+      <Box
+        sx={{
+          maxWidth: 900,
+          mx: "auto",
+          px: isMobile ? 2 : 3,
+          pt: 0.5,
+          pb: isMobile ? 2 : 3,
+        }}
+      >
         {/* Creator Profile & Page Info */}
         <CreatorInfo pubkey={page.user} />
 
-        <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>
+        <Typography variant="h5" sx={{ mt: 1, mb: 1 }}>
           {page.title}
         </Typography>
 
@@ -425,16 +432,16 @@ export const SchedulingPagePublic = () => {
           </Typography>
         )}
 
-        <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
-          {page.location && (
+        {page.location && (
+          <Box sx={{ display: "flex", gap: 2, mb: 1, flexWrap: "wrap" }}>
             <Chip
               icon={<LocationOnIcon />}
               label={page.location}
               size="small"
               variant="outlined"
             />
-          )}
-        </Box>
+          </Box>
+        )}
 
         {/* Duration selector (for fixed-duration mode) */}
         {page.durationMode === "fixed" && page.slotDurations.length > 1 && (
@@ -532,25 +539,35 @@ export const SchedulingPagePublic = () => {
                       gap: 0.5,
                     }}
                   >
-                    {daySlots.map((slot, i) => (
-                      <Button
-                        key={i}
-                        size="small"
-                        variant={
-                          selectedSlot === slot ? "contained" : "outlined"
-                        }
-                        onClick={() => handleSlotClick(slot)}
-                        sx={{
-                          fontSize: "0.7rem",
-                          py: 0.25,
-                          px: 0.5,
-                          minWidth: 0,
-                          textTransform: "none",
-                        }}
-                      >
-                        {formatTime(slot.start)}
-                      </Button>
-                    ))}
+                    {daySlots.map((slot, i) => {
+                      const disabled = !!slot.unavailable;
+                      return (
+                        <Button
+                          key={i}
+                          size="small"
+                          disabled={disabled}
+                          variant={
+                            selectedSlot === slot ? "contained" : "outlined"
+                          }
+                          onClick={() =>
+                            disabled ? undefined : handleSlotClick(slot)
+                          }
+                          sx={{
+                            fontSize: "0.7rem",
+                            py: 0.25,
+                            px: 0.5,
+                            minWidth: 0,
+                            textTransform: "none",
+                            ...(disabled && {
+                              opacity: 0.45,
+                              textDecoration: "line-through",
+                            }),
+                          }}
+                        >
+                          {formatTime(slot.start)}
+                        </Button>
+                      );
+                    })}
                   </Box>
                 )}
               </Paper>
