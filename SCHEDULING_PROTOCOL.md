@@ -71,7 +71,7 @@ A parameterized-replaceable record that exposes a user's already-committed time 
 
 | Tag | Shape | Meaning |
 |---|---|---|
-| `d` | `["d", "busy-MM-YYYY"]` | Identifier — UTC month bucket. |
+| `d` | `["d", "MM-YYYY"]` | Identifier — UTC month bucket. |
 | `t` | `["t", "MM-YYYY"]`, `["t", "busy"]` | Hashtags for relay indexing/discovery. |
 | `block` | `["block", "<startSec>", "<endSec>"]` (repeatable) | Opaque busy range in unix seconds. |
 

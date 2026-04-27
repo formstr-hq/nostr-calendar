@@ -3,7 +3,7 @@
  *
  * Tracks the current user's public free/busy entries and lets the booking
  * page consume other users' entries. One Nostr event per `(user, monthKey)`
- * (parameterized-replaceable, `["d", "busy-MM-YYYY"]`).
+ * (parameterized-replaceable, `["d", "MM-YYYY"]`).
  *
  * - `addBusyRange` / `removeBusyRange` mutate the user's own lists and
  *   republish each touched month.

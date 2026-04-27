@@ -219,7 +219,7 @@ export interface IBusyRange {
  * A user's public busy list for one calendar month.
  *
  * One Nostr event per `(user, monthKey)`. Each event is parameterized-replaceable
- * with `["d", "busy-MM-YYYY"]` so republishing replaces only that month.
+ * with `["d", "MM-YYYY"]` so republishing replaces only that month.
  */
 export interface IBusyList {
   /** Owner public key (event author). */
