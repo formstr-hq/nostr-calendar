@@ -69,31 +69,26 @@ export const ensureRelay = async (
   return relay;
 };
 
-export async function publishPrivateRSVPEvent({
-  authorpubKey, // Public key of the event author
-  eventId, // The dtag of the event
-  status, // Status of the RSVP event
-  participants, // List of participant public keys
-  referenceKind,
-}: {
+export async function publishPrivateRSVPEvent(params: {
   eventId: string;
+  // Public key of the event author
   authorpubKey: string;
+  // RSVP status for the event
   status: string;
+  // List of participant public keys
   participants: string[];
   referenceKind: EventKinds.PrivateCalendarEvent;
 }) {
+  void params;
   // this function is noop
 }
 
-export async function publishPublicRSVPEvent({
-  authorpubKey,
-  eventId,
-  status,
-}: {
+export async function publishPublicRSVPEvent(params: {
   authorpubKey: string;
   eventId: string;
   status: string;
 }) {
+  void params;
   // this function is noop
 }
 
@@ -170,7 +165,11 @@ async function preparePrivateCalendarEvent(
   };
 }
 
-export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
+export async function publishPrivateCalendarEvent(
+  event: ICalendarEvent,
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
+) {
   const viewSecretKey = generateSecretKey();
   const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
   const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
@@ -180,9 +179,15 @@ export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
   // Capture which relay accepts the event to use as a hint in invitations
   // and the creator's calendar list entry, so recipients can fetch from there.
   let publishedRelayHint = "";
-  await publishToRelays(signedEvent, (url) => {
-    if (!publishedRelayHint) publishedRelayHint = url;
-  });
+  await publishToRelays(
+    signedEvent,
+    (url) => {
+      if (!publishedRelayHint) publishedRelayHint = url;
+      onAcceptedRelays?.(url);
+    },
+    undefined,
+    { waitForAll: true, onRelayComplete },
+  );
 
   // Gift-wrap the event keys to each participant (including the creator).
   // These serve as invitations — recipients will see them as notifications
@@ -244,13 +249,18 @@ export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
 export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
 ) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
   const { signedEvent, eventKind, userPublicKey } =
     await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
-  await publishToRelays(signedEvent);
+  await publishToRelays(signedEvent, onAcceptedRelays, undefined, {
+    waitForAll: true,
+    onRelayComplete,
+  });
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
   const eventRef = buildEventRef({
@@ -267,6 +277,7 @@ export async function editPrivateCalendarEvent(
   return {
     event,
     calendarId,
+    signedEvent,
   };
 }
 
@@ -502,34 +513,75 @@ export const publishToRelays = (
   event: Event,
   onAcceptedRelays: (url: string) => void = _onAcceptedRelays,
   relays?: string[],
+  options: {
+    waitForAll?: boolean;
+    onRelayComplete?: (url: string, success: boolean) => void;
+  } = {},
 ) => {
-  const relayList = (relays ?? getRelays()).map(normalizeURL);
-  return Promise.any(
-    relayList.map(async (url) => {
-      let relay: AbstractRelay | null = null;
-      try {
-        relay = await ensureRelay(url, { connectionTimeout: 5000 });
-        return await Promise.race<string>([
-          relay.publish(event).then((reason) => {
-            onAcceptedRelays(url);
-            return reason;
-          }),
-          new Promise<string>((_, reject) =>
-            setTimeout(() => reject("timeout"), 5000),
-          ),
-        ]);
-      } finally {
-        if (relay) {
-          try {
-            await relay.close();
-          } catch {
-            // Ignore closing errors
-          }
+  const { onRelayComplete } = options;
+  const relayList = Array.from(
+    new Set((relays ?? getRelays()).map(normalizeURL)),
+  );
+  const publishPromises = relayList.map(async (url) => {
+    let relay: AbstractRelay | null = null;
+    try {
+      relay = await ensureRelay(url, { connectionTimeout: 5000 });
+      const reason = await Promise.race<string>([
+        relay.publish(event).then((r) => {
+          onAcceptedRelays(url);
+          return r;
+        }),
+        new Promise<string>((_, reject) =>
+          setTimeout(() => reject("timeout"), 5000),
+        ),
+      ]);
+      onRelayComplete?.(url, true);
+      return reason;
+    } catch (e) {
+      onRelayComplete?.(url, false);
+      throw e;
+    } finally {
+      if (relay) {
+        try {
+          await relay.close();
+        } catch {
+          // Ignore closing errors
         }
       }
-    }),
-  );
+    }
+  });
+
+  if (options.waitForAll) {
+    return Promise.allSettled(publishPromises).then((results) => {
+      if (results.some((result) => result.status === "fulfilled")) {
+        return results;
+      }
+
+      const rejectionReasons = results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      );
+
+      throw new AggregateError(
+        rejectionReasons,
+        "No relays accepted the event",
+      );
+    });
+  }
+
+  return Promise.any(publishPromises);
 };
+
+/** Re-publish a signed event to a subset of relays (e.g. retry after partial failure). */
+export const republishEventToRelays = (
+  event: Event,
+  relayUrls: string[],
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
+) =>
+  publishToRelays(event, onAcceptedRelays ?? (() => {}), relayUrls, {
+    waitForAll: true,
+    onRelayComplete,
+  });
 
 export const fetchCalendarEvents = (
   { since, until }: { since?: number; until?: number },
@@ -552,6 +604,7 @@ export const fetchCalendarEvents = (
 export const publishPublicCalendarEvent = async (
   event: ICalendarEvent,
   onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: (url: string, success: boolean) => void,
 ) => {
   const pubKey = await getUserPublicKey();
   const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();
@@ -586,9 +639,12 @@ export const publishPublicCalendarEvent = async (
   const signer = await signerManager.getSigner();
   const fullEvent = await signer.signEvent(baseEvent);
   fullEvent.id = getEventHash(baseEvent);
-  const result = await publishToRelays(fullEvent, onAcceptedRelays);
+  const result = await publishToRelays(fullEvent, onAcceptedRelays, undefined, {
+    waitForAll: true,
+    onRelayComplete,
+  });
 
-  return { result, id, pubKey };
+  return { result, id, pubKey, signedEvent: fullEvent };
 };
 
 /**
