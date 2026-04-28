@@ -14,6 +14,8 @@ import { defaultRelays, fetchRelayList } from "../common/nostr";
 import { useRelayStore } from "./relays";
 import { useCalendarLists } from "./calendarLists";
 import { useInvitations } from "./invitations";
+import { useBookingRequests } from "./bookingRequests";
+import { useSchedulingPages } from "./schedulingPages";
 import { nostrRuntime } from "../common/nostrRuntime";
 import {
   BG_KEY_USER_PUBKEY,
@@ -71,6 +73,9 @@ export const useUser = create<{
     await useCalendarLists.getState().clearCachedCalendars();
     logger.log("logout: cached calendars cleared");
     await useInvitations.getState().clearCachedInvitations();
+    await useBookingRequests.getState().clearCached();
+    await useSchedulingPages.getState().clearCachedPages();
+    // Clear background worker keys
     logger.log("logout: cached invitations cleared");
     await removeSecureItem(BG_KEY_USER_PUBKEY);
     await removeSecureItem(BG_KEY_RELAYS);

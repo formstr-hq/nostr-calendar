@@ -12,7 +12,9 @@ import { useInvitations } from "../stores/invitations";
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
   const calendars = useCalendarLists((state) => state.calendars);
-  const { invitations } = useInvitations();
+  const {invitations} = useInvitations();
+
+
   const { layout } = useLayout();
   const visibileCalendars = new Set(
     calendars.filter((cal) => cal.isVisible).map((cal) => cal.id),
