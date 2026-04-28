@@ -22,7 +22,6 @@ import { useUser } from "../stores/user";
 import {
   publishDeletionEvent,
   publishParticipantRemovalEvent,
-  publishEmptySelfKeyIndex,
 } from "../common/nostr";
 import { useInvitations } from "../stores/invitations";
 import { useBusyList } from "../stores/busyList";
@@ -95,20 +94,6 @@ export function DeleteEventDialog({
           void useBusyList
             .getState()
             .removeBusyRange({ start: event.begin, end: event.end });
-          // Tombstone the self-key index for private events so the
-          // creator's own backup is consistent with the deletion.
-          if (
-            event.isPrivateEvent &&
-            event.user === user?.pubkey &&
-            event.id
-          ) {
-            void publishEmptySelfKeyIndex(event.id).catch((err) =>
-              console.warn(
-                "Failed to tombstone self-key index:",
-                err instanceof Error ? err.message : err,
-              ),
-            );
-          }
           removeEvent(event.id);
           break;
         }

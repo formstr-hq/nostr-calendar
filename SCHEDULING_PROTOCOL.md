@@ -8,7 +8,7 @@ This document defines the appointment scheduling protocol implemented in this re
 |---|---|---|---|
 | 31927 | Scheduling Page | Parameterized replaceable | Scheduling page definition and availability settings. Always private in this client. |
 | 31926 | Public Busy List | Parameterized replaceable | Per-month list of opaque busy ranges published by a user. |
-| 32680 | Creator Self-Key Index | Parameterized replaceable | Self-encrypted backup of view keys for the author's private events. |
+| 32680 | Scheduling Pages List | Parameterized replaceable | Self-encrypted backup of viewKeys for the author's scheduling pages. |
 | 1057 | Booking Request Gift Wrap | Regular | NIP-59 gift wrap addressed to scheduling-page owner. |
 | 57 | Booking Request Rumor | Unsigned rumor | Inner request payload (inside kind `1057`). |
 | 1058 | Booking Response Gift Wrap | Regular | NIP-59 gift wrap addressed to booker. |
@@ -96,23 +96,22 @@ The client offers an opt-out checkbox on event creation and on invitation accept
 
 When rendering a scheduling page (`SchedulingPagePublic`), the client fetches the host's 31926 records covering the visible week's months and passes the union of `block` ranges to `getBookableSlots`, which discards any candidate slot whose `[start,end]` overlaps a busy range.
 
-## Creator Self-Key Index (Kind 32680)
+## Scheduling Pages List (Kind 32680)
 
-A self-encrypted backup record that lets the author of a private calendar event recover its `viewKey` independently of the calendar list (kind `32123`). This makes the private-event flow robust to fresh devices, calendar-list desync, and removed calendar-list entries.
+A self-encrypted backup record that lets the author of a scheduling page recover its `viewKey` independently of any other state. This makes private scheduling pages robust to fresh devices and to web refreshes (where secure storage is a no-op).
 
 ### Encoding
 
 - Event kind: `32680`
-- Author: the same pubkey that authored the underlying private calendar event.
-- Tags: `[["d", "<eventDTag>"]]` — the d-tag matches the d-tag of the private calendar event being indexed.
+- Author: the same pubkey that authored the underlying scheduling page.
+- Tags: `[["d", "<pageDTag>"]]` — the d-tag matches the d-tag of the scheduling page being indexed.
 - Content: NIP-44 ciphertext produced as a self-conversation under the author's own pubkey. Plaintext is JSON:
 
 ```json
 {
   "v": 1,
   "viewKey": "<nsec1...>",
-  "eventKind": 32678,
-  "dTag": "<eventDTag>",
+  "dTag": "<pageDTag>",
   "createdAt": <unixSeconds>
 }
 ```
@@ -124,12 +123,12 @@ A self-encrypted backup record that lets the author of a private calendar event 
 
 | Action | Effect |
 |---|---|
-| Author publishes a private calendar event | Publish a kind-32680 record alongside the event (best-effort, non-fatal on failure). |
-| Author deletes the private event for everyone | Publish an empty-content kind-32680 record as a tombstone. |
+| Author publishes a scheduling page | Publish a kind-32680 record alongside the page (best-effort, non-fatal on failure). |
+| Author deletes a scheduling page | Publish an empty-content kind-32680 record as a tombstone. |
 
 ### Consumption
 
-At login the client calls `fetchOwnPrivateEventKeys()` (filter `{kinds:[32680], authors:[self]}`), self-decrypts each record, and caches a `Map<dTag, {viewKey, eventKind}>` in the events store. When `fetchPrivateEvents` walks calendar-list refs and finds an entry whose `viewKey` field is empty, it falls back to this map. If neither source provides a key, the event is skipped.
+When the scheduling-pages store fetches the user's pages it calls `fetchOwnSchedulingPageKeys()` (filter `{kinds:[32680], authors:[self]}`), self-decrypts each record, and caches a `Map<dTag, viewKeyNsec>`. Each fetched page's outer ciphertext is then decrypted with the matching `viewKey`. Pages without a matching key (e.g. tombstoned, or authored by another user) are skipped silently.
 
 ## Booking Request Flow (Booker -> Creator)
 
@@ -291,7 +290,6 @@ Expiry behavior:
 ## Migration Notes
 
 - **Public scheduling pages (legacy):** Earlier versions of this client published `31927` events with plaintext tags. Such events remain parseable on the wire by other clients but are no longer rendered by this client; opening one without a `viewKey` shows an unsupported notice. New pages published by this client are always private.
-- **Private events without a 32680 record (legacy):** Private calendar events authored before kind `32680` was introduced will not have a self-key index record. They continue to work via the `viewKey` carried in the author's calendar list (kind `32123`) ref. Re-publishing the event from this client will emit the missing 32680 record going forward.
 - **Public busy list opt-in:** The toggle is shown on event creation and invitation accept; the user's choice is persisted locally under `cal:busy_list_default_optout` and applied to subsequent flows. Booking approvals always emit a busy entry regardless of the toggle.
 
 ## Implementation References

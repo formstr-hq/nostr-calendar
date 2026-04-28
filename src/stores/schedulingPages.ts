@@ -18,8 +18,9 @@ import {
   getRelays,
   publishToRelays,
   publishDeletionEvent,
-  publishSelfKeyIndex,
-  publishEmptySelfKeyIndex,
+  publishSchedulingPageKey,
+  publishEmptySchedulingPageKey,
+  fetchOwnSchedulingPageKeys,
 } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
 import { naddrEncode, nsecEncode, decode } from "nostr-tools/nip19";
@@ -31,12 +32,6 @@ import type { ISchedulingPage } from "../utils/types";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { nostrRuntime } from "../common/nostrRuntime";
 import { signerManager } from "../common/signer";
-import {
-  ensureOwnPrivateEventKeyIndexLoaded,
-  getOwnPrivateEventKeyIndex,
-  setOwnPrivateEventKey,
-  deleteOwnPrivateEventKey,
-} from "./events";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { isNative } from "../utils/platform";
@@ -47,6 +42,51 @@ import {
   getPublicKey,
   nip44,
 } from "nostr-tools";
+
+/**
+ * Cached map of `dTag -> nsec-encoded viewKey` for the current user's own
+ * scheduling pages, populated from kind-32680 self-encrypted records.
+ * Used as the sole source of truth for decrypting pages this user
+ * authored, on any device.
+ */
+let ownSchedulingPageKeyIndex: Map<string, string> | undefined;
+let ownSchedulingPageKeyIndexLoadPromise: Promise<void> | undefined;
+
+async function refreshOwnSchedulingPageKeyIndex(): Promise<void> {
+  try {
+    ownSchedulingPageKeyIndex = await fetchOwnSchedulingPageKeys();
+  } catch (err) {
+    console.warn(
+      "Failed to load scheduling page key index (kind 32680):",
+      err instanceof Error ? err.message : err,
+    );
+    ownSchedulingPageKeyIndex = ownSchedulingPageKeyIndex ?? new Map();
+  }
+}
+
+async function ensureOwnSchedulingPageKeyIndexLoaded(): Promise<void> {
+  if (ownSchedulingPageKeyIndex) return;
+  if (!ownSchedulingPageKeyIndexLoadPromise) {
+    ownSchedulingPageKeyIndexLoadPromise =
+      refreshOwnSchedulingPageKeyIndex().finally(() => {
+        ownSchedulingPageKeyIndexLoadPromise = undefined;
+      });
+  }
+  await ownSchedulingPageKeyIndexLoadPromise;
+}
+
+function setOwnSchedulingPageKey(dTag: string, viewKeyNsec: string): void {
+  if (!ownSchedulingPageKeyIndex) ownSchedulingPageKeyIndex = new Map();
+  ownSchedulingPageKeyIndex.set(dTag, viewKeyNsec);
+}
+
+function deleteOwnSchedulingPageKey(dTag: string): void {
+  ownSchedulingPageKeyIndex?.delete(dTag);
+}
+
+function getOwnSchedulingPageKeyIndex(): Map<string, string> {
+  return ownSchedulingPageKeyIndex ?? new Map();
+}
 
 async function publishSchedulingPage(page: ISchedulingPage): Promise<{
   event: Event;
@@ -90,18 +130,14 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
   // creator can still copy the share URL from the current session.
   try {
     const viewKeyNsec = nsecEncode(viewSecretKey);
-    await publishSelfKeyIndex({
+    await publishSchedulingPageKey({
       dTag: page.id,
-      eventKind: EventKinds.SchedulingPage,
       viewKeyNsec,
     });
-    setOwnPrivateEventKey(page.id, {
-      viewKey: viewKeyNsec,
-      eventKind: EventKinds.SchedulingPage,
-    });
+    setOwnSchedulingPageKey(page.id, viewKeyNsec);
   } catch (err) {
     console.warn(
-      "Failed to publish self-key index for scheduling page:",
+      "Failed to publish scheduling page key (kind 32680):",
       err instanceof Error ? err.message : err,
     );
   }
@@ -182,22 +218,22 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
-    // Make sure the kind-32680 self-key index is loaded so we can decrypt
-    // pages we authored on another device (or after a web refresh, where
-    // secure storage is a no-op).
-    void ensureOwnPrivateEventKeyIndexLoaded();
+    // Make sure the kind-32680 scheduling-page-key index is loaded so we
+    // can decrypt pages we authored on another device (or after a web
+    // refresh, where secure storage is a no-op).
+    void ensureOwnSchedulingPageKeyIndexLoaded();
 
     subscriptionHandle = fetchUserSchedulingPages(
       userPubkey,
       async (event) => {
         // All scheduling pages we publish are NIP-44 encrypted: the outer
         // event carries only `["d", id]` plus ciphertext in `content`.
-        // Decrypt unconditionally via the kind-32680 self-key index.
-        await ensureOwnPrivateEventKeyIndexLoaded();
+        // Decrypt unconditionally via the kind-32680 page-key index.
+        await ensureOwnSchedulingPageKeyIndexLoaded();
         const dTag = event.tags.find((t) => t[0] === "d")?.[1];
         if (!dTag) return;
-        const entry = getOwnPrivateEventKeyIndex().get(dTag);
-        if (!entry || entry.eventKind !== EventKinds.SchedulingPage) {
+        const viewKey = getOwnSchedulingPageKeyIndex().get(dTag);
+        if (!viewKey) {
           // Either someone else's encrypted page (we can't decrypt) or
           // a tombstoned record (entry deleted). Skip silently.
           return;
@@ -205,7 +241,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
         let parseSource: Event;
         let viewKeyHex: string;
         try {
-          const decoded = decode(entry.viewKey);
+          const decoded = decode(viewKey);
           if (decoded.type !== "nsec") {
             throw new Error(`unexpected viewKey encoding: ${decoded.type}`);
           }
@@ -298,18 +334,18 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
 
     await deleteSchedulingPageNostr(page);
 
-    // Tombstone the self-key index so other devices stop reconstructing
+    // Tombstone the page-key index so other devices stop reconstructing
     // this page after deletion. Best-effort — failure is non-fatal because
     // the NIP-09 deletion event above is the canonical signal.
     try {
-      await publishEmptySelfKeyIndex(page.id);
+      await publishEmptySchedulingPageKey(page.id);
     } catch (err) {
       console.warn(
-        "Failed to tombstone self-key index for scheduling page:",
+        "Failed to tombstone scheduling page key (kind 32680):",
         err instanceof Error ? err.message : err,
       );
     }
-    deleteOwnPrivateEventKey(page.id);
+    deleteOwnSchedulingPageKey(page.id);
 
     set((state) => {
       const pages = state.pages.filter((p) => p.id !== pageId);

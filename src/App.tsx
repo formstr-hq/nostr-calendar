@@ -14,10 +14,7 @@ import { Header } from "./components/Header";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
-import {
-  useTimeBasedEvents,
-  refreshOwnPrivateEventKeyIndex,
-} from "./stores/events";
+import { useTimeBasedEvents } from "./stores/events";
 import { isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
 import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "./utils/constants";
@@ -83,11 +80,7 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      // Refresh the self-key index FIRST so fetchPrivateEvents can use it
-      // as a fallback when the calendar list lacks viewKeys for own events.
-      void refreshOwnPrivateEventKeyIndex().then(() =>
-        events.fetchPrivateEvents(),
-      );
+      void events.fetchPrivateEvents();
       fetchInvitations();
     }
   }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
