@@ -31,18 +31,33 @@ export const TimeRenderer = ({
   begin,
   end,
   repeat,
+  allDay,
 }: {
   begin: number;
   end: number;
   repeat: ICalendarEvent["repeat"];
+  allDay?: boolean;
 }) => {
+  // For all-day events, `end` is the exclusive midnight of the day after the
+  // last full day, so subtract 1ms before formatting to get the inclusive
+  // "last day" label users expect.
+  const lastDay = dayjs(end - 1);
+  const isMultiDay = allDay && !lastDay.isSame(dayjs(begin), "day");
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <AccessTimeIcon />
         <Typography>
-          {dayjs(begin).format("ddd, DD MMMM YYYY ⋅ HH:mm -")}{" "}
-          {dayjs(end).format("HH:mm")}
+          {allDay
+            ? isMultiDay
+              ? `${dayjs(begin).format("ddd, DD MMM")} – ${lastDay.format(
+                  "ddd, DD MMM YYYY",
+                )} ⋅ All day`
+              : `${dayjs(begin).format("ddd, DD MMMM YYYY")} ⋅ All day`
+            : `${dayjs(begin).format(
+                "ddd, DD MMMM YYYY ⋅ HH:mm -",
+              )} ${dayjs(end).format("HH:mm")}`}
         </Typography>
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>

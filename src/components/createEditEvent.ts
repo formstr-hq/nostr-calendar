@@ -13,6 +13,10 @@ export default async function createEditEvent({
   event: React.MouseEvent<HTMLDivElement>;
 }): Promise<ICalendarEvent | null> {
   if (calendarEvent) {
+    if (calendarEvent.source === "device") {
+      // Device-sourced events are read-only and have no Nostr identity.
+      return null;
+    }
     return {
       ...calendarEvent,
     };

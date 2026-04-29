@@ -35,6 +35,7 @@ import Download from "@mui/icons-material/Download";
 import Edit from "@mui/icons-material/Edit";
 import Delete from "@mui/icons-material/Delete";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
@@ -44,10 +45,16 @@ import { getAppBaseUrl, isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
+import { useDeviceCalendars } from "../stores/deviceCalendars";
+import {
+  DEVICE_CALENDAR_ID_PREFIX,
+  deviceCalendarColor,
+} from "../utils/deviceCalendarAdapter";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
+
 import { useInvitations } from "../stores/invitations";
 import {
   buildEventRef,
@@ -71,6 +78,31 @@ export interface CalendarEventViewProps {
 }
 
 /**
+ * Resolves the display color for an event by checking, in order:
+ * 1. The owning Nostr calendar list's color, if `event.calendarId` matches one
+ * 2. The device calendar's hex color when `event.source === "device"`
+ * 3. `undefined` (caller falls back to the theme palette)
+ */
+function useResolvedCalendarColor(event: ICalendarEvent): string | undefined {
+  const nostrCalendars = useCalendarLists.getState().calendars;
+  const deviceCalendars = useDeviceCalendars((s) => s.calendars);
+
+  const owning = event.calendarId
+    ? nostrCalendars.find((c) => c.id === event.calendarId)
+    : undefined;
+  if (owning?.color) return owning.color;
+
+  if (event.source === "device" && event.calendarId) {
+    const nativeId = event.calendarId.startsWith(DEVICE_CALENDAR_ID_PREFIX)
+      ? event.calendarId.slice(DEVICE_CALENDAR_ID_PREFIX.length)
+      : event.calendarId;
+    const info = deviceCalendars.find((c) => c.id === nativeId);
+    if (info) return deviceCalendarColor(info);
+  }
+  return undefined;
+}
+
+/**
  * Returns color scheme for an event card based on its type:
  * - Invitation events: grey background with dashed border
  * - Private events with a calendar: themed by the calendar's color
@@ -88,6 +120,15 @@ function getColorScheme(
       color: theme.palette.text.secondary,
       backgroundColor: "#e0e0e0",
       border: "2px dashed #999",
+    };
+  }
+
+  // Device-sourced events get a muted, calendar-coloured style.
+  if (event.source === "device" && calendarColor) {
+    return {
+      color: "#fff",
+      backgroundColor: alpha(calendarColor, 0.6),
+      border: `1px solid ${alpha(calendarColor, 0.9)}`,
     };
   }
 
@@ -122,12 +163,9 @@ export function CalendarEventCard({
   const maxDescLength = 20;
   const theme = useTheme();
 
-  // Look up the calendar for this event
-  const calendars = useCalendarLists.getState().calendars;
-  const calendar = event.calendarId
-    ? calendars.find((c) => c.id === event.calendarId)
-    : undefined;
-  const colorScheme = getColorScheme(event, theme, calendar?.color);
+  const resolvedColor = useResolvedCalendarColor(event);
+
+  const colorScheme = getColorScheme(event, theme, resolvedColor);
   const title =
     event.title ??
     (event.description.length > maxDescLength
@@ -160,6 +198,11 @@ export function CalendarEventCard({
           color={colorScheme.color}
           fontWeight={600}
         >
+          {event.source === "device" && (
+            <PhoneAndroidIcon
+              sx={{ fontSize: 12, mr: 0.5, verticalAlign: "middle" }}
+            />
+          )}
           {title}
         </Typography>
       </Paper>
@@ -271,6 +314,41 @@ function ActionButtons({
   showOpenInNew?: boolean;
 }) {
   const intl = useIntl();
+  const { user } = useUser();
+  const navigate = useNavigate();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const iconSize = isMobile ? "small" : "medium";
+
+  // Device events have no Nostr coordinate; render a slim action bar that
+  // only allows ICS export + close. No edit, delete, copy-link, or share.
+  if (event.source === "device") {
+    return (
+      <Box
+        minWidth={isMobile ? "inherit" : "80px"}
+        sx={{ whiteSpace: "nowrap" }}
+      >
+        {!isNative && (
+          <IconButton size={iconSize} onClick={() => exportICS(event)}>
+            <Tooltip
+              title={intl.formatMessage({ id: "event.downloadDetails" })}
+            >
+              <Download fontSize={iconSize} />
+            </Tooltip>
+          </IconButton>
+        )}
+        {showClose && (
+          <IconButton
+            size={iconSize}
+            aria-label={intl.formatMessage({ id: "navigation.close" })}
+            onClick={closeModal}
+          >
+            <CloseIcon fontSize={iconSize} />
+          </IconButton>
+        )}
+      </Box>
+    );
+  }
+
   const linkToEvent = getEventPage(
     encodeNAddr(
       {
@@ -286,10 +364,7 @@ function ActionButtons({
   const copyLinkToEvent = () => {
     navigator.clipboard.writeText(eventUrl);
   };
-  const { user } = useUser();
-  const navigate = useNavigate();
   const isEditable = event.user === user?.pubkey;
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const editEvent = () => {
     const editLink = getEditEventPage(
@@ -306,8 +381,6 @@ function ActionButtons({
     closeModal();
     navigate(editLink);
   };
-
-  const iconSize = isMobile ? "small" : "medium";
 
   return (
     <Box
@@ -378,7 +451,10 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const locations = event.location.filter((location) => !!location?.trim?.());
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
-  const eventCoordinate = getCalendarEventCoordinate(event);
+  const isDeviceEvent = event.source === "device";
+  const eventCoordinate = isDeviceEvent
+    ? ""
+    : getCalendarEventCoordinate(event);
 
   const calendar = event.calendarId
     ? calendars.find((c) => c.id === event.calendarId)
@@ -449,6 +525,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             begin={event.begin}
             end={event.end}
             repeat={event.repeat}
+            allDay={event.allDay}
           ></TimeRenderer>
 
           {event.description && (
@@ -498,6 +575,13 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                 onCalendarUpdate={handleCalendarUpdate}
               />
             </>
+          ) : isDeviceEvent ? (
+            <>
+              <Divider />
+              <Typography variant="caption" color="text.secondary">
+                From your device calendar — read-only.
+              </Typography>
+            </>
           ) : (
             <>
               <Divider />
@@ -505,7 +589,9 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             </>
           )}
 
-          <ScheduledNotificationsSection eventId={event.id} />
+          {!isDeviceEvent && (
+            <ScheduledNotificationsSection eventId={event.id} />
+          )}
         </Stack>
       </Box>
     </Box>
@@ -793,6 +879,52 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           </Button>
         </DialogActions>
       </Dialog>
+    </>
+  );
+}
+
+/** Compact pill used in the all-day banner row of Day and Week views. */
+export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
+  const [open, setOpen] = useState(false);
+  const theme = useTheme();
+
+  const resolvedColor = useResolvedCalendarColor(event);
+  const colorScheme = getColorScheme(event, theme, resolvedColor);
+
+  return (
+    <>
+      <Box
+        onClick={() => setOpen(true)}
+        sx={{
+          bgcolor: colorScheme.backgroundColor,
+          border: colorScheme.border,
+          borderRadius: 0.5,
+          px: 0.5,
+          mb: 0.25,
+          cursor: "pointer",
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{ color: colorScheme.color, fontWeight: 600 }}
+        >
+          {event.source === "device" && (
+            <PhoneAndroidIcon
+              sx={{ fontSize: 12, mr: 0.5, verticalAlign: "middle" }}
+            />
+          )}
+          {event.title}
+        </Typography>
+      </Box>
+      <CalendarEventView
+        event={event}
+        display="modal"
+        open={open}
+        onClose={() => setOpen(false)}
+      />
     </>
   );
 }
