@@ -64,6 +64,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
       enterTitle: "Enter event title",
@@ -273,6 +274,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Termin bearbeiten",
+      duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
       enterTitle: "Titel eingeben",
