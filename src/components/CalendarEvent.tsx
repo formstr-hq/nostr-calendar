@@ -525,6 +525,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             begin={event.begin}
             end={event.end}
             repeat={event.repeat}
+            allDay={event.allDay}
           ></TimeRenderer>
 
           {event.description && (

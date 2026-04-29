@@ -161,6 +161,7 @@ export function DeleteEventDialog({
               begin={event.begin}
               end={event.end}
               repeat={event.repeat}
+              allDay={event.allDay}
             />
           </Box>
 
