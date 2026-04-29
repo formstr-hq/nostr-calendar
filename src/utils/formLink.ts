@@ -126,3 +126,36 @@ export function buildFormstrUrl(form: IFormAttachment): string {
   if (!form.viewKey) return base;
   return `${base}?viewKey=${encodeURIComponent(form.viewKey)}`;
 }
+
+/**
+ * Decodes an `naddr` to its NIP-01 replaceable-event coordinate string
+ * `<kind>:<pubkey>:<dtag>` used for `#a` filter lookups (NIP-101 form
+ * responses tag the source form with this coordinate).
+ *
+ * Returns null if the input is not a valid naddr.
+ */
+export function getFormCoordinate(naddr: string): string | null {
+  try {
+    const decoded = nip19.decode(naddr);
+    if (decoded.type !== "naddr") return null;
+    const { kind, pubkey, identifier } = decoded.data;
+    return `${kind}:${pubkey}:${identifier}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns the relay hints encoded inside a form `naddr`, if any.
+ * Useful so response-lookup queries reach the same relays that the
+ * form template lives on.
+ */
+export function getFormRelayHints(naddr: string): string[] {
+  try {
+    const decoded = nip19.decode(naddr);
+    if (decoded.type !== "naddr") return [];
+    return decoded.data.relays ?? [];
+  } catch {
+    return [];
+  }
+}

@@ -789,3 +789,35 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   const allRelays = [...new Set([...relays, ...defaultRelays])];
   await publishToRelays(fullEvent, () => {}, allRelays);
 };
+
+/**
+ * Looks up the most recent NIP-101 form response (kind 1069) authored by
+ * `userPubkey` for the form addressed by `formCoordinate`
+ * (`30168:<form_pubkey>:<dtag>`).
+ *
+ * Returns the latest matching response event, or null if none exist on
+ * the queried relays.
+ *
+ * `extraRelays` lets callers pass relay hints embedded in the form's
+ * naddr so the lookup reaches the same relays the form lives on.
+ *
+ * Note: this is the canonical "has the user submitted?" check. UI must
+ * not infer submission status from local memory across reloads.
+ */
+export const fetchUserFormResponse = async (
+  formCoordinate: string,
+  userPubkey: string,
+  extraRelays: string[] = [],
+): Promise<Event | null> => {
+  const relays = [...new Set([...defaultRelays, ...extraRelays])];
+  const events = await nostrRuntime.querySync(relays, {
+    kinds: [EventKinds.FormResponse],
+    authors: [userPubkey],
+    "#a": [formCoordinate],
+    limit: 1,
+  });
+  if (!events || events.length === 0) return null;
+  return events.reduce((latest, current) =>
+    current.created_at > latest.created_at ? current : latest,
+  );
+};

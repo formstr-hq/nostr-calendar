@@ -130,18 +130,13 @@ const dictionary: NestedObject = {
       fetchError: "Could not load the form. Please try again.",
       submitError: "Could not submit your response. Please try again.",
       alreadySubmitted: "You've already responded to this form.",
+      yourResponse: "Your response",
+      responseUnavailable:
+        "We found your submission, but the answer details are still syncing from relays.",
+      noAnswer: "No answer",
+      unknownQuestion: "Question",
       submitAgain: "Submit again",
       continue: "Continue",
-    },
-    formResponses: {
-      viewButton: "View responses",
-      title: "Form responses",
-      empty: "No one has submitted this form yet.",
-      respondent: "Respondent",
-      submittedAt: "Submitted",
-      loadError: "Could not load form responses.",
-      encryptedNotice:
-        "This form is encrypted. Open it in Formstr to view responses.",
     },
     deleteEvent: {
       title: "Delete Event",
@@ -167,6 +162,7 @@ const dictionary: NestedObject = {
       notifications: "Notifications",
       notificationsOn: "Enabled for this calendar",
       notificationsOff: "Disabled for this calendar",
+      submit: "Absenden",
       notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
@@ -175,6 +171,11 @@ const dictionary: NestedObject = {
     sidebar: {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Antwort gefunden, aber die Details synchronisieren noch von den Relays.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
       createCalendar: "Create Calendar",
     },
     addToCalendar: {
@@ -364,7 +365,6 @@ const dictionary: NestedObject = {
       fillTitle: "Formular ausfüllen",
       fillOut: "Ausfüllen",
       viewOrUpdate: "Antwort ansehen / aktualisieren",
-      submit: "Absenden",
       cancel: "Abbrechen",
       submitting: "Wird gesendet…",
       retry: "Erneut versuchen",
@@ -376,16 +376,6 @@ const dictionary: NestedObject = {
       alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
       submitAgain: "Erneut absenden",
       continue: "Weiter",
-    },
-    formResponses: {
-      viewButton: "Antworten ansehen",
-      title: "Formularantworten",
-      empty: "Noch hat niemand auf dieses Formular geantwortet.",
-      respondent: "Antwortende(r)",
-      submittedAt: "Gesendet",
-      loadError: "Antworten konnten nicht geladen werden.",
-      encryptedNotice:
-        "Dieses Formular ist verschlüsselt. Öffnen Sie es in Formstr, um die Antworten zu sehen.",
     },
     deleteEvent: {
       title: "Termin löschen",

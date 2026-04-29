@@ -60,6 +60,8 @@ import { bytesToHex } from "nostr-tools/utils";
 import { FormstrSDK } from "@formstr/sdk";
 import { FormFillerDialog } from "./FormFillerDialog";
 import type { IFormAttachment } from "../utils/types";
+import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -486,15 +488,15 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               <Typography variant="subtitle1">
                 {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
-              <Stack spacing={1}>
-                {event.forms.map((attachment) => (
-                  <FormAttachmentRow
-                    key={attachment.naddr}
-                    attachment={attachment}
-                    onFill={setActiveForm}
-                  />
-                ))}
-              </Stack>
+                <Stack spacing={1}>
+                  {event.forms.map((attachment) => (
+                    <FormAttachmentRow
+                      key={attachment.naddr}
+                      attachment={attachment}
+                      onFill={setActiveForm}
+                    />
+                  ))}
+                </Stack>
               <Divider />
             </>
           )}
@@ -548,7 +550,10 @@ function FormAttachmentRow({
   onFill: (attachment: IFormAttachment) => void;
 }) {
   const intl = useIntl();
+  const { user } = useUser();
   const [title, setTitle] = useState<string | null>(null);
+  const { status } = useFormSubmissionStatus(attachment.naddr, user?.pubkey);
+  const submitted = status.state === "submitted";
 
   useEffect(() => {
     let cancelled = false;
@@ -588,11 +593,14 @@ function FormAttachmentRow({
   return (
     <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
       <Button
-        variant="outlined"
+        variant={submitted ? "text" : "outlined"}
         size="small"
         onClick={() => onFill(attachment)}
+        startIcon={submitted ? <CheckCircleIcon color="success" /> : undefined}
       >
-        {intl.formatMessage({ id: "form.fillOut" })}
+        {intl.formatMessage({
+          id: submitted ? "form.viewOrUpdate" : "form.fillOut",
+        })}
       </Button>
       <Typography
         variant="caption"
