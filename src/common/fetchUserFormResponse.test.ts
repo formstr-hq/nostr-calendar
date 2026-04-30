@@ -2,7 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock heavy deps before importing fetchUserFormResponse — nostr.ts imports
 // many runtime modules we don't want to execute in this test.
-const { mockQuerySync } = vi.hoisted(() => ({ mockQuerySync: vi.fn() }));
+const { mockQuerySync, mockRelayStore } = vi.hoisted(() => ({
+  mockQuerySync: vi.fn(),
+  mockRelayStore: { relays: [] as string[] },
+}));
 vi.mock("./nostrRuntime", () => ({
   nostrRuntime: {
     querySync: mockQuerySync,
@@ -18,7 +21,7 @@ vi.mock("./signer", () => ({
   },
 }));
 vi.mock("../stores/relays", () => ({
-  useRelayStore: { getState: () => ({ relays: [] }) },
+  useRelayStore: { getState: () => mockRelayStore },
 }));
 vi.mock("../stores/calendarLists", () => ({ useCalendarLists: {} }));
 vi.mock("../stores/eventDetails", () => ({ TEMP_CALENDAR_ID: "tmp" }));
@@ -42,6 +45,7 @@ const make = (id: string, ts: number) => ({
 describe("fetchUserFormResponse", () => {
   beforeEach(() => {
     mockQuerySync.mockReset();
+    mockRelayStore.relays = [];
   });
 
   it("returns null when relays return no events", async () => {
@@ -77,9 +81,18 @@ describe("fetchUserFormResponse", () => {
     ]);
     const [relays] = mockQuerySync.mock.calls[0];
     const xCount = (relays as string[]).filter(
-      (r) => r === "wss://relay.damus.io",
+      (r) => r === "wss://relay.damus.io/",
     ).length;
     expect(xCount).toBe(1);
-    expect(relays).toContain("wss://relay.x");
+    expect(relays).toContain("wss://relay.x/");
+  });
+
+  it("includes user-configured relays for discovery", async () => {
+    mockRelayStore.relays = ["wss://relay.user"];
+    mockQuerySync.mockResolvedValue([]);
+    await fetchUserFormResponse(COORD, USER, ["wss://relay.form"]);
+    const [relays] = mockQuerySync.mock.calls[0];
+    expect(relays).toContain("wss://relay.form/");
+    expect(relays).toContain("wss://relay.user/");
   });
 });

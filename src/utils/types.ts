@@ -44,10 +44,11 @@ export type NotificationPreference = "enabled" | "disabled";
  * The naddr is the Nostr address (NIP-19) of the form.
  *
  * The optional viewKey is the form's read-only NIP-44 decryption key —
- * the same value Formstr surfaces in shareable links as `?viewKey=<hex>`.
- * It must NEVER be confused with the form's `responseKey` (a.k.a. admin /
- * edit key), which grants write access to the form definition itself and
- * must never be embedded in shared calendar events.
+ * the same value Formstr surfaces in shareable links as `?viewKey=<hex>`
+ * or inside an `#nkeys1...` bech32-TLV blob. It must NEVER be confused
+ * with the form's `responseKey` (a.k.a. admin / edit key), which grants
+ * write access to the form definition itself and must never be embedded
+ * in shared calendar events.
  */
 export interface IFormAttachment {
   naddr: string;

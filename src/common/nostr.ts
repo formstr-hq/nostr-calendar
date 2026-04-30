@@ -52,6 +52,26 @@ export const getRelays = (): string[] => {
   return userRelays.length > 0 ? userRelays : defaultRelays;
 };
 
+const normalizeRelayList = (relays: string[]): string[] => {
+  const normalized = new Set<string>();
+  relays.forEach((url) => {
+    try {
+      normalized.add(normalizeURL(url));
+    } catch {
+      // Ignore malformed relay hints from external naddr/form links.
+    }
+  });
+  return [...normalized];
+};
+
+const getDiscoveryRelays = (hintRelays: string[] = []): string[] => {
+  return normalizeRelayList([
+    ...hintRelays,
+    ...defaultRelays,
+    ...useRelayStore.getState().relays,
+  ]);
+};
+
 export async function getUserPublicKey() {
   const signer = await signerManager.getSigner();
   const pubKey = await signer.getPublicKey();
@@ -69,31 +89,23 @@ export const ensureRelay = async (
   return relay;
 };
 
-export async function publishPrivateRSVPEvent({
-  authorpubKey, // Public key of the event author
-  eventId, // The dtag of the event
-  status, // Status of the RSVP event
-  participants, // List of participant public keys
-  referenceKind,
-}: {
-  eventId: string;
+export async function publishPrivateRSVPEvent(params: {
   authorpubKey: string;
+  eventId: string;
   status: string;
   participants: string[];
   referenceKind: EventKinds.PrivateCalendarEvent;
 }) {
+  void params;
   // this function is noop
 }
 
-export async function publishPublicRSVPEvent({
-  authorpubKey,
-  eventId,
-  status,
-}: {
+export async function publishPublicRSVPEvent(params: {
   authorpubKey: string;
   eventId: string;
   status: string;
 }) {
+  void params;
   // this function is noop
 }
 
@@ -229,7 +241,6 @@ export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
   await Promise.all(
     giftWraps.map(async ({ giftWrap, participant }) => {
       const relays = participantRelayMap.get(participant) ?? defaultRelays;
-      console.log(`Publishing invitation for ${participant} to ${relays}`);
       await publishToRelays(giftWrap, undefined, relays);
     }),
   );
@@ -714,11 +725,8 @@ export const fetchCalendarEvent = async (
   naddr: NAddr,
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
-  // Merge: naddr hints first (where the author published), then defaults as
-  // fallback.  Trusting only naddr relays is fragile: a single unavailable
-  // relay makes the event invisible to every viewer who uses a shared link.
   const hintRelays = data.relays ?? [];
-  const relays = [...new Set([...hintRelays, ...defaultRelays])];
+  const relays = getDiscoveryRelays(hintRelays);
   const filter: Filter = {
     "#d": [data.identifier],
     kinds: [data.kind],
@@ -817,7 +825,7 @@ export const fetchUserFormResponse = async (
   userPubkey: string,
   extraRelays: string[] = [],
 ): Promise<Event | null> => {
-  const relays = [...new Set([...defaultRelays, ...extraRelays])];
+  const relays = getDiscoveryRelays(extraRelays);
   const events = await nostrRuntime.querySync(relays, {
     kinds: [EventKinds.FormResponse],
     authors: [userPubkey],

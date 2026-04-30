@@ -40,7 +40,7 @@ export function InvitationPanel() {
 
   useEffect(() => {
     fetchCalendars();
-  }, []);
+  }, [fetchCalendars]);
 
   const [addDialogEvent, setAddDialogEvent] = useState<ICalendarEvent | null>(
     null,
@@ -57,7 +57,6 @@ export function InvitationPanel() {
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
     .sort((a, b) => b.receivedAt - a.receivedAt);
-  console.log(pendingInvitations);
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
