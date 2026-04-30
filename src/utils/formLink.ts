@@ -1,4 +1,8 @@
 import { nip19 } from "nostr-tools";
+// Deep import: SDK doesn't re-export nkeys helpers from its main entry,
+// but the file is shipped in dist/. Using the SDK's own implementation
+// guarantees the decode matches what Formstr's app uses to encode.
+import { decodeNKeys } from "@formstr/sdk/dist/utils/nkeys.js";
 import type { IFormAttachment } from "./types";
 
 /**
@@ -11,20 +15,22 @@ import type { IFormAttachment } from "./types";
  * Formstr distinguishes two secrets per encrypted form:
  *
  *   • viewKey      — a read-only NIP-44 decryption key, surfaced in
- *                    shareable links as `?viewKey=<hex>`. Safe to embed
- *                    in a calendar event so recipients can decrypt and
- *                    fill the form.
+ *                    shareable links as `?viewKey=<hex>` (legacy) or
+ *                    inside an `#nkeys1...` bech32-TLV blob (modern).
+ *                    Safe to embed in a calendar event so recipients
+ *                    can decrypt and fill the form.
  *
  *   • responseKey  — the form *owner's* admin / edit key. Possessing
  *                    it allows modifying the form definition itself,
  *                    so it must NEVER be embedded in a calendar event
  *                    or any user-shared artifact.
  *
- * This module only ever extracts and persists viewKey. If a URL accidentally
- * contains a `responseKey=` query param it is ignored.
+ * This module only ever extracts and persists viewKey. Any
+ * `responseKey=` query param is intentionally ignored.
  */
 
 const NADDR_REGEX = /naddr1[0-9a-z]+/i;
+const NKEYS_REGEX = /nkeys1[0-9a-z]+/i;
 const VIEW_KEY_REGEX = /[?&]viewKey=([^&#\s]+)/i;
 
 /**
@@ -53,22 +59,45 @@ export function extractNaddr(input: string): string | null {
 }
 
 /**
- * Extracts the optional `viewKey` query parameter from a Formstr URL.
+ * Extracts the optional viewKey from a Formstr URL or share string.
  *
- * Only the `?viewKey=<value>` query form is recognized — this matches
- * Formstr's canonical share-link format, e.g.
+ * Recognised, in priority order, matching Formstr's own URL parser:
+ *  1. `nkeys1...` blob (typically a hash fragment) — Formstr's modern
+ *     share format, a bech32-TLV envelope carrying `viewKey` (and
+ *     optionally `editKey`). Decoded via the SDK's `decodeNKeys`.
+ *  2. `?viewKey=<hex>` query param — Formstr's legacy / canonical
+ *     query-string form, e.g.
+ *       https://formstr.app/f/naddr1...?viewKey=4155adc1f08a7c0d...
  *
- *   https://formstr.app/f/naddr1...?viewKey=4155adc1f08a7c0d...
+ * Any `responseKey=` query parameter is intentionally ignored — that
+ * value is the form owner's admin secret and must never propagate
+ * through this app.
  *
- * Returns undefined when the input contains no viewKey. Any
- * `responseKey=` parameter is intentionally ignored, as it represents
- * the form owner's admin secret and must not propagate.
+ * Returns undefined when no viewKey can be extracted.
  */
 export function extractViewKey(input: string): string | undefined {
   if (!input) return undefined;
-  const match = input.trim().match(VIEW_KEY_REGEX);
-  if (!match?.[1]) return undefined;
-  return decodeURIComponent(match[1]).toLowerCase();
+  const trimmed = input.trim();
+
+  // 1. nkeys1... blob (anywhere in the string, so naked
+  //    "naddr#nkeys..." input without a scheme still works).
+  const nkeysMatch = trimmed.match(NKEYS_REGEX);
+  if (nkeysMatch) {
+    try {
+      const decoded = decodeNKeys(nkeysMatch[0]) as { viewKey?: string };
+      if (decoded.viewKey) return decoded.viewKey.toLowerCase();
+    } catch {
+      // fall through to query-param extraction
+    }
+  }
+
+  // 2. ?viewKey=<hex> query param.
+  const queryMatch = trimmed.match(VIEW_KEY_REGEX);
+  if (queryMatch?.[1]) {
+    return decodeURIComponent(queryMatch[1]).toLowerCase();
+  }
+
+  return undefined;
 }
 
 /**
@@ -89,7 +118,8 @@ export function parseFormInput(input: string): IFormAttachment | null {
  * Path style is `https://formstr.app/f/<naddr>` because that is the
  * variant currently exposed by Formstr's public web app at the time of
  * writing. If the attachment carries a viewKey it is appended as the
- * `viewKey` query parameter, matching Formstr's own share-link format.
+ * `viewKey` query parameter, matching Formstr's own share-link format
+ * and round-tripping through `extractViewKey`.
  */
 export function buildFormstrUrl(form: IFormAttachment): string {
   const base = `https://formstr.app/f/${form.naddr}`;
