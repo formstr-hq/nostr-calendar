@@ -141,6 +141,20 @@ const dictionary: NestedObject = {
     formResponses: {
       viewButton: "View responses in Formstr",
     },
+    rsvp: {
+      yourResponse: "Your RSVP:",
+      yes: "Yes",
+      no: "No",
+      maybe: "Maybe",
+      toggleDetails: "Show RSVP details",
+      suggestedStart: "Suggested start",
+      suggestedEnd: "Suggested end",
+      comment: "Comment",
+      detailsHint:
+        "Suggested times and comments are shared with other participants. Pick a status above to send.",
+      suggestionsHeading: "Time suggestions from participants",
+      applySuggestion: "Move event to this time",
+    },
     deleteEvent: {
       title: "Delete Event",
       deleteForEveryone: "Delete for all participants",
@@ -387,6 +401,20 @@ const dictionary: NestedObject = {
     },
     formResponses: {
       viewButton: "Antworten in Formstr ansehen",
+    },
+    rsvp: {
+      yourResponse: "Deine Zusage:",
+      yes: "Ja",
+      no: "Nein",
+      maybe: "Vielleicht",
+      toggleDetails: "RSVP-Details anzeigen",
+      suggestedStart: "Vorgeschlagener Beginn",
+      suggestedEnd: "Vorgeschlagenes Ende",
+      comment: "Kommentar",
+      detailsHint:
+        "Vorgeschlagene Zeiten und Kommentare werden mit anderen Teilnehmern geteilt. Wähle oben einen Status, um zu senden.",
+      suggestionsHeading: "Zeitvorschläge von Teilnehmern",
+      applySuggestion: "Termin auf diese Zeit verschieben",
     },
     deleteEvent: {
       title: "Termin löschen",

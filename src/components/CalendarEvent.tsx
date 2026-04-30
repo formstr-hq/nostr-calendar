@@ -37,7 +37,12 @@ import Delete from "@mui/icons-material/Delete";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
-import { encodeNAddr } from "../common/nostr";
+import {
+  encodeNAddr,
+  publishPrivateRSVPEvent,
+  publishPublicRSVPEvent,
+} from "../common/nostr";
+import { RSVPStatus } from "../utils/types";
 import { getEditEventPage, getEventPage } from "../utils/routingHelper";
 import { useNavigate } from "react-router";
 import { getAppBaseUrl, isNative } from "../utils/platform";
@@ -61,6 +66,10 @@ import { bytesToHex } from "nostr-tools/utils";
 import { FormFillerDialog } from "./FormFillerDialog";
 import { FormAttachmentRow } from "./FormAttachmentRow";
 import type { IFormAttachment } from "../utils/types";
+import { useEventRsvps } from "../hooks/useEventRsvps";
+import { RSVPBar } from "./RSVPBar";
+import { RSVPSuggestionsPanel } from "./RSVPSuggestionsPanel";
+import { RSVPResponse } from "../stores/events";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -382,12 +391,20 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const locations = event.location.filter((location) => !!location?.trim?.());
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
+  const { user } = useUser();
   const eventCoordinate = getCalendarEventCoordinate(event);
   const [activeForm, setActiveForm] = useState<IFormAttachment | null>(null);
 
   const calendar = event.calendarId
     ? calendars.find((c) => c.id === event.calendarId)
     : undefined;
+  const isEditable = !!user && event.user === user.pubkey;
+
+  // Subscribe once at this level so both the participants list and the
+  // suggestions panel render off the same RSVP record set without
+  // duplicating relay subscriptions.
+  const { byPubkey: rsvpByPubkey, allParticipants: rsvpAllParticipants } =
+    useEventRsvps(event);
 
   const handleCalendarUpdate = async (nextCalendarId: string) => {
     const sourceCalendarId = event.calendarId;
@@ -509,13 +526,34 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               {intl.formatMessage({ id: "navigation.participants" })}
             </Typography>
             <Stack direction="row" gap={0.5} flexWrap="wrap">
-              {event.participants.map((p) => (
+              {rsvpAllParticipants.map((p) => (
                 <Box width={"100%"} key={p}>
-                  <Participant pubKey={p} isAuthor={p === event.user} />
+                  <Participant
+                    pubKey={p}
+                    isAuthor={p === event.user}
+                    rsvpResponse={
+                      (rsvpByPubkey[p]?.status as RSVPResponse) ??
+                      RSVPResponse.pending
+                    }
+                  />
                 </Box>
               ))}
             </Stack>
           </Box>
+
+          {calendar && user && (
+            <>
+              <Divider />
+              <RSVPBar event={event} />
+            </>
+          )}
+
+          {isEditable && (
+            <RSVPSuggestionsPanel
+              event={event}
+              records={Object.values(rsvpByPubkey)}
+            />
+          )}
 
           {calendar ? (
             <>
@@ -621,6 +659,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       calendarId: string;
       giftWrapId?: string;
     }) => {
+      const isSharedLinkAccept = !giftWrapId;
       if (giftWrapId) {
         await acceptInvitation(giftWrapId, calendarId);
       } else {
@@ -638,6 +677,35 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           isInvitation: false,
         });
       }
+
+      // When an event is added via shared link (not a direct invitation),
+      // automatically post a tentative RSVP so other participants can see
+      // the user's intent to attend. Form submission and calendar add are
+      // authoritative; this RSVP publish is best-effort.
+      if (isSharedLinkAccept) {
+        try {
+          if (event.isPrivateEvent) {
+            await publishPrivateRSVPEvent({
+              authorPubKey: event.user,
+              eventId: event.id,
+              participants: event.participants,
+              referenceKind: event.kind,
+              relayHint: event.relayHint,
+              payload: { status: RSVPStatus.tentative },
+            });
+          } else {
+            await publishPublicRSVPEvent({
+              authorPubKey: event.user,
+              eventId: event.id,
+              relayHint: event.relayHint,
+              payload: { status: RSVPStatus.tentative },
+            });
+          }
+        } catch (err) {
+          console.warn("auto-tentative RSVP failed", err);
+        }
+      }
+
       setSuccessDialogOpen(true);
     },
     [acceptInvitation, addEventToCalendar, event, updateEvent],
