@@ -265,10 +265,14 @@ export async function editPrivateCalendarEvent(
   await publishToRelays(signedEvent);
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
+  // Preserve the relay hint from the existing event so the updated ref still
+  // points to the relay where the event lives.  Without this the relay URL is
+  // dropped on every edit, making subsequent fetches miss the event.
   const eventRef = buildEventRef({
     kind: eventKind,
     authorPubkey: userPublicKey,
     eventDTag: dTag,
+    relayUrl: event.relayHint ?? "",
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
 
@@ -710,7 +714,11 @@ export const fetchCalendarEvent = async (
   naddr: NAddr,
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
-  const relays = data.relays ?? defaultRelays;
+  // Merge: naddr hints first (where the author published), then defaults as
+  // fallback.  Trusting only naddr relays is fragile: a single unavailable
+  // relay makes the event invisible to every viewer who uses a shared link.
+  const hintRelays = data.relays ?? [];
+  const relays = [...new Set([...hintRelays, ...defaultRelays])];
   const filter: Filter = {
     "#d": [data.identifier],
     kinds: [data.kind],
