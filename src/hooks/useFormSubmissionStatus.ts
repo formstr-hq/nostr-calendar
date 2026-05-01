@@ -39,7 +39,7 @@ function readSessionSubmission(
   }
   if (!raw) return null;
   const submittedAt = Number(raw);
-  return Number.isFinite(submittedAt) ? submittedAt : Date.now();
+  return Number.isFinite(submittedAt) ? submittedAt : null;
 }
 
 function writeSessionSubmission(

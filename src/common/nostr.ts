@@ -272,7 +272,7 @@ export async function publishPublicRSVPEvent(params: {
 }) {
   const responderPubkey = await getUserPublicKey();
   const tags = buildRSVPRumorTags({
-    referenceKind: params.referenceKind,
+    referenceKind: EventKinds.PublicCalendarEvent,
     authorPubKey: params.authorPubKey,
     eventDTag: params.eventId,
     relayHint: params.relayHint,

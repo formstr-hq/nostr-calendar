@@ -1067,7 +1067,7 @@ export function CalendarEventEdit({
                     borderRadius: 4,
                   }}
                 >
-                  <Participant pubKey={participant} />
+                  <Participant pubKey={participant} isAuthor={false} />
                   <Button
                     size="small"
                     color="error"
