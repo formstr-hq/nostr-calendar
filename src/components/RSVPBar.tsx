@@ -5,9 +5,10 @@
  * status buttons (Yes / Maybe / No) and an optional details panel for
  * suggesting an alternate time and leaving a comment.
  *
- * The component is a thin presentational shell over the `useEventRsvps`
- * hook — the hook owns the relay subscription, optimistic state, and
- * publish path.
+ * The component is a controlled RSVP editor. The parent owns the RSVP
+ * fetch/submission lifecycle and passes the current record plus a submit
+ * callback so page-level flows can reuse the same UI before and after an
+ * event is added to a calendar.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -27,11 +28,16 @@ import dayjs from "dayjs";
 import { useIntl } from "react-intl";
 import { ICalendarEvent } from "../utils/types";
 import { RSVPStatus } from "../utils/types";
-import { useEventRsvps } from "../hooks/useEventRsvps";
-import { useUser } from "../stores/user";
+import type { RSVPPayload, RSVPRecord } from "../common/nostr";
 
 interface RSVPBarProps {
   event: ICalendarEvent;
+  myRsvp?: RSVPRecord;
+  isSubmitting: boolean;
+  onSubmit: (payload: RSVPPayload) => Promise<void>;
+  deferSubmit?: boolean;
+  submitDisabled?: boolean;
+  submitLabel?: string;
 }
 
 const toLocalInput = (unixSec: number | undefined, fallbackMs: number) => {
@@ -39,15 +45,24 @@ const toLocalInput = (unixSec: number | undefined, fallbackMs: number) => {
   return dayjs(ms).format("YYYY-MM-DDTHH:mm");
 };
 
-export function RSVPBar({ event }: RSVPBarProps) {
+export function RSVPBar({
+  event,
+  myRsvp,
+  isSubmitting,
+  onSubmit,
+  deferSubmit = false,
+  submitDisabled = false,
+  submitLabel,
+}: RSVPBarProps) {
   const intl = useIntl();
-  const { user } = useUser();
-  const { myRsvp, isSubmitting, submit } = useEventRsvps(event);
 
   const [expanded, setExpanded] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [comment, setComment] = useState("");
+  const [draftStatus, setDraftStatus] = useState<RSVPStatus>(
+    RSVPStatus.pending,
+  );
 
   // Hydrate the details fields from any existing RSVP, falling back to
   // the event's actual start/end so users always see a sensible default.
@@ -55,17 +70,20 @@ export function RSVPBar({ event }: RSVPBarProps) {
     setStart(toLocalInput(myRsvp?.suggestedStart, event.begin));
     setEnd(toLocalInput(myRsvp?.suggestedEnd, event.end));
     setComment(myRsvp?.comment ?? "");
+    setDraftStatus(myRsvp?.status ?? RSVPStatus.pending);
   }, [myRsvp, event.begin, event.end]);
 
   const currentStatus: RSVPStatus = myRsvp?.status ?? RSVPStatus.pending;
 
-  const handleStatus = async (status: RSVPStatus) => {
-    if (!user) return;
+  const activeStatus = deferSubmit ? draftStatus : currentStatus;
+
+  const buildPayload = (status: RSVPStatus): RSVPPayload => {
     const startSec = start
       ? Math.floor(dayjs(start).valueOf() / 1000)
       : undefined;
     const endSec = end ? Math.floor(dayjs(end).valueOf() / 1000) : undefined;
-    await submit({
+
+    return {
       status,
       // Only include suggested times if the user actually changed them
       // away from the event's own times — avoids spurious "suggestions".
@@ -76,7 +94,26 @@ export function RSVPBar({ event }: RSVPBarProps) {
       suggestedEnd:
         endSec && endSec !== Math.floor(event.end / 1000) ? endSec : undefined,
       comment: comment.trim() || undefined,
-    });
+    };
+  };
+
+  const submitStatus = async (status: RSVPStatus) => {
+    await onSubmit(buildPayload(status));
+  };
+
+  const handleStatus = async (status: RSVPStatus) => {
+    if (deferSubmit) {
+      setDraftStatus(status);
+      return;
+    }
+
+    await submitStatus(status);
+  };
+
+  const handleDetailsSubmit = async () => {
+    const status =
+      activeStatus === RSVPStatus.pending ? RSVPStatus.tentative : activeStatus;
+    await submitStatus(status);
   };
 
   const buttonLabel = useMemo(
@@ -89,8 +126,6 @@ export function RSVPBar({ event }: RSVPBarProps) {
     [intl],
   );
 
-  if (!user) return null;
-
   return (
     <Box>
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
@@ -100,7 +135,7 @@ export function RSVPBar({ event }: RSVPBarProps) {
         <ButtonGroup size="small" disabled={isSubmitting}>
           <Button
             variant={
-              currentStatus === RSVPStatus.accepted ? "contained" : "outlined"
+              activeStatus === RSVPStatus.accepted ? "contained" : "outlined"
             }
             color="success"
             onClick={() => handleStatus(RSVPStatus.accepted)}
@@ -109,7 +144,7 @@ export function RSVPBar({ event }: RSVPBarProps) {
           </Button>
           <Button
             variant={
-              currentStatus === RSVPStatus.tentative ? "contained" : "outlined"
+              activeStatus === RSVPStatus.tentative ? "contained" : "outlined"
             }
             color="warning"
             onClick={() => handleStatus(RSVPStatus.tentative)}
@@ -118,7 +153,7 @@ export function RSVPBar({ event }: RSVPBarProps) {
           </Button>
           <Button
             variant={
-              currentStatus === RSVPStatus.declined ? "contained" : "outlined"
+              activeStatus === RSVPStatus.declined ? "contained" : "outlined"
             }
             color="error"
             onClick={() => handleStatus(RSVPStatus.declined)}
@@ -133,6 +168,18 @@ export function RSVPBar({ event }: RSVPBarProps) {
         >
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
+        {deferSubmit && submitLabel ? (
+          <Button
+            variant="contained"
+            size="small"
+            disabled={isSubmitting || submitDisabled}
+            onClick={() => {
+              void handleDetailsSubmit();
+            }}
+          >
+            {submitLabel}
+          </Button>
+        ) : null}
       </Stack>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Stack spacing={1.5} mt={1.5}>
@@ -165,6 +212,20 @@ export function RSVPBar({ event }: RSVPBarProps) {
           <Typography variant="caption" color="text.secondary">
             {intl.formatMessage({ id: "rsvp.detailsHint" })}
           </Typography>
+          {!deferSubmit ? (
+            <Box>
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={isSubmitting}
+                onClick={() => {
+                  void handleDetailsSubmit();
+                }}
+              >
+                {intl.formatMessage({ id: "navigation.save" })}
+              </Button>
+            </Box>
+          ) : null}
         </Stack>
       </Collapse>
     </Box>

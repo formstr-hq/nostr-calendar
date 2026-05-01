@@ -42,6 +42,7 @@ vi.mock("./nip59", () => ({
 import {
   fetchPrivateEventRSVPs,
   fetchPublicEventRSVPs,
+  getPrivateRsvpRecipients,
   RSVPRecord,
 } from "./nostr";
 import { RSVPStatus } from "../utils/types";
@@ -171,5 +172,16 @@ describe("RSVP fetch helpers", () => {
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(collected).toHaveLength(0);
+  });
+
+  it("includes known responders when publishing private RSVPs", () => {
+    expect(
+      getPrivateRsvpRecipients({
+        authorPubKey: AUTHOR,
+        responderPubkey: RESPONDER,
+        participants: [AUTHOR, "d".repeat(64)],
+        additionalRecipients: [RESPONDER, "e".repeat(64), "d".repeat(64)],
+      }),
+    ).toEqual([AUTHOR, RESPONDER, "d".repeat(64), "e".repeat(64)]);
   });
 });

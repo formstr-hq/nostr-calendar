@@ -59,9 +59,11 @@ const groupSuggestions = (
 
 export function RSVPSuggestionsPanel({
   event,
+  calendarId,
   records,
 }: {
   event: ICalendarEvent;
+  calendarId?: string;
   records: RSVPRecord[];
 }) {
   const intl = useIntl();
@@ -72,6 +74,7 @@ export function RSVPSuggestionsPanel({
     () => groupSuggestions(records, event),
     [records, event],
   );
+  const canApplySuggestions = event.isPrivateEvent && !!calendarId;
 
   if (suggestions.length === 0) return null;
 
@@ -89,8 +92,8 @@ export function RSVPSuggestionsPanel({
       };
       // Republish the private calendar event so all participants pick up
       // the new time on next decrypt; then sync local store.
-      if (event.isPrivateEvent && event.calendarId) {
-        await editPrivateCalendarEvent(updated, event.calendarId);
+      if (event.isPrivateEvent && calendarId) {
+        await editPrivateCalendarEvent(updated, calendarId);
       }
       updateEvent(updated);
     } finally {
@@ -135,14 +138,16 @@ export function RSVPSuggestionsPanel({
                   ))}
                 </Stack>
               </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => handleApply(s)}
-                disabled={applyingKey === key}
-              >
-                {intl.formatMessage({ id: "rsvp.applySuggestion" })}
-              </Button>
+              {canApplySuggestions ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleApply(s)}
+                  disabled={applyingKey === key}
+                >
+                  {intl.formatMessage({ id: "rsvp.applySuggestion" })}
+                </Button>
+              ) : null}
             </Box>
           );
         })}

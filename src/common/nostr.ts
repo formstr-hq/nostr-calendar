@@ -133,6 +133,22 @@ function buildRSVPRumorTags(opts: {
   return tags;
 }
 
+export function getPrivateRsvpRecipients(params: {
+  authorPubKey: string;
+  responderPubkey: string;
+  participants: string[];
+  additionalRecipients?: string[];
+}) {
+  return Array.from(
+    new Set([
+      params.authorPubKey,
+      params.responderPubkey,
+      ...params.participants,
+      ...(params.additionalRecipients ?? []),
+    ]),
+  );
+}
+
 /**
  * Publishes an RSVP for a private calendar event.
  *
@@ -145,6 +161,7 @@ export async function publishPrivateRSVPEvent(params: {
   authorPubKey: string;
   eventId: string; // d-tag of the calendar event
   participants: string[];
+  additionalRecipients?: string[];
   referenceKind: number; // EventKinds.PrivateCalendarEvent
   relayHint?: string;
   payload: RSVPPayload;
@@ -162,9 +179,12 @@ export async function publishPrivateRSVPEvent(params: {
   // The set of recipients is the union of the event author and every
   // listed participant. The responder is included so they can also see
   // their own RSVP from any client they sign in to.
-  const recipients = Array.from(
-    new Set([params.authorPubKey, responderPubkey, ...params.participants]),
-  );
+  const recipients = getPrivateRsvpRecipients({
+    authorPubKey: params.authorPubKey,
+    responderPubkey,
+    participants: params.participants,
+    additionalRecipients: params.additionalRecipients,
+  });
 
   // Fetch all recipients' relay lists in one query so each gift wrap is
   // delivered to the recipient's preferred relays.
@@ -546,6 +566,7 @@ const parseRSVPTags = (
 export const fetchPrivateEventRSVPs = (
   params: { eventCoord: string; recipientPubkey: string },
   onRSVP: (record: RSVPRecord) => void,
+  onEose?: () => void,
 ) => {
   const relayList = getRelays();
   const filter: Filter = {
@@ -575,6 +596,7 @@ export const fetchPrivateEventRSVPs = (
         console.error("Failed to process RSVP gift wrap:", error);
       }
     },
+    onEose,
   });
 };
 
@@ -585,6 +607,7 @@ export const fetchPrivateEventRSVPs = (
 export const fetchPublicEventRSVPs = (
   params: { eventCoord: string },
   onRSVP: (record: RSVPRecord) => void,
+  onEose?: () => void,
 ) => {
   const relayList = getRelays();
   const filter: Filter = {
@@ -602,6 +625,7 @@ export const fetchPublicEventRSVPs = (
       if (!record) return;
       onRSVP(record);
     },
+    onEose,
   });
 };
 

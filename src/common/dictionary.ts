@@ -4,12 +4,6 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
-    rsvp: {
-      accepted: "Accepted",
-      declined: "Declined",
-      maybe: "Maybe",
-      pending: "Pending",
-    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -262,12 +256,6 @@ const dictionary: NestedObject = {
     },
   },
   "de-DE": {
-    rsvp: {
-      accepted: "Angenommen",
-      declined: "Abgelehnt",
-      maybe: "Vielleicht",
-      pending: "Ausstehend",
-    },
     navigation: {
       today: "Heute",
       previousDay: "Vortag",

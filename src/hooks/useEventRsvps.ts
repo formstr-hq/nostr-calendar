@@ -66,6 +66,7 @@ export function useEventRsvps(
     if (!event || !eventCoord) return;
     setIsLoading(true);
     const handleRecord = (record: RSVPRecord) => {
+      setIsLoading(false);
       setByPubkey((prev) => {
         const existing = prev[record.pubkey];
         if (existing && existing.createdAt >= record.createdAt) return prev;
@@ -82,9 +83,12 @@ export function useEventRsvps(
       handle = fetchPrivateEventRSVPs(
         { eventCoord, recipientPubkey: myPubkey },
         handleRecord,
+        () => setIsLoading(false),
       );
     } else {
-      handle = fetchPublicEventRSVPs({ eventCoord }, handleRecord);
+      handle = fetchPublicEventRSVPs({ eventCoord }, handleRecord, () =>
+        setIsLoading(false),
+      );
     }
 
     const loadingTimer = setTimeout(() => setIsLoading(false), 4000);
@@ -105,6 +109,7 @@ export function useEventRsvps(
             authorPubKey: event.user,
             eventId: event.id,
             participants: event.participants,
+            additionalRecipients: Object.keys(byPubkey),
             referenceKind: EventKinds.PrivateCalendarEvent,
             relayHint: event.relayHint,
             payload,
@@ -134,7 +139,7 @@ export function useEventRsvps(
         setIsSubmitting(false);
       }
     },
-    [event, myPubkey, eventCoord],
+    [byPubkey, event, myPubkey, eventCoord],
   );
 
   const allParticipants = useMemo(() => {
