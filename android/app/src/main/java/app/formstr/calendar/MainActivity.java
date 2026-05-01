@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
     private static final String APP_LINK_HOST = "calendar.formstr.app";
     private static final String NOTIFICATION_WORK_NAME = "calendar_notification_worker";
     private static final String INVITATION_WORK_NAME = "invitation_check_worker";
+    private static final String BOOKING_WORK_NAME = "booking_check_worker";
     private String pendingIcsContent = null;
     private String pendingRoute = null;
     private boolean webAppReady = false;
@@ -42,6 +43,7 @@ public class MainActivity extends BridgeActivity {
 
         scheduleNotificationWorker();
         scheduleInvitationWorker();
+        scheduleBookingWorker();
         handleIncomingIntent(getIntent());
     }
 
@@ -229,6 +231,22 @@ public class MainActivity extends BridgeActivity {
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                 INVITATION_WORK_NAME,
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                workRequest);
+    }
+
+    private void scheduleBookingWorker() {
+        androidx.work.Constraints constraints = new androidx.work.Constraints.Builder()
+                .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                .build();
+
+        PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                BookingWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                BOOKING_WORK_NAME,
                 ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
                 workRequest);
     }

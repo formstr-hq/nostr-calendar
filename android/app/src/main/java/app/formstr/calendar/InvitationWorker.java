@@ -283,6 +283,18 @@ public class InvitationWorker extends Worker {
 
                         if ("EVENT".equals(type) && msg.length() >= 3) {
                             JSONObject event = msg.getJSONObject(2);
+                            JSONArray tags = event.optJSONArray("tags");
+                            if (tags != null) {
+                                for (int i = 0; i < tags.length(); i++) {
+                                    JSONArray tag = tags.optJSONArray(i);
+                                    if (tag == null || tag.length() < 2) continue;
+                                    if ("booking".equals(tag.optString(0))
+                                            && "true".equals(tag.optString(1))) {
+                                        Log.d(TAG, "Skipping booking-origin invitation " + event.getString("id"));
+                                        return;
+                                    }
+                                }
+                            }
                             String id = event.getString("id");
                             // Skip invitations already seen or dismissed by the user
                             if (seenInvitationIds.contains(id) || dismissedInvitationIds.contains(id)) {

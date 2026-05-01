@@ -22,6 +22,8 @@ import {
   BG_KEY_RELAYS,
   BG_KEY_LAST_LOGIN_TIME,
   BG_KEY_LAST_INVITATION_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
 } from "../utils/constants";
 
 export interface IUser {
@@ -81,6 +83,8 @@ export const useUser = create<{
     await removeSecureItem(BG_KEY_RELAYS);
     await removeSecureItem(BG_KEY_LAST_LOGIN_TIME);
     await removeSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME);
+    await removeSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME);
+    await removeSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME);
     logger.log("logout: background worker keys cleared");
     set({ user: null, isInitialized: false });
     localStorage.removeItem(USER_STORAGE_KEY);
