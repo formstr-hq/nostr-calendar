@@ -23,4 +23,20 @@ export enum EventKinds {
 
   // Relay List (NIP-65)
   RelayList = 10002,
+
+  // Appointment Scheduling
+  SchedulingPage = 31927,
+  BookingRequestGiftWrap = 1057,
+  BookingRequestRumor = 57,
+  BookingResponseGiftWrap = 1058,
+  BookingResponseRumor = 58,
+
+  // Public Busy List (free/busy "I'm unavailable here" entries; one event per
+  // user per calendar month, replacement key = ["d", "YYYY-MM"]).
+  PublicBusyList = 31926,
+
+  // Scheduling Pages List (per-page self-encrypted record holding the
+  // viewKey for one scheduling page authored by the user). Parameterized-
+  // replaceable per (pubkey, page d-tag); empty content = tombstone.
+  SchedulingPagesList = 32680,
 }

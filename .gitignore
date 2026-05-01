@@ -143,3 +143,6 @@ src/test_scripts/*
 *.keystore
 *.jks
 keystore.properties
+
+# Editor
+.vscode/

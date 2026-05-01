@@ -30,6 +30,7 @@ vi.mock("../common/nostr", () => ({
   }),
   getRelays: vi.fn().mockReturnValue(["wss://relay.test"]),
   publishToRelays: vi.fn().mockResolvedValue("ok"),
+  publishParticipantRemovalEvent: vi.fn().mockResolvedValue("ok"),
 }));
 
 // Mock calendarList protocol
