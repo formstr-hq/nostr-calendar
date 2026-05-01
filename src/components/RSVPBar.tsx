@@ -16,14 +16,10 @@ import {
   Box,
   Button,
   ButtonGroup,
-  Collapse,
-  IconButton,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import dayjs from "dayjs";
 import { useIntl } from "react-intl";
 import { ICalendarEvent } from "../utils/types";
@@ -56,7 +52,6 @@ export function RSVPBar({
 }: RSVPBarProps) {
   const intl = useIntl();
 
-  const [expanded, setExpanded] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [comment, setComment] = useState("");
@@ -127,62 +122,72 @@ export function RSVPBar({
   );
 
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+    <Stack spacing={1.75}>
+      <Stack spacing={1}>
         <Typography variant="subtitle2">
           {intl.formatMessage({ id: "rsvp.yourResponse" })}
         </Typography>
-        <ButtonGroup size="small" disabled={isSubmitting}>
-          <Button
-            variant={
-              activeStatus === RSVPStatus.accepted ? "contained" : "outlined"
-            }
-            color="success"
-            onClick={() => handleStatus(RSVPStatus.accepted)}
-          >
-            {buttonLabel[RSVPStatus.accepted]}
-          </Button>
-          <Button
-            variant={
-              activeStatus === RSVPStatus.tentative ? "contained" : "outlined"
-            }
-            color="warning"
-            onClick={() => handleStatus(RSVPStatus.tentative)}
-          >
-            {buttonLabel[RSVPStatus.tentative]}
-          </Button>
-          <Button
-            variant={
-              activeStatus === RSVPStatus.declined ? "contained" : "outlined"
-            }
-            color="error"
-            onClick={() => handleStatus(RSVPStatus.declined)}
-          >
-            {buttonLabel[RSVPStatus.declined]}
-          </Button>
-        </ButtonGroup>
-        <IconButton
-          size="small"
-          onClick={() => setExpanded((v) => !v)}
-          aria-label={intl.formatMessage({ id: "rsvp.toggleDetails" })}
-        >
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </IconButton>
-        {deferSubmit && submitLabel ? (
-          <Button
-            variant="contained"
-            size="small"
-            disabled={isSubmitting || submitDisabled}
-            onClick={() => {
-              void handleDetailsSubmit();
-            }}
-          >
-            {submitLabel}
-          </Button>
-        ) : null}
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          <ButtonGroup size="small" disabled={isSubmitting}>
+            <Button
+              variant={
+                activeStatus === RSVPStatus.accepted ? "contained" : "outlined"
+              }
+              color="success"
+              onClick={() => handleStatus(RSVPStatus.accepted)}
+            >
+              {buttonLabel[RSVPStatus.accepted]}
+            </Button>
+            <Button
+              variant={
+                activeStatus === RSVPStatus.tentative ? "contained" : "outlined"
+              }
+              color="warning"
+              onClick={() => handleStatus(RSVPStatus.tentative)}
+            >
+              {buttonLabel[RSVPStatus.tentative]}
+            </Button>
+            <Button
+              variant={
+                activeStatus === RSVPStatus.declined ? "contained" : "outlined"
+              }
+              color="error"
+              onClick={() => handleStatus(RSVPStatus.declined)}
+            >
+              {buttonLabel[RSVPStatus.declined]}
+            </Button>
+          </ButtonGroup>
+          {deferSubmit && submitLabel ? (
+            <Button
+              variant="contained"
+              size="small"
+              disabled={isSubmitting || submitDisabled}
+              onClick={() => {
+                void handleDetailsSubmit();
+              }}
+            >
+              {submitLabel}
+            </Button>
+          ) : null}
+        </Stack>
       </Stack>
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <Stack spacing={1.5} mt={1.5}>
+
+      <Box
+        sx={{
+          border: (theme) => `1px solid ${theme.palette.divider}`,
+          borderRadius: 1,
+          p: 1.5,
+        }}
+      >
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography variant="subtitle2">
+              {intl.formatMessage({ id: "rsvp.alternateTimeTitle" })}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {intl.formatMessage({ id: "rsvp.detailsHint" })}
+            </Typography>
+          </Box>
           <Stack direction="row" gap={1} flexWrap="wrap">
             <TextField
               label={intl.formatMessage({ id: "rsvp.suggestedStart" })}
@@ -209,9 +214,6 @@ export function RSVPBar({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
-          <Typography variant="caption" color="text.secondary">
-            {intl.formatMessage({ id: "rsvp.detailsHint" })}
-          </Typography>
           {!deferSubmit ? (
             <Box>
               <Button
@@ -227,7 +229,7 @@ export function RSVPBar({
             </Box>
           ) : null}
         </Stack>
-      </Collapse>
-    </Box>
+      </Box>
+    </Stack>
   );
 }

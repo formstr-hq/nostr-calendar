@@ -1087,8 +1087,9 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
  * `extraRelays` lets callers pass relay hints embedded in the form's
  * naddr so the lookup reaches the same relays the form lives on.
  *
- * Note: this is the canonical "has the user submitted?" check. UI must
- * not infer submission status from local memory across reloads.
+ * Note: this is the canonical relay-backed "has the user submitted?" check.
+ * UI may layer a short-lived local fallback over this for relay-lag resilience,
+ * but this function only reports events that exist on relays.
  */
 export const fetchUserFormResponse = async (
   formCoordinate: string,
