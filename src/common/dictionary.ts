@@ -64,6 +64,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
       enterTitle: "Enter event title",
@@ -98,6 +99,19 @@ const dictionary: NestedObject = {
       private: "Private",
       public: "Public",
       publishingToRelays: "Publishing to {count} relay(s)",
+      publishingEvent: "Publishing Event",
+      relaysPublishStatus: "Relays{complete}",
+      eventSaved: "Your event has been saved",
+      noRelaysAccepted:
+        "No relays accepted the event. Please check your relay configuration and try again.",
+      relayDetails: "Details",
+      relayPartialFailure:
+        "Some relays did not accept the event. You can try again for failed relays only.",
+      retryFailedRelays: "Retry failed relays",
+      closeEditor: "Close",
+      note: "Note",
+      partialPublishHint:
+        "The event is on your calendar. Retry to publish to relays that did not accept.",
       saving: "Saving...",
       saveEvent: "Save Event",
       copyLink: "Copy link to this event",
@@ -363,6 +377,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Termin bearbeiten",
+      duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
       enterTitle: "Titel eingeben",
@@ -397,6 +412,19 @@ const dictionary: NestedObject = {
       private: "Privat",
       public: "Öffentlich",
       publishingToRelays: "Veröffentlichung an {count} Relay(s)",
+      publishingEvent: "Termin veröffentlichen",
+      relaysPublishStatus: "Relays{complete}",
+      eventSaved: "Ihr Termin wurde gespeichert",
+      noRelaysAccepted:
+        "Kein Relay hat den Termin akzeptiert. Bitte überprüfen Sie Ihre Relay-Konfiguration und versuchen Sie es erneut.",
+      relayDetails: "Details",
+      relayPartialFailure:
+        "Einige Relays haben den Termin nicht akzeptiert. Sie können nur fehlgeschlagene Relays erneut versuchen.",
+      retryFailedRelays: "Fehlgeschlagene Relays erneut senden",
+      closeEditor: "Schließen",
+      note: "Hinweis",
+      partialPublishHint:
+        "Der Termin ist in Ihrem Kalender. Wiederholen, um an Relays zu senden, die nicht angenommen haben.",
       saving: "Speichern...",
       saveEvent: "Termin speichern",
       copyLink: "Link zu diesem Termin kopieren",
