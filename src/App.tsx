@@ -15,7 +15,6 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
-import { useRelayStore } from "./stores/relays";
 import { isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
 import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "./utils/constants";
@@ -25,8 +24,12 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-import { AppStatusMessage } from "./components/AppStatusMessage";
-import { useAppStartup } from "./hooks/useAppStartup";
+import { useSchedulingPages } from "./stores/schedulingPages";
+import { useBookingRequests } from "./stores/bookingRequests";
+import { useInvitations } from "./stores/invitations";
+import { useBusyList } from "./stores/busyList";
+import { busyListMonthKeysForRange } from "./utils/dateHelper";
+import { useDateWithRouting } from "./hooks/useDateWithRouting";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -49,6 +52,7 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
+  const events = useTimeBasedEvents((state) => state);
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -57,14 +61,64 @@ function Application() {
   } = useCalendarLists();
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
 
-  // Startup state machine: drives the loading bar + status message
-  const { stage, statusMessage, retry } = useAppStartup();
-
   useEffect(() => {
     initializeUser();
-    useTimeBasedEvents.getState().loadCachedEvents();
-    useRelayStore.getState().loadCachedRelays();
   }, []);
+
+  const { fetchInvitations, stopInvitations } = useInvitations();
+
+  // When user is logged in, fetch calendar lists and invitations.
+  // Private events are fetched reactively when calendars are loaded.
+  useEffect(() => {
+    if (isInitialized && user) {
+      useCalendarLists.getState().fetchCalendars();
+    }
+  }, [isInitialized, user]);
+
+  // Fetch private events whenever visible calendars change.
+  // This ensures events update when calendars load from network
+  // or when the user toggles calendar visibility.
+  useEffect(() => {
+    if (user && isInitialized && calendarsLoaded) {
+      void events.fetchPrivateEvents();
+      fetchInvitations();
+    }
+  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+
+  // Refetch the user's own public busy lists whenever the visible month
+  // changes, so add/remove operations merge with the latest remote state
+  // and viewers navigating across months see up-to-date availability.
+  const { date: visibleDate } = useDateWithRouting();
+  const visibleMonthKey = `${visibleDate.year()}-${visibleDate.month()}`;
+  useEffect(() => {
+    if (!user || !isInitialized || !calendarsLoaded) return;
+    const center = visibleDate.startOf("month").valueOf();
+    const month = 30 * 24 * 60 * 60 * 1000;
+    void useBusyList
+      .getState()
+      .loadOwnLists(
+        busyListMonthKeysForRange(center - month, center + 2 * month),
+      );
+    // visibleMonthKey is the stable derived dep; visibleDate identity
+    // changes on every render so we key off the month string instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isInitialized, calendarsLoaded, visibleMonthKey]);
+
+  // Cleanup invitation listener on unmount
+  useEffect(() => {
+    return () => stopInvitations();
+  }, []);
+
+  // Fetch calendar lists, scheduling pages, and bookings when user is available.
+  // This must live in App.tsx (not Calendar.tsx) so it fires on every route.
+  useEffect(() => {
+    if (user) {
+      fetchCalendars();
+      useSchedulingPages.getState().fetchPages();
+      useBookingRequests.getState().fetchIncomingRequests();
+      useBookingRequests.getState().fetchOutgoingBookings();
+    }
+  }, [user, fetchCalendars]);
 
   useEffect(() => {
     return addNotificationClickListener((eventId) => {
@@ -141,12 +195,12 @@ function Application() {
 
   // Show onboarding dialog when user is logged in but has no calendars
   useEffect(() => {
-    if (user && calendarsLoaded && calendars.length === 0) {
+    if (isInitialized && calendarsLoaded && calendars.length === 0) {
       setShowOnboardingDialog(true);
     } else {
       setShowOnboardingDialog(false);
     }
-  }, [user, calendarsLoaded, calendars.length]);
+  }, [user, calendarsLoaded, calendars.length, isInitialized]);
 
   const handleOnboardingSave = async (data: {
     title: string;
@@ -190,22 +244,9 @@ function Application() {
       <RelayManager />
       <Toolbar />
 
-      {/* Startup indicators float inside normal flow, positioned straight under toolbar */}
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-        }}
-      >
-        <AppLoadingBar stage={stage} />
-        <AppStatusMessage
-          stage={stage}
-          statusMessage={statusMessage}
-          onRetry={retry}
-        />
-      </Box>
+      <AppLoadingBar />
 
-      <Box>{isInitialized && <Routing />}</Box>
+      <Box>{user && <Routing />}</Box>
     </>
   );
 }

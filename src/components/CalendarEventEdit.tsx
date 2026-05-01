@@ -17,6 +17,8 @@ import {
   Divider,
   useMediaQuery,
   useTheme,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
@@ -54,6 +56,7 @@ import { getRelays } from "../common/nostr";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
+import { parseEventRef } from "../utils/calendarListTypes";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { v4 as uuid } from "uuid";
 import {
@@ -70,6 +73,11 @@ import {
   scheduleEventNotifications,
 } from "../utils/notifications";
 import { useNotifications } from "../stores/notifications";
+import {
+  useBusyList,
+  getBusyListDefaultOptIn,
+  setBusyListDefaultOptIn,
+} from "../stores/busyList";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -297,7 +305,13 @@ export function CalendarEventEdit({
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
-  const { calendars } = useCalendarLists();
+  // Whether to publish a public busy entry (kind 31926) for this event.
+  // Applies to creates and to edits where the time range changes; on edits
+  // we also remove the previous range so the busy list stays in sync.
+  const [publishBusy, setPublishBusy] = useState<boolean>(() =>
+    getBusyListDefaultOptIn(),
+  );
+  const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
     initialEvent?.calendarId || calendars[0]?.id || "",
   );
@@ -509,7 +523,17 @@ export function CalendarEventEdit({
             .getState()
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
-          await publishPrivateCalendarEvent(eventToSave, selectedCalendarId);
+          const { eventRef, authorPubkey } =
+            await publishPrivateCalendarEvent(eventToSave);
+          await addEventToCalendar(selectedCalendarId, eventRef);
+          const { eventDTag, viewKey } = parseEventRef(eventRef);
+          useTimeBasedEvents.getState().addEvent({
+            ...eventToSave,
+            id: eventDTag,
+            viewKey,
+            user: authorPubkey,
+            calendarId: selectedCalendarId,
+          });
         }
       } else {
         const { id: savedId, pubKey } =
@@ -556,6 +580,34 @@ export function CalendarEventEdit({
         }
       }
 
+      // Public busy list maintenance:
+      //  - create + opted-in        -> publish a busy range for the new event.
+      //  - edit + range changed     -> always remove the previous range
+      //                                 (idempotent) and, if opted-in, publish
+      //                                 the new one.
+      //  - edit + range unchanged   -> do nothing.
+      // Best-effort, don't block save UX on relay roundtrip.
+      const rangeChanged =
+        mode === "edit" &&
+        !!initialEvent &&
+        (initialEvent.begin !== eventToSave.begin ||
+          initialEvent.end !== eventToSave.end);
+      if (rangeChanged && initialEvent) {
+        void useBusyList
+          .getState()
+          .removeBusyRange({
+            start: initialEvent.begin,
+            end: initialEvent.end,
+          });
+      }
+      if (publishBusy && (mode === "create" || rangeChanged)) {
+        void useBusyList
+          .getState()
+          .addBusyRange({ start: eventToSave.begin, end: eventToSave.end });
+      }
+
+      // Persist preference so future events default to the user's last choice.
+      setBusyListDefaultOptIn(publishBusy);
       if (onSave) {
         onSave(eventToSave);
       }
@@ -1298,6 +1350,29 @@ export function CalendarEventEdit({
             ? intl.formatMessage({ id: "event.private" })
             : intl.formatMessage({ id: "event.public" })}
         </Button>
+      </Box>
+      <Box style={{ paddingLeft: 12, paddingRight: 12 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={publishBusy}
+              onChange={(e) => setPublishBusy(e.target.checked)}
+              size="small"
+            />
+          }
+          label={
+            <Typography variant="body2">
+              {intl.formatMessage({ id: "busyList.publishToggle" })}
+            </Typography>
+          }
+        />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          style={{ display: "block", marginLeft: 32 }}
+        >
+          {intl.formatMessage({ id: "busyList.helperText" })}
+        </Typography>
       </Box>
     </Box>
   );

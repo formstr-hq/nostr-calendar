@@ -27,6 +27,7 @@ import {
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
   createCalendar,
+  updateEventRefViewKey,
 } from "../common/calendarList";
 import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
@@ -57,7 +58,9 @@ const saveVisibilityToStorage = (visibility: Record<string, boolean>) => {
 
 let subscriptionHandle: SubscriptionHandle | undefined;
 
-const withNotificationPreference = (calendar: ICalendarList): ICalendarList => ({
+const withNotificationPreference = (
+  calendar: ICalendarList,
+): ICalendarList => ({
   ...calendar,
   notificationPreference:
     calendar.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
@@ -96,6 +99,7 @@ interface CalendarListsState {
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
   getAllEventIds: () => string[];
+  updateEventViewKey: (eventDTag: string, viewKey: string) => Promise<void>;
   clearCachedCalendars: () => Promise<void>;
 }
 
@@ -141,10 +145,6 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
    * Auto-creates a default calendar if user has no calendars after fetch.
    */
   fetchCalendars: async () => {
-    if (subscriptionHandle) {
-      subscriptionHandle.unsubscribe();
-    }
-
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
@@ -400,6 +400,29 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     return calendars.flatMap((c) =>
       c.eventRefs.map((ref) => ref[0].split(":")[2]),
     );
+  },
+
+  /**
+   * Updates the viewKey for an event reference that has an empty viewKey (placeholder).
+   * Called when an invitation gift wrap arrives for an event the user already
+   * added to their calendar (e.g. via booking flow with empty viewKey).
+   */
+  updateEventViewKey: async (eventDTag, viewKey) => {
+    const { calendars } = get();
+
+    for (const calendar of calendars) {
+      const updated = await updateEventRefViewKey(calendar, eventDTag, viewKey);
+      if (updated) {
+        set((state) => {
+          const cals = state.calendars.map((c) =>
+            c.id === updated.id ? updated : c,
+          );
+          saveCalendarsToStorage(cals);
+          return { calendars: cals };
+        });
+        return;
+      }
+    }
   },
 
   /**

@@ -31,6 +31,12 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import {
+  busyListToTags,
+  busyListDTag,
+  nostrEventToBusyList,
+} from "../utils/parser";
+import type { IBusyList } from "../utils/types";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -172,10 +178,12 @@ async function preparePrivateCalendarEvent(
 
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
-  calendarId: string,
+  /** Optional pre-generated d-tag (e.g. from a booking request) */
+  existingDTag?: string,
 ) {
   const viewSecretKey = generateSecretKey();
   const dTag =
+    existingDTag ||
     event.id ||
     bytesToHex(
       sha256(utf8ToBytes(`${JSON.stringify(event)}-${Date.now()}`)),
@@ -238,11 +246,14 @@ export async function publishPrivateCalendarEvent(
     relayUrl: publishedRelayHint,
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
-  await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
 
   return {
+    eventRef,
+    authorPubkey: userPublicKey,
     calendarEvent: signedEvent,
     giftWraps: giftWraps.map(({ giftWrap }) => giftWrap),
+    dTag,
+    viewKey: nip19.nsecEncode(viewSecretKey),
   };
 }
 
@@ -296,6 +307,7 @@ export async function getDetailsFromGiftWrap(giftWrap: Event) {
     authorPubkey,
     kind,
     relayHint,
+    createdAt: rumor.created_at,
   };
 }
 
@@ -319,6 +331,7 @@ export const fetchCalendarGiftWraps = (
     kind: number;
     relayHint: string;
     originalInvitationId: string;
+    createdAt: number;
   }) => void,
   onEose: () => void,
 ) => {
@@ -780,3 +793,175 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   const allRelays = [...new Set([...relays, ...defaultRelays])];
   await publishToRelays(fullEvent, () => {}, allRelays);
 };
+
+// --- Public Busy List (kind 31926) ---
+
+/**
+ * Publishes a public busy list event (kind 31926) for one calendar month.
+ * Replaces any prior version (parameterized-replaceable per `(pubkey, d)`).
+ */
+export async function publishBusyList(list: IBusyList): Promise<Event> {
+  const pubKey = await getUserPublicKey();
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.PublicBusyList,
+    pubkey: pubKey,
+    tags: busyListToTags(list),
+    content: "",
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  const signer = await signerManager.getSigner();
+  const signedEvent = await signer.signEvent(baseEvent);
+  signedEvent.id = getEventHash(baseEvent);
+  await publishToRelays(signedEvent);
+  nostrRuntime.addEvent(signedEvent);
+  return signedEvent;
+}
+
+/**
+ * Fetches a user's public busy lists for the given month partition keys.
+ * Returns one IBusyList per month found (skipped silently if absent).
+ */
+export async function fetchBusyListsForUser(
+  pubkey: string,
+  monthKeys: string[],
+): Promise<IBusyList[]> {
+  if (monthKeys.length === 0) return [];
+  const filter: Filter = {
+    kinds: [EventKinds.PublicBusyList],
+    authors: [pubkey],
+    "#d": monthKeys.map(busyListDTag),
+  };
+  const events = await nostrRuntime.querySync(getRelays(), filter);
+  const lists: IBusyList[] = [];
+  for (const event of events) {
+    const list = nostrEventToBusyList(event);
+    if (list) lists.push(list);
+  }
+  return lists;
+}
+
+// --- Scheduling Pages List (kind 32680) ---
+
+/**
+ * Encrypted payload schema for kind 32680 events. The shape is versioned
+ * so we can extend the schema without rotating the kind.
+ */
+interface SchedulingPageKeyPayload {
+  v: 1;
+  /** NIP-19 nsec encoding of the scheduling page's viewKey. */
+  viewKey: string;
+  /** d-tag of the scheduling page. */
+  dTag: string;
+  /** Unix-seconds timestamp of when the key was published. */
+  createdAt: number;
+}
+
+/**
+ * Publishes a self-encrypted kind-32680 event recording `viewKey` for one
+ * scheduling page the current user authored. Replaces any prior version
+ * (parameterized-replaceable per `(pubkey, page d-tag)`).
+ *
+ * `content === ""` is reserved for tombstones; callers wishing to revoke
+ * a key should publish an empty payload via `publishEmptySchedulingPageKey`.
+ */
+export async function publishSchedulingPageKey(params: {
+  dTag: string;
+  viewKeyNsec: string;
+}): Promise<Event> {
+  const userPubkey = await getUserPublicKey();
+  const signer = await signerManager.getSigner();
+  if (!signer.nip44Encrypt) {
+    throw new Error(
+      "publishSchedulingPageKey requires a NIP-44-capable signer (none available)",
+    );
+  }
+  const payload: SchedulingPageKeyPayload = {
+    v: 1,
+    viewKey: params.viewKeyNsec,
+    dTag: params.dTag,
+    createdAt: Math.floor(Date.now() / 1000),
+  };
+  const encrypted = await signer.nip44Encrypt(
+    userPubkey,
+    JSON.stringify(payload),
+  );
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.SchedulingPagesList,
+    pubkey: userPubkey,
+    tags: [["d", params.dTag]],
+    content: encrypted,
+    created_at: payload.createdAt,
+  };
+  const signedEvent = await signer.signEvent(baseEvent);
+  signedEvent.id = getEventHash(baseEvent);
+  await publishToRelays(signedEvent);
+  nostrRuntime.addEvent(signedEvent);
+  return signedEvent;
+}
+
+/**
+ * Publishes a tombstone (empty-content) kind-32680 event for the given
+ * d-tag. Used when the creator deletes the underlying scheduling page.
+ */
+export async function publishEmptySchedulingPageKey(
+  dTag: string,
+): Promise<Event> {
+  const userPubkey = await getUserPublicKey();
+  const signer = await signerManager.getSigner();
+  const baseEvent: UnsignedEvent = {
+    kind: EventKinds.SchedulingPagesList,
+    pubkey: userPubkey,
+    tags: [["d", dTag]],
+    content: "",
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  const signedEvent = await signer.signEvent(baseEvent);
+  signedEvent.id = getEventHash(baseEvent);
+  await publishToRelays(signedEvent);
+  nostrRuntime.addEvent(signedEvent);
+  return signedEvent;
+}
+
+/**
+ * Fetches all kind-32680 scheduling-page-key events for the current user
+ * and decrypts them. Returns a `Map<dTag, viewKeyNsec>`. Tombstones (empty
+ * content) and entries the signer cannot decrypt are skipped.
+ */
+export async function fetchOwnSchedulingPageKeys(): Promise<
+  Map<string, string>
+> {
+  const userPubkey = await getUserPublicKey();
+  const filter: Filter = {
+    kinds: [EventKinds.SchedulingPagesList],
+    authors: [userPubkey],
+  };
+  const events = await nostrRuntime.querySync(getRelays(), filter);
+  const signer = await signerManager.getSigner();
+  if (!signer.nip44Decrypt) return new Map();
+
+  const result = new Map<string, string>();
+  for (const event of events) {
+    const dTag = event.tags.find((t) => t[0] === "d")?.[1];
+    if (!dTag) continue;
+    if (!event.content) continue; // tombstone
+    try {
+      const decrypted = await signer.nip44Decrypt(userPubkey, event.content);
+      const payload = JSON.parse(
+        decrypted,
+      ) as Partial<SchedulingPageKeyPayload>;
+      if (
+        payload &&
+        typeof payload.viewKey === "string" &&
+        payload.dTag === dTag
+      ) {
+        result.set(dTag, payload.viewKey);
+      }
+    } catch (err) {
+      console.warn(
+        `Failed to decrypt scheduling page key for d=${dTag}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  return result;
+}

@@ -30,6 +30,7 @@ import {
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
+import { useBookingRequests } from "./bookingRequests";
 import { buildEventRef } from "../utils/calendarListTypes";
 import type { IInvitation } from "../utils/calendarListTypes";
 import { EventKinds } from "../common/EventConfigs";
@@ -197,8 +198,32 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           useCalendarLists.getState().getAllEventIds(),
         );
 
-        // Skip if already in a calendar
-        if (existingEventIds.has(rumor.eventId)) return;
+        // If already in a calendar, check if its viewKey needs updating
+        if (existingEventIds.has(rumor.eventId)) {
+          // Find if the ref has an empty viewKey (placeholder from booking flow)
+          const calendars = useCalendarLists.getState().calendars;
+          const hasEmptyViewKey = calendars.some((cal) =>
+            cal.eventRefs.some(
+              (ref) =>
+                ref[0].split(":")[2] === rumor.eventId &&
+                (!ref[2] || ref[2] === ""),
+            ),
+          );
+          if (hasEmptyViewKey && rumor.viewKey) {
+            useCalendarLists
+              .getState()
+              .updateEventViewKey(rumor.eventId, rumor.viewKey);
+            // The placeholder ref was created by the booking flow when the
+            // user submitted a request. The host has now approved by
+            // publishing the calendar event with the booker's d-tag, so
+            // flip the matching outgoing booking to "approved" without
+            // requiring a separate booking-response gift wrap.
+            useBookingRequests
+              .getState()
+              .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
+          }
+          return;
+        }
         // Skip if already processed
         if (processedIds.has(rumor.eventId)) return;
         processedIds.add(rumor.eventId);
@@ -215,7 +240,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           eventId: rumor.eventId,
           viewKey: rumor.viewKey,
           relayHint: rumor.relayHint,
-          receivedAt: Date.now(),
+          receivedAt: rumor.createdAt,
           status: "pending",
           pubkey: rumor.authorPubkey,
           kind: rumor.kind,
