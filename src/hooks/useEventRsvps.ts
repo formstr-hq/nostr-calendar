@@ -4,7 +4,8 @@
  * Subscribes to RSVP responses for a calendar event and exposes a
  * deduplicated, pubkey-keyed map of the latest RSVP per responder.
  *
- * Private events: gift-wrapped kind RSVPRumor → unwrapped client-side.
+ * Private events: kind 32069 encrypted with the event viewKey, with
+ * legacy gift-wrap reads kept for backwards compatibility.
  * Public events:  NIP-52 kind 31925, read directly off the event tags.
  *
  * Per the issue, all responders are treated as participants — even when
@@ -76,12 +77,17 @@ export function useEventRsvps(
 
     let handle: { close?: () => void; unsubscribe?: () => void } | null = null;
     if (event.isPrivateEvent) {
-      if (!myPubkey) {
+      if (!event.viewKey) {
         setIsLoading(false);
         return;
       }
       handle = fetchPrivateEventRSVPs(
-        { eventCoord, recipientPubkey: myPubkey },
+        {
+          eventCoord,
+          viewKey: event.viewKey,
+          relayHint: event.relayHint,
+          recipientPubkey: myPubkey,
+        },
         handleRecord,
         () => setIsLoading(false),
       );
@@ -108,10 +114,9 @@ export function useEventRsvps(
           await publishPrivateRSVPEvent({
             authorPubKey: event.user,
             eventId: event.id,
-            participants: event.participants,
-            additionalRecipients: Object.keys(byPubkey),
             referenceKind: EventKinds.PrivateCalendarEvent,
             relayHint: event.relayHint,
+            viewKey: event.viewKey as string,
             payload,
           });
         } else {
@@ -139,7 +144,7 @@ export function useEventRsvps(
         setIsSubmitting(false);
       }
     },
-    [byPubkey, event, myPubkey, eventCoord],
+    [event, myPubkey, eventCoord],
   );
 
   const allParticipants = useMemo(() => {

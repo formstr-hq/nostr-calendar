@@ -575,6 +575,11 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             />
           )}
 
+          <RSVPDetailsPanel
+            event={event}
+            records={Object.values(rsvpByPubkey)}
+          />
+
           {calendar ? (
             <>
               <Divider />
@@ -594,6 +599,83 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
         onClose={() => setActiveForm(null)}
         onSubmitted={() => setActiveForm(null)}
       />
+    </Box>
+  );
+}
+
+function RSVPDetailsPanel({
+  event,
+  records,
+}: {
+  event: ICalendarEvent;
+  records: RSVPRecord[];
+}) {
+  const intl = useIntl();
+
+  const recordsWithDetails = [...records]
+    .filter(
+      (record) =>
+        !!record.comment.trim() ||
+        record.suggestedStart !== undefined ||
+        record.suggestedEnd !== undefined,
+    )
+    .sort((left, right) => right.createdAt - left.createdAt);
+
+  if (recordsWithDetails.length === 0) {
+    return null;
+  }
+
+  const eventStartSec = Math.floor(event.begin / 1000);
+  const eventEndSec = Math.floor(event.end / 1000);
+
+  return (
+    <Box>
+      <Divider sx={{ mb: 1 }} />
+      <Typography variant="subtitle2" gutterBottom>
+        {intl.formatMessage({ id: "navigation.rsvpDetails" })}
+      </Typography>
+      <Stack spacing={1}>
+        {recordsWithDetails.map((record) => {
+          const hasSuggestedStart =
+            record.suggestedStart !== undefined &&
+            record.suggestedStart !== eventStartSec;
+          const hasSuggestedEnd =
+            record.suggestedEnd !== undefined &&
+            record.suggestedEnd !== eventEndSec;
+
+          return (
+            <Paper
+              key={`${record.pubkey}-${record.createdAt}`}
+              variant="outlined"
+              sx={{ p: 1.25 }}
+            >
+              <Stack spacing={0.75}>
+                <Participant pubKey={record.pubkey} isAuthor={false} />
+                {(hasSuggestedStart || hasSuggestedEnd) && (
+                  <Typography variant="caption" color="text.secondary">
+                    {hasSuggestedStart
+                      ? `${intl.formatMessage({ id: "rsvp.suggestedStart" })}: ${dayjs(
+                          (record.suggestedStart ?? eventStartSec) * 1000,
+                        ).format("ddd, DD MMM YYYY ⋅ HH:mm")}`
+                      : null}
+                    {hasSuggestedStart && hasSuggestedEnd ? " · " : ""}
+                    {hasSuggestedEnd
+                      ? `${intl.formatMessage({ id: "rsvp.suggestedEnd" })}: ${dayjs(
+                          (record.suggestedEnd ?? eventEndSec) * 1000,
+                        ).format("ddd, DD MMM YYYY ⋅ HH:mm")}`
+                      : null}
+                  </Typography>
+                )}
+                {record.comment.trim() ? (
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                    {record.comment}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Stack>
     </Box>
   );
 }

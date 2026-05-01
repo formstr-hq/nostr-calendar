@@ -133,20 +133,77 @@ function buildRSVPRumorTags(opts: {
   return tags;
 }
 
-export function getPrivateRsvpRecipients(params: {
-  authorPubKey: string;
-  responderPubkey: string;
-  participants: string[];
-  additionalRecipients?: string[];
-}) {
-  return Array.from(
-    new Set([
-      params.authorPubKey,
-      params.responderPubkey,
-      ...params.participants,
-      ...(params.additionalRecipients ?? []),
-    ]),
+function getRsvpDTag(
+  responderPubkey: string,
+  authorPubKey: string,
+  eventId: string,
+) {
+  return bytesToHex(
+    sha256(utf8ToBytes(`${responderPubkey}:${authorPubKey}:${eventId}`)),
+  ).substring(0, 30);
+}
+
+function normalizeRsvpPayload(
+  payload: Partial<RSVPPayload> | null | undefined,
+): Pick<
+  RSVPRecord,
+  "status" | "suggestedStart" | "suggestedEnd" | "comment"
+> | null {
+  if (!payload) return null;
+  if (
+    payload.status !== RSVPStatus.accepted &&
+    payload.status !== RSVPStatus.declined &&
+    payload.status !== RSVPStatus.tentative
+  ) {
+    return null;
+  }
+
+  const suggestedStart =
+    payload.suggestedStart !== undefined
+      ? Number(payload.suggestedStart)
+      : undefined;
+  const suggestedEnd =
+    payload.suggestedEnd !== undefined
+      ? Number(payload.suggestedEnd)
+      : undefined;
+
+  return {
+    status: payload.status,
+    suggestedStart: Number.isFinite(suggestedStart)
+      ? suggestedStart
+      : undefined,
+    suggestedEnd: Number.isFinite(suggestedEnd) ? suggestedEnd : undefined,
+    comment: payload.comment ?? "",
+  };
+}
+
+function parsePrivateRSVPEvent(
+  event: Event,
+  viewKey: string,
+): RSVPRecord | null {
+  const aTag = event.tags.find((tag) => tag[0] === "a")?.[1];
+  if (!aTag) return null;
+
+  const viewPrivateKey = nip19.decode(viewKey as NSec).data;
+  const decryptedContent = nip44.decrypt(
+    event.content,
+    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
   );
+
+  const payload = normalizeRsvpPayload(
+    JSON.parse(decryptedContent) as Partial<RSVPPayload>,
+  );
+  if (!payload) return null;
+
+  return {
+    pubkey: event.pubkey,
+    status: payload.status,
+    suggestedStart: payload.suggestedStart,
+    suggestedEnd: payload.suggestedEnd,
+    comment: payload.comment,
+    createdAt: event.created_at,
+    eventCoord: aTag,
+  };
 }
 
 /**
@@ -160,53 +217,47 @@ export function getPrivateRsvpRecipients(params: {
 export async function publishPrivateRSVPEvent(params: {
   authorPubKey: string;
   eventId: string; // d-tag of the calendar event
-  participants: string[];
-  additionalRecipients?: string[];
   referenceKind: number; // EventKinds.PrivateCalendarEvent
   relayHint?: string;
+  viewKey: string;
   payload: RSVPPayload;
 }) {
   const responderPubkey = await getUserPublicKey();
-  const tags = buildRSVPRumorTags({
-    referenceKind: params.referenceKind,
-    authorPubKey: params.authorPubKey,
-    eventDTag: params.eventId,
-    relayHint: params.relayHint,
-    payload: params.payload,
-  });
-  const createdAt = Math.floor(Date.now() / 1000);
-
-  // The set of recipients is the union of the event author and every
-  // listed participant. The responder is included so they can also see
-  // their own RSVP from any client they sign in to.
-  const recipients = getPrivateRsvpRecipients({
-    authorPubKey: params.authorPubKey,
-    responderPubkey,
-    participants: params.participants,
-    additionalRecipients: params.additionalRecipients,
-  });
-
-  // Fetch all recipients' relay lists in one query so each gift wrap is
-  // delivered to the recipient's preferred relays.
-  const recipientRelayMap = await fetchRelayLists(recipients);
-
-  await Promise.all(
-    recipients.map(async (recipient) => {
-      const giftWrap = await nip59.wrapEvent(
-        {
-          pubkey: responderPubkey,
-          created_at: createdAt,
-          kind: EventKinds.RSVPRumor,
-          content: params.payload.comment ?? "",
-          tags,
-        },
-        recipient,
-        EventKinds.RSVPGiftWrap,
-      );
-      const relays = recipientRelayMap.get(recipient) ?? defaultRelays;
-      await publishToRelays(giftWrap, undefined, relays);
-    }),
+  const tags: string[][] = [
+    params.relayHint
+      ? [
+          "a",
+          `${params.referenceKind}:${params.authorPubKey}:${params.eventId}`,
+          params.relayHint,
+        ]
+      : [
+          "a",
+          `${params.referenceKind}:${params.authorPubKey}:${params.eventId}`,
+        ],
+    ["d", getRsvpDTag(responderPubkey, params.authorPubKey, params.eventId)],
+  ];
+  const viewPrivateKey = nip19.decode(params.viewKey as NSec).data;
+  const encryptedContent = nip44.encrypt(
+    JSON.stringify(params.payload),
+    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
   );
+  const unsigned: UnsignedEvent = {
+    pubkey: responderPubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: EventKinds.PrivateRSVPEvent,
+    content: encryptedContent,
+    tags,
+  };
+  const signer = await signerManager.getSigner();
+  const signed = await signer.signEvent(unsigned);
+  signed.id = getEventHash(unsigned);
+
+  await publishToRelays(
+    signed,
+    undefined,
+    getDiscoveryRelays(params.relayHint ? [params.relayHint] : []),
+  );
+  nostrRuntime.addEvent(signed);
 }
 
 /**
@@ -221,7 +272,7 @@ export async function publishPublicRSVPEvent(params: {
 }) {
   const responderPubkey = await getUserPublicKey();
   const tags = buildRSVPRumorTags({
-    referenceKind: EventKinds.PublicCalendarEvent,
+    referenceKind: params.referenceKind,
     authorPubKey: params.authorPubKey,
     eventDTag: params.eventId,
     relayHint: params.relayHint,
@@ -229,13 +280,11 @@ export async function publishPublicRSVPEvent(params: {
   });
   // The d-tag for the RSVP itself: deterministic per (responder, event)
   // so a single replaceable event holds the latest status per responder.
-  const rsvpDTag = bytesToHex(
-    sha256(
-      utf8ToBytes(
-        `${responderPubkey}:${params.authorPubKey}:${params.eventId}`,
-      ),
-    ),
-  ).substring(0, 30);
+  const rsvpDTag = getRsvpDTag(
+    responderPubkey,
+    params.authorPubKey,
+    params.eventId,
+  );
   tags.push(["d", rsvpDTag]);
 
   const unsigned: UnsignedEvent = {
@@ -534,24 +583,24 @@ const parseRSVPTags = (
 ): RSVPRecord | null => {
   const aTag = tags.find((t) => t[0] === "a")?.[1];
   if (!aTag) return null;
-  const statusTag = tags.find((t) => t[0] === "status")?.[1];
-  if (
-    statusTag !== RSVPStatus.accepted &&
-    statusTag !== RSVPStatus.declined &&
-    statusTag !== RSVPStatus.tentative
-  ) {
-    return null;
-  }
-  const startStr = tags.find((t) => t[0] === "start")?.[1];
-  const endStr = tags.find((t) => t[0] === "end")?.[1];
-  const start = startStr ? Number(startStr) : undefined;
-  const end = endStr ? Number(endStr) : undefined;
+  const payload = normalizeRsvpPayload({
+    status: tags.find((t) => t[0] === "status")?.[1] as RSVPStatus | undefined,
+    suggestedStart: tags.find((t) => t[0] === "start")?.[1]
+      ? Number(tags.find((t) => t[0] === "start")?.[1])
+      : undefined,
+    suggestedEnd: tags.find((t) => t[0] === "end")?.[1]
+      ? Number(tags.find((t) => t[0] === "end")?.[1])
+      : undefined,
+    comment: content || "",
+  });
+  if (!payload) return null;
+
   return {
     pubkey,
-    status: statusTag,
-    suggestedStart: Number.isFinite(start) ? start : undefined,
-    suggestedEnd: Number.isFinite(end) ? end : undefined,
-    comment: content || "",
+    status: payload.status,
+    suggestedStart: payload.suggestedStart,
+    suggestedEnd: payload.suggestedEnd,
+    comment: payload.comment,
     createdAt,
     eventCoord: aTag,
   };
@@ -564,40 +613,95 @@ const parseRSVPTags = (
  * statuses for a private calendar event.
  */
 export const fetchPrivateEventRSVPs = (
-  params: { eventCoord: string; recipientPubkey: string },
+  params: {
+    eventCoord: string;
+    viewKey: string;
+    relayHint?: string;
+    recipientPubkey?: string;
+  },
   onRSVP: (record: RSVPRecord) => void,
   onEose?: () => void,
 ) => {
-  const relayList = getRelays();
-  const filter: Filter = {
-    kinds: [EventKinds.RSVPGiftWrap],
-    "#p": [params.recipientPubkey],
+  const privateRelayList = getDiscoveryRelays(
+    params.relayHint ? [params.relayHint] : [],
+  );
+  let pendingEoseCount = params.recipientPubkey ? 2 : 1;
+  const handleEose = () => {
+    pendingEoseCount -= 1;
+    if (pendingEoseCount === 0) {
+      onEose?.();
+    }
   };
-  return nostrRuntime.subscribe(relayList, [filter], {
-    onEvent: async (giftWrap: Event) => {
-      try {
-        const rumor = await nip59.unwrapEvent(giftWrap);
-        if (rumor.kind !== EventKinds.RSVPRumor) return;
-        const record = parseRSVPTags(
-          rumor.pubkey,
-          rumor.tags,
-          rumor.content,
-          rumor.created_at,
-        );
-        if (!record) return;
-        if (
-          record.eventCoord.split(":").slice(0, 3).join(":") !==
-          params.eventCoord
-        ) {
-          return;
-        }
-        onRSVP(record);
-      } catch (error) {
-        console.error("Failed to process RSVP gift wrap:", error);
-      }
+
+  const handles: Array<{ close?: () => void; unsubscribe?: () => void }> = [];
+  handles.push(
+    nostrRuntime.subscribe(
+      privateRelayList,
+      [
+        {
+          kinds: [EventKinds.PrivateRSVPEvent],
+          "#a": [params.eventCoord],
+        },
+      ],
+      {
+        onEvent: (event: Event) => {
+          try {
+            const record = parsePrivateRSVPEvent(event, params.viewKey);
+            if (!record) return;
+            if (record.eventCoord !== params.eventCoord) return;
+            onRSVP(record);
+          } catch (error) {
+            console.error("Failed to process private RSVP:", error);
+          }
+        },
+        onEose: handleEose,
+      },
+    ),
+  );
+
+  if (params.recipientPubkey) {
+    const legacyRelayList = getRelays();
+    const legacyFilter: Filter = {
+      kinds: [EventKinds.RSVPGiftWrap],
+      "#p": [params.recipientPubkey],
+    };
+    handles.push(
+      nostrRuntime.subscribe(legacyRelayList, [legacyFilter], {
+        onEvent: async (giftWrap: Event) => {
+          try {
+            const rumor = await nip59.unwrapEvent(giftWrap);
+            if (rumor.kind !== EventKinds.RSVPRumor) return;
+            const record = parseRSVPTags(
+              rumor.pubkey,
+              rumor.tags,
+              rumor.content,
+              rumor.created_at,
+            );
+            if (!record) return;
+            if (
+              record.eventCoord.split(":").slice(0, 3).join(":") !==
+              params.eventCoord
+            ) {
+              return;
+            }
+            onRSVP(record);
+          } catch (error) {
+            console.error("Failed to process RSVP gift wrap:", error);
+          }
+        },
+        onEose: handleEose,
+      }),
+    );
+  }
+
+  return {
+    close: () => {
+      handles.forEach((handle) => handle.close?.());
     },
-    onEose,
-  });
+    unsubscribe: () => {
+      handles.forEach((handle) => handle.unsubscribe?.());
+    },
+  };
 };
 
 /**
@@ -886,7 +990,13 @@ export const fetchCalendarEvent = async (
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
   const hintRelays = data.relays ?? [];
-  const relays = getDiscoveryRelays(hintRelays);
+  let authorRelayHints: string[] = [];
+  try {
+    authorRelayHints = await fetchRelayList(data.pubkey);
+  } catch {
+    authorRelayHints = [];
+  }
+  const relays = getDiscoveryRelays([...hintRelays, ...authorRelayHints]);
   const filter: Filter = {
     "#d": [data.identifier],
     kinds: [data.kind],
