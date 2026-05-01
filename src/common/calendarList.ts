@@ -83,6 +83,16 @@ export async function encryptCalendarList(
 export async function decryptCalendarList(
   event: Event,
 ): Promise<ICalendarList> {
+  if (event.kind !== EventKinds.PrivateCalendarList) {
+    throw new Error(
+      `Expected kind ${EventKinds.PrivateCalendarList}, got ${event.kind}`,
+    );
+  }
+
+  if (!event.content) {
+    throw new Error("Calendar list event has empty content");
+  }
+
   const signer = await signerManager.getSigner();
 
   // Self-decrypt: the event was encrypted with our own pubkey
@@ -91,7 +101,13 @@ export async function decryptCalendarList(
     event.content,
   );
 
-  const tags: string[][] = JSON.parse(decryptedContent);
+  const parsed = JSON.parse(decryptedContent) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      `Calendar list payload is not a tags array (got ${typeof parsed})`,
+    );
+  }
+  const tags = parsed as string[][];
 
   let title = DEFAULT_CALENDAR_TITLE;
   let description = "";
@@ -100,6 +116,7 @@ export async function decryptCalendarList(
   const eventRefs: string[][] = [];
 
   for (const tag of tags) {
+    if (!Array.isArray(tag) || tag.length === 0) continue;
     switch (tag[0]) {
       case "title":
         title = tag[1];
@@ -190,6 +207,16 @@ export function fetchCalendarLists(
 
   return nostrRuntime.subscribe(relayList, [filter], {
     onEvent: async (event: Event) => {
+      // Guard: the subscription filter should ensure this, but relays or the
+      // local event-store broadcast can occasionally deliver wrong-kind events
+      // (e.g. kind 31926 PublicBusyList, which shares a similar d-tag shape
+      // and has empty content that JSON.parse can't turn into a tags array).
+      if (event.kind !== EventKinds.PrivateCalendarList) {
+        console.warn(
+          `Skipping unexpected kind ${event.kind} in calendar-list stream`,
+        );
+        return;
+      }
       try {
         const list = await decryptCalendarList(event);
         onList(list);
@@ -331,4 +358,42 @@ export async function moveEventBetweenCalendarLists(
   const updatedTarget = await addEventToCalendarList(targetCalendar, eventRef);
 
   return { source: updatedSource, target: updatedTarget };
+}
+
+/**
+ * Updates the viewKey of an event reference in a calendar list and republishes.
+ * Used when a placeholder ref (empty viewKey) needs to be filled with the real
+ * viewKey received from an invitation gift wrap.
+ *
+ * @param calendarList - The calendar list containing the ref to update
+ * @param eventDTag - The d-tag of the event whose viewKey should be updated
+ * @param viewKey - The new viewKey to set
+ * @returns The updated calendar list, or null if no matching ref was found
+ */
+export async function updateEventRefViewKey(
+  calendarList: ICalendarList,
+  eventDTag: string,
+  viewKey: string,
+): Promise<ICalendarList | null> {
+  const refIndex = calendarList.eventRefs.findIndex(
+    (ref) => ref[0].split(":")[2] === eventDTag && (!ref[2] || ref[2] === ""),
+  );
+
+  if (refIndex === -1) return null;
+
+  const updatedRefs = [...calendarList.eventRefs];
+  updatedRefs[refIndex] = [
+    updatedRefs[refIndex][0],
+    updatedRefs[refIndex][1],
+    viewKey,
+  ];
+
+  const updated: ICalendarList = {
+    ...calendarList,
+    eventRefs: updatedRefs,
+    createdAt: Math.floor(Date.now() / 1000),
+  };
+
+  await publishCalendarList(updated);
+  return updated;
 }

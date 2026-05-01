@@ -24,6 +24,7 @@ import {
   publishParticipantRemovalEvent,
 } from "../common/nostr";
 import { useInvitations } from "../stores/invitations";
+import { useBusyList } from "../stores/busyList";
 import type { ICalendarEvent } from "../utils/types";
 import { EventKinds } from "../common/EventConfigs";
 import { TimeRenderer } from "./TimeRenderer";
@@ -88,6 +89,11 @@ export function DeleteEventDialog({
               await removeEventFromCalendar(event.calendarId, eventRef);
             }
           }
+          // The author is rescinding the commitment — drop the matching
+          // public busy entry if any. No-op when none exists.
+          void useBusyList
+            .getState()
+            .removeBusyRange({ start: event.begin, end: event.end });
           removeEvent(event.id);
           break;
         }
@@ -97,6 +103,11 @@ export function DeleteEventDialog({
             if (eventRef) {
               await removeEventFromCalendar(event.calendarId, eventRef);
             }
+            // Whether or not the user is the author, this slot is no longer
+            // a personal commitment from this client — remove busy entry.
+            void useBusyList
+              .getState()
+              .removeBusyRange({ start: event.begin, end: event.end });
             removeEvent(event.id);
           }
           break;

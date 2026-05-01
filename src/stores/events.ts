@@ -364,7 +364,7 @@ export const useTimeBasedEvents = create<{
       kinds.add(parsed.kind);
       if (parsed.relayUrl) hintRelays.add(parsed.relayUrl);
       viewKeyMap.set(parsed.eventDTag, {
-        viewKey: parsed.viewKey,
+        viewKey: parsed.viewKey || "",
         calendarId: refToCalendarId.get(ref[0]) || "",
         relayUrl: parsed.relayUrl,
       });

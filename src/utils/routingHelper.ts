@@ -6,6 +6,11 @@ export enum ROUTES {
   DayCalendar = "/d/:year/:month/:day",
   MonthCalendar = "/m/:year/:monthNumber",
   Notifications = "/notifications",
+  // Appointment Scheduling
+  SchedulingPageCreate = "/schedule/create",
+  SchedulingPageEdit = "/schedule/edit/:naddr",
+  SchedulingPagePublic = "/schedule/:naddr",
+  Bookings = "/bookings",
 }
 
 export function getEventPage(naddr: string, viewKey?: string) {
@@ -30,4 +35,12 @@ export function getDuplicateEventPage(naddr: string, viewKey?: string) {
     urlParam.append("viewKey", viewKey);
   }
   return `/event/duplicate/${naddr}?${urlParam.toString()}`;
+}
+
+export function getSchedulingPagePublicUrl(naddr: string) {
+  return `/schedule/${naddr}`;
+}
+
+export function getSchedulingPageEditUrl(naddr: string) {
+  return `/schedule/edit/${naddr}`;
 }

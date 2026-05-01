@@ -24,7 +24,12 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
+import { useSchedulingPages } from "./stores/schedulingPages";
+import { useBookingRequests } from "./stores/bookingRequests";
 import { useInvitations } from "./stores/invitations";
+import { useBusyList } from "./stores/busyList";
+import { busyListMonthKeysForRange } from "./utils/dateHelper";
+import { useDateWithRouting } from "./hooks/useDateWithRouting";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -75,15 +80,45 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      events.fetchPrivateEvents();
+      void events.fetchPrivateEvents();
       fetchInvitations();
     }
   }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+
+  // Refetch the user's own public busy lists whenever the visible month
+  // changes, so add/remove operations merge with the latest remote state
+  // and viewers navigating across months see up-to-date availability.
+  const { date: visibleDate } = useDateWithRouting();
+  const visibleMonthKey = `${visibleDate.year()}-${visibleDate.month()}`;
+  useEffect(() => {
+    if (!user || !isInitialized || !calendarsLoaded) return;
+    const center = visibleDate.startOf("month").valueOf();
+    const month = 30 * 24 * 60 * 60 * 1000;
+    void useBusyList
+      .getState()
+      .loadOwnLists(
+        busyListMonthKeysForRange(center - month, center + 2 * month),
+      );
+    // visibleMonthKey is the stable derived dep; visibleDate identity
+    // changes on every render so we key off the month string instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isInitialized, calendarsLoaded, visibleMonthKey]);
 
   // Cleanup invitation listener on unmount
   useEffect(() => {
     return () => stopInvitations();
   }, []);
+
+  // Fetch calendar lists, scheduling pages, and bookings when user is available.
+  // This must live in App.tsx (not Calendar.tsx) so it fires on every route.
+  useEffect(() => {
+    if (user) {
+      fetchCalendars();
+      useSchedulingPages.getState().fetchPages();
+      useBookingRequests.getState().fetchIncomingRequests();
+      useBookingRequests.getState().fetchOutgoingBookings();
+    }
+  }, [user, fetchCalendars]);
 
   useEffect(() => {
     return addNotificationClickListener((eventId) => {
