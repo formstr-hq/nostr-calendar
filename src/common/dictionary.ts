@@ -110,14 +110,6 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
-      forms: "Forms",
-      attachForm: "Attach form",
-      formInputPlaceholder: "Paste form naddr or Formstr URL",
-      addForm: "Add",
-      removeForm: "Remove form",
-      invalidFormInput: "Could not recognize a form naddr in that input.",
-      duplicateFormInput: "That form is already attached.",
-      formsPrivateOnly: "Forms can only be attached to private events.",
     },
     form: {
       attachments: "Forms",
@@ -360,15 +352,6 @@ const dictionary: NestedObject = {
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
       scheduledNotifications: "Geplante Benachrichtigungen",
-      forms: "Formulare",
-      attachForm: "Formular anhängen",
-      formInputPlaceholder: "Formular-naddr oder Formstr-URL einfügen",
-      addForm: "Hinzufügen",
-      removeForm: "Formular entfernen",
-      invalidFormInput: "In der Eingabe wurde keine Formular-naddr erkannt.",
-      duplicateFormInput: "Dieses Formular ist bereits angehängt.",
-      formsPrivateOnly:
-        "Formulare können nur an private Termine angehängt werden.",
     },
     form: {
       attachments: "Formulare",
