@@ -68,7 +68,7 @@ export function extractViewKey(input: string): string | undefined {
   if (!input) return undefined;
   const match = input.trim().match(VIEW_KEY_REGEX);
   if (!match?.[1]) return undefined;
-  return decodeURIComponent(match[1]);
+  return decodeURIComponent(match[1]).toLowerCase();
 }
 
 /**

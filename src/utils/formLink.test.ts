@@ -72,6 +72,14 @@ describe("extractViewKey", () => {
     ).toBe(SAMPLE_VIEW_KEY);
   });
 
+  it("normalizes ?viewKey query params to lowercase", () => {
+    expect(
+      extractViewKey(
+        `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=${SAMPLE_VIEW_KEY.toUpperCase()}`,
+      ),
+    ).toBe(SAMPLE_VIEW_KEY);
+  });
+
   it("reads &viewKey when not the first param", () => {
     expect(
       extractViewKey(
