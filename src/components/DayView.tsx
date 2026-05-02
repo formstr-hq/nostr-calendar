@@ -8,20 +8,29 @@ import {
   getTimeFromCell,
   layoutDayEvents,
 } from "../common/calendarEngine";
-import { CalendarEventCard } from "./CalendarEvent";
+import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DndContext } from "@dnd-kit/core";
 import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
+import { useIntl } from "react-intl";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export function DayView({ events, date }: ViewProps) {
+  const intl = useIntl();
   const dayStart = date.startOf("day").valueOf();
-  const dayEvents = layoutDayEvents(getEventSegmentsForDay(events, dayStart));
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  const allDayEvents = events.filter(
+    (e) => e.allDay && e.begin < dayEnd && e.end > dayStart,
+  );
+  const timedEvents = events.filter((e) => !e.allDay);
+  const dayEvents = layoutDayEvents(
+    getEventSegmentsForDay(timedEvents, dayStart),
+  );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clickedDateTime, setClickedDateTime] = useState<number | undefined>();
@@ -35,6 +44,29 @@ export function DayView({ events, date }: ViewProps) {
 
   return (
     <>
+      {allDayEvents.length > 0 && (
+        <Box
+          display="flex"
+          sx={{ borderBottom: "1px solid #ddd", minHeight: 24 }}
+        >
+          <Box
+            width={60}
+            borderRight="1px solid #ddd"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {intl.formatMessage({ id: "event.allDayLabel" })}
+            </Typography>
+          </Box>
+          <Box flex={1} p={0.5}>
+            {allDayEvents.map((evt) => (
+              <AllDayEventChip key={`${evt.id}:${evt.begin}`} event={evt} />
+            ))}
+          </Box>
+        </Box>
+      )}
       <DndContext>
         <Box display="flex" height={24 * 60}>
           {/* Time column */}

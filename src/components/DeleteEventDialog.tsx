@@ -65,6 +65,12 @@ export function DeleteEventDialog({
   const [selectedOption, setSelectedOption] =
     useState<DeleteOption>(getDefaultOption);
 
+  // Defensive: device events have no Nostr identity and must never be deleted
+  // through Nostr. The UI hides the entry point, but bail here as well.
+  if (event.source === "device") {
+    return null;
+  }
+
   const findEventRef = (): string[] | null => {
     if (!event.calendarId) return null;
     const calendar = calendars.find((c) => c.id === event.calendarId);
@@ -166,6 +172,7 @@ export function DeleteEventDialog({
               begin={event.begin}
               end={event.end}
               repeat={event.repeat}
+              allDay={event.allDay}
             />
           </Box>
 

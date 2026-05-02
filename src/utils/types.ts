@@ -69,6 +69,13 @@ export interface ICalendarEvent {
   calendarId?: string;
   isInvitation?: boolean;
   relayHint?: string;
+  allDay?: boolean;
+  /**
+   * Origin of this event. Defaults to "nostr" when undefined for backwards
+   * compatibility. "device" events are read-only and must never enter the
+   * Nostr publish/RSVP code paths.
+   */
+  source?: "nostr" | "device";
 }
 
 // --- Appointment Scheduling Types ---

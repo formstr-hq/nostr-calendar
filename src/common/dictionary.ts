@@ -113,6 +113,11 @@ const dictionary: NestedObject = {
       copyLink: "Copy link to this event",
       openNewTab: "Open event in new tab",
       downloadDetails: "Download event details",
+      untitled: "Untitled",
+      allDayLabel: "All day",
+      allDayDate: "{date} ⋅ {label}",
+      allDayDateRange: "{start} – {end} ⋅ {label}",
+      deviceReadOnly: "From your device calendar — read-only.",
       repeats: "Repeats {label}",
       event: "Event",
       eventNotFound: "Event not found. It may not have loaded yet.",
@@ -158,6 +163,30 @@ const dictionary: NestedObject = {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
       createCalendar: "Create Calendar",
+    },
+    deviceCalendar: {
+      title: "Device calendars",
+      visibleCount: "{visibleCount}/{calendarCount} visible",
+      refresh: "Refresh device calendars",
+      connectHelp:
+        "Show events from your phone's calendar apps alongside Nostr events.",
+      connect: "Connect device calendars",
+      empty: "No calendars found on this device.",
+      showAll: "Show all",
+      hideAll: "Hide all",
+      localDevice: "Local device",
+      unnamed: "Unnamed calendar",
+      errorPermissionDenied: "Calendar permission is not currently granted.",
+      errorInvalidCalendarIds:
+        "We could not read those device calendars. Please refresh and try again.",
+      errorInvalidRange:
+        "We could not load device events for that date range. Please try again.",
+      errorReadCalendars:
+        "We could not read your device calendars. Please try again.",
+      errorReadEvents:
+        "We could not load events from your device calendars. Please try again.",
+      errorUnknown:
+        "Something went wrong while reading your device calendars. Please try again.",
     },
     addToCalendar: {
       addToCalendar: "Add to Calendar",
@@ -422,6 +451,11 @@ const dictionary: NestedObject = {
       copyLink: "Link zu diesem Termin kopieren",
       openNewTab: "Termin in neuem Tab öffnen",
       downloadDetails: "Termindetails herunterladen",
+      untitled: "Ohne Titel",
+      allDayLabel: "Ganztägig",
+      allDayDate: "{date} ⋅ {label}",
+      allDayDateRange: "{start} – {end} ⋅ {label}",
+      deviceReadOnly: "Aus dem Gerätekalender — schreibgeschützt.",
       repeats: "Wiederholt sich {label}",
       event: "Termin",
       eventNotFound:
@@ -468,6 +502,31 @@ const dictionary: NestedObject = {
       calendars: "Kalender",
       noCalendarsYet: "Noch keine Kalender",
       createCalendar: "Kalender erstellen",
+    },
+    deviceCalendar: {
+      title: "Gerätekalender",
+      visibleCount: "{visibleCount}/{calendarCount} sichtbar",
+      refresh: "Gerätekalender aktualisieren",
+      connectHelp:
+        "Zeigt Ereignisse aus den Kalender-Apps Ihres Telefons neben\nNostr-Terminen an.",
+      connect: "Gerätekalender verbinden",
+      empty: "Auf diesem Gerät wurden keine Kalender gefunden.",
+      showAll: "Alle anzeigen",
+      hideAll: "Alle ausblenden",
+      localDevice: "Lokales Gerät",
+      unnamed: "Unbenannter Kalender",
+      errorPermissionDenied:
+        "Die Kalenderberechtigung ist derzeit nicht erteilt.",
+      errorInvalidCalendarIds:
+        "Diese Gerätekalender konnten nicht gelesen werden. Bitte aktualisieren Sie und versuchen Sie es erneut.",
+      errorInvalidRange:
+        "Geräteereignisse für diesen Datumsbereich konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      errorReadCalendars:
+        "Ihre Gerätekalender konnten nicht gelesen werden. Bitte versuchen Sie es erneut.",
+      errorReadEvents:
+        "Ereignisse aus Ihren Gerätekalendern konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      errorUnknown:
+        "Beim Lesen Ihrer Gerätekalender ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     },
     addToCalendar: {
       addToCalendar: "Zum Kalender hinzufügen",
@@ -619,7 +678,8 @@ const dictionary: NestedObject = {
       customDurationPlaceholder: "z.B. 45",
       openLink: "Link öffnen",
       copyLink: "Link kopieren",
-      noBlockedDates: "Keine gesperrten Tage. Fügen Sie Tage hinzu, um sie für Buchungen zu sperren.",
+      noBlockedDates:
+        "Keine gesperrten Tage. Fügen Sie Tage hinzu, um sie für Buchungen zu sperren.",
     },
   },
 };

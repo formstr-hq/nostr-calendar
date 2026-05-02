@@ -75,7 +75,11 @@ export const Header = ({ onImportEvent }: HeaderProps) => {
           </Stack>
         </Toolbar>
       </AppBar>
-      <Drawer open={drawerOpen} onClose={closeDrawer}>
+      <Drawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        PaperProps={{ sx: { width: { xs: "100vw", sm: 340 } } }}
+      >
         <CalendarSidebar onClose={closeDrawer} />
       </Drawer>
     </>

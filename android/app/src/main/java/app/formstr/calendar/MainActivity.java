@@ -31,6 +31,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppReadyPlugin.class);
+        registerPlugin(DeviceCalendarPlugin.class);
         super.onCreate(savedInstanceState);
 
         View contentView = findViewById(android.R.id.content);
