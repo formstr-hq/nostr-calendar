@@ -1,11 +1,5 @@
 # Nostr Calendar — Form-Backed RSVP Specification
 
-Status: Draft (matches stacked PRs `feat/rsvp-split-pr1` … `feat/rsvp-split-pr4`)
-Owner: Calendar maintainers
-Audience: Reviewers of the four stacked PRs and future maintainers
-Last updated: rebase on master tip `60ae999` (v1.4.1)
-
----
 
 ## 1. Goal
 
@@ -24,7 +18,6 @@ The feature is delivered as **four sequential, reviewable PRs** that build
 on each other.
 
 ---
-
 ## 2. Background — Formstr keys (security-critical)
 
 Formstr forms are NIP‑33 replaceable events whose answer schema is encrypted.
@@ -46,9 +39,6 @@ https://formstr.app/f/<naddr>#nkeys1...              # bech32-TLV "nkeys" hash
 The `#nkeys1...` payload contains both the form `naddr` *and* the view key,
 encoded by `@formstr/sdk` `encodeNKeys`. It is decoded with `decodeNKeys`.
 
-> **Reviewer fix integrated into all four PRs:** the data model field is
-> named `viewKey` everywhere (it used to be `responseKey`, which was both
-> wrong and dangerous because it implied admin access).
 
 ---
 
@@ -173,12 +163,6 @@ The feature is split across four stacked branches off `master` (`60ae999`).
 - Misc: parser hardening for the real-world URL shapes Formstr emits
   (commit `a549c44`).
 
-**Reviewer fix:** the dialog passes `attachment.viewKey`, never
-`attachment.responseKey` — matches the renamed model from PR1.
-A trailing `chore(forms)` commit drops dead `event.{forms,attachForm,
-formInputPlaceholder,addForm,removeForm,invalidFormInput,
-duplicateFormInput,formsPrivateOnly}` i18n keys; the form-attachment
-UI consumes only the new `form.*` namespace.
 
 ---
 
@@ -191,7 +175,7 @@ in earlier review iterations.)
 
 - `src/hooks/useFormSubmissionStatus.ts` — relay-backed detection. Given
   a form `naddr` and the current pubkey, queries the relays returned by
-  `getDiscoveryRelays` (user-configured ⊕ form `naddr` hints ⊕ defaults)
+  `getDiscoveryRelays` (user-configured, form `naddr` hints, defaults)
   for a matching response event from that pubkey. Returns
   `{ status: "loading" | "submitted" | "not_submitted", refetch }`.
 - `FormFillerDialog.tsx` — gates UI on `useFormSubmissionStatus`:
@@ -210,10 +194,6 @@ in earlier review iterations.)
 - Tests: relay-merge expectations, `fetchUserFormResponse` cases,
   formLink/parser remain at 29/26 passing.
 
-**Reviewer fix:** chore commit (`cb1730d`) explicitly reframes the
-`IFormAttachment` field as `viewKey` and updates all comments. No
-`issue.txt` / `sdk-improve.md` are committed (they were scratchpads
-that briefly slipped in during a rebase and have been removed).
 
 ---
 
@@ -236,23 +216,9 @@ that briefly slipped in during a rebase and have been removed).
   panel and the public shared-link `CalendarEvent` view share the same
   acceptance pipeline, so a participant who follows an `nevent` link
   goes through the same form-filling gate.
-- Several review follow-ups (decrypt-error UX, event-not-found state,
-  relay-drop retry, picture-in-picture safety, restored dialog polish).
 - `FormFillerDialog.tsx` keeps an "Open in Formstr" external button
   that emits `?viewKey=` (never `responseKey`).
 
-**Reviewer fix:** the `unify shared-link response flow` commit left a
-dangling `onViewResponses={setResponsesForm}` wiring referencing the
-state setter PR3 had already removed alongside `FormResponsesDialog`.
-The trailing `fix(rsvp): drop dangling onViewResponses wiring` commit
-removes the prop from the call site, `RespondPanel`'s prop type, and
-the `FormAttachmentRow` invocation. The owner-only "View responses in
-Formstr" link is rendered directly by `FormAttachmentRow` via
-`buildFormstrResponsesUrl`, so no replacement wiring is needed.
-
-**Constraints:** PR4 does NOT introduce a public-relay form-response
-viewer (that idea was explored in earlier drafts and removed because
-the discovery surface was too weak — see §7).
 
 ---
 
@@ -302,33 +268,3 @@ follow-up:
    note ("this link is missing a viewKey") would be friendlier.
 
 ---
-
-## 8. Manual test plan
-
-| # | Scenario | Expected |
-|---|---|---|
-| 1 | Author event, paste `https://formstr.app/f/<naddr>?viewKey=<hex>` | Chip appears; on publish, encrypted event has `["form", naddr, hex]` |
-| 2 | Author event, paste `https://formstr.app/f/<naddr>#nkeys1...` | Same as #1; `viewKey` extracted from TLV |
-| 3 | Author event, paste a URL containing only `?responseKey=...` | Chip appears with naddr, **without** viewKey; no error, no leak |
-| 4 | Invitee accepts an event with one form (PR2) | Dialog opens, form renders, submit publishes response |
-| 5 | Invitee re-opens an event they already responded to (PR3) | Status pill = "submitted"; dialog shows "already submitted" |
-| 6 | Invitee on shared-link `nevent` URL with form attached (PR4) | Same gate as the invitation panel |
-| 7 | Invitee with no attached form (PR4) | Default native RSVP questionnaire renders |
-| 8 | Network failure mid-fetch (PR4) | Error state with retry; "Open in Formstr" link present |
-
----
-
-## 9. Branch tips at submission
-
-| PR | Branch | Tip |
-|----|--------|-----|
-| PR1 | `feat/rsvp-split-pr1` | `0726246` |
-| PR2 | `feat/rsvp-split-pr2` | `4b56117` |
-| PR3 | `feat/rsvp-split-pr3` | `f6c1af7` |
-| PR4 | `feat/rsvp-split-pr4` | `d911c84` |
-
-All four branches build cleanly (`pnpm build`) and the relevant unit
-suites (`formLink.test.ts`, `parser.test.ts`,
-`fetchUserFormResponse.test.ts`) pass. Pre-existing failures in
-`events.test.ts`, `calendarListTypes.test.ts`, and `invitations.test.ts`
-are inherited from `master` and are out of scope for this feature.
