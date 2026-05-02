@@ -14,8 +14,7 @@
  */
 
 import { create } from "zustand";
-import { getItem, setItem } from "../common/localStorage";
-import { setSecureItem } from "../common/localStorage";
+import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import {
   getUserPublicKey,
   publishPrivateCalendarEvent,
@@ -454,11 +453,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
           ? {
-              ...r,
-              status: "declined" as const,
-              respondedAt: Date.now(),
-              declineReason: reason,
-            }
+            ...r,
+            status: "declined" as const,
+            respondedAt: Date.now(),
+            declineReason: reason,
+          }
           : r,
       );
       const incomingUnreadCount = incomingRequests.filter(
