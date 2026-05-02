@@ -177,6 +177,8 @@ export async function publishPrivateCalendarEvent(
   onRelayComplete?: (url: string, success: boolean) => void,
   /** Optional pre-generated d-tag (e.g. from a booking request) */
   existingDTag?: string,
+  /** Optional public tags to place on the invitation gift wraps. */
+  invitationGiftWrapTags: string[][] = [],
 ) {
   const viewSecretKey = generateSecretKey();
   const dTag =
@@ -226,6 +228,7 @@ export async function publishPrivateCalendarEvent(
         },
         participant,
         EventKinds.CalendarEventGiftWrap,
+        invitationGiftWrapTags,
       );
       return { giftWrap, participant };
     }),

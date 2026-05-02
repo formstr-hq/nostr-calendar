@@ -17,7 +17,11 @@ import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
 import { isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
-import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "./utils/constants";
+import {
+  BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+  BG_KEY_LAST_INVITATION_FETCH_TIME,
+} from "./utils/constants";
 import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
@@ -158,10 +162,13 @@ function Application() {
     import("@capacitor/app").then(({ App: CapApp }) => {
       const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
+          const now = Math.floor(Date.now() / 1000);
           setSecureItem(
             BG_KEY_LAST_INVITATION_FETCH_TIME,
-            Math.floor(Date.now() / 1000),
+            now,
           );
+          setSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME, now);
+          setSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME, now);
         }
       });
       cleanup = () => {

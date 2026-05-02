@@ -19,14 +19,8 @@ import org.json.JSONObject;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 
 /**
  * Background worker that periodically queries Nostr relays for new kind 1052
@@ -60,7 +54,7 @@ public class InvitationWorker extends Worker {
             SharedPreferences prefs = getApplicationContext()
                     .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-            String pubkey = parseJsonString(prefs.getString(PUBKEY_KEY, null));
+            String pubkey = RelayQueryUtils.parseJsonString(prefs.getString(PUBKEY_KEY, null));
             String relaysRaw = prefs.getString(RELAYS_KEY, null);
             String lastFetchRaw = prefs.getString(LAST_INVITATION_FETCH_KEY, null);
 
@@ -94,10 +88,7 @@ public class InvitationWorker extends Worker {
 
             // Fetch kind 84 (ParticipantRemoval) event IDs that the user has dismissed
             Set<String> dismissedInvitationIds = new HashSet<>();
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .connectTimeout(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .readTimeout(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .build();
+            OkHttpClient client = RelayQueryUtils.createClient(RELAY_TIMEOUT_SECONDS);
 
             for (int i = 0; i < relayCount; i++) {
                 String relay = relaysArray.getString(i).replace("\"", "");
@@ -111,8 +102,7 @@ public class InvitationWorker extends Worker {
                 queryRelay(client, relay, pubkey, since, eventIds, seenInvitationIds, dismissedInvitationIds);
             }
 
-            client.dispatcher().executorService().shutdown();
-            client.connectionPool().evictAll();
+            RelayQueryUtils.shutdownClient(client);
 
             Log.d(TAG, "Found " + eventIds.size() + " new invitation(s)");
 
@@ -129,19 +119,6 @@ public class InvitationWorker extends Worker {
             Log.e(TAG, "InvitationWorker failed", e);
             return Result.retry();
         }
-    }
-
-    /**
-     * Capacitor Preferences stores values as JSON strings (e.g. "\"abc\"").
-     * Strip the outer quotes to get the raw value.
-     */
-    private String parseJsonString(String raw) {
-        if (raw == null) return null;
-        String trimmed = raw.trim();
-        if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {
-            return trimmed.substring(1, trimmed.length() - 1);
-        }
-        return trimmed;
     }
 
     /**
@@ -174,70 +151,30 @@ public class InvitationWorker extends Worker {
      */
     private void queryDismissals(OkHttpClient client, String relayUrl, String pubkey,
                                  Set<String> dismissedIds) {
-        String httpUrl = relayUrl.replace("wss://", "https://").replace("ws://", "http://");
-        CountDownLatch latch = new CountDownLatch(1);
         try {
-            Request request = new Request.Builder().url(httpUrl).build();
-            String subscriptionId = "k84_" + System.currentTimeMillis();
-
             JSONObject filterObj = new JSONObject();
             filterObj.put("kinds", new JSONArray().put(84));
             filterObj.put("authors", new JSONArray().put(pubkey));
 
-            JSONArray reqMessage = new JSONArray();
-            reqMessage.put("REQ");
-            reqMessage.put(subscriptionId);
-            reqMessage.put(filterObj);
-
-            client.newWebSocket(request, new WebSocketListener() {
-                @Override
-                public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
-                    webSocket.send(reqMessage.toString());
-                }
-
-                @Override
-                public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-                    try {
-                        JSONArray msg = new JSONArray(text);
-                        String type = msg.getString(0);
-                        if ("EVENT".equals(type) && msg.length() >= 3) {
-                            JSONObject event = msg.getJSONObject(2);
-                            JSONArray tags = event.getJSONArray("tags");
-                            for (int i = 0; i < tags.length(); i++) {
-                                JSONArray tag = tags.getJSONArray(i);
-                                if (tag.length() >= 2 && "e".equals(tag.getString(0))) {
-                                    synchronized (dismissedIds) {
-                                        dismissedIds.add(tag.getString(1));
-                                    }
+            RelayQueryUtils.queryEvents(
+                    client,
+                    relayUrl,
+                    "k84",
+                    filterObj,
+                    RELAY_TIMEOUT_SECONDS,
+                    TAG,
+                    event -> {
+                        JSONArray tags = event.getJSONArray("tags");
+                        for (int i = 0; i < tags.length(); i++) {
+                            JSONArray tag = tags.getJSONArray(i);
+                            if (tag.length() >= 2 && "e".equals(tag.getString(0))) {
+                                synchronized (dismissedIds) {
+                                    dismissedIds.add(tag.getString(1));
                                 }
                             }
-                        } else if ("EOSE".equals(type)) {
-                            JSONArray closeMsg = new JSONArray();
-                            closeMsg.put("CLOSE");
-                            closeMsg.put(subscriptionId);
-                            webSocket.send(closeMsg.toString());
-                            webSocket.close(1000, "done");
-                            latch.countDown();
                         }
-                    } catch (Exception e) {
-                        Log.w(TAG, "Failed to parse kind 84 message", e);
                     }
-                }
-
-                @Override
-                public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t,
-                                      okhttp3.Response response) {
-                    Log.w(TAG, "WebSocket failure (kind 84) for " + relayUrl, t);
-                    latch.countDown();
-                }
-
-                @Override
-                public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
-                    latch.countDown();
-                }
-            });
-
-            latch.await(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            );
         } catch (Exception e) {
             Log.w(TAG, "Failed to query kind 84 from relay: " + relayUrl, e);
         }
@@ -247,16 +184,8 @@ public class InvitationWorker extends Worker {
                             long since, Set<String> eventIds,
                             Set<String> seenInvitationIds, Set<String> dismissedInvitationIds) {
         Log.d(TAG, "Querying: " + relayUrl + " " + " " + pubkey + " " + since);
-        // Convert wss:// to https:// for OkHttp WebSocket
-        String httpUrl = relayUrl.replace("wss://", "https://").replace("ws://", "http://");
-
-        CountDownLatch latch = new CountDownLatch(1);
 
         try {
-            Request request = new Request.Builder().url(httpUrl).build();
-
-            // Build the Nostr REQ filter for kind 1052 events tagged to this pubkey
-            String subscriptionId = "inv_" + System.currentTimeMillis();
             JSONObject filterObj = new JSONObject();
             filterObj.put("kinds", new JSONArray().put(1052));
             filterObj.put("#p", new JSONArray().put(pubkey));
@@ -264,64 +193,37 @@ public class InvitationWorker extends Worker {
                 filterObj.put("since", since);
             }
 
-            JSONArray reqMessage = new JSONArray();
-            reqMessage.put("REQ");
-            reqMessage.put(subscriptionId);
-            reqMessage.put(filterObj);
-
-            client.newWebSocket(request, new WebSocketListener() {
-                @Override
-                public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
-                    webSocket.send(reqMessage.toString());
-                }
-
-                @Override
-                public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-                    try {
-                        JSONArray msg = new JSONArray(text);
-                        String type = msg.getString(0);
-
-                        if ("EVENT".equals(type) && msg.length() >= 3) {
-                            JSONObject event = msg.getJSONObject(2);
-                            String id = event.getString("id");
-                            // Skip invitations already seen or dismissed by the user
-                            if (seenInvitationIds.contains(id) || dismissedInvitationIds.contains(id)) {
-                                Log.d(TAG, "Skipping already-handled invitation " + id);
-                                return;
+            RelayQueryUtils.queryEvents(
+                    client,
+                    relayUrl,
+                    "inv",
+                    filterObj,
+                    RELAY_TIMEOUT_SECONDS,
+                    TAG,
+                    event -> {
+                        JSONArray tags = event.optJSONArray("tags");
+                        if (tags != null) {
+                            for (int i = 0; i < tags.length(); i++) {
+                                JSONArray tag = tags.optJSONArray(i);
+                                if (tag == null || tag.length() < 2) continue;
+                                if ("booking".equals(tag.optString(0))
+                                        && "true".equals(tag.optString(1))) {
+                                    Log.d(TAG, "Skipping booking-origin invitation " + event.getString("id"));
+                                    return;
+                                }
                             }
-                            Log.d(TAG, "New invitation received " + id);
-                            synchronized (eventIds) {
-                                eventIds.add(id);
-                            }
-                        } else if ("EOSE".equals(type)) {
-                            // Close the subscription and connection
-                            JSONArray closeMsg = new JSONArray();
-                             Log.d(TAG, "EOSE received ");
-                            closeMsg.put("CLOSE");
-                            closeMsg.put(subscriptionId);
-                            webSocket.send(closeMsg.toString());
-                            webSocket.close(1000, "done");
-                            latch.countDown();
                         }
-                    } catch (Exception e) {
-                        Log.w(TAG, "Failed to parse relay message", e);
+                        String id = event.getString("id");
+                        if (seenInvitationIds.contains(id) || dismissedInvitationIds.contains(id)) {
+                            Log.d(TAG, "Skipping already-handled invitation " + id);
+                            return;
+                        }
+                        Log.d(TAG, "New invitation received " + id);
+                        synchronized (eventIds) {
+                            eventIds.add(id);
+                        }
                     }
-                }
-
-                @Override
-                public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t,
-                                      okhttp3.Response response) {
-                    Log.w(TAG, "WebSocket failure for " + relayUrl, t);
-                    latch.countDown();
-                }
-
-                @Override
-                public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
-                    latch.countDown();
-                }
-            });
-
-            latch.await(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            );
         } catch (Exception e) {
             Log.w(TAG, "Failed to query relay: " + relayUrl, e);
         }

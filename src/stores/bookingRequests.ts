@@ -14,7 +14,7 @@
  */
 
 import { create } from "zustand";
-import { getItem, setItem } from "../common/localStorage";
+import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import {
   getUserPublicKey,
   publishPrivateCalendarEvent,
@@ -37,6 +37,10 @@ import { useBusyList } from "./busyList";
 import { useTimeBasedEvents } from "./events";
 import { parseEventRef } from "../utils/calendarListTypes";
 import { Event } from "nostr-tools";
+import {
+  BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+} from "../utils/constants";
 
 function subscribeBookingRequests(
   pubkey: string,
@@ -154,6 +158,7 @@ async function sendBookingResponse({
     },
     bookerPubkey,
     EventKinds.BookingResponseGiftWrap,
+    [["status", status]],
   );
   await publishToRelays(giftWrap);
   return giftWrap;
@@ -262,6 +267,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             saveIncomingToStorage(incomingRequests);
             return { incomingRequests, incomingUnreadCount };
           });
+          void setSecureItem(
+            BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         } catch (error) {
           console.error("Failed to unwrap booking request:", error);
         }
@@ -334,6 +343,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             saveOutgoingToStorage(outgoingBookings);
             return { outgoingBookings, outgoingUnreadCount };
           });
+          void setSecureItem(
+            BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         } catch (error) {
           console.error("Failed to unwrap booking response:", error);
         }
@@ -374,9 +387,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // publishPrivateCalendarEvent already sends invitation gift wraps
     // with viewKey to all participants (including booker), so the
     // booker's calendar will pick it up automatically.
-    const { eventRef, authorPubkey } = await publishPrivateCalendarEvent(
+    const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
       event,
       request.dTag || undefined,
+      [["booking", "true"]],
     );
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
@@ -386,11 +400,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     await useCalendarLists
       .getState()
       .addEventToCalendar(calendarId, eventRef);
-    const { eventDTag, viewKey } = parseEventRef(eventRef);
+    const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
       id: eventDTag,
-      viewKey,
+      viewKey: parsedViewKey,
       user: authorPubkey,
       calendarId,
     });
@@ -417,10 +431,17 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       return { incomingRequests, incomingUnreadCount };
     });
 
-    // No booking-response gift wrap is sent: the published calendar event
-    // arrives at the booker via the existing CalendarEventGiftWrap (kind
-    // 1052) flow, which carries the viewKey and triggers the booker's
-    // outgoing-booking status flip in `useInvitations`.
+    sendBookingResponse({
+      schedulingPageRef: request.schedulingPageRef,
+      bookerPubkey: request.bookerPubkey,
+      start: request.start,
+      end: request.end,
+      status: "approved",
+      eventRef,
+      viewKey,
+    }).catch((err) => {
+      console.error("Failed to send booking approval response:", err);
+    });
   },
 
   declineRequest: async (requestId, reason) => {
@@ -432,11 +453,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
           ? {
-              ...r,
-              status: "declined" as const,
-              respondedAt: Date.now(),
-              declineReason: reason,
-            }
+            ...r,
+            status: "declined" as const,
+            respondedAt: Date.now(),
+            declineReason: reason,
+          }
           : r,
       );
       const incomingUnreadCount = incomingRequests.filter(
