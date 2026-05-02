@@ -59,6 +59,7 @@ import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
 import { FormstrSDK } from "@formstr/sdk";
 import { FormFillerDialog } from "./FormFillerDialog";
+import { buildFormstrResponsesUrl } from "../utils/formLink";
 import type { IFormAttachment } from "../utils/types";
 import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -491,15 +492,16 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               <Typography variant="subtitle1">
                 {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
-                <Stack spacing={1}>
-                  {event.forms.map((attachment) => (
-                    <FormAttachmentRow
-                      key={attachment.naddr}
-                      attachment={attachment}
-                      onFill={setActiveForm}
-                    />
-                  ))}
-                </Stack>
+              <Stack spacing={1}>
+                {event.forms.map((attachment) => (
+                  <FormAttachmentRow
+                    key={attachment.naddr}
+                    attachment={attachment}
+                    eventAuthor={event.user}
+                    onFill={setActiveForm}
+                  />
+                ))}
+              </Stack>
               <Divider />
             </>
           )}
@@ -547,9 +549,11 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
 
 function FormAttachmentRow({
   attachment,
+  eventAuthor,
   onFill,
 }: {
   attachment: IFormAttachment;
+  eventAuthor: string;
   onFill: (attachment: IFormAttachment) => void;
 }) {
   const intl = useIntl();
@@ -557,6 +561,7 @@ function FormAttachmentRow({
   const [title, setTitle] = useState<string | null>(null);
   const { status } = useFormSubmissionStatus(attachment.naddr, user?.pubkey);
   const submitted = status.state === "submitted";
+  const hasEditAccess = !!user?.pubkey && eventAuthor === user.pubkey;
 
   useEffect(() => {
     let cancelled = false;
@@ -605,6 +610,18 @@ function FormAttachmentRow({
           id: submitted ? "form.viewOrUpdate" : "form.fillOut",
         })}
       </Button>
+      {hasEditAccess && (
+        <Button
+          variant="text"
+          size="small"
+          href={buildFormstrResponsesUrl(attachment)}
+          target="_blank"
+          rel="noopener noreferrer"
+          endIcon={<OpenInNew fontSize="inherit" />}
+        >
+          {intl.formatMessage({ id: "formResponses.viewButton" })}
+        </Button>
+      )}
       <Typography
         variant="caption"
         color="text.secondary"

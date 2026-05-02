@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { naddrEncode } from "nostr-tools/nip19";
 import {
+  buildFormstrResponsesUrl,
   buildFormstrUrl,
   extractNaddr,
   extractViewKey,
@@ -111,9 +112,7 @@ describe("extractViewKey", () => {
   });
 
   it("prefers nkeys hash over query params when both are present", async () => {
-    const { encodeNKeys } = await import(
-      "@formstr/sdk/dist/utils/nkeys.js"
-    );
+    const { encodeNKeys } = await import("@formstr/sdk/dist/utils/nkeys.js");
     const hashKey = "a".repeat(64);
     const nkeys = encodeNKeys({ viewKey: hashKey });
     expect(
@@ -179,6 +178,20 @@ describe("buildFormstrUrl", () => {
     expect(buildFormstrUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" })).toBe(
       `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`,
     );
+  });
+});
+
+describe("buildFormstrResponsesUrl", () => {
+  it("builds a Formstr responses URL when no view key", () => {
+    expect(buildFormstrResponsesUrl({ naddr: SAMPLE_NADDR })).toBe(
+      `https://formstr.app/s/${SAMPLE_NADDR}`,
+    );
+  });
+
+  it("passes viewKey as ?viewKey= query param", () => {
+    expect(
+      buildFormstrResponsesUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" }),
+    ).toBe(`https://formstr.app/s/${SAMPLE_NADDR}?viewKey=a%2Fb`);
   });
 });
 

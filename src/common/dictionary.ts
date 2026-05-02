@@ -138,6 +138,9 @@ const dictionary: NestedObject = {
       submitAgain: "Submit again",
       continue: "Continue",
     },
+    formResponses: {
+      viewButton: "View responses in Formstr",
+    },
     deleteEvent: {
       title: "Delete Event",
       deleteForEveryone: "Delete for all participants",
@@ -374,8 +377,16 @@ const dictionary: NestedObject = {
       submitError:
         "Ihre Antwort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
       alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Einreichung gefunden, aber die Antwortdetails werden noch von den Relays synchronisiert.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
       submitAgain: "Erneut absenden",
       continue: "Weiter",
+    },
+    formResponses: {
+      viewButton: "Antworten in Formstr ansehen",
     },
     deleteEvent: {
       title: "Termin löschen",

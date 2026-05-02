@@ -128,6 +128,20 @@ export function buildFormstrUrl(form: IFormAttachment): string {
 }
 
 /**
+ * Builds the Formstr-hosted responses URL for a form attachment.
+ *
+ * Formstr's current responses route accepts the form `naddr` directly at
+ * `/s/:naddr`. If we have a view key, pass it through using Formstr's
+ * supported `viewKey` query parameter so encrypted form metadata can still
+ * be opened by the Formstr app.
+ */
+export function buildFormstrResponsesUrl(form: IFormAttachment): string {
+  const base = `https://formstr.app/s/${form.naddr}`;
+  if (!form.viewKey) return base;
+  return `${base}?viewKey=${encodeURIComponent(form.viewKey)}`;
+}
+
+/**
  * Decodes an `naddr` to its NIP-01 replaceable-event coordinate string
  * `<kind>:<pubkey>:<dtag>` used for `#a` filter lookups (NIP-101 form
  * responses tag the source form with this coordinate).

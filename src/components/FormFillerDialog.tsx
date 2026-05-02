@@ -63,7 +63,6 @@ type SdkField = {
   options?: SdkOption[] | unknown;
   config?: { renderElement?: string };
 };
-
 type SdkForm = {
   id: string;
   name?: string;
@@ -279,6 +278,8 @@ export function FormFillerDialog({
     }
   }, [attachment, intl]);
 
+  // Fetch the form template whenever we need to render either the editable
+  // SDK form or a read-only summary of the user's previous response.
   useEffect(() => {
     const shouldRender =
       open &&
@@ -414,6 +415,7 @@ export function FormFillerDialog({
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 1,
                     overflow: "hidden",
+                    width: "100%",
                   }}
                 >
                   <Box
