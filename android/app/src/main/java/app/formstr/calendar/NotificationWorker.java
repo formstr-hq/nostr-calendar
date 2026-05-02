@@ -18,7 +18,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,8 +34,9 @@ public class NotificationWorker extends Worker {
     private static final String TAG = "NotificationWorker";
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
+    private static final String NOTIFICATION_PREFERENCES_KEY = "cal:notification-preferences";
     private static final long SCHEDULE_WINDOW_MS = 5L * 24 * 60 * 60 * 1000;
-    private static final long TEN_MINUTES_MS = 10L * 60 * 1000;
+    private static final int[] DEFAULT_REMINDER_OFFSETS_MINUTES = new int[]{10, 0};
 
     public NotificationWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -47,6 +51,8 @@ public class NotificationWorker extends Worker {
             SharedPreferences prefs = getApplicationContext()
                     .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String eventsJson = prefs.getString(EVENTS_KEY, null);
+            String notificationPreferencesJson =
+                    prefs.getString(NOTIFICATION_PREFERENCES_KEY, null);
 
             if (eventsJson == null || eventsJson.isEmpty()) {
                 Log.d(TAG, "No cached events found");
@@ -54,6 +60,10 @@ public class NotificationWorker extends Worker {
             }
 
             JSONArray events = new JSONArray(eventsJson);
+            JSONObject notificationPreferences = notificationPreferencesJson == null
+                    || notificationPreferencesJson.isEmpty()
+                    ? new JSONObject()
+                    : new JSONObject(notificationPreferencesJson);
             Set<Integer> existingNotificationIds = getExistingNotificationIds();
             long now = System.currentTimeMillis();
             long twoDaysFromNow = now + SCHEDULE_WINDOW_MS;
@@ -61,7 +71,13 @@ public class NotificationWorker extends Worker {
 
             for (int i = 0; i < events.length(); i++) {
                 JSONObject event = events.getJSONObject(i);
-                scheduled += processEvent(event, now, twoDaysFromNow, existingNotificationIds);
+                scheduled += processEvent(
+                        event,
+                        notificationPreferences,
+                        now,
+                        twoDaysFromNow,
+                        existingNotificationIds
+                );
             }
 
             Log.d(TAG, "NotificationWorker finished. Scheduled " + scheduled + " notifications.");
@@ -76,15 +92,23 @@ public class NotificationWorker extends Worker {
         }
     }
 
-    private String getNotificationBody(int timeToBegin, String location){
-        if(timeToBegin <= 0){
-            return "Starting now";
+    private String getNotificationBody(int offsetMinutes, String location){
+        String body;
+        if(offsetMinutes <= 0){
+            body = "Starting now";
         } else {
-            return "Starting in " + timeToBegin + " minutes";
+            body = "Starts in " + offsetMinutes + " minute" + (offsetMinutes == 1 ? "" : "s");
         }
+
+        if (location != null && !location.isEmpty()) {
+            return body + " at " + location;
+        }
+
+        return body;
     }
 
-    private int processEvent(JSONObject event, long now, long twoDaysFromNow,
+    private int processEvent(JSONObject event, JSONObject notificationPreferences,
+                              long now, long twoDaysFromNow,
                               Set<Integer> existingNotificationIds) {
         try {
             JSONObject repeat = event.optJSONObject("repeat");
@@ -100,6 +124,7 @@ public class NotificationWorker extends Worker {
             long end = event.getLong("end");
             String eventId = event.getString("id");
             String title = event.getString("title");
+            List<Integer> reminderOffsets = getReminderOffsets(notificationPreferences, eventId);
 
             // Build location string from location array
             String location = buildLocationString(event);
@@ -116,24 +141,22 @@ public class NotificationWorker extends Worker {
                 return 0;
             }
 
-            // Build notification key matching the JS side
-            String notificationKey = eventId + ":" + nextOccurrence;
-            int baseId = hashToNumber(notificationKey);
-
             int count = 0;
+            for (int offsetMinutes : reminderOffsets) {
+                long scheduledAt = nextOccurrence - offsetMinutes * 60L * 1000L;
+                if (scheduledAt <= now) {
+                    continue;
+                }
 
-            // Schedule "10 minutes before" notification
-            long tenMinBefore = nextOccurrence - TEN_MINUTES_MS;
-            if (tenMinBefore > now && !existingNotificationIds.contains(baseId)) {
-                String body = getNotificationBody(10, location);
-                scheduleAlarm(baseId, "Upcoming: " + title, body, eventId, tenMinBefore);
-                count++;
-            }
+                String notificationKey = eventId + ":" + nextOccurrence + ":" + offsetMinutes;
+                int notificationId = hashToNumber(notificationKey);
+                if (existingNotificationIds.contains(notificationId)) {
+                    continue;
+                }
 
-            // Schedule "starting now" notification
-            if (nextOccurrence > now && !existingNotificationIds.contains(baseId + 1)) {
-                String body =  getNotificationBody(0, location);
-                scheduleAlarm(baseId + 1, title, body, eventId, nextOccurrence);
+                String body = getNotificationBody(offsetMinutes, location);
+                String notificationTitle = offsetMinutes <= 0 ? title : "Upcoming: " + title;
+                scheduleAlarm(notificationId, notificationTitle, body, eventId, scheduledAt);
                 count++;
             }
 
@@ -161,6 +184,30 @@ public class NotificationWorker extends Worker {
         }
     }
 
+    private List<Integer> getReminderOffsets(JSONObject notificationPreferences, String eventId) {
+        List<Integer> offsets = new ArrayList<>();
+        JSONObject eventPreference = notificationPreferences.optJSONObject(eventId);
+        JSONArray offsetsArray = eventPreference != null
+                ? eventPreference.optJSONArray("offsetsMinutes")
+                : null;
+
+        if (offsetsArray == null) {
+            for (int offset : DEFAULT_REMINDER_OFFSETS_MINUTES) {
+                offsets.add(offset);
+            }
+            return offsets;
+        }
+
+        for (int i = 0; i < offsetsArray.length(); i++) {
+            int offset = offsetsArray.optInt(i, -1);
+            if (offset >= 0 && !offsets.contains(offset)) {
+                offsets.add(offset);
+            }
+        }
+
+        return offsets;
+    }
+
     /**
      * Hash function matching the JS side's hashToNumber for consistent notification IDs.
      */
@@ -169,7 +216,8 @@ public class NotificationWorker extends Worker {
         for (int i = 0; i < str.length(); i++) {
             hash = (hash * 31 + str.charAt(i));
         }
-        return (Math.abs(hash) >> 1) * 2;
+        int positiveHash = Math.abs(hash);
+        return positiveHash != 0 ? positiveHash : 1;
     }
 
     private void scheduleAlarm(int notificationId, String title, String body,

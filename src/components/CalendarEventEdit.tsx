@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -48,6 +48,9 @@ import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
@@ -57,6 +60,21 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { parseEventRef } from "../utils/calendarListTypes";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { v4 as uuid } from "uuid";
+import {
+  areNotificationOffsetsEqual,
+  clearNotificationPreference,
+  DEFAULT_NOTIFICATION_OFFSETS,
+  getNotificationPreference,
+  normalizeNotificationOffsets,
+  setNotificationPreference,
+  shouldScheduleNotifications,
+} from "../utils/notificationPreferences";
+import {
+  cancelEventNotifications,
+  scheduleEventNotifications,
+} from "../utils/notifications";
+import { useNotifications } from "../stores/notifications";
 import { RelayPublishDialog } from "./RelayPublishDialog";
 import { RelayDots } from "./RelayDots";
 import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
@@ -355,6 +373,11 @@ export function CalendarEventEdit({
       },
     } as ICalendarEvent;
   });
+  const [notificationOffsets, setNotificationOffsets] = useState<number[]>(
+    DEFAULT_NOTIFICATION_OFFSETS,
+  );
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] =
+    useState(!initialEvent?.id);
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RepeatingFrequency>(
       initialIsCustom
@@ -398,6 +421,77 @@ export function CalendarEventEdit({
     setEventDetails((prev) => ({ ...prev, [key]: value }));
   };
 
+  useEffect(() => {
+    let active = true;
+
+    if (!open) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!initialEvent?.id) {
+      setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+      setNotificationPreferencesLoaded(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setNotificationPreferencesLoaded(false);
+    getNotificationPreference(initialEvent.id)
+      .then((preference) => {
+        if (!active) {
+          return;
+        }
+
+        if (preference) {
+          setNotificationOffsets(preference.offsetsMinutes);
+        } else {
+          setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        }
+        setNotificationPreferencesLoaded(true);
+      })
+      .catch((error) => {
+        console.warn("Failed to load notification preferences", error);
+        if (!active) {
+          return;
+        }
+        setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        setNotificationPreferencesLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialEvent?.id, open]);
+
+  const handleNotificationOffsetChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const parsed = Number.parseInt(e.target.value, 10);
+    setNotificationOffsets((previousOffsets) =>
+      previousOffsets.map((offset, currentIndex) =>
+        currentIndex === index
+          ? Number.isFinite(parsed)
+            ? Math.max(0, parsed)
+            : 0
+          : offset,
+      ),
+    );
+  };
+
+  const addNotificationOffset = () => {
+    setNotificationOffsets((previousOffsets) => [...previousOffsets, 0]);
+  };
+
+  const removeNotificationOffset = (index: number) => {
+    setNotificationOffsets((previousOffsets) =>
+      previousOffsets.filter((_, currentIndex) => currentIndex !== index),
+    );
+  };
+
   const openCustomDialog = () => {
     setCustomDraft(
       customRule
@@ -431,6 +525,8 @@ export function CalendarEventEdit({
 
     setProcessing(true);
     try {
+      const normalizedNotificationOffsets =
+        normalizeNotificationOffsets(notificationOffsets);
       const rrule = isCustomRecurrence
         ? customRule
         : buildRecurrenceRule({
@@ -440,8 +536,10 @@ export function CalendarEventEdit({
             untilDate: recurrenceUntilDate?.valueOf() ?? null,
             eventStart: eventDetails.begin,
           });
+      const eventId = eventDetails.id || uuid();
       const eventToSave = {
         ...eventDetails,
+        id: eventId,
         isPrivateEvent: isPrivate,
         repeat: { rrule },
       };
@@ -497,6 +595,39 @@ export function CalendarEventEdit({
         });
       }
 
+      if (
+        areNotificationOffsetsEqual(
+          normalizedNotificationOffsets,
+          DEFAULT_NOTIFICATION_OFFSETS,
+        )
+      ) {
+        await clearNotificationPreference(eventId);
+      } else {
+        await setNotificationPreference(eventId, normalizedNotificationOffsets);
+      }
+
+      if (mode === "create" && isPrivate) {
+        await cancelEventNotifications(eventId);
+        useNotifications.getState().removeNotifications(eventId);
+
+        const calendarPreference = calendars.find(
+          (calendar) => calendar.id === selectedCalendarId,
+        )?.notificationPreference;
+
+        if (
+          shouldScheduleNotifications(
+            eventToSave.notificationPreference,
+            calendarPreference,
+          )
+        ) {
+          const notifications = await scheduleEventNotifications({
+            ...eventToSave,
+            calendarId: selectedCalendarId,
+          });
+          useNotifications.getState().setNotifications(eventId, notifications);
+        }
+      }
+
       // Public busy list maintenance:
       //  - create + opted-in        -> publish a busy range for the new event.
       //  - edit + range changed     -> always remove the previous range
@@ -525,7 +656,6 @@ export function CalendarEventEdit({
 
       // Persist preference so future events default to the user's last choice.
       setBusyListDefaultOptIn(publishBusy);
-
       if (onSave) {
         onSave(eventToSave);
       }
@@ -619,6 +749,12 @@ export function CalendarEventEdit({
     setRecurrenceFrequency(value as RepeatingFrequency);
   };
 
+  const notificationsValid =
+    notificationPreferencesLoaded &&
+    notificationOffsets.every(
+      (offset) =>
+        Number.isInteger(offset) && Number.isFinite(offset) && offset >= 0,
+    );
   const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as RecurrenceEndMode;
     setRecurrenceEndMode(value);
@@ -670,7 +806,8 @@ export function CalendarEventEdit({
     eventDetails.begin &&
     eventDetails.end &&
     eventDetails.begin < eventDetails.end &&
-    recurrenceValid
+    recurrenceValid &&
+    notificationsValid
   );
 
   const showRelayDetailsButton =
@@ -1145,6 +1282,69 @@ export function CalendarEventEdit({
               )}
             </Box>
           )}
+        </Box>
+      </EventAttributeEditContainer>
+      <Divider />
+      <EventAttributeEditContainer>
+        <NotificationsActiveIcon />
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Typography variant="subtitle2">
+            {intl.formatMessage({ id: "event.notifications" })}
+          </Typography>
+
+          {notificationOffsets.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              {intl.formatMessage({ id: "event.noNotifications" })}
+            </Typography>
+          ) : (
+            notificationOffsets.map((offset, index) => (
+              <Box
+                key={`notification-offset-${index}`}
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  alignItems: "center",
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label={intl.formatMessage({
+                    id: "event.reminderMinutesBefore",
+                  })}
+                  value={offset}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    handleNotificationOffsetChange(index, e)
+                  }
+                  inputProps={{ min: 0 }}
+                />
+                <IconButton
+                  aria-label={intl.formatMessage({ id: "navigation.remove" })}
+                  onClick={() => removeNotificationOffset(index)}
+                  size="small"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))
+          )}
+
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={addNotificationOffset}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {intl.formatMessage({ id: "event.addReminder" })}
+          </Button>
         </Box>
       </EventAttributeEditContainer>
       <Divider />
