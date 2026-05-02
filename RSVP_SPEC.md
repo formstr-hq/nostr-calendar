@@ -126,7 +126,7 @@ form reference visible only to invited participants.
 
 The feature is split across four stacked branches off `master` (`60ae999`).
 
-### PR1 — `feat/rsvp-split-pr1` (`34f3df9`)
+### PR1 — `feat/rsvp-split-pr1` (`0726246`)
 **Title:** `feat(forms): persist form attachments on private calendar events`
 
 **Surface area:**
@@ -154,7 +154,7 @@ The feature is split across four stacked branches off `master` (`60ae999`).
 
 ---
 
-### PR2 — `feat/rsvp-split-pr2` (`0c43a1c`)
+### PR2 — `feat/rsvp-split-pr2` (`4b56117`)
 **Title:** `feat(rsvp): form-filler at invitation acceptance`
 
 **Surface area:**
@@ -175,10 +175,14 @@ The feature is split across four stacked branches off `master` (`60ae999`).
 
 **Reviewer fix:** the dialog passes `attachment.viewKey`, never
 `attachment.responseKey` — matches the renamed model from PR1.
+A trailing `chore(forms)` commit drops dead `event.{forms,attachForm,
+formInputPlaceholder,addForm,removeForm,invalidFormInput,
+duplicateFormInput,formsPrivateOnly}` i18n keys; the form-attachment
+UI consumes only the new `form.*` namespace.
 
 ---
 
-### PR3 — `feat/rsvp-split-pr3` (`3310448`)
+### PR3 — `feat/rsvp-split-pr3` (`f6c1af7`)
 **Title:** `feat(forms): improve submitted response handling`
 (Stacked: also includes the relay-backed status detection that landed
 in earlier review iterations.)
@@ -213,7 +217,7 @@ that briefly slipped in during a rebase and have been removed).
 
 ---
 
-### PR4 — `feat/rsvp-split-pr4` (`05c7fa2`)
+### PR4 — `feat/rsvp-split-pr4` (`d911c84`)
 **Title:** `feat(rsvp): automatic RSVP questionnaire + status UI`
 
 **Surface area:**
@@ -236,6 +240,15 @@ that briefly slipped in during a rebase and have been removed).
   relay-drop retry, picture-in-picture safety, restored dialog polish).
 - `FormFillerDialog.tsx` keeps an "Open in Formstr" external button
   that emits `?viewKey=` (never `responseKey`).
+
+**Reviewer fix:** the `unify shared-link response flow` commit left a
+dangling `onViewResponses={setResponsesForm}` wiring referencing the
+state setter PR3 had already removed alongside `FormResponsesDialog`.
+The trailing `fix(rsvp): drop dangling onViewResponses wiring` commit
+removes the prop from the call site, `RespondPanel`'s prop type, and
+the `FormAttachmentRow` invocation. The owner-only "View responses in
+Formstr" link is rendered directly by `FormAttachmentRow` via
+`buildFormstrResponsesUrl`, so no replacement wiring is needed.
 
 **Constraints:** PR4 does NOT introduce a public-relay form-response
 viewer (that idea was explored in earlier drafts and removed because
@@ -309,10 +322,10 @@ follow-up:
 
 | PR | Branch | Tip |
 |----|--------|-----|
-| PR1 | `feat/rsvp-split-pr1` | `34f3df9` |
-| PR2 | `feat/rsvp-split-pr2` | `0c43a1c` |
-| PR3 | `feat/rsvp-split-pr3` | `3310448` |
-| PR4 | `feat/rsvp-split-pr4` | `05c7fa2` |
+| PR1 | `feat/rsvp-split-pr1` | `0726246` |
+| PR2 | `feat/rsvp-split-pr2` | `4b56117` |
+| PR3 | `feat/rsvp-split-pr3` | `f6c1af7` |
+| PR4 | `feat/rsvp-split-pr4` | `d911c84` |
 
 All four branches build cleanly (`pnpm build`) and the relevant unit
 suites (`formLink.test.ts`, `parser.test.ts`,
