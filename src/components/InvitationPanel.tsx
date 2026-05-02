@@ -106,6 +106,7 @@ export function InvitationPanel() {
                 begin={invitation.event.begin}
                 end={invitation.event.end}
                 repeat={invitation.event.repeat}
+                allDay={invitation.event.allDay}
               />
               {invitation.event.description && (
                 <Typography
