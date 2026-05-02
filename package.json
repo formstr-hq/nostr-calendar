@@ -10,7 +10,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "simulate-android": "pnpm build && ANDROID_SDK_ROOT=/home/rama/Android/Sdk pnpm cap run android",
+    "simulate-android": "pnpm build && pnpm cap run android",
     "release-android": "./scripts/build-release.sh",
     "simulate-ios": "pnpm cap run ios",
     "build-ios": "pnpm cap build ios",
