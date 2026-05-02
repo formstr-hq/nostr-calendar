@@ -19,14 +19,8 @@ import org.json.JSONObject;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 
 /**
  * Background worker that polls relays for booking-related gift wraps:
@@ -63,7 +57,7 @@ public class BookingWorker extends Worker {
             SharedPreferences prefs = getApplicationContext()
                     .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-            String pubkey = parseJsonString(prefs.getString(PUBKEY_KEY, null));
+            String pubkey = RelayQueryUtils.parseJsonString(prefs.getString(PUBKEY_KEY, null));
             String relaysRaw = prefs.getString(RELAYS_KEY, null);
 
             if (pubkey == null || pubkey.isEmpty()) {
@@ -91,10 +85,7 @@ public class BookingWorker extends Worker {
             JSONArray relaysArray = new JSONArray(relaysRaw);
             int relayCount = Math.min(relaysArray.length(), MAX_RELAYS);
 
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .connectTimeout(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .readTimeout(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .build();
+            OkHttpClient client = RelayQueryUtils.createClient(RELAY_TIMEOUT_SECONDS);
 
             Set<String> requestIds = new HashSet<>();
             Set<String> approvalIds = new HashSet<>();
@@ -105,8 +96,7 @@ public class BookingWorker extends Worker {
                 queryApprovedResponses(client, relay, pubkey, responseSince, approvalIds);
             }
 
-            client.dispatcher().executorService().shutdown();
-            client.connectionPool().evictAll();
+            RelayQueryUtils.shutdownClient(client);
 
             if (!requestIds.isEmpty()) {
                 showBookingRequestNotification(requestIds.size());
@@ -127,15 +117,6 @@ public class BookingWorker extends Worker {
             Log.e(TAG, "BookingWorker failed", e);
             return Result.retry();
         }
-    }
-
-    private String parseJsonString(String raw) {
-        if (raw == null) return null;
-        String trimmed = raw.trim();
-        if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {
-            return trimmed.substring(1, trimmed.length() - 1);
-        }
-        return trimmed;
     }
 
     private long parseLongPref(String raw, long defaultValue) {
@@ -160,13 +141,7 @@ public class BookingWorker extends Worker {
     private void queryRelay(OkHttpClient client, String relayUrl, String pubkey,
                             int kind, long since, Set<String> eventIds,
                             boolean approvalsOnly) {
-        String httpUrl = relayUrl.replace("wss://", "https://").replace("ws://", "http://");
-        CountDownLatch latch = new CountDownLatch(1);
-
         try {
-            Request request = new Request.Builder().url(httpUrl).build();
-            String subscriptionId = "booking_" + kind + "_" + System.currentTimeMillis();
-
             JSONObject filterObj = new JSONObject();
             filterObj.put("kinds", new JSONArray().put(kind));
             filterObj.put("#p", new JSONArray().put(pubkey));
@@ -174,58 +149,22 @@ public class BookingWorker extends Worker {
                 filterObj.put("since", since);
             }
 
-            JSONArray reqMessage = new JSONArray();
-            reqMessage.put("REQ");
-            reqMessage.put(subscriptionId);
-            reqMessage.put(filterObj);
-
-            client.newWebSocket(request, new WebSocketListener() {
-                @Override
-                public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
-                    webSocket.send(reqMessage.toString());
-                }
-
-                @Override
-                public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-                    try {
-                        JSONArray msg = new JSONArray(text);
-                        String type = msg.getString(0);
-
-                        if ("EVENT".equals(type) && msg.length() >= 3) {
-                            JSONObject event = msg.getJSONObject(2);
-                            if (approvalsOnly && !isApprovedResponse(event)) {
-                                return;
-                            }
-                            synchronized (eventIds) {
-                                eventIds.add(event.getString("id"));
-                            }
-                        } else if ("EOSE".equals(type)) {
-                            JSONArray closeMsg = new JSONArray();
-                            closeMsg.put("CLOSE");
-                            closeMsg.put(subscriptionId);
-                            webSocket.send(closeMsg.toString());
-                            webSocket.close(1000, "done");
-                            latch.countDown();
+            RelayQueryUtils.queryEvents(
+                    client,
+                    relayUrl,
+                    "booking_" + kind,
+                    filterObj,
+                    RELAY_TIMEOUT_SECONDS,
+                    TAG,
+                    event -> {
+                        if (approvalsOnly && !isApprovedResponse(event)) {
+                            return;
                         }
-                    } catch (Exception e) {
-                        Log.w(TAG, "Failed to parse booking relay message", e);
+                        synchronized (eventIds) {
+                            eventIds.add(event.getString("id"));
+                        }
                     }
-                }
-
-                @Override
-                public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t,
-                                      okhttp3.Response response) {
-                    Log.w(TAG, "WebSocket failure for " + relayUrl, t);
-                    latch.countDown();
-                }
-
-                @Override
-                public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
-                    latch.countDown();
-                }
-            });
-
-            latch.await(RELAY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            );
         } catch (Exception e) {
             Log.w(TAG, "Failed to query booking relay: " + relayUrl, e);
         }
