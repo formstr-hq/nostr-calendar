@@ -219,9 +219,9 @@ that briefly slipped in during a rebase and have been removed).
 **Surface area:**
 
 - Default RSVP questionnaire: when the event has no attached form and
-  the invitee accepts/declines/tentatives, a built-in questionnaire is
-  rendered (yes/no + free-text note) and stored as a Formstr response
-  for parity.
+  the invitee accepts/declines/tentatives, a built-in native RSVP editor
+  is rendered (yes/no/maybe + optional suggested time + free-text note)
+  and stored as the app's RSVP event, not as a Formstr response.
 - Status UI in event detail: each attached form gets a "submitted /
   pending" pill driven by `useFormSubmissionStatus`. A
   `sessionStorage` marker (`cal:form-submitted:<naddr>:<pubkey>`) is
@@ -300,7 +300,7 @@ follow-up:
 | 4 | Invitee accepts an event with one form (PR2) | Dialog opens, form renders, submit publishes response |
 | 5 | Invitee re-opens an event they already responded to (PR3) | Status pill = "submitted"; dialog shows "already submitted" |
 | 6 | Invitee on shared-link `nevent` URL with form attached (PR4) | Same gate as the invitation panel |
-| 7 | Invitee with no attached form (PR4) | Default RSVP questionnaire renders |
+| 7 | Invitee with no attached form (PR4) | Default native RSVP questionnaire renders |
 | 8 | Network failure mid-fetch (PR4) | Error state with retry; "Open in Formstr" link present |
 
 ---
