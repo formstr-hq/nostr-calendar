@@ -401,11 +401,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     await useCalendarLists
       .getState()
       .addEventToCalendar(calendarId, eventRef);
-    const { eventDTag, viewKey } = parseEventRef(eventRef);
+    const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
       id: eventDTag,
-      viewKey,
+      viewKey: parsedViewKey,
       user: authorPubkey,
       calendarId,
     });
