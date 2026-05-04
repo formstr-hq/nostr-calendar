@@ -61,6 +61,7 @@ import { FormattedMessage, useIntl, type IntlShape } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { EventBusyListToggle } from "./EventBusyListToggle";
 
 import { useInvitations } from "../stores/invitations";
 import {
@@ -575,6 +576,8 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             repeat={event.repeat}
             allDay={event.allDay}
           ></TimeRenderer>
+
+          <EventBusyListToggle event={event} />
 
           {event.description && (
             <>

@@ -195,8 +195,13 @@ const dictionary: NestedObject = {
     },
     busyList: {
       publishToggle: "Show this time as busy on my public availability",
+      eventToggle: "Show this event as busy on my public availability",
       helperText:
         "Publishes a public busy entry so others booking with you can see this slot is taken. The entry contains only start/end times — no event details.",
+      eventHelperText:
+        "Adds or removes only this event's time range from your public busy list. Event details stay private.",
+      updateError:
+        "We could not update your public busy list. Please try again.",
     },
     invitation: {
       invitations: "Invitations",
@@ -536,8 +541,14 @@ const dictionary: NestedObject = {
     busyList: {
       publishToggle:
         "Diese Zeit in meiner öffentlichen Verfügbarkeit als belegt anzeigen",
+      eventToggle:
+        "Diesen Termin in meiner öffentlichen Verfügbarkeit als belegt anzeigen",
       helperText:
         "Veröffentlicht einen öffentlichen Belegt-Eintrag, sodass andere, die mit Ihnen einen Termin buchen, sehen können, dass dieser Zeitraum vergeben ist. Der Eintrag enthält ausschließlich Start- und Endzeit – keine Termindetails.",
+      eventHelperText:
+        "Fügt nur den Zeitraum dieses Termins zu Ihrer öffentlichen Belegt-Liste hinzu oder entfernt ihn daraus. Termindetails bleiben privat.",
+      updateError:
+        "Ihre öffentliche Belegt-Liste konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
     },
     invitation: {
       invitations: "Einladungen",
