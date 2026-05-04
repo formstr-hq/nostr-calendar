@@ -486,7 +486,13 @@ export const SchedulingPageEdit = () => {
               ? intl.formatMessage({ id: "scheduling.editSchedulingPage" })
               : intl.formatMessage({ id: "scheduling.createSchedulingPage" })}
           </Typography>
+
         </Box>
+
+        {/* Feature description */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          {intl.formatMessage({ id: "scheduling.featureDescription" })}
+        </Typography>
 
         {/* Saved link banner */}
         {savedNAddr && (
@@ -527,7 +533,7 @@ export const SchedulingPageEdit = () => {
               value={formData.eventTitle}
               onChange={(e) => updateField("eventTitle", e.target.value)}
               size="small"
-              helperText="Title for calendar events created from bookings"
+              helperText={intl.formatMessage({id:"scheduling.eventTitleHelp"})}
             />
             <TextField
               fullWidth
@@ -596,7 +602,7 @@ export const SchedulingPageEdit = () => {
                   addCustomDuration();
                 }
               }}
-              sx={{ width: 150 }}
+              sx={{ width: 170 }}
               slotProps={{ htmlInput: { min: 1 } }}
             />
             <IconButton size="small" onClick={addCustomDuration} disabled={!customDuration}>
@@ -940,8 +946,8 @@ export const SchedulingPageEdit = () => {
               {processing
                 ? intl.formatMessage({ id: "scheduling.saving" })
                 : isEditMode
-                  ? intl.formatMessage({ id: "scheduling.updatePage" })
-                  : intl.formatMessage({ id: "scheduling.createSchedulingPage" })}
+                  ? intl.formatMessage({ id: "scheduling.updatePageButton" })
+                  : intl.formatMessage({ id: "scheduling.createSchedulingPageButton" })}
             </Button>
           )}
         </Box>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Box,
@@ -10,13 +11,20 @@ import {
   ListItemSecondaryAction,
   Tooltip,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AddIcon from "@mui/icons-material/Add";
 import { useSchedulingPages } from "../stores/schedulingPages";
 import { ROUTES, getSchedulingPageEditUrl } from "../utils/routingHelper";
+import { useIntl } from "react-intl";
 
 interface SchedulingPagesListProps {
   /** When provided, called after navigation to close a parent drawer */
@@ -27,8 +35,10 @@ export const SchedulingPagesList = ({
   onNavigate,
 }: SchedulingPagesListProps) => {
   const navigate = useNavigate();
+  const { formatMessage } = useIntl();
   const { pages, isLoaded, deletePage, getNAddr, getPageUrl } =
     useSchedulingPages();
+  const [pageToDelete, setPageToDelete] = useState<string | null>(null);
 
   const handleCreate = () => {
     navigate(ROUTES.SchedulingPageCreate);
@@ -49,8 +59,18 @@ export const SchedulingPagesList = ({
     navigator.clipboard.writeText(url);
   };
 
-  const handleDelete = async (pageId: string) => {
-    await deletePage(pageId);
+  const handleDelete = (pageId: string) => {
+    setPageToDelete(pageId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pageToDelete) return;
+    await deletePage(pageToDelete);
+    setPageToDelete(null);
+  };
+
+  const handleCancelDelete = () => {
+    setPageToDelete(null);
   };
 
   if (!isLoaded) {
@@ -72,7 +92,7 @@ export const SchedulingPagesList = ({
         }}
       >
         <Typography variant="subtitle2" fontWeight={600}>
-          Scheduling
+          {formatMessage({id: "scheduling.sidebarTitle"})}
         </Typography>
         <IconButton size="small" onClick={handleCreate}>
           <AddIcon fontSize="small" />
@@ -82,7 +102,7 @@ export const SchedulingPagesList = ({
       {pages.length === 0 ? (
         <Box py={1} textAlign="center">
           <Typography variant="body2" color="text.secondary">
-            No scheduling pages
+            {formatMessage({ id: "scheduling.noSchedulingPages" })}
           </Typography>
           <Button
             size="small"
@@ -90,7 +110,7 @@ export const SchedulingPagesList = ({
             onClick={handleCreate}
             sx={{ mt: 0.5 }}
           >
-            Create Page
+            {formatMessage({ id: "scheduling.createPage" })}
           </Button>
         </Box>
       ) : (
@@ -109,7 +129,7 @@ export const SchedulingPagesList = ({
                 primaryTypographyProps={{ variant: "body2", noWrap: true }}
               />
               <ListItemSecondaryAction>
-                <Tooltip title="Copy link">
+                <Tooltip title={formatMessage({ id: "scheduling.copyLink" })}>
                   <IconButton
                     edge="end"
                     size="small"
@@ -118,12 +138,23 @@ export const SchedulingPagesList = ({
                     <ContentCopyIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Edit">
+                <Tooltip title={formatMessage({ id: "scheduling.openLink" })}>
+                  <IconButton
+                    size="small"
+                    component="a"
+                    href={getPageUrl(page)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <OpenInNewIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={formatMessage({ id: "navigation.edit" })}>
                   <IconButton size="small" onClick={() => handleEdit(page.id)}>
                     <EditIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Delete">
+                <Tooltip title={formatMessage({ id: "navigation.delete" })}>
                   <IconButton
                     size="small"
                     onClick={() => handleDelete(page.id)}
@@ -147,8 +178,32 @@ export const SchedulingPagesList = ({
           onNavigate?.();
         }}
       >
-        View Bookings
+        {formatMessage({ id: "scheduling.viewBookings" })}
       </Button>
+
+      <Dialog
+        open={pageToDelete !== null}
+        onClose={handleCancelDelete}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {formatMessage({ id: "scheduling.deletePageTitle" })}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {formatMessage({ id: "scheduling.deletePageWarning" })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>
+            {formatMessage({ id: "navigation.cancel" })}
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            {formatMessage({ id: "navigation.delete" })}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
