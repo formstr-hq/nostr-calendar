@@ -61,6 +61,7 @@ import { FormattedMessage, useIntl, type IntlShape } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { EventBusyListToggle } from "./EventBusyListToggle";
 
 import { useInvitations } from "../stores/invitations";
 import {
@@ -72,6 +73,7 @@ import {
   buildEventRef,
   getCalendarEventCoordinate,
 } from "../utils/calendarListTypes";
+import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
 import { generateSecretKey } from "nostr-tools";
@@ -576,6 +578,8 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             allDay={event.allDay}
           ></TimeRenderer>
 
+          <EventBusyListToggle event={event} />
+
           {event.description && (
             <>
               <Typography variant="subtitle1">
@@ -693,7 +697,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const [publishBusy, setPublishBusy] = useState<boolean>(() =>
     getBusyListDefaultOptIn(),
   );
-  const { updateEvent } = useTimeBasedEvents();
+  const { events, updateEvent } = useTimeBasedEvents();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     calendars[0]?.id || "",
   );
@@ -716,6 +720,12 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       fetchCalendars();
     }
   }, [user, calendarsLoaded, fetchCalendars]);
+
+  const supportsBusyListPublish = isBusyListRangeSupportedForEvent(
+    event,
+    events,
+    user?.pubkey,
+  );
 
   const handleAccept = async () => {
     if (!selectedCalendarId) return;
@@ -749,7 +759,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       // Persist the user's preference and (best-effort) publish a busy entry
       // for the accepted slot.
       setBusyListDefaultOptIn(publishBusy);
-      if (publishBusy) {
+      if (publishBusy && supportsBusyListPublish) {
         void useBusyList
           .getState()
           .addBusyRange({ start: event.begin, end: event.end });
@@ -907,20 +917,22 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
             {intl.formatMessage({ id: "invitation.acceptInvitation" })}
           </Button>
         </Box>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={publishBusy}
-              onChange={(e) => setPublishBusy(e.target.checked)}
-              size="small"
-            />
-          }
-          label={
-            <Typography variant="body2">
-              {intl.formatMessage({ id: "busyList.publishToggle" })}
-            </Typography>
-          }
-        />
+        {supportsBusyListPublish && (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={publishBusy}
+                onChange={(e) => setPublishBusy(e.target.checked)}
+                size="small"
+              />
+            }
+            label={
+              <Typography variant="body2">
+                {intl.formatMessage({ id: "busyList.publishToggle" })}
+              </Typography>
+            }
+          />
+        )}
       </Stack>
 
       <Snackbar

@@ -55,7 +55,9 @@ import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
+import { useUser } from "../stores/user";
 import { parseEventRef } from "../utils/calendarListTypes";
+import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { RelayPublishDialog } from "./RelayPublishDialog";
 import { RelayDots } from "./RelayDots";
@@ -319,6 +321,8 @@ export function CalendarEventEdit({
   const [publishBusy, setPublishBusy] = useState<boolean>(() =>
     getBusyListDefaultOptIn(),
   );
+  const { user } = useUser();
+  const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
     initialEvent?.calendarId || calendars[0]?.id || "",
@@ -381,6 +385,26 @@ export function CalendarEventEdit({
       ? getCustomDraftFromRule(initialRule, dayjs(eventDetails.begin))
       : createDefaultCustomDraft(dayjs(eventDetails.begin)),
   );
+  const draftRecurrenceRule = isCustomRecurrence
+    ? customRule
+    : buildRecurrenceRule({
+        frequency: recurrenceFrequency,
+        endMode: recurrenceEndMode,
+        count: recurrenceCount,
+        untilDate: recurrenceUntilDate?.valueOf() ?? null,
+        eventStart: eventDetails.begin,
+      });
+  const supportsBusyListPublish = isBusyListRangeSupportedForEvent(
+    {
+      begin: eventDetails.begin,
+      end: eventDetails.end,
+      id: eventDetails.id,
+      repeat: { rrule: draftRecurrenceRule },
+      source: initialEvent?.source,
+    },
+    existingEvents,
+    user?.pubkey,
+  );
 
   const handleClose = () => {
     resetRelayStatus();
@@ -431,15 +455,7 @@ export function CalendarEventEdit({
 
     setProcessing(true);
     try {
-      const rrule = isCustomRecurrence
-        ? customRule
-        : buildRecurrenceRule({
-            frequency: recurrenceFrequency,
-            endMode: recurrenceEndMode,
-            count: recurrenceCount,
-            untilDate: recurrenceUntilDate?.valueOf() ?? null,
-            eventStart: eventDetails.begin,
-          });
+      const rrule = draftRecurrenceRule;
       const eventToSave = {
         ...eventDetails,
         isPrivateEvent: isPrivate,
@@ -510,14 +526,16 @@ export function CalendarEventEdit({
         (initialEvent.begin !== eventToSave.begin ||
           initialEvent.end !== eventToSave.end);
       if (rangeChanged && initialEvent) {
-        void useBusyList
-          .getState()
-          .removeBusyRange({
-            start: initialEvent.begin,
-            end: initialEvent.end,
-          });
+        void useBusyList.getState().removeBusyRange({
+          start: initialEvent.begin,
+          end: initialEvent.end,
+        });
       }
-      if (publishBusy && (mode === "create" || rangeChanged)) {
+      if (
+        publishBusy &&
+        supportsBusyListPublish &&
+        (mode === "create" || rangeChanged)
+      ) {
         void useBusyList
           .getState()
           .addBusyRange({ start: eventToSave.begin, end: eventToSave.end });
@@ -1250,29 +1268,31 @@ export function CalendarEventEdit({
             : intl.formatMessage({ id: "event.public" })}
         </Button>
       </Box>
-      <Box style={{ paddingLeft: 12, paddingRight: 12 }}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={publishBusy}
-              onChange={(e) => setPublishBusy(e.target.checked)}
-              size="small"
-            />
-          }
-          label={
-            <Typography variant="body2">
-              {intl.formatMessage({ id: "busyList.publishToggle" })}
-            </Typography>
-          }
-        />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          style={{ display: "block", marginLeft: 32 }}
-        >
-          {intl.formatMessage({ id: "busyList.helperText" })}
-        </Typography>
-      </Box>
+      {supportsBusyListPublish && (
+        <Box style={{ paddingLeft: 12, paddingRight: 12 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={publishBusy}
+                onChange={(e) => setPublishBusy(e.target.checked)}
+                size="small"
+              />
+            }
+            label={
+              <Typography variant="body2">
+                {intl.formatMessage({ id: "busyList.publishToggle" })}
+              </Typography>
+            }
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            style={{ display: "block", marginLeft: 32 }}
+          >
+            {intl.formatMessage({ id: "busyList.helperText" })}
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 
