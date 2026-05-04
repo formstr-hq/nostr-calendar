@@ -12,10 +12,12 @@ import EventBusyIcon from "@mui/icons-material/EventBusy";
 import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useBusyList } from "../stores/busyList";
+import { useTimeBasedEvents } from "../stores/events";
 import { useUser } from "../stores/user";
 import {
   canManageEventBusyList,
   getBusyRangeForEvent,
+  isBusyListRangeSupportedForEvent,
   isExactBusyRangeInLists,
 } from "../utils/busyList";
 import { busyListMonthKeysForRange } from "../utils/dateHelper";
@@ -28,6 +30,7 @@ interface EventBusyListToggleProps {
 export function EventBusyListToggle({ event }: EventBusyListToggleProps) {
   const intl = useIntl();
   const { user } = useUser();
+  const events = useTimeBasedEvents((state) => state.events);
   const ownLists = useBusyList((state) => state.ownLists);
   const loadOwnLists = useBusyList((state) => state.loadOwnLists);
   const addBusyRange = useBusyList((state) => state.addBusyRange);
@@ -50,6 +53,11 @@ export function EventBusyListToggle({ event }: EventBusyListToggleProps) {
     [busyRangeStart, busyRangeEnd],
   );
   const canManage = canManageEventBusyList(event, user?.pubkey);
+  const isSupported = isBusyListRangeSupportedForEvent(
+    event,
+    events,
+    user?.pubkey,
+  );
   const isBusy = busyRange
     ? isExactBusyRangeInLists(ownLists, busyRange)
     : false;
@@ -59,6 +67,7 @@ export function EventBusyListToggle({ event }: EventBusyListToggleProps) {
 
     if (
       !canManage ||
+      !isSupported ||
       busyRangeStart === undefined ||
       busyRangeEnd === undefined ||
       monthKeys.length === 0
@@ -85,9 +94,16 @@ export function EventBusyListToggle({ event }: EventBusyListToggleProps) {
     return () => {
       mounted = false;
     };
-  }, [busyRangeEnd, busyRangeStart, canManage, loadOwnLists, monthKeys]);
+  }, [
+    busyRangeEnd,
+    busyRangeStart,
+    canManage,
+    isSupported,
+    loadOwnLists,
+    monthKeys,
+  ]);
 
-  if (!canManage || !busyRange) {
+  if (!canManage || !isSupported || !busyRange) {
     return null;
   }
 

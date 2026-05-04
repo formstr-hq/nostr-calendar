@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   canManageEventBusyList,
   getBusyRangeForEvent,
+  hasBusyListTimeConflict,
+  isBusyListRangeSupportedForEvent,
   isExactBusyRangeInLists,
 } from "./busyList";
 import type { IBusyList, ICalendarEvent } from "./types";
@@ -109,5 +111,59 @@ describe("busy list event helpers", () => {
         "author-pubkey",
       ),
     ).toBe(false);
+  });
+
+  it("rejects recurring events for direct busy-list support", () => {
+    expect(
+      isBusyListRangeSupportedForEvent(
+        makeEvent({ repeat: { rrule: "FREQ=WEEKLY" } }),
+        [],
+        "author-pubkey",
+      ),
+    ).toBe(false);
+  });
+
+  it("detects same-range conflicts with another user-managed event", () => {
+    const event = makeEvent();
+    const conflictingEvent = makeEvent({
+      id: "other-event-id",
+      user: "someone-else",
+      calendarId: "other-calendar-id",
+    });
+
+    expect(
+      hasBusyListTimeConflict(
+        event,
+        [event, conflictingEvent],
+        "author-pubkey",
+      ),
+    ).toBe(true);
+    expect(
+      isBusyListRangeSupportedForEvent(
+        event,
+        [event, conflictingEvent],
+        "author-pubkey",
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores unrelated events outside the user's busy-list scope", () => {
+    const event = makeEvent();
+    const unrelatedEvent = makeEvent({
+      id: "unrelated-event-id",
+      user: "someone-else",
+      calendarId: undefined,
+    });
+
+    expect(
+      hasBusyListTimeConflict(event, [unrelatedEvent], "author-pubkey"),
+    ).toBe(false);
+    expect(
+      isBusyListRangeSupportedForEvent(
+        event,
+        [event, unrelatedEvent],
+        "author-pubkey",
+      ),
+    ).toBe(true);
   });
 });
