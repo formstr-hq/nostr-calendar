@@ -221,7 +221,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     // Make sure the kind-32680 scheduling-page-key index is loaded so we
     // can decrypt pages we authored on another device (or after a web
     // refresh, where secure storage is a no-op).
-    void ensureOwnSchedulingPageKeyIndexLoaded();
+    await ensureOwnSchedulingPageKeyIndexLoaded();
 
     subscriptionHandle = fetchUserSchedulingPages(
       userPubkey,
@@ -229,7 +229,6 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
         // All scheduling pages we publish are NIP-44 encrypted: the outer
         // event carries only `["d", id]` plus ciphertext in `content`.
         // Decrypt unconditionally via the kind-32680 page-key index.
-        await ensureOwnSchedulingPageKeyIndexLoaded();
         const dTag = event.tags.find((t) => t[0] === "d")?.[1];
         if (!dTag) return;
         const viewKey = getOwnSchedulingPageKeyIndex().get(dTag);

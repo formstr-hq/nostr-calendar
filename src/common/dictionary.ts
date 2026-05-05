@@ -28,6 +28,7 @@ const dictionary: NestedObject = {
       save: "Save",
       cancel: "Cancel",
       delete: "Delete",
+      edit: "Edit",
       create: "Create",
       add: "Add",
       remove: "Remove",
@@ -196,7 +197,7 @@ const dictionary: NestedObject = {
     busyList: {
       publishToggle: "Show this time as busy on my public availability",
       helperText:
-        "Publishes a public busy entry so others booking with you can see this slot is taken. The entry contains only start/end times — no event details.",
+        "Publishes an event so others booking with you can see that this slot is taken. The entry contains only start/end times and no event details.",
     },
     invitation: {
       invitations: "Invitations",
@@ -259,10 +260,14 @@ const dictionary: NestedObject = {
       author: "Organiser",
     },
     scheduling: {
-      createSchedulingPage: "Create Scheduling Page",
-      editSchedulingPage: "Edit Scheduling Page",
-      schedulingPages: "Scheduling",
-      noSchedulingPages: "No scheduling pages",
+      featureDescription: "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
+      sidebarTitle: "Booking Links",
+      createSchedulingPage: "Create a booking page",
+      createSchedulingPageButton: "Create page",
+      editSchedulingPage: "Edit booking page",
+      updatePageButton: "Edit page",
+      schedulingPages: "Booking Links",
+      noSchedulingPages: "No booking links yet",
       createPage: "Create Page",
       viewBookings: "View Bookings",
       bookings: "Bookings",
@@ -294,7 +299,7 @@ const dictionary: NestedObject = {
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
       eventTitle: "Event Title",
-      eventTitleHelp: "Title for calendar events created from bookings",
+      eventTitleHelp: "Title for calendar events created from bookings. You will be able to update it later on",
       eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
@@ -335,6 +340,9 @@ const dictionary: NestedObject = {
       openLink: "Open link",
       copyLink: "Copy link",
       noBlockedDates: "No blocked dates. Add dates to block them from booking.",
+      deletePageTitle: "Delete Booking Link",
+      deletePageWarning:
+        "Are you sure you want to delete this booking link? Users will not be able to use this link to book more events. Already booked events will remain in the calendars.",
     },
   },
   "de-DE": {
@@ -364,6 +372,7 @@ const dictionary: NestedObject = {
       save: "Speichern",
       cancel: "Abbrechen",
       delete: "Löschen",
+      edit: "Bearbeiten",
       create: "Erstellen",
       add: "Hinzufügen",
       remove: "Entfernen",
@@ -601,6 +610,7 @@ const dictionary: NestedObject = {
       author: "Organisator",
     },
     scheduling: {
+      featureDescription: "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
       createSchedulingPage: "Terminseite erstellen",
       editSchedulingPage: "Terminseite bearbeiten",
       schedulingPages: "Terminplanung",
@@ -637,7 +647,7 @@ const dictionary: NestedObject = {
         "Keine verfügbaren Zeitfenster diese Woche. Versuchen Sie eine andere Woche.",
       eventTitle: "Ereignistitel",
       eventTitleHelp:
-        "Titel für Kalendereinträge, die aus Buchungen erstellt werden",
+        "Titel für Kalendereinträge, die aus Buchungen erstellt werden. Sie können ihn später noch ändern.",
       eventTitlePlaceholder: "z.B. Besprechung mit {name}",
       basicInformation: "Grundinformationen",
       appointmentDuration: "Termindauer",
@@ -680,6 +690,9 @@ const dictionary: NestedObject = {
       copyLink: "Link kopieren",
       noBlockedDates:
         "Keine gesperrten Tage. Fügen Sie Tage hinzu, um sie für Buchungen zu sperren.",
+      deletePageTitle: "Buchungslink löschen",
+      deletePageWarning:
+        "Möchten Sie diesen Buchungslink wirklich löschen? Über diesen Link können keine neuen Termine mehr gebucht werden. Bereits gebuchte Termine bleiben in den Kalendern erhalten.",
     },
   },
 };

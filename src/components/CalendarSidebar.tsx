@@ -50,7 +50,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { user } = useUser();
+  const { isInitialized } = useUser();
   const {
     calendars,
     toggleVisibility,
@@ -217,7 +217,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
 
       <DeviceCalendarsSection />
       {/* Scheduling section — only visible to logged-in users */}
-      {user && (
+      {isInitialized && (
         <Box mt={3}>
           <SchedulingPagesList onNavigate={onClose} />
         </Box>
