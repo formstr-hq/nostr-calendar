@@ -48,6 +48,8 @@ export function InvitationPanel() {
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
+  const [addDialogInitialCalendarId, setAddDialogInitialCalendarId] =
+    useState("");
   // Pending acceptance after AddToCalendarDialog confirms — we hold here while
   // walking through any attached forms before finalizing the accept.
   const [pendingAccept, setPendingAccept] = useState<{
@@ -62,15 +64,22 @@ export function InvitationPanel() {
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
+      setAddDialogInitialCalendarId("");
       setAddDialogEvent(event);
       setAddDialogGiftWrapId(giftWrapId);
     }
   };
 
+  const closeAddDialog = () => {
+    setAddDialogEvent(null);
+    setAddDialogGiftWrapId("");
+    setAddDialogInitialCalendarId("");
+  };
+
   const handleAcceptConfirm = async (calendarId: string) => {
     const event = addDialogEvent;
     const giftWrapId = addDialogGiftWrapId;
-    setAddDialogEvent(null);
+    closeAddDialog();
     if (!event) return;
     const forms = event.forms ?? [];
     if (forms.length > 0) {
@@ -79,6 +88,14 @@ export function InvitationPanel() {
       return;
     }
     await acceptInvitation(giftWrapId, calendarId);
+  };
+
+  const handlePendingAcceptClose = () => {
+    if (!pendingAccept) return;
+    setAddDialogInitialCalendarId(pendingAccept.calendarId);
+    setAddDialogGiftWrapId(pendingAccept.giftWrapId);
+    setAddDialogEvent(pendingAccept.event);
+    setPendingAccept(null);
   };
 
   const advanceForm = async () => {
@@ -187,6 +204,7 @@ export function InvitationPanel() {
                       <FormAttachmentRow
                         key={attachment.naddr}
                         attachment={attachment}
+                        showSubmissionStatus={false}
                       />
                     ))}
                   </Stack>
@@ -225,9 +243,10 @@ export function InvitationPanel() {
       {addDialogEvent && (
         <AddToCalendarDialog
           open={!!addDialogEvent}
-          onClose={() => setAddDialogEvent(null)}
+          onClose={closeAddDialog}
           event={addDialogEvent}
           onAccept={handleAcceptConfirm}
+          initialCalendarId={addDialogInitialCalendarId || undefined}
         />
       )}
 
@@ -238,7 +257,7 @@ export function InvitationPanel() {
           attachment={pendingForm}
           index={pendingFormIndex + 1}
           total={pendingForms.length}
-          onClose={() => setPendingAccept(null)}
+          onClose={handlePendingAcceptClose}
           onSubmitted={() => {
             void advanceForm();
           }}

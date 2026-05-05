@@ -13,22 +13,25 @@ type FormAttachmentRowProps = {
   attachment: IFormAttachment;
   eventAuthor?: string;
   onFill?: (attachment: IFormAttachment) => void;
+  showSubmissionStatus?: boolean;
 };
 
 export function FormAttachmentRow({
   attachment,
   eventAuthor,
   onFill,
+  showSubmissionStatus = !!onFill,
 }: FormAttachmentRowProps) {
   const intl = useIntl();
   const { user } = useUser();
   const [title, setTitle] = useState<string | null>(null);
   const { status } = useFormSubmissionStatus(
-    onFill ? attachment.naddr : undefined,
+    showSubmissionStatus ? attachment.naddr : undefined,
     user?.pubkey,
   );
   const submitted = status.state === "submitted";
   const hasEditAccess = !!user?.pubkey && eventAuthor === user.pubkey;
+  const canViewResponsesInFormstr = hasEditAccess && !attachment.viewKey;
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +84,7 @@ export function FormAttachmentRow({
           })}
         </Button>
       )}
-      {hasEditAccess && (
+      {canViewResponsesInFormstr && (
         <Button
           variant="text"
           size="small"

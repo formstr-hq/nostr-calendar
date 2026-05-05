@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -23,6 +23,7 @@ interface AddToCalendarDialogProps {
   onClose: () => void;
   event: ICalendarEvent;
   onAccept: (calendarId: string) => void;
+  initialCalendarId?: string;
 }
 
 export function AddToCalendarDialog({
@@ -30,14 +31,21 @@ export function AddToCalendarDialog({
   onClose,
   event,
   onAccept,
+  initialCalendarId,
 }: AddToCalendarDialogProps) {
   const intl = useIntl();
   const { calendars } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
-    calendars[0]?.id || "",
+    initialCalendarId || calendars[0]?.id || "",
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  useEffect(() => {
+    if (!selectedCalendarId && calendars[0]?.id) {
+      setSelectedCalendarId(initialCalendarId || calendars[0].id);
+    }
+  }, [calendars, initialCalendarId, selectedCalendarId]);
 
   const handleAccept = () => {
     if (selectedCalendarId) {
