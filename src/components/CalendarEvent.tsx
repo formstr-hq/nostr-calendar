@@ -57,6 +57,7 @@ import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
 import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
+import { FormstrSDK } from "@formstr/sdk";
 import { FormFillerDialog } from "./FormFillerDialog";
 import type { IFormAttachment } from "../utils/types";
 
@@ -486,34 +487,12 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                 {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
               <Stack spacing={1}>
-                {event.forms.map((f, i) => (
-                  <Box
-                    key={`${f.naddr}-${i}`}
-                    display="flex"
-                    alignItems="center"
-                    gap={1}
-                    flexWrap="wrap"
-                  >
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => setActiveForm(f)}
-                    >
-                      {intl.formatMessage({ id: "form.fillOut" })}
-                    </Button>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        fontFamily: "monospace",
-                        wordBreak: "break-all",
-                      }}
-                    >
-                      {f.naddr.length > 24
-                        ? `${f.naddr.slice(0, 12)}…${f.naddr.slice(-8)}`
-                        : f.naddr}
-                    </Typography>
-                  </Box>
+                {event.forms.map((attachment) => (
+                  <FormAttachmentRow
+                    key={attachment.naddr}
+                    attachment={attachment}
+                    onFill={setActiveForm}
+                  />
                 ))}
               </Stack>
               <Divider />
@@ -557,6 +536,78 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
         onClose={() => setActiveForm(null)}
         onSubmitted={() => setActiveForm(null)}
       />
+    </Box>
+  );
+}
+
+function FormAttachmentRow({
+  attachment,
+  onFill,
+}: {
+  attachment: IFormAttachment;
+  onFill: (attachment: IFormAttachment) => void;
+}) {
+  const intl = useIntl();
+  const [title, setTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setTitle(null);
+
+    const resolveTitle = async () => {
+      try {
+        const sdk = new FormstrSDK();
+        const form = (await (attachment.viewKey
+          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
+          : sdk.fetchForm(attachment.naddr))) as { name?: string };
+        const nextTitle = form.name?.trim();
+
+        if (!cancelled) {
+          setTitle(nextTitle || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setTitle(null);
+        }
+      }
+    };
+
+    void resolveTitle();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.naddr, attachment.viewKey]);
+
+  const fallbackLabel =
+    attachment.naddr.length > 24
+      ? `${attachment.naddr.slice(0, 12)}…${attachment.naddr.slice(-8)}`
+      : attachment.naddr;
+
+  return (
+    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+      <Button
+        variant="outlined"
+        size="small"
+        onClick={() => onFill(attachment)}
+      >
+        {intl.formatMessage({ id: "form.fillOut" })}
+      </Button>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={
+          title
+            ? { wordBreak: "break-word" }
+            : {
+                fontFamily: "monospace",
+                wordBreak: "break-all",
+              }
+        }
+      >
+        {title ?? fallbackLabel}
+      </Typography>
     </Box>
   );
 }

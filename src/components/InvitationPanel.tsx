@@ -93,6 +93,10 @@ export function InvitationPanel() {
     }
   };
 
+  const pendingFormIndex = pendingAccept?.formIndex ?? 0;
+  const pendingForms = pendingAccept?.event.forms ?? [];
+  const pendingForm = pendingForms[pendingFormIndex] ?? null;
+
   return (
     <Box p={2} maxWidth={isMobile ? "100%" : 600} mx="auto">
       <Box display="flex" alignItems="center" gap={1} mb={3}>
@@ -207,21 +211,18 @@ export function InvitationPanel() {
       )}
 
       {/* Form filler — runs after calendar selection, before accept finalizes */}
-      {pendingAccept &&
-        (pendingAccept.event.forms ?? [])[pendingAccept.formIndex] && (
-          <FormFillerDialog
-            open
-            attachment={
-              (pendingAccept.event.forms ?? [])[pendingAccept.formIndex]
-            }
-            index={pendingAccept.formIndex + 1}
-            total={(pendingAccept.event.forms ?? []).length}
-            onClose={() => setPendingAccept(null)}
-            onSubmitted={() => {
-              void advanceForm();
-            }}
-          />
-        )}
+      {pendingForm && (
+        <FormFillerDialog
+          open
+          attachment={pendingForm}
+          index={pendingFormIndex + 1}
+          total={pendingForms.length}
+          onClose={() => setPendingAccept(null)}
+          onSubmitted={() => {
+            void advanceForm();
+          }}
+        />
+      )}
     </Box>
   );
 }
