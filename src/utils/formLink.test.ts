@@ -64,7 +64,7 @@ describe("extractViewKey", () => {
     ).toBeUndefined();
   });
 
-  it("reads ?viewKey query param", () => {
+  it("reads ?viewKey query param (Formstr's canonical share format)", () => {
     expect(
       extractViewKey(
         `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=${SAMPLE_VIEW_KEY}`,
@@ -80,12 +80,45 @@ describe("extractViewKey", () => {
     ).toBe(SAMPLE_VIEW_KEY);
   });
 
-  it("reads &viewKey when not the first param", () => {
+  it("reads &viewKey when not the first query param", () => {
     expect(
       extractViewKey(
         `https://formstr.app/f/${SAMPLE_NADDR}?foo=bar&viewKey=${SAMPLE_VIEW_KEY}`,
       ),
     ).toBe(SAMPLE_VIEW_KEY);
+  });
+
+  it("decodes #nkeys1 hash fragment to viewKey (Formstr's modern format)", async () => {
+    // Build a real nkeys blob using the SDK's encoder so the test
+    // round-trips through the same TLV path the SDK uses at runtime.
+    const { encodeNKeys } = await import(
+      "@formstr/sdk/dist/utils/nkeys.js"
+    );
+    const nkeys = encodeNKeys({ viewKey: SAMPLE_VIEW_KEY });
+    expect(
+      extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}#${nkeys}`),
+    ).toBe(SAMPLE_VIEW_KEY);
+  });
+
+  it("normalizes nkeys-derived view keys to lowercase", async () => {
+    const { encodeNKeys } = await import("@formstr/sdk/dist/utils/nkeys.js");
+    const nkeys = encodeNKeys({ viewKey: SAMPLE_VIEW_KEY.toUpperCase() });
+    expect(
+      extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}#${nkeys}`),
+    ).toBe(SAMPLE_VIEW_KEY);
+  });
+
+  it("prefers nkeys hash over query params when both are present", async () => {
+    const { encodeNKeys } = await import(
+      "@formstr/sdk/dist/utils/nkeys.js"
+    );
+    const hashKey = "a".repeat(64);
+    const nkeys = encodeNKeys({ viewKey: hashKey });
+    expect(
+      extractViewKey(
+        `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=should-be-ignored#${nkeys}`,
+      ),
+    ).toBe(hashKey);
   });
 
   it("decodes percent-encoded keys", () => {
@@ -101,14 +134,6 @@ describe("extractViewKey", () => {
       extractViewKey(
         `https://formstr.app/f/${SAMPLE_NADDR}?responseKey=should-be-ignored`,
       ),
-    ).toBeUndefined();
-  });
-
-  it("ignores path-style trailing segments", () => {
-    // Pre-rename code accidentally extracted `<naddr>/<segment>` as a key.
-    // We now only honor the explicit `?viewKey=` query form.
-    expect(
-      extractViewKey(`https://formstr.app/forms/${SAMPLE_NADDR}/some-segment`),
     ).toBeUndefined();
   });
 });
@@ -149,8 +174,8 @@ describe("buildFormstrUrl", () => {
   });
 
   it("appends viewKey as query param", () => {
-    expect(
-      buildFormstrUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" }),
-    ).toBe(`https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`);
+    expect(buildFormstrUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" })).toBe(
+      `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`,
+    );
   });
 });

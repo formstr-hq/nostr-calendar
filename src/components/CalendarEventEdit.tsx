@@ -368,11 +368,13 @@ export function CalendarEventEdit({
   const handleAddForm = () => {
     const parsed = parseFormInput(formInput);
     if (!parsed) {
-      setFormInputError(intl.formatMessage({ id: "event.invalidFormInput" }));
+      setFormInputError(intl.formatMessage({ id: "form.invalidInput" }));
       return;
     }
     if (attachedForms.some((f) => f.naddr === parsed.naddr)) {
-      setFormInputError(intl.formatMessage({ id: "event.duplicateFormInput" }));
+      setFormInputError(
+        intl.formatMessage({ id: "form.duplicateAttachment" }),
+      );
       return;
     }
     updateField("forms", [...attachedForms, parsed]);
@@ -1093,7 +1095,7 @@ export function CalendarEventEdit({
             <AssignmentIcon />
             <Box style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <Typography variant="body2" style={{ fontWeight: 500 }}>
-                {intl.formatMessage({ id: "event.forms" })}
+                {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
 
               {attachedForms.length > 0 && (
@@ -1131,7 +1133,7 @@ export function CalendarEventEdit({
                         color="error"
                         onClick={() => handleRemoveForm(form.naddr)}
                       >
-                        {intl.formatMessage({ id: "event.removeForm" })}
+                        {intl.formatMessage({ id: "form.removeAttachment" })}
                       </Button>
                     </Box>
                   ))}
@@ -1145,7 +1147,7 @@ export function CalendarEventEdit({
                   fullWidth
                   size="small"
                   placeholder={intl.formatMessage({
-                    id: "event.formInputPlaceholder",
+                    id: "form.inputPlaceholder",
                   })}
                   value={formInput}
                   onChange={(e) => {
@@ -1168,7 +1170,7 @@ export function CalendarEventEdit({
                   disabled={!formInput.trim()}
                   style={{ marginTop: 0 }}
                 >
-                  {intl.formatMessage({ id: "event.addForm" })}
+                  {intl.formatMessage({ id: "form.addAttachment" })}
                 </Button>
               </Box>
             </Box>
