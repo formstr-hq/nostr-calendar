@@ -9,7 +9,7 @@
  * and dashed border styling. Users can accept (add to calendar) or dismiss.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import { Participant } from "./Participant";
 import type { ICalendarEvent } from "../utils/types";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
+import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import { FormAttachmentRow } from "./FormAttachmentRow";
 
 export function InvitationPanel() {
@@ -50,17 +51,42 @@ export function InvitationPanel() {
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
   const [addDialogInitialCalendarId, setAddDialogInitialCalendarId] =
     useState("");
-  // Pending acceptance after AddToCalendarDialog confirms — we hold here while
-  // walking through any attached forms before finalizing the accept.
-  const [pendingAccept, setPendingAccept] = useState<{
-    giftWrapId: string;
-    calendarId: string;
-    event: ICalendarEvent;
-    formIndex: number;
-  } | null>(null);
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
     .sort((a, b) => b.receivedAt - a.receivedAt);
+
+  const finalizeAccept = useCallback(
+    async ({
+      calendarId,
+      giftWrapId,
+    }: {
+      calendarId: string;
+      giftWrapId?: string;
+    }) => {
+      if (!giftWrapId) {
+        throw new Error("Missing gift wrap id for invitation acceptance");
+      }
+
+      await acceptInvitation(giftWrapId, calendarId);
+    },
+    [acceptInvitation],
+  );
+
+  const {
+    pendingAccept,
+    pendingForm,
+    formCount,
+    startAccept,
+    advanceAccept,
+    cancelAccept,
+  } = useAcceptWithFormsFlow<ICalendarEvent>({
+    onFinalize: finalizeAccept,
+    onCancel: (currentPendingAccept) => {
+      setAddDialogInitialCalendarId(currentPendingAccept.calendarId);
+      setAddDialogGiftWrapId(currentPendingAccept.giftWrapId ?? "");
+      setAddDialogEvent(currentPendingAccept.context);
+    },
+  });
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
@@ -81,39 +107,13 @@ export function InvitationPanel() {
     const giftWrapId = addDialogGiftWrapId;
     closeAddDialog();
     if (!event) return;
-    const forms = event.forms ?? [];
-    if (forms.length > 0) {
-      // Walk forms first; only finalize accept after they're submitted.
-      setPendingAccept({ giftWrapId, calendarId, event, formIndex: 0 });
-      return;
-    }
-    await acceptInvitation(giftWrapId, calendarId);
+    await startAccept({
+      calendarId,
+      giftWrapId,
+      attachments: event.forms ?? [],
+      context: event,
+    });
   };
-
-  const handlePendingAcceptClose = () => {
-    if (!pendingAccept) return;
-    setAddDialogInitialCalendarId(pendingAccept.calendarId);
-    setAddDialogGiftWrapId(pendingAccept.giftWrapId);
-    setAddDialogEvent(pendingAccept.event);
-    setPendingAccept(null);
-  };
-
-  const advanceForm = async () => {
-    if (!pendingAccept) return;
-    const next = pendingAccept.formIndex + 1;
-    const forms = pendingAccept.event.forms ?? [];
-    if (next >= forms.length) {
-      const { giftWrapId, calendarId } = pendingAccept;
-      setPendingAccept(null);
-      await acceptInvitation(giftWrapId, calendarId);
-    } else {
-      setPendingAccept({ ...pendingAccept, formIndex: next });
-    }
-  };
-
-  const pendingFormIndex = pendingAccept?.formIndex ?? 0;
-  const pendingForms = pendingAccept?.event.forms ?? [];
-  const pendingForm = pendingForms[pendingFormIndex] ?? null;
 
   return (
     <Box p={2} maxWidth={isMobile ? "100%" : 600} mx="auto">
@@ -255,11 +255,11 @@ export function InvitationPanel() {
         <FormFillerDialog
           open
           attachment={pendingForm}
-          index={pendingFormIndex + 1}
-          total={pendingForms.length}
-          onClose={handlePendingAcceptClose}
+          index={pendingAccept ? pendingAccept.formIndex + 1 : undefined}
+          total={formCount}
+          onClose={cancelAccept}
           onSubmitted={() => {
-            void advanceForm();
+            void advanceAccept();
           }}
         />
       )}

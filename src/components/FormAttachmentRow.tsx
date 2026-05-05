@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Box, Button, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import { FormstrSDK } from "@formstr/sdk";
 import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
+import { fetchAttachedFormCached } from "../utils/formAttachment";
 import { buildFormstrResponsesUrl } from "../utils/formLink";
 import type { IFormAttachment } from "../utils/types";
 
@@ -25,6 +25,7 @@ export function FormAttachmentRow({
   const intl = useIntl();
   const { user } = useUser();
   const [title, setTitle] = useState<string | null>(null);
+  const { naddr, viewKey } = attachment;
   const { status } = useFormSubmissionStatus(
     showSubmissionStatus ? attachment.naddr : undefined,
     user?.pubkey,
@@ -40,10 +41,10 @@ export function FormAttachmentRow({
 
     const resolveTitle = async () => {
       try {
-        const sdk = new FormstrSDK();
-        const form = (await (attachment.viewKey
-          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
-          : sdk.fetchForm(attachment.naddr))) as { name?: string };
+        const form = await fetchAttachedFormCached<{ name?: string }>({
+          naddr,
+          viewKey,
+        });
         const nextTitle = form.name?.trim();
 
         if (!cancelled) {
@@ -61,7 +62,7 @@ export function FormAttachmentRow({
     return () => {
       cancelled = true;
     };
-  }, [attachment.naddr, attachment.viewKey]);
+  }, [naddr, viewKey]);
 
   const fallbackLabel =
     attachment.naddr.length > 24

@@ -24,7 +24,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,6 +49,7 @@ import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import {
   buildEventRef,
   getCalendarEventCoordinate,
@@ -596,11 +597,6 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [pendingFormAccept, setPendingFormAccept] = useState<{
-    calendarId: string;
-    giftWrapId?: string;
-    formIndex: number;
-  } | null>(null);
 
   // Sync selected calendar once calendars load (e.g. right after login)
   useEffect(() => {
@@ -617,26 +613,46 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     }
   }, [user, calendarsLoaded, fetchCalendars]);
 
-  const finalizeAccept = async (calendarId: string, giftWrapId?: string) => {
-    if (giftWrapId) {
-      await acceptInvitation(giftWrapId, calendarId);
-    } else {
-      const eventRef = buildEventRef({
-        kind: event.kind,
-        authorPubkey: event.user,
-        eventDTag: event.id,
-        relayUrl: event.relayHint ?? "",
-        viewKey: event.viewKey || "",
-      });
-      await addEventToCalendar(calendarId, eventRef);
-      updateEvent({
-        ...event,
-        calendarId,
-        isInvitation: false,
-      });
-    }
-    setSuccessDialogOpen(true);
-  };
+  const finalizeAccept = useCallback(
+    async ({
+      calendarId,
+      giftWrapId,
+    }: {
+      calendarId: string;
+      giftWrapId?: string;
+    }) => {
+      if (giftWrapId) {
+        await acceptInvitation(giftWrapId, calendarId);
+      } else {
+        const eventRef = buildEventRef({
+          kind: event.kind,
+          authorPubkey: event.user,
+          eventDTag: event.id,
+          relayUrl: event.relayHint ?? "",
+          viewKey: event.viewKey || "",
+        });
+        await addEventToCalendar(calendarId, eventRef);
+        updateEvent({
+          ...event,
+          calendarId,
+          isInvitation: false,
+        });
+      }
+      setSuccessDialogOpen(true);
+    },
+    [acceptInvitation, addEventToCalendar, event, updateEvent],
+  );
+
+  const {
+    pendingAccept,
+    pendingForm,
+    formCount,
+    startAccept,
+    advanceAccept,
+    cancelAccept,
+  } = useAcceptWithFormsFlow<void>({
+    onFinalize: finalizeAccept,
+  });
 
   const handleAccept = async () => {
     if (!selectedCalendarId) return;
@@ -645,16 +661,12 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       const matchingInvitation = invitations.find(
         (inv) => inv.eventId === event.id && inv.pubkey === event.user,
       );
-      const forms = event.forms ?? [];
-      if (forms.length > 0) {
-        setPendingFormAccept({
-          calendarId: selectedCalendarId,
-          giftWrapId: matchingInvitation?.giftWrapId,
-          formIndex: 0,
-        });
-        return;
-      }
-      await finalizeAccept(selectedCalendarId, matchingInvitation?.giftWrapId);
+      await startAccept({
+        calendarId: selectedCalendarId,
+        giftWrapId: matchingInvitation?.giftWrapId,
+        attachments: event.forms ?? [],
+        context: undefined,
+      });
     } catch {
       setErrorOpen(true);
     } finally {
@@ -662,20 +674,10 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     }
   };
 
-  const advancePendingFormAccept = async () => {
-    if (!pendingFormAccept) return;
-    const forms = event.forms ?? [];
-    const next = pendingFormAccept.formIndex + 1;
-    if (next < forms.length) {
-      setPendingFormAccept({ ...pendingFormAccept, formIndex: next });
-      return;
-    }
-
-    const { calendarId, giftWrapId } = pendingFormAccept;
-    setPendingFormAccept(null);
+  const handlePendingAcceptAdvance = async () => {
     setAccepting(true);
     try {
-      await finalizeAccept(calendarId, giftWrapId);
+      await advanceAccept();
     } catch {
       setErrorOpen(true);
     } finally {
@@ -702,11 +704,6 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     const d = dayjs(event.begin);
     navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
   };
-
-  const pendingForm = pendingFormAccept
-    ? (event.forms ?? [])[pendingFormAccept.formIndex]
-    : null;
-  const formCount = event.forms?.length ?? 0;
 
   // ── Login gate ─────────────────────────────────────────────────────────────
   if (!user) {
@@ -835,15 +832,15 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
         </Box>
       </Stack>
 
-      {pendingFormAccept && pendingForm && (
+      {pendingAccept && pendingForm && (
         <FormFillerDialog
           open
           attachment={pendingForm}
-          index={pendingFormAccept.formIndex + 1}
+          index={pendingAccept.formIndex + 1}
           total={formCount}
-          onClose={() => setPendingFormAccept(null)}
+          onClose={cancelAccept}
           onSubmitted={() => {
-            void advancePendingFormAccept();
+            void handlePendingAcceptAdvance();
           }}
         />
       )}

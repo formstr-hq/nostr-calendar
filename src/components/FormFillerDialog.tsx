@@ -48,6 +48,7 @@ import type { IFormAttachment } from "../utils/types";
 import { signerManager } from "../common/signer";
 import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
 import { useUser } from "../stores/user";
+import { fetchAttachedFormCached } from "../utils/formAttachment";
 import { buildFormstrUrl } from "../utils/formLink";
 
 type SdkOption = {
@@ -259,11 +260,7 @@ export function FormFillerDialog({
       // accumulate across retries or re-opened dialogs.
       const sdk = new FormstrSDK();
       sdkRef.current = sdk;
-      const fetched = (await (
-        attachment.viewKey
-          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
-          : sdk.fetchForm(attachment.naddr)
-      )) as SdkForm;
+      const fetched = await fetchAttachedFormCached<SdkForm>(attachment);
       sdk.renderHtml(fetched as never);
       setForm(fetched);
     } catch (err) {
