@@ -57,12 +57,9 @@ import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
 import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
-import { FormstrSDK } from "@formstr/sdk";
 import { FormFillerDialog } from "./FormFillerDialog";
-import { buildFormstrResponsesUrl } from "../utils/formLink";
+import { FormAttachmentRow } from "./FormAttachmentRow";
 import type { IFormAttachment } from "../utils/types";
-import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -543,99 +540,6 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
         onClose={() => setActiveForm(null)}
         onSubmitted={() => setActiveForm(null)}
       />
-    </Box>
-  );
-}
-
-function FormAttachmentRow({
-  attachment,
-  eventAuthor,
-  onFill,
-}: {
-  attachment: IFormAttachment;
-  eventAuthor: string;
-  onFill: (attachment: IFormAttachment) => void;
-}) {
-  const intl = useIntl();
-  const { user } = useUser();
-  const [title, setTitle] = useState<string | null>(null);
-  const { status } = useFormSubmissionStatus(attachment.naddr, user?.pubkey);
-  const submitted = status.state === "submitted";
-  const hasEditAccess = !!user?.pubkey && eventAuthor === user.pubkey;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setTitle(null);
-
-    const resolveTitle = async () => {
-      try {
-        const sdk = new FormstrSDK();
-        const form = (await (attachment.viewKey
-          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
-          : sdk.fetchForm(attachment.naddr))) as { name?: string };
-        const nextTitle = form.name?.trim();
-
-        if (!cancelled) {
-          setTitle(nextTitle || null);
-        }
-      } catch {
-        if (!cancelled) {
-          setTitle(null);
-        }
-      }
-    };
-
-    void resolveTitle();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachment.naddr, attachment.viewKey]);
-
-  const fallbackLabel =
-    attachment.naddr.length > 24
-      ? `${attachment.naddr.slice(0, 12)}…${attachment.naddr.slice(-8)}`
-      : attachment.naddr;
-
-  return (
-    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-      <Button
-        variant={submitted ? "text" : "outlined"}
-        size="small"
-        onClick={() => onFill(attachment)}
-        startIcon={submitted ? <CheckCircleIcon color="success" /> : undefined}
-      >
-        {intl.formatMessage({
-          id: submitted ? "form.viewOrUpdate" : "form.fillOut",
-        })}
-      </Button>
-      {hasEditAccess && (
-        <Button
-          variant="text"
-          size="small"
-          href={buildFormstrResponsesUrl(attachment)}
-          target="_blank"
-          rel="noopener noreferrer"
-          endIcon={<OpenInNew fontSize="inherit" />}
-        >
-          {intl.formatMessage({ id: "formResponses.viewButton" })}
-        </Button>
-      )}
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={
-          title
-            ? { wordBreak: "break-word" }
-            : {
-                fontFamily: "monospace",
-                wordBreak: "break-all",
-              }
-        }
-      >
-        {title ?? fallbackLabel}
-      </Typography>
     </Box>
   );
 }

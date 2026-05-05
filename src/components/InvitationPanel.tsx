@@ -16,6 +16,7 @@ import {
   Button,
   Paper,
   IconButton,
+  Stack,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -29,6 +30,7 @@ import { Participant } from "./Participant";
 import type { ICalendarEvent } from "../utils/types";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
+import { FormAttachmentRow } from "./FormAttachmentRow";
 
 export function InvitationPanel() {
   const intl = useIntl();
@@ -170,6 +172,26 @@ export function InvitationPanel() {
                   }}
                 />
               </Box>
+              {invitation.event.forms && invitation.event.forms.length > 0 && (
+                <Box mt={1.5}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    mb={0.75}
+                  >
+                    {intl.formatMessage({ id: "form.attachments" })}
+                  </Typography>
+                  <Stack spacing={0.75}>
+                    {invitation.event.forms.map((attachment) => (
+                      <FormAttachmentRow
+                        key={attachment.naddr}
+                        attachment={attachment}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
