@@ -24,7 +24,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Participant } from "./Participant";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,6 +49,7 @@ import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useInvitations } from "../stores/invitations";
+import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import {
   buildEventRef,
   getCalendarEventCoordinate,
@@ -57,8 +58,8 @@ import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
 import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
-import { FormstrSDK } from "@formstr/sdk";
 import { FormFillerDialog } from "./FormFillerDialog";
+import { FormAttachmentRow } from "./FormAttachmentRow";
 import type { IFormAttachment } from "../utils/types";
 
 interface CalendarEventCardProps {
@@ -406,6 +407,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             kind: event.kind,
             authorPubkey: event.user,
             eventDTag: event.id,
+            relayUrl: event.relayHint ?? "",
             viewKey: event.viewKey,
           })
         : undefined);
@@ -460,7 +462,9 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               <Typography variant="subtitle1">
                 {intl.formatMessage({ id: "navigation.description" })}
               </Typography>
-              <Typography variant="body2">
+              {/* component="div" avoids <p> nesting: Typography defaults to <p>
+                  but react-markdown also wraps paragraphs in <p> tags */}
+              <Typography component="div" variant="body2">
                 <Markdown remarkPlugins={[remarkGfm]}>
                   {event.description}
                 </Markdown>
@@ -491,6 +495,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                   <FormAttachmentRow
                     key={attachment.naddr}
                     attachment={attachment}
+                    eventAuthor={event.user}
                     onFill={setActiveForm}
                   />
                 ))}
@@ -536,78 +541,6 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
         onClose={() => setActiveForm(null)}
         onSubmitted={() => setActiveForm(null)}
       />
-    </Box>
-  );
-}
-
-function FormAttachmentRow({
-  attachment,
-  onFill,
-}: {
-  attachment: IFormAttachment;
-  onFill: (attachment: IFormAttachment) => void;
-}) {
-  const intl = useIntl();
-  const [title, setTitle] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setTitle(null);
-
-    const resolveTitle = async () => {
-      try {
-        const sdk = new FormstrSDK();
-        const form = (await (attachment.viewKey
-          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
-          : sdk.fetchForm(attachment.naddr))) as { name?: string };
-        const nextTitle = form.name?.trim();
-
-        if (!cancelled) {
-          setTitle(nextTitle || null);
-        }
-      } catch {
-        if (!cancelled) {
-          setTitle(null);
-        }
-      }
-    };
-
-    void resolveTitle();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachment.naddr, attachment.viewKey]);
-
-  const fallbackLabel =
-    attachment.naddr.length > 24
-      ? `${attachment.naddr.slice(0, 12)}…${attachment.naddr.slice(-8)}`
-      : attachment.naddr;
-
-  return (
-    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-      <Button
-        variant="outlined"
-        size="small"
-        onClick={() => onFill(attachment)}
-      >
-        {intl.formatMessage({ id: "form.fillOut" })}
-      </Button>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={
-          title
-            ? { wordBreak: "break-word" }
-            : {
-                fontFamily: "monospace",
-                wordBreak: "break-all",
-              }
-        }
-      >
-        {title ?? fallbackLabel}
-      </Typography>
     </Box>
   );
 }
@@ -680,36 +613,71 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     }
   }, [user, calendarsLoaded, fetchCalendars]);
 
-  const handleAccept = async () => {
-    if (!selectedCalendarId) return;
-    setAccepting(true);
-    try {
-      // If there is a matching gift-wrap invitation in the store, use the full
-      // invitation flow so the record is removed from the notifications panel.
-      // Otherwise (shared-link context) build the event reference directly.
-      const matchingInvitation = invitations.find(
-        (inv) => inv.eventId === event.id && inv.pubkey === event.user,
-      );
-      if (matchingInvitation) {
-        await acceptInvitation(
-          matchingInvitation.giftWrapId,
-          selectedCalendarId,
-        );
+  const finalizeAccept = useCallback(
+    async ({
+      calendarId,
+      giftWrapId,
+    }: {
+      calendarId: string;
+      giftWrapId?: string;
+    }) => {
+      if (giftWrapId) {
+        await acceptInvitation(giftWrapId, calendarId);
       } else {
         const eventRef = buildEventRef({
           kind: event.kind,
           authorPubkey: event.user,
           eventDTag: event.id,
+          relayUrl: event.relayHint ?? "",
           viewKey: event.viewKey || "",
         });
-        await addEventToCalendar(selectedCalendarId, eventRef);
+        await addEventToCalendar(calendarId, eventRef);
         updateEvent({
           ...event,
-          calendarId: selectedCalendarId,
+          calendarId,
           isInvitation: false,
         });
       }
       setSuccessDialogOpen(true);
+    },
+    [acceptInvitation, addEventToCalendar, event, updateEvent],
+  );
+
+  const {
+    pendingAccept,
+    pendingForm,
+    formCount,
+    startAccept,
+    advanceAccept,
+    cancelAccept,
+  } = useAcceptWithFormsFlow<void>({
+    onFinalize: finalizeAccept,
+  });
+
+  const handleAccept = async () => {
+    if (!selectedCalendarId) return;
+    setAccepting(true);
+    try {
+      const matchingInvitation = invitations.find(
+        (inv) => inv.eventId === event.id && inv.pubkey === event.user,
+      );
+      await startAccept({
+        calendarId: selectedCalendarId,
+        giftWrapId: matchingInvitation?.giftWrapId,
+        attachments: event.forms ?? [],
+        context: undefined,
+      });
+    } catch {
+      setErrorOpen(true);
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  const handlePendingAcceptAdvance = async () => {
+    setAccepting(true);
+    try {
+      await advanceAccept();
     } catch {
       setErrorOpen(true);
     } finally {
@@ -863,6 +831,19 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           </Button>
         </Box>
       </Stack>
+
+      {pendingAccept && pendingForm && (
+        <FormFillerDialog
+          open
+          attachment={pendingForm}
+          index={pendingAccept.formIndex + 1}
+          total={formCount}
+          onClose={cancelAccept}
+          onSubmitted={() => {
+            void handlePendingAcceptAdvance();
+          }}
+        />
+      )}
 
       <Snackbar
         open={errorOpen}

@@ -19,7 +19,7 @@
  * - On submit failure: surface the error and let the user retry.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -38,30 +38,178 @@ import {
 import type { Theme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { FormstrSDK } from "@formstr/sdk";
+import dayjs from "dayjs";
 import type { Event as NostrEvent, EventTemplate } from "nostr-tools";
 import { useIntl } from "react-intl";
 import type { IFormAttachment } from "../utils/types";
 import { signerManager } from "../common/signer";
+import { useFormSubmissionStatus } from "../hooks/useFormSubmissionStatus";
+import { useUser } from "../stores/user";
+import { fetchAttachedFormCached } from "../utils/formAttachment";
 import { buildFormstrUrl } from "../utils/formLink";
 
-// SDK's NormalizedForm shape (subset we touch)
+type SdkOption = {
+  id: string;
+  labelHtml: string;
+  config?: { isOther?: boolean };
+};
+
+type SdkField = {
+  id: string;
+  type: string;
+  labelHtml: string;
+  options?: SdkOption[] | unknown;
+  config?: { renderElement?: string };
+};
 type SdkForm = {
   id: string;
   name?: string;
   html?: { form: string };
+  fields?: Record<string, SdkField>;
+  fieldOrder?: string[];
 };
+
+type ResponseRow = {
+  fieldId: string;
+  question: string;
+  answer: string;
+};
+
+function plainText(html: string | undefined): string {
+  if (!html) return "";
+  if (typeof document === "undefined") {
+    return html.replace(/<[^>]*>/g, "").trim();
+  }
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || "").trim();
+}
+
+function parseMetadata(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function formatAnswer(
+  field: SdkField | undefined,
+  rawValue: string | undefined,
+  metadataRaw: string | undefined,
+  noAnswerLabel: string,
+): string {
+  if (!rawValue) return noAnswerLabel;
+  if (!field) return rawValue;
+
+  if (field.type === "option" && Array.isArray(field.options)) {
+    const metadata = parseMetadata(metadataRaw);
+    const selectedIds = rawValue.split(";").filter(Boolean);
+    const labels = selectedIds.map((id) => {
+      const options = Array.isArray(field.options) ? field.options : [];
+      const option = options.find((entry) => entry.id === id);
+      const label = option ? plainText(option.labelHtml) : id;
+      if (option?.config?.isOther && typeof metadata.message === "string") {
+        return `${label} (${metadata.message})`;
+      }
+      return label;
+    });
+    return labels.length > 0 ? labels.join(", ") : rawValue;
+  }
+
+  if (field.type === "grid") {
+    try {
+      const parsed = JSON.parse(rawValue) as Record<string, string>;
+      if (parsed && typeof parsed === "object") {
+        return Object.entries(parsed)
+          .map(([rowId, selected]) => `${rowId}: ${selected}`)
+          .join(" | ");
+      }
+    } catch {
+      return rawValue;
+    }
+  }
+
+  if (field.config?.renderElement === "datetime") {
+    const timestamp = Number(rawValue);
+    if (Number.isFinite(timestamp)) {
+      return new Date(timestamp * 1000).toLocaleString();
+    }
+  }
+
+  if (field.config?.renderElement === "fileUpload") {
+    try {
+      const metadata = JSON.parse(rawValue) as { filename?: string };
+      if (metadata.filename) return metadata.filename;
+    } catch {
+      return rawValue;
+    }
+  }
+
+  return rawValue;
+}
+
+function responseRowsFromEvent(
+  response: NostrEvent,
+  form: SdkForm | null,
+  noAnswerLabel: string,
+  unknownQuestionLabel: string,
+): ResponseRow[] {
+  const responseTags = response.tags.filter(
+    (tag) => tag[0] === "response" && tag[1],
+  );
+  const tagsByField = new Map<string, string[]>();
+  for (const tag of responseTags) {
+    tagsByField.set(tag[1], tag);
+  }
+
+  const rows: ResponseRow[] = [];
+  const consumed = new Set<string>();
+  const fields = form?.fields ?? {};
+  const fieldOrder = form?.fieldOrder ?? [];
+
+  for (const fieldId of fieldOrder) {
+    const field = fields[fieldId];
+    if (!field || field.type === "label") continue;
+    const tag = tagsByField.get(fieldId);
+    if (!tag) continue;
+    consumed.add(fieldId);
+    rows.push({
+      fieldId,
+      question:
+        plainText(field.labelHtml) || `${unknownQuestionLabel} ${fieldId}`,
+      answer: formatAnswer(field, tag[2], tag[3], noAnswerLabel),
+    });
+  }
+
+  for (const tag of responseTags) {
+    const fieldId = tag[1];
+    if (consumed.has(fieldId)) continue;
+    const field = fields[fieldId];
+    rows.push({
+      fieldId,
+      question: field
+        ? plainText(field.labelHtml) || `${unknownQuestionLabel} ${fieldId}`
+        : `${unknownQuestionLabel} ${fieldId}`,
+      answer: formatAnswer(field, tag[2], tag[3], noAnswerLabel),
+    });
+  }
+
+  return rows;
+}
 
 type Props = {
   open: boolean;
   attachment: IFormAttachment | null;
-  /** 1-based position of this attachment in a list, for multi-form flows. */
   index?: number;
-  /** Total number of attachments in the list, for multi-form flows. */
   total?: number;
   onClose: () => void;
-  onSubmitted: (response: NostrEvent) => void;
+  onSubmitted: (response: NostrEvent | null) => void;
 };
 
 export function FormFillerDialog({
@@ -77,14 +225,29 @@ export function FormFillerDialog({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sdkRef = useRef<FormstrSDK | null>(null);
-  // Stored by the form-setup effect so DialogActions can trigger submit.
   const submitFnRef = useRef<(() => void) | null>(null);
+  const { user } = useUser();
+  const { status, markSubmitted } = useFormSubmissionStatus(
+    open ? attachment?.naddr : undefined,
+    open ? user?.pubkey : undefined,
+  );
+  const alreadySubmitted = status.state === "submitted";
+  const [resubmitting, setResubmitting] = useState(false);
 
   const [form, setForm] = useState<SdkForm | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const responseRows = useMemo(() => {
+    if (status.state !== "submitted" || !status.event) return [];
+    return responseRowsFromEvent(
+      status.event,
+      form,
+      intl.formatMessage({ id: "form.noAnswer" }),
+      intl.formatMessage({ id: "form.unknownQuestion" }),
+    );
+  }, [status, form, intl]);
 
   const fetchForm = useCallback(async () => {
     if (!attachment) return;
@@ -97,11 +260,7 @@ export function FormFillerDialog({
       // accumulate across retries or re-opened dialogs.
       const sdk = new FormstrSDK();
       sdkRef.current = sdk;
-      const fetched = (await (
-        attachment.viewKey
-          ? sdk.fetchFormWithViewKey(attachment.naddr, attachment.viewKey)
-          : sdk.fetchForm(attachment.naddr)
-      )) as SdkForm;
+      const fetched = await fetchAttachedFormCached<SdkForm>(attachment);
       sdk.renderHtml(fetched as never);
       setForm(fetched);
     } catch (err) {
@@ -116,20 +275,27 @@ export function FormFillerDialog({
     }
   }, [attachment, intl]);
 
-  // Fetch the form template only when we should render it.
+  // Fetch the form template whenever we need to render either the editable
+  // SDK form or a read-only summary of the user's previous response.
   useEffect(() => {
-    if (open && attachment) fetchForm();
+    const shouldRender =
+      open &&
+      attachment &&
+      (status.state === "not-submitted" ||
+        status.state === "error" ||
+        status.state === "submitted" ||
+        resubmitting);
+    if (shouldRender) fetchForm();
     if (!open) {
       setForm(null);
       setFetchError(null);
       setSubmitError(null);
       sdkRef.current = null;
       submitFnRef.current = null;
+      setResubmitting(false);
     }
-  }, [open, attachment, fetchForm]);
+  }, [open, attachment, fetchForm, status.state, resubmitting]);
 
-  // After form HTML is in the DOM, attach the SDK submit listener and wire
-  // submitFnRef so the DialogActions Submit button can trigger it.
   useEffect(() => {
     if (!form || !sdkRef.current || !containerRef.current) return;
     const sdk = sdkRef.current;
@@ -142,6 +308,7 @@ export function FormFillerDialog({
     sdk.attachSubmitListener(form as never, signer, {
       onSuccess: ({ event }) => {
         setSubmitting(false);
+        markSubmitted(event);
         onSubmitted(event);
       },
       onError: (err) => {
@@ -159,7 +326,6 @@ export function FormFillerDialog({
     const formEl = root.querySelector("form");
     if (!formEl) return;
 
-    // Wire the external submit button.
     submitFnRef.current = () => formEl.requestSubmit();
 
     const onSubmitDom = () => {
@@ -171,9 +337,10 @@ export function FormFillerDialog({
       submitFnRef.current = null;
       formEl.removeEventListener("submit", onSubmitDom);
     };
-  }, [form, intl, onSubmitted]);
+  }, [form, intl, onSubmitted, markSubmitted]);
 
-  const showForm = !loading && !fetchError && form;
+  const showForm =
+    !loading && !fetchError && form && !(alreadySubmitted && !resubmitting);
 
   return (
     <Dialog
@@ -205,10 +372,99 @@ export function FormFillerDialog({
       </DialogTitle>
 
       <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
-        {loading && (
+        {(status.state === "loading" || loading) && (
           <Box display="flex" justifyContent="center" py={6}>
             <CircularProgress />
           </Box>
+        )}
+
+        {alreadySubmitted && !resubmitting && !loading && (
+          <Stack spacing={2}>
+            <Alert
+              icon={<CheckCircleIcon fontSize="inherit" />}
+              severity="success"
+            >
+              {intl.formatMessage({ id: "form.alreadySubmitted" })}
+            </Alert>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (status.state === "submitted") {
+                    onSubmitted(status.event ?? null);
+                  } else {
+                    onClose();
+                  }
+                }}
+              >
+                {intl.formatMessage({ id: "form.continue" })}
+              </Button>
+              <Button variant="outlined" onClick={() => setResubmitting(true)}>
+                {intl.formatMessage({ id: "form.submitAgain" })}
+              </Button>
+            </Stack>
+
+            {status.state === "submitted" &&
+              status.event &&
+              responseRows.length > 0 && (
+                <Box
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 1,
+                    overflow: "hidden",
+                    width: "100%",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      px: 1.5,
+                      py: 1,
+                      borderBottom: `1px solid ${theme.palette.divider}`,
+                      bgcolor: "action.hover",
+                    }}
+                  >
+                    <Typography variant="subtitle2">
+                      {intl.formatMessage({ id: "form.yourResponse" })}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {dayjs(status.submittedAt).format("YYYY-MM-DD HH:mm")}
+                    </Typography>
+                  </Box>
+                  <Stack spacing={0}>
+                    {responseRows.map((row, rowIndex) => (
+                      <Box
+                        key={`${row.fieldId}-${rowIndex}`}
+                        sx={{
+                          px: 1.5,
+                          py: 1.25,
+                          borderTop:
+                            rowIndex === 0
+                              ? "none"
+                              : `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          {row.question}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {row.answer}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+            {status.state === "submitted" &&
+              (!status.event || responseRows.length === 0) && (
+                <Typography variant="body2" color="text.secondary">
+                  {intl.formatMessage({ id: "form.responseUnavailable" })}
+                </Typography>
+              )}
+          </Stack>
         )}
 
         {fetchError && !loading && (
@@ -221,6 +477,17 @@ export function FormFillerDialog({
             >
               {intl.formatMessage({ id: "form.retry" })}
             </Button>
+            {attachment && (
+              <Button
+                variant="text"
+                href={buildFormstrUrl(attachment)}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ alignSelf: "flex-start" }}
+              >
+                {intl.formatMessage({ id: "form.openExternal" })}
+              </Button>
+            )}
           </Stack>
         )}
 
@@ -231,9 +498,6 @@ export function FormFillerDialog({
                 {submitError}
               </Alert>
             )}
-            {/* SDK-generated HTML styled via scoped sx. Source is a trusted
-                Nostr form template. The SDK's own h2 and submit button are
-                hidden — we render them in the dialog chrome instead. */}
             <Box
               ref={containerRef}
               sx={buildFormSx(theme)}
@@ -253,7 +517,6 @@ export function FormFillerDialog({
           gap: 1,
         }}
       >
-        {/* Always-visible "Open in Formstr" link */}
         {attachment ? (
           <Button
             size="small"
@@ -261,7 +524,11 @@ export function FormFillerDialog({
             href={buildFormstrUrl(attachment)}
             target="_blank"
             rel="noopener noreferrer"
-            sx={{ textTransform: "none", color: "text.secondary", flexShrink: 0 }}
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              flexShrink: 0,
+            }}
           >
             {intl.formatMessage({ id: "form.openExternal" })}
           </Button>
@@ -296,12 +563,6 @@ export function FormFillerDialog({
   );
 }
 
-/**
- * Scoped styles for the SDK-generated form HTML. The SDK emits unstyled
- * standard HTML: `<label>LabelText<input></label>` for text fields and
- * `<fieldset>` for radio groups. We stack everything vertically and apply
- * Material-like input styling.
- */
 function buildFormSx(theme: Theme) {
   return {
     "& form": {
@@ -311,20 +572,13 @@ function buildFormSx(theme: Theme) {
       padding: 0,
       margin: 0,
     },
-    // The SDK duplicates the form name in an h2; DialogTitle already shows it.
     "& form h2": { display: "none" },
-    // We supply our own Submit button in DialogActions.
     "& form button[type='submit']": { display: "none" },
-
-    // label-type fields: plain <div> used for descriptions / section headings.
     "& form > div": {
       fontSize: "0.875rem",
       color: theme.palette.text.secondary,
       lineHeight: 1.6,
     },
-
-    // Text field wrappers: <label>LabelText<input ...></label>
-    // The label element acts as both the caption and the wrapper.
     "& form > label": {
       display: "flex",
       flexDirection: "column",
@@ -334,8 +588,6 @@ function buildFormSx(theme: Theme) {
       color: theme.palette.text.secondary,
       cursor: "default",
     },
-
-    // Text inputs
     "& form input[type='text']": {
       boxSizing: "border-box",
       width: "100%",
@@ -357,8 +609,6 @@ function buildFormSx(theme: Theme) {
       borderColor: theme.palette.primary.main,
       boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.15)}`,
     },
-
-    // Radio group fieldsets
     "& form fieldset": {
       border: "none",
       padding: 0,
@@ -371,7 +621,6 @@ function buildFormSx(theme: Theme) {
       color: theme.palette.text.secondary,
     },
     "& form fieldset br": { display: "none" },
-    // Individual radio option labels (inside fieldset)
     "& form fieldset label": {
       display: "flex",
       flexDirection: "row",

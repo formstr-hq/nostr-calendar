@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { naddrEncode } from "nostr-tools/nip19";
 import {
+  buildFormstrResponsesUrl,
   buildFormstrUrl,
   extractNaddr,
   extractViewKey,
+  getFormAddress,
+  getFormCoordinate,
+  getFormRelayHints,
   parseFormInput,
 } from "./formLink";
 
@@ -91,9 +95,7 @@ describe("extractViewKey", () => {
   it("decodes #nkeys1 hash fragment to viewKey (Formstr's modern format)", async () => {
     // Build a real nkeys blob using the SDK's encoder so the test
     // round-trips through the same TLV path the SDK uses at runtime.
-    const { encodeNKeys } = await import(
-      "@formstr/sdk/dist/utils/nkeys.js"
-    );
+    const { encodeNKeys } = await import("@formstr/sdk/dist/utils/nkeys.js");
     const nkeys = encodeNKeys({ viewKey: SAMPLE_VIEW_KEY });
     expect(
       extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}#${nkeys}`),
@@ -109,9 +111,7 @@ describe("extractViewKey", () => {
   });
 
   it("prefers nkeys hash over query params when both are present", async () => {
-    const { encodeNKeys } = await import(
-      "@formstr/sdk/dist/utils/nkeys.js"
-    );
+    const { encodeNKeys } = await import("@formstr/sdk/dist/utils/nkeys.js");
     const hashKey = "a".repeat(64);
     const nkeys = encodeNKeys({ viewKey: hashKey });
     expect(
@@ -123,9 +123,7 @@ describe("extractViewKey", () => {
 
   it("decodes percent-encoded keys", () => {
     expect(
-      extractViewKey(
-        `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`,
-      ),
+      extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`),
     ).toBe("a/b");
   });
 
@@ -177,5 +175,72 @@ describe("buildFormstrUrl", () => {
     expect(buildFormstrUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" })).toBe(
       `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`,
     );
+  });
+});
+
+describe("buildFormstrResponsesUrl", () => {
+  it("builds a Formstr responses URL when no view key", () => {
+    expect(buildFormstrResponsesUrl({ naddr: SAMPLE_NADDR })).toBe(
+      `https://formstr.app/s/${SAMPLE_NADDR}`,
+    );
+  });
+
+  it("passes viewKey as ?viewKey= query param", () => {
+    expect(
+      buildFormstrResponsesUrl({ naddr: SAMPLE_NADDR, viewKey: "a/b" }),
+    ).toBe(`https://formstr.app/s/${SAMPLE_NADDR}?viewKey=a%2Fb`);
+  });
+});
+
+describe("getFormCoordinate", () => {
+  it("returns kind:pubkey:dtag for a valid naddr", () => {
+    expect(getFormCoordinate(SAMPLE_NADDR)).toBe(
+      `${FORM_KIND}:${SAMPLE_PUBKEY}:demo-form`,
+    );
+  });
+
+  it("returns null for non-naddr input", () => {
+    expect(getFormCoordinate("not-an-naddr")).toBeNull();
+    expect(getFormCoordinate("")).toBeNull();
+  });
+});
+
+describe("getFormAddress", () => {
+  it("returns the coordinate and embedded relay hints", () => {
+    const naddr = naddrEncode({
+      kind: FORM_KIND,
+      pubkey: SAMPLE_PUBKEY,
+      identifier: "x",
+      relays: ["wss://relay.example"],
+    });
+
+    expect(getFormAddress(naddr)).toEqual({
+      coordinate: `${FORM_KIND}:${SAMPLE_PUBKEY}:x`,
+      relayHints: ["wss://relay.example"],
+    });
+  });
+
+  it("returns null for invalid input", () => {
+    expect(getFormAddress("garbage")).toBeNull();
+  });
+});
+
+describe("getFormRelayHints", () => {
+  it("returns the embedded relays", () => {
+    const naddr = naddrEncode({
+      kind: FORM_KIND,
+      pubkey: SAMPLE_PUBKEY,
+      identifier: "x",
+      relays: ["wss://relay.example"],
+    });
+    expect(getFormRelayHints(naddr)).toEqual(["wss://relay.example"]);
+  });
+
+  it("returns empty array when no relays encoded", () => {
+    expect(getFormRelayHints(SAMPLE_NADDR)).toEqual([]);
+  });
+
+  it("returns empty array for invalid input", () => {
+    expect(getFormRelayHints("garbage")).toEqual([]);
   });
 });

@@ -23,4 +23,8 @@ export enum EventKinds {
 
   // Relay List (NIP-65)
   RelayList = 10002,
+
+  // Formstr / NIP-101
+  FormTemplate = 30168,
+  FormResponse = 1069,
 }

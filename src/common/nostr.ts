@@ -52,6 +52,30 @@ export const getRelays = (): string[] => {
   return userRelays.length > 0 ? userRelays : defaultRelays;
 };
 
+const normalizeRelayList = (relays: string[]): string[] => {
+  const normalized = new Set<string>();
+  relays.forEach((url) => {
+    try {
+      normalized.add(normalizeURL(url));
+    } catch {
+      // Ignore malformed relay hints from external naddr/form links.
+    }
+  });
+  return [...normalized];
+};
+
+const getDiscoveryRelays = (hintRelays: string[] = []): string[] => {
+  // Query/discovery only: merge hints with broad fallback relays so fetches
+  // survive stale or incomplete naddr relay hints. Do not reuse this helper
+  // for publishing, where explicit relay targets must not be expanded to the
+  // public default relay set.
+  return normalizeRelayList([
+    ...hintRelays,
+    ...defaultRelays,
+    ...useRelayStore.getState().relays,
+  ]);
+};
+
 export async function getUserPublicKey() {
   const signer = await signerManager.getSigner();
   const pubKey = await signer.getPublicKey();
@@ -69,31 +93,23 @@ export const ensureRelay = async (
   return relay;
 };
 
-export async function publishPrivateRSVPEvent({
-  authorpubKey, // Public key of the event author
-  eventId, // The dtag of the event
-  status, // Status of the RSVP event
-  participants, // List of participant public keys
-  referenceKind,
-}: {
-  eventId: string;
+export async function publishPrivateRSVPEvent(params: {
   authorpubKey: string;
+  eventId: string;
   status: string;
   participants: string[];
   referenceKind: EventKinds.PrivateCalendarEvent;
 }) {
+  void params;
   // this function is noop
 }
 
-export async function publishPublicRSVPEvent({
-  authorpubKey,
-  eventId,
-  status,
-}: {
+export async function publishPublicRSVPEvent(params: {
   authorpubKey: string;
   eventId: string;
   status: string;
 }) {
+  void params;
   // this function is noop
 }
 
@@ -229,7 +245,6 @@ export async function publishPrivateCalendarEvent(event: ICalendarEvent) {
   await Promise.all(
     giftWraps.map(async ({ giftWrap, participant }) => {
       const relays = participantRelayMap.get(participant) ?? defaultRelays;
-      console.log(`Publishing invitation for ${participant} to ${relays}`);
       await publishToRelays(giftWrap, undefined, relays);
     }),
   );
@@ -265,10 +280,14 @@ export async function editPrivateCalendarEvent(
   await publishToRelays(signedEvent);
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
+  // Preserve the relay hint from the existing event so the updated ref still
+  // points to the relay where the event lives.  Without this the relay URL is
+  // dropped on every edit, making subsequent fetches miss the event.
   const eventRef = buildEventRef({
     kind: eventKind,
     authorPubkey: userPublicKey,
     eventDTag: dTag,
+    relayUrl: event.relayHint ?? "",
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
 
@@ -710,7 +729,8 @@ export const fetchCalendarEvent = async (
   naddr: NAddr,
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
-  const relays = data.relays ?? defaultRelays;
+  const hintRelays = data.relays ?? [];
+  const relays = getDiscoveryRelays(hintRelays);
   const filter: Filter = {
     "#d": [data.identifier],
     kinds: [data.kind],
@@ -788,4 +808,36 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
   // Publish to both user relays and default relays so the list is discoverable
   const allRelays = [...new Set([...relays, ...defaultRelays])];
   await publishToRelays(fullEvent, () => {}, allRelays);
+};
+
+/**
+ * Looks up the most recent NIP-101 form response (kind 1069) authored by
+ * `userPubkey` for the form addressed by `formCoordinate`
+ * (`30168:<form_pubkey>:<dtag>`).
+ *
+ * Returns the latest matching response event, or null if none exist on
+ * the queried relays.
+ *
+ * `extraRelays` lets callers pass relay hints embedded in the form's
+ * naddr so the lookup reaches the same relays the form lives on.
+ *
+ * Note: this is the canonical "has the user submitted?" check. UI must
+ * not infer submission status from local memory across reloads.
+ */
+export const fetchUserFormResponse = async (
+  formCoordinate: string,
+  userPubkey: string,
+  extraRelays: string[] = [],
+): Promise<Event | null> => {
+  const relays = getDiscoveryRelays(extraRelays);
+  const events = await nostrRuntime.querySync(relays, {
+    kinds: [EventKinds.FormResponse],
+    authors: [userPubkey],
+    "#a": [formCoordinate],
+    limit: 1,
+  });
+  if (!events || events.length === 0) return null;
+  return events.reduce((latest, current) =>
+    current.created_at > latest.created_at ? current : latest,
+  );
 };

@@ -33,6 +33,11 @@ const NADDR_REGEX = /naddr1[0-9a-z]+/i;
 const NKEYS_REGEX = /nkeys1[0-9a-z]+/i;
 const VIEW_KEY_REGEX = /[?&]viewKey=([^&#\s]+)/i;
 
+export type FormAddress = {
+  coordinate: string;
+  relayHints: string[];
+};
+
 /**
  * Extracts an `naddr` from arbitrary user input.
  *
@@ -125,4 +130,57 @@ export function buildFormstrUrl(form: IFormAttachment): string {
   const base = `https://formstr.app/f/${form.naddr}`;
   if (!form.viewKey) return base;
   return `${base}?viewKey=${encodeURIComponent(form.viewKey)}`;
+}
+
+/**
+ * Builds the Formstr-hosted responses URL for a form attachment.
+ *
+ * Formstr's current responses route accepts the form `naddr` directly at
+ * `/s/:naddr`. If we have a view key, pass it through using Formstr's
+ * supported `viewKey` query parameter so encrypted form metadata can still
+ * be opened by the Formstr app.
+ */
+export function buildFormstrResponsesUrl(form: IFormAttachment): string {
+  const base = `https://formstr.app/s/${form.naddr}`;
+  if (!form.viewKey) return base;
+  return `${base}?viewKey=${encodeURIComponent(form.viewKey)}`;
+}
+
+/**
+ * Decodes a form `naddr` into both pieces we need from the address:
+ * the NIP-01 replaceable-event coordinate used for `#a` filters and
+ * the relay hints embedded in the same naddr.
+ */
+export function getFormAddress(naddr: string): FormAddress | null {
+  try {
+    const decoded = nip19.decode(naddr);
+    if (decoded.type !== "naddr") return null;
+    const { kind, pubkey, identifier } = decoded.data;
+    return {
+      coordinate: `${kind}:${pubkey}:${identifier}`,
+      relayHints: decoded.data.relays ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decodes an `naddr` to its NIP-01 replaceable-event coordinate string
+ * `<kind>:<pubkey>:<dtag>` used for `#a` filter lookups (NIP-101 form
+ * responses tag the source form with this coordinate).
+ *
+ * Returns null if the input is not a valid naddr.
+ */
+export function getFormCoordinate(naddr: string): string | null {
+  return getFormAddress(naddr)?.coordinate ?? null;
+}
+
+/**
+ * Returns the relay hints encoded inside a form `naddr`, if any.
+ * Useful so response-lookup queries reach the same relays that the
+ * form template lives on.
+ */
+export function getFormRelayHints(naddr: string): string[] {
+  return getFormAddress(naddr)?.relayHints ?? [];
 }
