@@ -76,6 +76,15 @@ const getDiscoveryRelays = (hintRelays: string[] = []): string[] => {
   ]);
 };
 
+export const getPrivateRSVPPublishRelays = (relayHint?: string): string[] => {
+  const hintedRelays = relayHint ? normalizeRelayList([relayHint]) : [];
+  if (hintedRelays.length > 0) {
+    return hintedRelays;
+  }
+
+  return getRelays().map(normalizeURL);
+};
+
 export async function getUserPublicKey() {
   const signer = await signerManager.getSigner();
   const pubKey = await signer.getPublicKey();
@@ -93,24 +102,211 @@ export const ensureRelay = async (
   return relay;
 };
 
-export async function publishPrivateRSVPEvent(params: {
-  authorpubKey: string;
-  eventId: string;
-  status: string;
-  participants: string[];
-  referenceKind: EventKinds.PrivateCalendarEvent;
-}) {
-  void params;
-  // this function is noop
+export interface RSVPPayload {
+  status: RSVPStatus; // accepted | declined | tentative
+  suggestedStart?: number; // unix seconds
+  suggestedEnd?: number; // unix seconds
+  comment?: string;
 }
 
-export async function publishPublicRSVPEvent(params: {
-  authorpubKey: string;
-  eventId: string;
-  status: string;
+/**
+ * Builds the rumor (kind RSVPRumor) for an RSVP. The rumor pubkey is
+ * the responder's pubkey and the tags carry the questionnaire data:
+ *
+ *   ["a", "<kind>:<authorPubkey>:<dTag>", relayHint?]
+ *   ["status", "accepted"|"declined"|"tentative"]
+ *   ["start", "<unix>"]?
+ *   ["end",   "<unix>"]?
+ *
+ * The free-text comment is placed in `content`. For private RSVPs the
+ * whole rumor is gift-wrapped so `content` is encrypted in transit.
+ */
+function buildRSVPRumorTags(opts: {
+  referenceKind: number;
+  authorPubKey: string;
+  eventDTag: string;
+  relayHint?: string;
+  payload: RSVPPayload;
+}): string[][] {
+  const aValue = `${opts.referenceKind}:${opts.authorPubKey}:${opts.eventDTag}`;
+  const tags: string[][] = [
+    opts.relayHint ? ["a", aValue, opts.relayHint] : ["a", aValue],
+    ["status", opts.payload.status],
+  ];
+  if (opts.payload.suggestedStart) {
+    tags.push(["start", String(opts.payload.suggestedStart)]);
+  }
+  if (opts.payload.suggestedEnd) {
+    tags.push(["end", String(opts.payload.suggestedEnd)]);
+  }
+  return tags;
+}
+
+function getRsvpDTag(
+  responderPubkey: string,
+  authorPubKey: string,
+  eventId: string,
+) {
+  return bytesToHex(
+    sha256(utf8ToBytes(`${responderPubkey}:${authorPubKey}:${eventId}`)),
+  ).substring(0, 30);
+}
+
+function normalizeRsvpPayload(
+  payload: Partial<RSVPPayload> | null | undefined,
+): Pick<
+  RSVPRecord,
+  "status" | "suggestedStart" | "suggestedEnd" | "comment"
+> | null {
+  if (!payload) return null;
+  if (
+    payload.status !== RSVPStatus.accepted &&
+    payload.status !== RSVPStatus.declined &&
+    payload.status !== RSVPStatus.tentative
+  ) {
+    return null;
+  }
+
+  const suggestedStart =
+    payload.suggestedStart !== undefined
+      ? Number(payload.suggestedStart)
+      : undefined;
+  const suggestedEnd =
+    payload.suggestedEnd !== undefined
+      ? Number(payload.suggestedEnd)
+      : undefined;
+
+  return {
+    status: payload.status,
+    suggestedStart: Number.isFinite(suggestedStart)
+      ? suggestedStart
+      : undefined,
+    suggestedEnd: Number.isFinite(suggestedEnd) ? suggestedEnd : undefined,
+    comment: payload.comment ?? "",
+  };
+}
+
+function parsePrivateRSVPEvent(
+  event: Event,
+  viewKey: string,
+): RSVPRecord | null {
+  const aTag = event.tags.find((tag) => tag[0] === "a")?.[1];
+  if (!aTag) return null;
+
+  const viewPrivateKey = nip19.decode(viewKey as NSec).data;
+  const decryptedContent = nip44.decrypt(
+    event.content,
+    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
+  );
+
+  const payload = normalizeRsvpPayload(
+    JSON.parse(decryptedContent) as Partial<RSVPPayload>,
+  );
+  if (!payload) return null;
+
+  return {
+    pubkey: event.pubkey,
+    status: payload.status,
+    suggestedStart: payload.suggestedStart,
+    suggestedEnd: payload.suggestedEnd,
+    comment: payload.comment,
+    createdAt: event.created_at,
+    eventCoord: aTag,
+  };
+}
+
+/**
+ * Publishes an RSVP for a private calendar event.
+ *
+ * The RSVP is constructed as a kind 55 rumor signed by the responder's
+ * pubkey, then gift-wrapped (NIP-59) to every participant of the event.
+ * This keeps the responder's reply private to the invited group while
+ * still letting other participants discover and aggregate statuses.
+ */
+export async function publishPrivateRSVPEvent(params: {
+  authorPubKey: string;
+  eventId: string; // d-tag of the calendar event
+  referenceKind: number; // EventKinds.PrivateCalendarEvent
+  relayHint?: string;
+  viewKey: string;
+  payload: RSVPPayload;
 }) {
-  void params;
-  // this function is noop
+  const responderPubkey = await getUserPublicKey();
+  const tags: string[][] = [
+    params.relayHint
+      ? [
+          "a",
+          `${params.referenceKind}:${params.authorPubKey}:${params.eventId}`,
+          params.relayHint,
+        ]
+      : [
+          "a",
+          `${params.referenceKind}:${params.authorPubKey}:${params.eventId}`,
+        ],
+    ["d", getRsvpDTag(responderPubkey, params.authorPubKey, params.eventId)],
+  ];
+  const viewPrivateKey = nip19.decode(params.viewKey as NSec).data;
+  const encryptedContent = nip44.encrypt(
+    JSON.stringify(params.payload),
+    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
+  );
+  const unsigned: UnsignedEvent = {
+    pubkey: responderPubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: EventKinds.PrivateRSVPEvent,
+    content: encryptedContent,
+    tags,
+  };
+  const signer = await signerManager.getSigner();
+  const signed = await signer.signEvent(unsigned);
+  signed.id = getEventHash(unsigned);
+
+  await publishToRelays(
+    signed,
+    undefined,
+    getPrivateRSVPPublishRelays(params.relayHint),
+  );
+  nostrRuntime.addEvent(signed);
+}
+
+/**
+ * Publishes a NIP-52 RSVP (kind 31925) for a public calendar event.
+ * Tags carry status + suggested times; comment goes in content.
+ */
+export async function publishPublicRSVPEvent(params: {
+  authorPubKey: string;
+  eventId: string;
+  relayHint?: string;
+  payload: RSVPPayload;
+}) {
+  const responderPubkey = await getUserPublicKey();
+  const tags = buildRSVPRumorTags({
+    referenceKind: EventKinds.PublicCalendarEvent,
+    authorPubKey: params.authorPubKey,
+    eventDTag: params.eventId,
+    relayHint: params.relayHint,
+    payload: params.payload,
+  });
+  // The d-tag for the RSVP itself: deterministic per (responder, event)
+  // so a single replaceable event holds the latest status per responder.
+  const rsvpDTag = getRsvpDTag(
+    responderPubkey,
+    params.authorPubKey,
+    params.eventId,
+  );
+  tags.push(["d", rsvpDTag]);
+
+  const unsigned: UnsignedEvent = {
+    pubkey: responderPubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: EventKinds.PublicRSVPEvent,
+    content: params.payload.comment ?? "",
+    tags,
+  };
+  const signer = await signerManager.getSigner();
+  const signed = await signer.signEvent(unsigned);
+  signed.id = getEventHash(unsigned);
+  await publishToRelays(signed);
 }
 
 /**
@@ -373,103 +569,176 @@ export const fetchCalendarGiftWraps = (
   });
 };
 
-export async function getDetailsFromRSVPGiftWrap(giftWrap: Event) {
-  const rumor = await nip59.unwrapEvent(giftWrap);
-  const aTag = rumor.tags.find((tag) => tag[0] === "a");
-  if (!aTag || !aTag[1]) {
-    console.log(rumor);
-    throw new Error("invalid rumor. a tag not found or malformed");
-  }
-
-  const parts = aTag[1].split(":");
-  if (parts.length < 3) {
-    throw new Error("invalid a tag format");
-  }
-
-  const eventId = parts[2];
-  const viewKey = rumor.tags.find((tag) => tag[0] === "viewKey")?.[1];
-
-  // Fetch the RSVP event using the a tag reference
-  const relayList = getRelays();
-  const filter: Filter = {
-    kinds: [EventKinds.PrivateRSVPEvent], // RSVP event kind
-    "#d": [eventId], // Match the dtag
-  };
-
-  return new Promise((resolve, reject) => {
-    const handle = nostrRuntime.subscribe(relayList, [filter], {
-      onEvent: async (rsvpEvent: Event) => {
-        try {
-          const viewPrivateKey = nip19.decode(viewKey as NSec).data;
-          const decryptedContent = nip44.decrypt(
-            rsvpEvent.content,
-            nip44.getConversationKey(
-              viewPrivateKey,
-              getPublicKey(viewPrivateKey),
-            ),
-          );
-          const eventData = JSON.parse(decryptedContent);
-
-          handle.unsubscribe();
-          resolve({
-            rsvpEvent: {
-              ...rsvpEvent,
-              decryptedData: eventData,
-            },
-            eventId,
-            viewKey,
-            aTag: aTag[1],
-            isPrivate: true,
-          });
-        } catch (error: unknown) {
-          handle.unsubscribe();
-          reject(
-            new Error(
-              `Failed to process RSVP event: ${(error as Error).message}`,
-            ),
-          );
-        }
-      },
-      onEose: () => {
-        handle.unsubscribe();
-        // If no RSVP event is found, return tentative status
-        resolve({
-          rsvpEvent: null,
-          eventId,
-          viewKey,
-          aTag: aTag[1],
-          isPrivate: viewKey ? true : false,
-          status: RSVPStatus.tentative,
-        });
-      },
-    });
-
-    setTimeout(() => {
-      handle.unsubscribe();
-      reject(new Error("Timeout: RSVP event fetch timed out"));
-    }, 10000);
-  });
+/**
+ * RSVP record returned by RSVP fetch helpers. Carries the questionnaire
+ * data (status + suggested times + free-text comment) along with the
+ * responder's pubkey and the event coordinate the RSVP refers to.
+ */
+export interface RSVPRecord {
+  pubkey: string; // responder
+  status: RSVPStatus;
+  suggestedStart?: number; // unix seconds
+  suggestedEnd?: number; // unix seconds
+  comment: string;
+  createdAt: number;
+  eventCoord: string; // "<kind>:<authorPubkey>:<dTag>"
 }
 
-export const fetchAndDecryptPrivateRSVPEvents = (
-  { participants }: { participants: string[] },
-  onEvent: (decryptedRSVP: unknown) => void,
+const parseRSVPTags = (
+  pubkey: string,
+  tags: string[][],
+  content: string,
+  createdAt: number,
+): RSVPRecord | null => {
+  const aTag = tags.find((t) => t[0] === "a")?.[1];
+  if (!aTag) return null;
+  const payload = normalizeRsvpPayload({
+    status: tags.find((t) => t[0] === "status")?.[1] as RSVPStatus | undefined,
+    suggestedStart: tags.find((t) => t[0] === "start")?.[1]
+      ? Number(tags.find((t) => t[0] === "start")?.[1])
+      : undefined,
+    suggestedEnd: tags.find((t) => t[0] === "end")?.[1]
+      ? Number(tags.find((t) => t[0] === "end")?.[1])
+      : undefined,
+    comment: content || "",
+  });
+  if (!payload) return null;
+
+  return {
+    pubkey,
+    status: payload.status,
+    suggestedStart: payload.suggestedStart,
+    suggestedEnd: payload.suggestedEnd,
+    comment: payload.comment,
+    createdAt,
+    eventCoord: aTag,
+  };
+};
+
+/**
+ * Subscribes to RSVP gift wraps addressed to the current user and emits
+ * a parsed RSVP record for each rumor that matches the supplied event
+ * coordinate. Use this on the event detail page to aggregate participant
+ * statuses for a private calendar event.
+ */
+export const fetchPrivateEventRSVPs = (
+  params: {
+    eventCoord: string;
+    viewKey: string;
+    relayHint?: string;
+    recipientPubkey?: string;
+  },
+  onRSVP: (record: RSVPRecord) => void,
+  onEose?: () => void,
+) => {
+  const privateRelayList = getDiscoveryRelays(
+    params.relayHint ? [params.relayHint] : [],
+  );
+  let pendingEoseCount = params.recipientPubkey ? 2 : 1;
+  const handleEose = () => {
+    pendingEoseCount -= 1;
+    if (pendingEoseCount === 0) {
+      onEose?.();
+    }
+  };
+
+  const handles: Array<{ close?: () => void; unsubscribe?: () => void }> = [];
+  handles.push(
+    nostrRuntime.subscribe(
+      privateRelayList,
+      [
+        {
+          kinds: [EventKinds.PrivateRSVPEvent],
+          "#a": [params.eventCoord],
+        },
+      ],
+      {
+        onEvent: (event: Event) => {
+          try {
+            const record = parsePrivateRSVPEvent(event, params.viewKey);
+            if (!record) return;
+            if (record.eventCoord !== params.eventCoord) return;
+            onRSVP(record);
+          } catch (error) {
+            console.error("Failed to process private RSVP:", error);
+          }
+        },
+        onEose: handleEose,
+      },
+    ),
+  );
+
+  if (params.recipientPubkey) {
+    const legacyRelayList = getRelays();
+    const legacyFilter: Filter = {
+      kinds: [EventKinds.RSVPGiftWrap],
+      "#p": [params.recipientPubkey],
+    };
+    handles.push(
+      nostrRuntime.subscribe(legacyRelayList, [legacyFilter], {
+        onEvent: async (giftWrap: Event) => {
+          try {
+            const rumor = await nip59.unwrapEvent(giftWrap);
+            if (rumor.kind !== EventKinds.RSVPRumor) return;
+            const record = parseRSVPTags(
+              rumor.pubkey,
+              rumor.tags,
+              rumor.content,
+              rumor.created_at,
+            );
+            if (!record) return;
+            if (
+              record.eventCoord.split(":").slice(0, 3).join(":") !==
+              params.eventCoord
+            ) {
+              return;
+            }
+            onRSVP(record);
+          } catch (error) {
+            console.error("Failed to process RSVP gift wrap:", error);
+          }
+        },
+        onEose: handleEose,
+      }),
+    );
+  }
+
+  return {
+    close: () => {
+      handles.forEach((handle) => handle.close?.());
+    },
+    unsubscribe: () => {
+      handles.forEach((handle) => handle.unsubscribe?.());
+    },
+  };
+};
+
+/**
+ * Subscribes to public NIP-52 RSVPs (kind 31925) for the given event
+ * coordinate. Tags are read directly off the public event.
+ */
+export const fetchPublicEventRSVPs = (
+  params: { eventCoord: string },
+  onRSVP: (record: RSVPRecord) => void,
+  onEose?: () => void,
 ) => {
   const relayList = getRelays();
   const filter: Filter = {
-    kinds: [EventKinds.RSVPGiftWrap],
-    "#p": participants,
+    kinds: [EventKinds.PublicRSVPEvent],
+    "#a": [params.eventCoord],
   };
-
   return nostrRuntime.subscribe(relayList, [filter], {
-    onEvent: async (giftWrap: Event) => {
-      try {
-        const decryptedRSVP = await getDetailsFromRSVPGiftWrap(giftWrap);
-        onEvent(decryptedRSVP);
-      } catch (error) {
-        console.error("Failed to process RSVP gift wrap:", error);
-      }
+    onEvent: (event: Event) => {
+      const record = parseRSVPTags(
+        event.pubkey,
+        event.tags,
+        event.content,
+        event.created_at,
+      );
+      if (!record) return;
+      onRSVP(record);
     },
+    onEose,
   });
 };
 
@@ -730,7 +999,13 @@ export const fetchCalendarEvent = async (
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
   const hintRelays = data.relays ?? [];
-  const relays = getDiscoveryRelays(hintRelays);
+  let authorRelayHints: string[] = [];
+  try {
+    authorRelayHints = await fetchRelayList(data.pubkey);
+  } catch {
+    authorRelayHints = [];
+  }
+  const relays = getDiscoveryRelays([...hintRelays, ...authorRelayHints]);
   const filter: Filter = {
     "#d": [data.identifier],
     kinds: [data.kind],
@@ -821,8 +1096,9 @@ export const publishRelayList = async (relays: string[]): Promise<void> => {
  * `extraRelays` lets callers pass relay hints embedded in the form's
  * naddr so the lookup reaches the same relays the form lives on.
  *
- * Note: this is the canonical "has the user submitted?" check. UI must
- * not infer submission status from local memory across reloads.
+ * Note: this is the canonical relay-backed "has the user submitted?" check.
+ * UI may layer a short-lived local fallback over this for relay-lag resilience,
+ * but this function only reports events that exist on relays.
  */
 export const fetchUserFormResponse = async (
   formCoordinate: string,

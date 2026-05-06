@@ -6,7 +6,6 @@ import {
   Button,
   CircularProgress,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -21,7 +20,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { ICalendarEvent } from "../utils/types";
+import { ICalendarEvent, RSVPStatus } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
 import { useCallback, useEffect, useState } from "react";
@@ -38,6 +37,7 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
 import { encodeNAddr } from "../common/nostr";
+import type { RSVPPayload, RSVPRecord } from "../common/nostr";
 import { getEditEventPage, getEventPage } from "../utils/routingHelper";
 import { useNavigate } from "react-router";
 import { getAppBaseUrl, isNative } from "../utils/platform";
@@ -52,6 +52,7 @@ import { useInvitations } from "../stores/invitations";
 import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import {
   buildEventRef,
+  findCalendarForEvent,
   getCalendarEventCoordinate,
 } from "../utils/calendarListTypes";
 import { EventCalendarListManagement } from "./EventCalendarListManagement";
@@ -61,10 +62,29 @@ import { bytesToHex } from "nostr-tools/utils";
 import { FormFillerDialog } from "./FormFillerDialog";
 import { FormAttachmentRow } from "./FormAttachmentRow";
 import type { IFormAttachment } from "../utils/types";
+import { useEventRsvps } from "../hooks/useEventRsvps";
+import { RSVPBar } from "./RSVPBar";
+import { RSVPSuggestionsPanel } from "./RSVPSuggestionsPanel";
+import { RSVPResponse } from "../stores/events";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
   offset?: string;
+}
+
+function toParticipantRSVPResponse(
+  status: RSVPStatus | undefined,
+): RSVPResponse {
+  switch (status) {
+    case RSVPStatus.accepted:
+      return RSVPResponse.accepted;
+    case RSVPStatus.declined:
+      return RSVPResponse.declined;
+    case RSVPStatus.tentative:
+      return RSVPResponse.tentative;
+    default:
+      return RSVPResponse.pending;
+  }
 }
 
 export interface CalendarEventViewProps {
@@ -382,15 +402,29 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const locations = event.location.filter((location) => !!location?.trim?.());
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
+  const { user } = useUser();
   const eventCoordinate = getCalendarEventCoordinate(event);
   const [activeForm, setActiveForm] = useState<IFormAttachment | null>(null);
 
-  const calendar = event.calendarId
-    ? calendars.find((c) => c.id === event.calendarId)
-    : undefined;
+  const calendar = findCalendarForEvent(calendars, event);
+  const currentCalendarId = calendar?.id ?? event.calendarId;
+  const isEditable = !!user && event.user === user.pubkey;
+
+  // Subscribe once at this level so both the participants list and the
+  // suggestions panel render off the same RSVP record set without
+  // duplicating relay subscriptions.
+  const {
+    byPubkey: rsvpByPubkey,
+    allParticipants: rsvpAllParticipants,
+    myRsvp,
+    isSubmitting: isRsvpSubmitting,
+    submit: submitRsvp,
+  } = useEventRsvps(event);
+  const standaloneForms = calendar ? (event.forms ?? []) : [];
+  const showStandaloneForms = standaloneForms.length > 0;
 
   const handleCalendarUpdate = async (nextCalendarId: string) => {
-    const sourceCalendarId = event.calendarId;
+    const sourceCalendarId = currentCalendarId;
     if (!sourceCalendarId) {
       throw new Error("Event is not in any calendar");
     }
@@ -485,13 +519,25 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             </>
           )}
 
-          {event.forms && event.forms.length > 0 && (
+          {!calendar && (
+            <>
+              <RespondPanel
+                event={event}
+                myRsvp={myRsvp}
+                isRsvpSubmitting={isRsvpSubmitting}
+                onSubmitRsvp={submitRsvp}
+              />
+              <Divider />
+            </>
+          )}
+
+          {showStandaloneForms && (
             <>
               <Typography variant="subtitle1">
                 {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
               <Stack spacing={1}>
-                {event.forms.map((attachment) => (
+                {standaloneForms.map((attachment) => (
                   <FormAttachmentRow
                     key={attachment.naddr}
                     attachment={attachment}
@@ -509,28 +555,54 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               {intl.formatMessage({ id: "navigation.participants" })}
             </Typography>
             <Stack direction="row" gap={0.5} flexWrap="wrap">
-              {event.participants.map((p) => (
+              {rsvpAllParticipants.map((p) => (
                 <Box width={"100%"} key={p}>
-                  <Participant pubKey={p} isAuthor={p === event.user} />
+                  <Participant
+                    pubKey={p}
+                    isAuthor={p === event.user}
+                    rsvpResponse={toParticipantRSVPResponse(
+                      rsvpByPubkey[p]?.status,
+                    )}
+                  />
                 </Box>
               ))}
             </Stack>
           </Box>
 
+          {calendar && user && (
+            <>
+              <Divider />
+              <RSVPBar
+                event={event}
+                myRsvp={myRsvp}
+                isSubmitting={isRsvpSubmitting}
+                onSubmit={submitRsvp}
+              />
+            </>
+          )}
+
+          {isEditable && (
+            <RSVPSuggestionsPanel
+              event={event}
+              calendarId={currentCalendarId}
+              records={Object.values(rsvpByPubkey)}
+            />
+          )}
+
+          <RSVPDetailsPanel
+            event={event}
+            records={Object.values(rsvpByPubkey)}
+          />
+
           {calendar ? (
             <>
               <Divider />
               <EventCalendarListManagement
-                calendarId={event.calendarId || ""}
+                calendarId={currentCalendarId || ""}
                 onCalendarUpdate={handleCalendarUpdate}
               />
             </>
-          ) : (
-            <>
-              <Divider />
-              <InvitationAcceptBar event={event} />
-            </>
-          )}
+          ) : null}
 
           <ScheduledNotificationsSection eventId={event.id} />
         </Stack>
@@ -541,6 +613,83 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
         onClose={() => setActiveForm(null)}
         onSubmitted={() => setActiveForm(null)}
       />
+    </Box>
+  );
+}
+
+function RSVPDetailsPanel({
+  event,
+  records,
+}: {
+  event: ICalendarEvent;
+  records: RSVPRecord[];
+}) {
+  const intl = useIntl();
+
+  const recordsWithDetails = [...records]
+    .filter(
+      (record) =>
+        !!record.comment.trim() ||
+        record.suggestedStart !== undefined ||
+        record.suggestedEnd !== undefined,
+    )
+    .sort((left, right) => right.createdAt - left.createdAt);
+
+  if (recordsWithDetails.length === 0) {
+    return null;
+  }
+
+  const eventStartSec = Math.floor(event.begin / 1000);
+  const eventEndSec = Math.floor(event.end / 1000);
+
+  return (
+    <Box>
+      <Divider sx={{ mb: 1 }} />
+      <Typography variant="subtitle2" gutterBottom>
+        {intl.formatMessage({ id: "navigation.rsvpDetails" })}
+      </Typography>
+      <Stack spacing={1}>
+        {recordsWithDetails.map((record) => {
+          const hasSuggestedStart =
+            record.suggestedStart !== undefined &&
+            record.suggestedStart !== eventStartSec;
+          const hasSuggestedEnd =
+            record.suggestedEnd !== undefined &&
+            record.suggestedEnd !== eventEndSec;
+
+          return (
+            <Paper
+              key={`${record.pubkey}-${record.createdAt}`}
+              variant="outlined"
+              sx={{ p: 1.25 }}
+            >
+              <Stack spacing={0.75}>
+                <Participant pubKey={record.pubkey} isAuthor={false} />
+                {(hasSuggestedStart || hasSuggestedEnd) && (
+                  <Typography variant="caption" color="text.secondary">
+                    {hasSuggestedStart
+                      ? `${intl.formatMessage({ id: "rsvp.suggestedStart" })}: ${dayjs(
+                          (record.suggestedStart ?? eventStartSec) * 1000,
+                        ).format("ddd, DD MMM YYYY ⋅ HH:mm")}`
+                      : null}
+                    {hasSuggestedStart && hasSuggestedEnd ? " · " : ""}
+                    {hasSuggestedEnd
+                      ? `${intl.formatMessage({ id: "rsvp.suggestedEnd" })}: ${dayjs(
+                          (record.suggestedEnd ?? eventEndSec) * 1000,
+                        ).format("ddd, DD MMM YYYY ⋅ HH:mm")}`
+                      : null}
+                  </Typography>
+                )}
+                {record.comment.trim() ? (
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                    {record.comment}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Stack>
     </Box>
   );
 }
@@ -578,9 +727,18 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
   );
 }
 
-function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
+function RespondPanel({
+  event,
+  myRsvp,
+  isRsvpSubmitting,
+  onSubmitRsvp,
+}: {
+  event: ICalendarEvent;
+  myRsvp?: RSVPRecord;
+  isRsvpSubmitting: boolean;
+  onSubmitRsvp: (payload: RSVPPayload) => Promise<void>;
+}) {
   const intl = useIntl();
-  const navigate = useNavigate();
   const { user, updateLoginModal } = useUser();
   const {
     calendars,
@@ -596,7 +754,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const [accepting, setAccepting] = useState(false);
   const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const forms = event.forms ?? [];
 
   // Sync selected calendar once calendars load (e.g. right after login)
   useEffect(() => {
@@ -617,9 +775,11 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     async ({
       calendarId,
       giftWrapId,
+      context: payload,
     }: {
       calendarId: string;
       giftWrapId?: string;
+      context: RSVPPayload;
     }) => {
       if (giftWrapId) {
         await acceptInvitation(giftWrapId, calendarId);
@@ -638,9 +798,9 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           isInvitation: false,
         });
       }
-      setSuccessDialogOpen(true);
+      await onSubmitRsvp(payload);
     },
-    [acceptInvitation, addEventToCalendar, event, updateEvent],
+    [acceptInvitation, addEventToCalendar, event, onSubmitRsvp, updateEvent],
   );
 
   const {
@@ -650,11 +810,11 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     startAccept,
     advanceAccept,
     cancelAccept,
-  } = useAcceptWithFormsFlow<void>({
+  } = useAcceptWithFormsFlow<RSVPPayload>({
     onFinalize: finalizeAccept,
   });
 
-  const handleAccept = async () => {
+  const handleRespond = async (payload: RSVPPayload) => {
     if (!selectedCalendarId) return;
     setAccepting(true);
     try {
@@ -664,8 +824,8 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
       await startAccept({
         calendarId: selectedCalendarId,
         giftWrapId: matchingInvitation?.giftWrapId,
-        attachments: event.forms ?? [],
-        context: undefined,
+        attachments: forms,
+        context: payload,
       });
     } catch {
       setErrorOpen(true);
@@ -697,12 +857,6 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
     } finally {
       setCreatingGuest(false);
     }
-  };
-
-  const handleViewInCalendar = () => {
-    setSuccessDialogOpen(false);
-    const d = dayjs(event.begin);
-    navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
   };
 
   // ── Login gate ─────────────────────────────────────────────────────────────
@@ -807,28 +961,41 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
             {intl.formatMessage({ id: "event.notInCalendar" })}
           </Typography>
         </Box>
-        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-          <Box maxWidth={500} flex={1} minWidth={150}>
-            <CalendarListSelect
-              value={selectedCalendarId}
-              onChange={setSelectedCalendarId}
-              size="small"
-            />
-          </Box>
-          <Button
-            variant="contained"
+        <RSVPBar
+          event={event}
+          myRsvp={myRsvp}
+          isSubmitting={accepting || isRsvpSubmitting}
+          onSubmit={handleRespond}
+          deferSubmit
+          submitDisabled={!selectedCalendarId}
+          submitLabel={intl.formatMessage({
+            id: "invitation.acceptInvitation",
+          })}
+        />
+        {forms.length > 0 ? (
+          <>
+            <Divider />
+            <Stack spacing={1}>
+              <Typography variant="subtitle2">
+                {intl.formatMessage({ id: "event.forms" })}
+              </Typography>
+              {forms.map((form, index) => (
+                <FormAttachmentRow
+                  key={`${form.naddr}-${index}`}
+                  attachment={form}
+                  eventAuthor={event.user}
+                />
+              ))}
+            </Stack>
+          </>
+        ) : null}
+        <Divider />
+        <Box maxWidth={500}>
+          <CalendarListSelect
+            value={selectedCalendarId}
+            onChange={setSelectedCalendarId}
             size="small"
-            disabled={!selectedCalendarId || accepting}
-            onClick={handleAccept}
-            sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
-            startIcon={
-              accepting ? (
-                <CircularProgress size={14} color="inherit" />
-              ) : undefined
-            }
-          >
-            {intl.formatMessage({ id: "invitation.acceptInvitation" })}
-          </Button>
+          />
         </Box>
       </Stack>
 
@@ -854,26 +1021,6 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           {intl.formatMessage({ id: "event.calendarMoveError" })}
         </Alert>
       </Snackbar>
-
-      {/* Success: stay here or navigate to calendar day view */}
-      <Dialog
-        open={successDialogOpen}
-        onClose={() => setSuccessDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>
-          {intl.formatMessage({ id: "invitation.addedToCalendar" })}
-        </DialogTitle>
-        <DialogActions>
-          <Button onClick={() => setSuccessDialogOpen(false)}>
-            {intl.formatMessage({ id: "invitation.stayHere" })}
-          </Button>
-          <Button variant="contained" onClick={handleViewInCalendar}>
-            {intl.formatMessage({ id: "invitation.viewInCalendar" })}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }
