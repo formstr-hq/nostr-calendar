@@ -132,7 +132,7 @@ const dictionary: NestedObject = {
       alreadySubmitted: "You've already responded to this form.",
       yourResponse: "Your response",
       responseUnavailable:
-        "We found your submission, but the answer details are still syncing from relays.",
+        "We found your submission, and we're still collecting your answers.",
       noAnswer: "No answer",
       unknownQuestion: "Question",
       submitAgain: "Submit again",
@@ -379,7 +379,7 @@ const dictionary: NestedObject = {
       alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
       yourResponse: "Ihre Antwort",
       responseUnavailable:
-        "Wir haben Ihre Einreichung gefunden, aber die Antwortdetails werden noch von den Relays synchronisiert.",
+        "Wir haben Ihre Einreichung gefunden und sammeln noch Ihre Antworten.",
       noAnswer: "Keine Antwort",
       unknownQuestion: "Frage",
       submitAgain: "Erneut absenden",

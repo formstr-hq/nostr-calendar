@@ -65,6 +65,10 @@ const normalizeRelayList = (relays: string[]): string[] => {
 };
 
 const getDiscoveryRelays = (hintRelays: string[] = []): string[] => {
+  // Query/discovery only: merge hints with broad fallback relays so fetches
+  // survive stale or incomplete naddr relay hints. Do not reuse this helper
+  // for publishing, where explicit relay targets must not be expanded to the
+  // public default relay set.
   return normalizeRelayList([
     ...hintRelays,
     ...defaultRelays,

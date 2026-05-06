@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchUserFormResponse } from "../common/nostr";
-import { getFormCoordinate, getFormRelayHints } from "../utils/formLink";
+import { getFormAddress } from "../utils/formLink";
 import type { Event as NostrEvent } from "nostr-tools";
 
 export type FormSubmissionStatus =
@@ -34,17 +34,17 @@ export function useFormSubmissionStatus(
       setStatus({ state: "idle" });
       return;
     }
-    const coordinate = getFormCoordinate(naddr);
-    if (!coordinate) {
+    const formAddress = getFormAddress(naddr);
+    if (!formAddress) {
       setStatus({ state: "error", error: "Invalid form address" });
       return;
     }
     setStatus({ state: "loading" });
     try {
       const event = await fetchUserFormResponse(
-        coordinate,
+        formAddress.coordinate,
         userPubkey,
-        getFormRelayHints(naddr),
+        formAddress.relayHints,
       );
       if (event) {
         setStatus({

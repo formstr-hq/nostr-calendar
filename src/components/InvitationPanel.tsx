@@ -49,7 +49,7 @@ export function InvitationPanel() {
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
-  const [addDialogInitialCalendarId, setAddDialogInitialCalendarId] =
+  const [addDialogDefaultCalendarId, setAddDialogDefaultCalendarId] =
     useState("");
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
@@ -82,7 +82,7 @@ export function InvitationPanel() {
   } = useAcceptWithFormsFlow<ICalendarEvent>({
     onFinalize: finalizeAccept,
     onCancel: (currentPendingAccept) => {
-      setAddDialogInitialCalendarId(currentPendingAccept.calendarId);
+      setAddDialogDefaultCalendarId(currentPendingAccept.calendarId);
       setAddDialogGiftWrapId(currentPendingAccept.giftWrapId ?? "");
       setAddDialogEvent(currentPendingAccept.context);
     },
@@ -90,7 +90,7 @@ export function InvitationPanel() {
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
-      setAddDialogInitialCalendarId("");
+      setAddDialogDefaultCalendarId("");
       setAddDialogEvent(event);
       setAddDialogGiftWrapId(giftWrapId);
     }
@@ -99,7 +99,7 @@ export function InvitationPanel() {
   const closeAddDialog = () => {
     setAddDialogEvent(null);
     setAddDialogGiftWrapId("");
-    setAddDialogInitialCalendarId("");
+    setAddDialogDefaultCalendarId("");
   };
 
   const handleAcceptConfirm = async (calendarId: string) => {
@@ -246,7 +246,7 @@ export function InvitationPanel() {
           onClose={closeAddDialog}
           event={addDialogEvent}
           onAccept={handleAcceptConfirm}
-          initialCalendarId={addDialogInitialCalendarId || undefined}
+          defaultCalendarId={addDialogDefaultCalendarId || undefined}
         />
       )}
 

@@ -23,7 +23,7 @@ interface AddToCalendarDialogProps {
   onClose: () => void;
   event: ICalendarEvent;
   onAccept: (calendarId: string) => void;
-  initialCalendarId?: string;
+  defaultCalendarId?: string;
 }
 
 export function AddToCalendarDialog({
@@ -31,21 +31,21 @@ export function AddToCalendarDialog({
   onClose,
   event,
   onAccept,
-  initialCalendarId,
+  defaultCalendarId,
 }: AddToCalendarDialogProps) {
   const intl = useIntl();
   const { calendars } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
-    initialCalendarId || calendars[0]?.id || "",
+    defaultCalendarId || calendars[0]?.id || "",
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
     if (!selectedCalendarId && calendars[0]?.id) {
-      setSelectedCalendarId(initialCalendarId || calendars[0].id);
+      setSelectedCalendarId(defaultCalendarId || calendars[0].id);
     }
-  }, [calendars, initialCalendarId, selectedCalendarId]);
+  }, [calendars, defaultCalendarId, selectedCalendarId]);
 
   const handleAccept = () => {
     if (selectedCalendarId) {

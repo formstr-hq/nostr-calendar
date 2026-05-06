@@ -5,6 +5,7 @@ import {
   buildFormstrUrl,
   extractNaddr,
   extractViewKey,
+  getFormAddress,
   getFormCoordinate,
   getFormRelayHints,
   parseFormInput,
@@ -94,9 +95,7 @@ describe("extractViewKey", () => {
   it("decodes #nkeys1 hash fragment to viewKey (Formstr's modern format)", async () => {
     // Build a real nkeys blob using the SDK's encoder so the test
     // round-trips through the same TLV path the SDK uses at runtime.
-    const { encodeNKeys } = await import(
-      "@formstr/sdk/dist/utils/nkeys.js"
-    );
+    const { encodeNKeys } = await import("@formstr/sdk/dist/utils/nkeys.js");
     const nkeys = encodeNKeys({ viewKey: SAMPLE_VIEW_KEY });
     expect(
       extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}#${nkeys}`),
@@ -124,9 +123,7 @@ describe("extractViewKey", () => {
 
   it("decodes percent-encoded keys", () => {
     expect(
-      extractViewKey(
-        `https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`,
-      ),
+      extractViewKey(`https://formstr.app/f/${SAMPLE_NADDR}?viewKey=a%2Fb`),
     ).toBe("a/b");
   });
 
@@ -205,6 +202,26 @@ describe("getFormCoordinate", () => {
   it("returns null for non-naddr input", () => {
     expect(getFormCoordinate("not-an-naddr")).toBeNull();
     expect(getFormCoordinate("")).toBeNull();
+  });
+});
+
+describe("getFormAddress", () => {
+  it("returns the coordinate and embedded relay hints", () => {
+    const naddr = naddrEncode({
+      kind: FORM_KIND,
+      pubkey: SAMPLE_PUBKEY,
+      identifier: "x",
+      relays: ["wss://relay.example"],
+    });
+
+    expect(getFormAddress(naddr)).toEqual({
+      coordinate: `${FORM_KIND}:${SAMPLE_PUBKEY}:x`,
+      relayHints: ["wss://relay.example"],
+    });
+  });
+
+  it("returns null for invalid input", () => {
+    expect(getFormAddress("garbage")).toBeNull();
   });
 });
 
