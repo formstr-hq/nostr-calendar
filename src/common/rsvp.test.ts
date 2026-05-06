@@ -43,6 +43,7 @@ vi.mock("./nip59", () => ({
 import {
   fetchPrivateEventRSVPs,
   fetchPublicEventRSVPs,
+  getPrivateRSVPPublishRelays,
   RSVPRecord,
 } from "./nostr";
 import { RSVPStatus } from "../utils/types";
@@ -209,5 +210,20 @@ describe("RSVP fetch helpers", () => {
       status: RSVPStatus.accepted,
       comment: "legacy comment",
     });
+  });
+});
+
+describe("RSVP publish helpers", () => {
+  it("publishes private RSVPs only to the explicit relay hint when one is valid", () => {
+    expect(getPrivateRSVPPublishRelays("wss://relay.example.com")).toEqual([
+      "wss://relay.example.com/",
+    ]);
+  });
+
+  it("falls back to configured/default relays when no relay hint exists", () => {
+    const relays = getPrivateRSVPPublishRelays();
+
+    expect(relays.length).toBeGreaterThan(0);
+    expect(relays).toContain("wss://relay.damus.io/");
   });
 });

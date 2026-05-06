@@ -81,6 +81,7 @@ export function useFormSubmissionStatus(
       setStatus({ state: "error", error: "Invalid form address" });
       return;
     }
+    const { coordinate, relayHints } = formAddress;
 
     const sessionSubmittedAt = readSessionSubmission(coordinate, userPubkey);
     if (sessionSubmittedAt) {
@@ -95,9 +96,9 @@ export function useFormSubmissionStatus(
 
     try {
       const event = await fetchUserFormResponse(
-        formAddress.coordinate,
+        coordinate,
         userPubkey,
-        formAddress.relayHints,
+        relayHints,
       );
       if (event) {
         writeSessionSubmission(coordinate, userPubkey, event.created_at * 1000);
@@ -138,10 +139,10 @@ export function useFormSubmissionStatus(
   /** Mark submitted for UI and same-session fallback while relays catch up. */
   const markSubmitted = useCallback(
     (event: NostrEvent) => {
-      const coordinate = naddr ? getFormCoordinate(naddr) : null;
+      const formAddress = naddr ? getFormAddress(naddr) : null;
       const submittedAt = event.created_at * 1000;
-      if (coordinate && userPubkey) {
-        writeSessionSubmission(coordinate, userPubkey, submittedAt);
+      if (formAddress && userPubkey) {
+        writeSessionSubmission(formAddress.coordinate, userPubkey, submittedAt);
       }
       setStatus({
         state: "submitted",

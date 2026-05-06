@@ -420,7 +420,8 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
     isSubmitting: isRsvpSubmitting,
     submit: submitRsvp,
   } = useEventRsvps(event);
-  const showStandaloneForms = !!event.forms?.length && !!calendar;
+  const standaloneForms = calendar ? (event.forms ?? []) : [];
+  const showStandaloneForms = standaloneForms.length > 0;
 
   const handleCalendarUpdate = async (nextCalendarId: string) => {
     const sourceCalendarId = currentCalendarId;
@@ -525,7 +526,6 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                 myRsvp={myRsvp}
                 isRsvpSubmitting={isRsvpSubmitting}
                 onSubmitRsvp={submitRsvp}
-                onOpenForm={setActiveForm}
               />
               <Divider />
             </>
@@ -537,7 +537,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                 {intl.formatMessage({ id: "form.attachments" })}
               </Typography>
               <Stack spacing={1}>
-                {event.forms.map((attachment) => (
+                {standaloneForms.map((attachment) => (
                   <FormAttachmentRow
                     key={attachment.naddr}
                     attachment={attachment}
@@ -732,13 +732,11 @@ function RespondPanel({
   myRsvp,
   isRsvpSubmitting,
   onSubmitRsvp,
-  onOpenForm,
 }: {
   event: ICalendarEvent;
   myRsvp?: RSVPRecord;
   isRsvpSubmitting: boolean;
   onSubmitRsvp: (payload: RSVPPayload) => Promise<void>;
-  onOpenForm: (form: IFormAttachment) => void;
 }) {
   const intl = useIntl();
   const { user, updateLoginModal } = useUser();
@@ -986,7 +984,6 @@ function RespondPanel({
                   key={`${form.naddr}-${index}`}
                   attachment={form}
                   eventAuthor={event.user}
-                  onFill={onOpenForm}
                 />
               ))}
             </Stack>

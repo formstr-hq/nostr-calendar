@@ -76,6 +76,15 @@ const getDiscoveryRelays = (hintRelays: string[] = []): string[] => {
   ]);
 };
 
+export const getPrivateRSVPPublishRelays = (relayHint?: string): string[] => {
+  const hintedRelays = relayHint ? normalizeRelayList([relayHint]) : [];
+  if (hintedRelays.length > 0) {
+    return hintedRelays;
+  }
+
+  return getRelays().map(normalizeURL);
+};
+
 export async function getUserPublicKey() {
   const signer = await signerManager.getSigner();
   const pubKey = await signer.getPublicKey();
@@ -255,7 +264,7 @@ export async function publishPrivateRSVPEvent(params: {
   await publishToRelays(
     signed,
     undefined,
-    getDiscoveryRelays(params.relayHint ? [params.relayHint] : []),
+    getPrivateRSVPPublishRelays(params.relayHint),
   );
   nostrRuntime.addEvent(signed);
 }
