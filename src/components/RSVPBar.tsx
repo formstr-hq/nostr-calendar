@@ -106,6 +106,10 @@ export function RSVPBar({
   };
 
   const handleDetailsSubmit = async () => {
+    if (deferSubmit && activeStatus === RSVPStatus.pending) {
+      return;
+    }
+
     const status =
       activeStatus === RSVPStatus.pending ? RSVPStatus.tentative : activeStatus;
     await submitStatus(status);
@@ -161,7 +165,11 @@ export function RSVPBar({
             <Button
               variant="contained"
               size="small"
-              disabled={isSubmitting || submitDisabled}
+              disabled={
+                isSubmitting ||
+                submitDisabled ||
+                activeStatus === RSVPStatus.pending
+              }
               onClick={() => {
                 void handleDetailsSubmit();
               }}

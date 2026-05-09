@@ -32,7 +32,7 @@ export function FormAttachmentRow({
   );
   const submitted = status.state === "submitted";
   const hasEditAccess = !!user?.pubkey && eventAuthor === user.pubkey;
-  const canViewResponsesInFormstr = hasEditAccess && !attachment.viewKey;
+  const canViewResponsesInFormstr = hasEditAccess;
 
   useEffect(() => {
     let cancelled = false;
