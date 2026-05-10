@@ -3,8 +3,6 @@ export enum EventKinds {
   CalendarEventGiftWrap = 1052,
   CalendarEventRumor = 52,
   PrivateRSVPEvent = 32069,
-  RSVPGiftWrap = 1055,
-  RSVPRumor = 55,
   // Public Events
   PublicCalendarEvent = 31923,
   PublicRSVPEvent = 31925,

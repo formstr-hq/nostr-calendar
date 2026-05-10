@@ -44,6 +44,7 @@ type UseAcceptWithFormsFlowParams<TContext> = {
   onFinalize: (params: {
     calendarId: string;
     giftWrapId?: string;
+    context: TContext;
   }) => Promise<void>;
   onCancel?: (pendingAccept: PendingAcceptWithForms<TContext>) => void;
 };
@@ -66,6 +67,7 @@ export function useAcceptWithFormsFlow<TContext>({
         await onFinalize({
           calendarId: params.calendarId,
           giftWrapId: params.giftWrapId,
+          context: params.context,
         });
         return false;
       }
@@ -87,9 +89,9 @@ export function useAcceptWithFormsFlow<TContext>({
       return;
     }
 
-    const { calendarId, giftWrapId } = pendingAccept;
+    const { calendarId, giftWrapId, context } = pendingAccept;
     setPendingAccept(null);
-    await onFinalize({ calendarId, giftWrapId });
+    await onFinalize({ calendarId, giftWrapId, context });
   }, [onFinalize, pendingAccept]);
 
   const cancelAccept = useCallback(() => {

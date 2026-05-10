@@ -52,7 +52,10 @@ import { getRelays } from "../common/nostr";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
-import { parseEventRef } from "../utils/calendarListTypes";
+import {
+  findCalendarForEvent,
+  parseEventRef,
+} from "../utils/calendarListTypes";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { parseFormInput } from "../utils/formLink";
 import type { IFormAttachment } from "../utils/types";
@@ -285,7 +288,9 @@ export function CalendarEventEdit({
   );
   const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
-    initialEvent?.calendarId || calendars[0]?.id || "",
+    (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
+      calendars[0]?.id ||
+      "",
   );
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
@@ -372,9 +377,7 @@ export function CalendarEventEdit({
       return;
     }
     if (attachedForms.some((f) => f.naddr === parsed.naddr)) {
-      setFormInputError(
-        intl.formatMessage({ id: "form.duplicateAttachment" }),
-      );
+      setFormInputError(intl.formatMessage({ id: "form.duplicateAttachment" }));
       return;
     }
     updateField("forms", [...attachedForms, parsed]);
@@ -439,20 +442,18 @@ export function CalendarEventEdit({
             selectedCalendarId,
           );
 
-          useTimeBasedEvents
-            .getState()
-            .updateEvent({ ...updates.event, calendarId: updates.calendarId });
+          useTimeBasedEvents.getState().updateEvent(updates.event);
         } else {
           const { eventRef, authorPubkey } =
             await publishPrivateCalendarEvent(eventToSave);
           await addEventToCalendar(selectedCalendarId, eventRef);
-          const { eventDTag, viewKey } = parseEventRef(eventRef);
+          const { eventDTag, relayUrl, viewKey } = parseEventRef(eventRef);
           useTimeBasedEvents.getState().addEvent({
             ...eventToSave,
             id: eventDTag,
             viewKey,
+            relayHint: relayUrl,
             user: authorPubkey,
-            calendarId: selectedCalendarId,
           });
         }
       } else {
@@ -1068,7 +1069,7 @@ export function CalendarEventEdit({
                     borderRadius: 4,
                   }}
                 >
-                  <Participant pubKey={participant} />
+                  <Participant pubKey={participant} isAuthor={false} />
                   <Button
                     size="small"
                     color="error"

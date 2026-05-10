@@ -4,12 +4,6 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
-    rsvp: {
-      accepted: "Accepted",
-      declined: "Declined",
-      maybe: "Maybe",
-      pending: "Pending",
-    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -141,6 +135,21 @@ const dictionary: NestedObject = {
     formResponses: {
       viewButton: "View responses in Formstr",
     },
+    rsvp: {
+      yourResponse: "Will you be attending?",
+      yes: "Yes",
+      no: "No",
+      maybe: "Maybe",
+      toggleDetails: "Show RSVP details",
+      alternateTimeTitle: "Can't attend at this time? Suggest a new time",
+      suggestedStart: "Suggested start",
+      suggestedEnd: "Suggested end",
+      comment: "Comment",
+      detailsHint:
+        "Share another time that works, or leave a note for the host and participants.",
+      suggestionsHeading: "Time suggestions from participants",
+      applySuggestion: "Move event to this time",
+    },
     deleteEvent: {
       title: "Delete Event",
       deleteForEveryone: "Delete for all participants",
@@ -248,12 +257,6 @@ const dictionary: NestedObject = {
     },
   },
   "de-DE": {
-    rsvp: {
-      accepted: "Angenommen",
-      declined: "Abgelehnt",
-      maybe: "Vielleicht",
-      pending: "Ausstehend",
-    },
     navigation: {
       today: "Heute",
       previousDay: "Vortag",
@@ -387,6 +390,22 @@ const dictionary: NestedObject = {
     },
     formResponses: {
       viewButton: "Antworten in Formstr ansehen",
+    },
+    rsvp: {
+      yourResponse: "Nimmst du teil?",
+      yes: "Ja",
+      no: "Nein",
+      maybe: "Vielleicht",
+      toggleDetails: "RSVP-Details anzeigen",
+      alternateTimeTitle:
+        "Kannst du zu dieser Zeit nicht? Schlage eine neue Zeit vor",
+      suggestedStart: "Vorgeschlagener Beginn",
+      suggestedEnd: "Vorgeschlagenes Ende",
+      comment: "Kommentar",
+      detailsHint:
+        "Teile eine andere passende Zeit oder hinterlasse eine Notiz für Gastgeber und Teilnehmer.",
+      suggestionsHeading: "Zeitvorschläge von Teilnehmern",
+      applySuggestion: "Termin auf diese Zeit verschieben",
     },
     deleteEvent: {
       title: "Termin löschen",

@@ -8,18 +8,20 @@ import { Box } from "@mui/material";
 import { SwipeableView } from "./SwipeableView";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
+import { findCalendarForEvent } from "../utils/calendarListTypes";
 
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
   const calendars = useCalendarLists((state) => state.calendars);
   const { invitations } = useInvitations();
   const { layout } = useLayout();
-  const visibileCalendars = new Set(
+  const visibleCalendars = new Set(
     calendars.filter((cal) => cal.isVisible).map((cal) => cal.id),
   );
-  const visibleEvents = events.events.filter((evt) =>
-    visibileCalendars.has(evt.calendarId ?? ""),
-  );
+  const visibleEvents = events.events.filter((evt) => {
+    const calendar = findCalendarForEvent(calendars, evt);
+    return !!calendar && visibleCalendars.has(calendar.id);
+  });
 
   const allEvents = [
     ...visibleEvents,

@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { NAddr } from "nostr-tools/nip19";
-import { Alert, Box, CircularProgress, Toolbar } from "@mui/material";
+import { Alert, Box, CircularProgress } from "@mui/material";
 import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import type { ICalendarEvent } from "../utils/types";
@@ -22,7 +22,7 @@ export const EditEventPage = () => {
   const navigate = useNavigate();
   const intl = useIntl();
   const { user } = useUser();
-  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
+  const { isLoaded: calendarsLoaded } = useCalendarLists();
 
   const [loadState, setLoadState] = React.useState<ILoadState>({
     event: null,
@@ -51,20 +51,6 @@ export const EditEventPage = () => {
         setLoadState({ event: null, fetchState: "error" });
       });
   }, [naddr, viewKey]);
-
-  // Once both the event and calendars are loaded, resolve the calendarId
-  const eventWithCalendar = React.useMemo(() => {
-    if (!loadState.event || !calendarsLoaded) return null;
-    const event = loadState.event;
-    const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
-    const owningCalendar = calendars.find((cal) =>
-      cal.eventRefs.some((ref) => ref[0] === eventCoordinate),
-    );
-    return {
-      ...event,
-      calendarId: owningCalendar?.id || "",
-    };
-  }, [loadState.event, calendarsLoaded, calendars]);
 
   if (!naddr) return null;
 
@@ -99,7 +85,7 @@ export const EditEventPage = () => {
             </Alert>
           </Box>
         )}
-        {eventWithCalendar && eventWithCalendar.user !== user?.pubkey && (
+        {loadState.event && loadState.event.user !== user?.pubkey && (
           <Box
             style={{
               width: "100%",
@@ -114,10 +100,10 @@ export const EditEventPage = () => {
             </Alert>
           </Box>
         )}
-        {eventWithCalendar && eventWithCalendar.user === user?.pubkey && (
+        {loadState.event && loadState.event.user === user?.pubkey && (
           <CalendarEventEdit
             open={true}
-            event={eventWithCalendar}
+            event={loadState.event}
             onClose={() => navigate(-1)}
             onSave={() => navigate(-1)}
             mode="edit"

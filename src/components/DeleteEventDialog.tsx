@@ -28,6 +28,10 @@ import type { ICalendarEvent } from "../utils/types";
 import { EventKinds } from "../common/EventConfigs";
 import { TimeRenderer } from "./TimeRenderer";
 import { useIntl } from "react-intl";
+import {
+  findCalendarForEvent,
+  getCalendarEventCoordinate,
+} from "../utils/calendarListTypes";
 
 type DeleteOption = "deleteForEveryone" | "removeFromCalendar" | "ignore";
 
@@ -52,8 +56,9 @@ export function DeleteEventDialog({
   const [loading, setLoading] = useState(false);
 
   const isAuthor = event.user === user?.pubkey;
-  const isInCalendar = !!event.calendarId;
-  const eventCoordinate = `${event.kind}:${event.user}:${event.id}`;
+  const calendar = findCalendarForEvent(calendars, event);
+  const isInCalendar = !!calendar;
+  const eventCoordinate = getCalendarEventCoordinate(event);
 
   const getDefaultOption = (): DeleteOption => {
     if (isAuthor) return "deleteForEveryone";
@@ -65,8 +70,6 @@ export function DeleteEventDialog({
     useState<DeleteOption>(getDefaultOption);
 
   const findEventRef = (): string[] | null => {
-    if (!event.calendarId) return null;
-    const calendar = calendars.find((c) => c.id === event.calendarId);
     if (!calendar) return null;
     const ref = calendar.eventRefs.find((r) => r[0] === eventCoordinate);
     return ref || null;
@@ -82,20 +85,20 @@ export function DeleteEventDialog({
             eventIds: event.eventId ? [event.eventId] : [],
             kinds: [event.kind],
           });
-          if (isInCalendar && event.calendarId) {
+          if (calendar) {
             const eventRef = findEventRef();
             if (eventRef) {
-              await removeEventFromCalendar(event.calendarId, eventRef);
+              await removeEventFromCalendar(calendar.id, eventRef);
             }
           }
           removeEvent(event.id);
           break;
         }
         case "removeFromCalendar": {
-          if (isInCalendar && event.calendarId) {
+          if (calendar) {
             const eventRef = findEventRef();
             if (eventRef) {
-              await removeEventFromCalendar(event.calendarId, eventRef);
+              await removeEventFromCalendar(calendar.id, eventRef);
             }
             removeEvent(event.id);
           }

@@ -7,37 +7,37 @@ import HelpIcon from "@mui/icons-material/Help";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { nip19 } from "nostr-tools";
-import { RSVPResponse } from "../stores/events";
+import { RSVPStatus } from "../utils/types";
 import { useState } from "react";
 import { useIntl } from "react-intl";
 
 interface ParticipantProps {
   pubKey: string;
-  rsvpResponse?: RSVPResponse;
+  rsvpResponse?: RSVPStatus;
   isAuthor: boolean;
 }
 
-const getRSVPIcon = (response: RSVPResponse, theme: Theme) => {
+const getRSVPIcon = (response: RSVPStatus, theme: Theme) => {
   switch (response) {
-    case RSVPResponse.accepted:
+    case RSVPStatus.accepted:
       return (
         <CheckCircleIcon
           style={{ color: theme.palette.success.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.declined:
+    case RSVPStatus.declined:
       return (
         <CancelIcon
           style={{ color: theme.palette.error.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.tentative:
+    case RSVPStatus.tentative:
       return (
         <HelpIcon
           style={{ color: theme.palette.warning.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.pending:
+    case RSVPStatus.pending:
       return (
         <ScheduleIcon
           style={{ color: theme.palette.text.secondary, fontSize: "16px" }}

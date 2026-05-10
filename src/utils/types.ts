@@ -15,16 +15,9 @@ export enum RepeatingFrequency {
   Yearly = "yearly",
 }
 
-export enum RSVPResponse {
-  accepted = "accepted",
-  declined = "declined",
-  tentative = "tentative",
-  pending = "pending",
-}
-
-export interface IRSVPResponse {
+export interface IParticipantRSVP {
   participantId: string;
-  response: RSVPResponse;
+  response: RSVPStatus;
   timestamp: number;
 }
 
@@ -66,7 +59,7 @@ export interface ICalendarEvent {
   createdAt: number;
   categories: string[];
   participants: string[];
-  rsvpResponses: IRSVPResponse[];
+  rsvpResponses: IParticipantRSVP[];
   reference: string[];
   image?: string;
   location: string[];
@@ -83,7 +76,6 @@ export interface ICalendarEvent {
    * If undefined, calendar-list preference should be used as fallback.
    */
   notificationPreference?: NotificationPreference;
-  calendarId?: string;
   isInvitation?: boolean;
   relayHint?: string;
   /**
