@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "simulate-android": "pnpm build && pnpm cap run android",
     "release-android": "./scripts/build-release.sh",
+    "create-release": "./scripts/create-release.sh",
     "simulate-ios": "pnpm cap run ios",
     "build-ios": "pnpm cap build ios",
     "test": "vitest"
