@@ -214,8 +214,8 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           </Box>
         )}
       </Box>
-
-      <DeviceCalendarsSection />
+      {/* Disabling device calendars for now */}
+      {/* <DeviceCalendarsSection /> */}
       {/* Scheduling section — only visible to logged-in users */}
       {isInitialized && (
         <Box mt={3}>

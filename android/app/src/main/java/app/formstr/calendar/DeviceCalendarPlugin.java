@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.database.Cursor;
+import android.net.Uri;
 import android.provider.CalendarContract;
 import android.text.TextUtils;
 import android.util.Log;

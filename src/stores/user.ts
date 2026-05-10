@@ -120,7 +120,7 @@ const onUserChange = async () => {
       eventManager.resetPrivateEvents();
       logger.log("onUserChange: loading cached calendars and invitations");
       useCalendarLists.getState().loadCachedCalendars();
-      useInvitations.getState().loadCachedInvitations();
+      useTimeBasedEvents.getState().loadCachedEvents();
       logger.log("onUserChange: fetching relay list");
       const relays = await fetchRelayList(cachedUser.pubkey);
       const userRelays = relays.length > 0 ? relays : defaultRelays;

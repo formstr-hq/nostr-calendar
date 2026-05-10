@@ -9,7 +9,7 @@ if [ ! -f "$KEYSTORE_PROPS" ]; then
     exit 1
 fi
 
-VERSION=$(node -p "require('./package.json').version")
+VERSION="${VERSION:-$(node -p "require('./package.json').version")}"
 TAG="v$VERSION"
 
 echo "Building version $VERSION ($TAG)"
