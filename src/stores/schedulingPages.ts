@@ -34,7 +34,7 @@ import { nostrRuntime } from "../common/nostrRuntime";
 import { signerManager } from "../common/signer";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { isNative } from "../utils/platform";
+import { getAppBaseUrl, isNative } from "../utils/platform";
 import type { Event, UnsignedEvent, Filter } from "nostr-tools";
 import {
   generateSecretKey,
@@ -368,7 +368,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
 
   getPageUrl: (page) => {
     const naddr = get().getNAddr(page);
-    const base = `${window.location.origin}/schedule/${naddr}`;
+    const base = `${getAppBaseUrl()}/schedule/${naddr}`;
     // viewKey is mandatory after vNEXT. If it is missing (e.g. a stale
     // legacy entry surfaced before recovery completed), return the bare
     // naddr URL so the unsupported notice is shown rather than a literal
