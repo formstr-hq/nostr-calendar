@@ -133,7 +133,7 @@ async function sendBookingResponse({
   start: number;
   end: number;
   status: "approved" | "declined";
-  eventRef?: string;
+  eventRef?: string[];
   viewKey?: string;
   reason?: string;
 }): Promise<Event> {
@@ -144,7 +144,7 @@ async function sendBookingResponse({
     ["end", String(Math.floor(end / 1000))],
     ["status", status],
   ];
-  if (status === "approved" && eventRef) tags.push(["event_ref", eventRef]);
+  if (status === "approved" && eventRef) tags.push(["event_ref", ...eventRef]);
   if (status === "approved" && viewKey) tags.push(["viewKey", viewKey]);
   if (status === "declined" && reason) tags.push(["reason", reason]);
 
@@ -389,8 +389,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // booker's calendar will pick it up automatically.
     const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
       event,
-      request.dTag || undefined,
-      [["booking", "true"]],
+      {
+        existingDTag: request.dTag,
+        invitationGiftWrapTags: [["booking", "true"]],
+        waitForAll: false
+      }
     );
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the

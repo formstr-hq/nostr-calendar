@@ -173,12 +173,21 @@ async function preparePrivateCalendarEvent(
 
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
-  onAcceptedRelays?: (url: string) => void,
-  onRelayComplete?: (url: string, success: boolean) => void,
-  /** Optional pre-generated d-tag (e.g. from a booking request) */
-  existingDTag?: string,
-  /** Optional public tags to place on the invitation gift wraps. */
-  invitationGiftWrapTags: string[][] = [],
+  {
+    onAcceptedRelays,
+    onRelayComplete,
+    existingDTag,
+    invitationGiftWrapTags = [],
+    waitForAll = true
+  }: {
+    onAcceptedRelays?: (url: string) => void; 
+    onRelayComplete?: (url: string, success: boolean) => void;
+    /** Optional pre-generated d-tag (e.g. from a booking request) */
+    existingDTag?: string;
+    /** Optional public tags to place on the invitation gift wraps. */
+    invitationGiftWrapTags?: string[][];
+    waitForAll?: boolean,
+  }
 ) {
   const viewSecretKey = generateSecretKey();
   const dTag =
@@ -199,7 +208,7 @@ export async function publishPrivateCalendarEvent(
       onAcceptedRelays?.(url);
     },
     undefined,
-    { waitForAll: true, onRelayComplete },
+    { waitForAll, onRelayComplete },
   );
 
   // Gift-wrap the event keys to each participant (including the creator).
