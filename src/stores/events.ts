@@ -390,13 +390,15 @@ export const useTimeBasedEvents = create<{
         if (meta) {
           if (meta.viewKey) {
             const decrypted = viewPrivateEvent(event, meta.viewKey);
-            processPrivateEvent(
-              decrypted,
-              timeRange,
-              meta.viewKey,
-              meta.calendarId,
-              meta.relayUrl,
-            );
+            if (decrypted) {
+              processPrivateEvent(
+                decrypted,
+                timeRange,
+                meta.viewKey,
+                meta.calendarId,
+                meta.relayUrl,
+              );
+            }
           }
           processedEventIds.add(dTag);
         }

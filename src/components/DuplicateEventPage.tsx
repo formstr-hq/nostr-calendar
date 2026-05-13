@@ -38,6 +38,7 @@ export const DuplicateEventPage = () => {
         let parsedEvent: ICalendarEvent;
         if (viewKey) {
           const privateEvent = viewPrivateEvent(event, viewKey);
+          if (!privateEvent) throw new Error("Failed to decrypt event");
           parsedEvent = nostrEventToCalendar(privateEvent, {
             viewKey,
             isPrivateEvent: true,

@@ -37,6 +37,7 @@ import {
   nostrEventToBusyList,
 } from "../utils/parser";
 import type { IBusyList } from "../utils/types";
+import { createLogger } from "../utils/logger";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -47,6 +48,8 @@ export const defaultRelays = [
   "wss://relay.snort.social",
   "wss://nostr21.com",
 ];
+
+const logger = createLogger("NOSTR_CORE");
 
 const _onAcceptedRelays = console.log.bind(
   console,
@@ -178,16 +181,16 @@ export async function publishPrivateCalendarEvent(
     onRelayComplete,
     existingDTag,
     invitationGiftWrapTags = [],
-    waitForAll = true
+    waitForAll = true,
   }: {
-    onAcceptedRelays?: (url: string) => void; 
+    onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
     /** Optional pre-generated d-tag (e.g. from a booking request) */
     existingDTag?: string;
     /** Optional public tags to place on the invitation gift wraps. */
     invitationGiftWrapTags?: string[][];
-    waitForAll?: boolean,
-  }
+    waitForAll?: boolean;
+  },
 ) {
   const viewSecretKey = generateSecretKey();
   const dTag =
@@ -480,15 +483,20 @@ export const fetchAndDecryptPrivateRSVPEvents = (
 
 export function viewPrivateEvent(calendarEvent: Event, viewKey: string) {
   const viewPrivateKey = nip19.decode(viewKey as NSec).data;
-  const decryptedContent = nip44.decrypt(
-    calendarEvent.content,
-    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
-  );
+  try {
+    const decryptedContent = nip44.decrypt(
+      calendarEvent.content,
+      nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
+    );
 
-  return {
-    ...calendarEvent,
-    tags: JSON.parse(decryptedContent),
-  }; // Return the decrypted event details
+    return {
+      ...calendarEvent,
+      tags: JSON.parse(decryptedContent),
+    }; // Return the decrypted event details
+  } catch (error) {
+    logger.error("Could not decrypt event", calendarEvent, viewKey, error);
+  }
+  return null;
 }
 
 /**
