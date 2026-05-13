@@ -36,7 +36,10 @@ import * as nip59 from "../common/nip59";
 import { nostrRuntime } from "../common/nostrRuntime";
 import { EventKinds } from "../common/EventConfigs";
 import { nostrEventToSchedulingPage } from "../utils/parser";
-import { getDisplaySlots, type IDisplaySlot } from "../utils/availabilityHelper";
+import {
+  getDisplaySlots,
+  type IDisplaySlot,
+} from "../utils/availabilityHelper";
 import { useBusyList, collectBusyRanges } from "../stores/busyList";
 import { busyListMonthKeysForRange } from "../utils/dateHelper";
 import type { IBusyList } from "../utils/types";
@@ -47,6 +50,8 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { Header, HEADER_HEIGHT } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { nip44, getPublicKey } from "nostr-tools";
@@ -56,6 +61,7 @@ import type {
   ISchedulingPage,
   ITimeSlot,
   IOutgoingBooking,
+  RelayPublishCompleteHandler,
 } from "../utils/types";
 
 async function fetchSchedulingPage(naddr: NAddr): Promise<Event> {
@@ -80,6 +86,7 @@ async function sendBookingRequest({
   note,
   dTag,
   relayHints,
+  onRelayComplete,
 }: {
   schedulingPageRef: string;
   creatorPubkey: string;
@@ -89,6 +96,7 @@ async function sendBookingRequest({
   note: string;
   dTag: string;
   relayHints?: string[];
+  onRelayComplete?: RelayPublishCompleteHandler;
 }): Promise<Event> {
   const userPublicKey = await getUserPublicKey();
   const giftWrap = await nip59.wrapEvent(
@@ -112,7 +120,10 @@ async function sendBookingRequest({
   const targetRelays = relayHints
     ? [...new Set([...relayHints, ...getRelays()])]
     : undefined;
-  await publishToRelays(giftWrap, undefined, targetRelays);
+  await publishToRelays(giftWrap, undefined, targetRelays, {
+    waitForAll: true,
+    onRelayComplete,
+  });
   return giftWrap;
 }
 
@@ -136,6 +147,14 @@ export const BookingPage = () => {
   const [bookingNote, setBookingNote] = useState("");
   const [bookingTitle, setBookingTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -296,6 +315,11 @@ export const BookingPage = () => {
 
       // Extract relay hints from the scheduling page event tags
       const relayHints = page.relayHints;
+      const relaysToPublish = relayHints
+        ? [...new Set([...relayHints, ...getRelays()])]
+        : getRelays();
+      initRelays(relaysToPublish);
+      setRelayDetailsOpen(true);
 
       const giftWrap = await sendBookingRequest({
         schedulingPageRef,
@@ -306,6 +330,7 @@ export const BookingPage = () => {
         note: bookingNote,
         dTag,
         relayHints,
+        onRelayComplete,
       });
 
       // Add a placeholder event reference to the booker's calendar list.
@@ -319,7 +344,11 @@ export const BookingPage = () => {
           eventDTag: dTag,
           viewKey: "",
         });
-        await calendarLists.addEventToCalendar(selectedCalendarId, eventRef);
+        await calendarLists.addEventToCalendar(
+          selectedCalendarId,
+          eventRef,
+          onRelayComplete,
+        );
       }
 
       // Store the outgoing booking locally so the Sent tab can display it
@@ -678,6 +707,16 @@ export const BookingPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={intl.formatMessage({
+          id: "scheduling.publishingBookingRequest",
+        })}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
     </>
   );
 };

@@ -41,6 +41,9 @@ import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { deviceCalendarColor } from "../utils/deviceCalendarAdapter";
 import { useUser } from "../stores/user";
 import { SchedulingPagesList } from "./SchedulingPagesList";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
+import { getRelays } from "../common/nostr";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -60,9 +63,17 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   } = useCalendarLists();
 
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<
     ICalendarList | undefined
   >();
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
 
   const handleCreateCalendar = () => {
     setEditingCalendar(undefined);
@@ -80,12 +91,16 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
     color: string;
     notificationPreference: "enabled" | "disabled";
   }) => {
+    const relaysToPublish = getRelays();
+    initRelays(relaysToPublish);
+    setRelayDetailsOpen(true);
+
     if (editingCalendar) {
       const preferenceChanged =
         (editingCalendar.notificationPreference ??
           DEFAULT_NOTIFICATION_PREFERENCE) !== data.notificationPreference;
 
-      await updateCalendar({ ...editingCalendar, ...data });
+      await updateCalendar({ ...editingCalendar, ...data }, onRelayComplete);
       if (preferenceChanged) {
         useTimeBasedEvents
           .getState()
@@ -97,6 +112,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
         data.description,
         data.color,
         data.notificationPreference,
+        onRelayComplete,
       );
     }
   };
@@ -232,6 +248,18 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           onDelete={editingCalendar ? handleDelete : undefined}
         />
       )}
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={intl.formatMessage({ id: "calendarManage.publishingCalendar" })}
+        statusLabel={intl.formatMessage(
+          { id: "event.relaysPublishStatus" },
+          { complete: "" },
+        )}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
     </Box>
   );
 }

@@ -159,6 +159,7 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
+      publishingCalendar: "Publishing calendar",
     },
     sidebar: {
       calendars: "Calendars",
@@ -193,6 +194,7 @@ const dictionary: NestedObject = {
       addToCalendar: "Add to Calendar",
       selectCalendar: "Select Calendar",
       addNewCalendar: "Add new calendar",
+      publishingAdd: "Publishing calendar update",
     },
     busyList: {
       publishToggle: "Show this time as busy on my public availability",
@@ -265,7 +267,8 @@ const dictionary: NestedObject = {
       author: "Organiser",
     },
     scheduling: {
-      featureDescription: "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
+      featureDescription:
+        "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
       sidebarTitle: "Booking Links",
       createSchedulingPage: "Create a booking page",
       createSchedulingPageButton: "Create page",
@@ -300,11 +303,15 @@ const dictionary: NestedObject = {
       sending: "Sending...",
       bookingRequestSent:
         "Booking request sent! You'll be notified when it's approved.",
+      publishingBookingApproval: "Publishing booking approval",
+      publishingBookingRequest: "Publishing booking request",
+      publishingPage: "Publishing booking page",
       selectDuration: "Select duration",
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
       eventTitle: "Event Title",
-      eventTitleHelp: "Title for calendar events created from bookings. You will be able to update it later on",
+      eventTitleHelp:
+        "Title for calendar events created from bookings. You will be able to update it later on",
       eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
@@ -511,6 +518,7 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
+      publishingCalendar: "Kalender wird veröffentlicht",
     },
     sidebar: {
       calendars: "Kalender",
@@ -546,6 +554,7 @@ const dictionary: NestedObject = {
       addToCalendar: "Zum Kalender hinzufügen",
       selectCalendar: "Kalender auswählen",
       addNewCalendar: "Neuen Kalender hinzufügen",
+      publishingAdd: "Kalenderaktualisierung wird veröffentlicht",
     },
     busyList: {
       publishToggle:
@@ -621,7 +630,8 @@ const dictionary: NestedObject = {
       author: "Organisator",
     },
     scheduling: {
-      featureDescription: "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
+      featureDescription:
+        "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
       createSchedulingPage: "Terminseite erstellen",
       editSchedulingPage: "Terminseite bearbeiten",
       schedulingPages: "Terminplanung",
@@ -653,6 +663,9 @@ const dictionary: NestedObject = {
       sending: "Wird gesendet...",
       bookingRequestSent:
         "Buchungsanfrage gesendet! Sie werden benachrichtigt, sobald sie genehmigt wird.",
+      publishingBookingApproval: "Buchungsgenehmigung wird veröffentlicht",
+      publishingBookingRequest: "Buchungsanfrage wird veröffentlicht",
+      publishingPage: "Terminseite wird veröffentlicht",
       selectDuration: "Dauer auswählen",
       noSlotsThisWeek:
         "Keine verfügbaren Zeitfenster diese Woche. Versuchen Sie eine andere Woche.",

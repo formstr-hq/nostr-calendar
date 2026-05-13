@@ -37,6 +37,12 @@ export type NotificationPreference = "enabled" | "disabled";
 
 export type RelayLineStatus = "pending" | "ok" | "error";
 export type RelayStatusMap = Record<string, RelayLineStatus>;
+export type RelayFeedbackMap = Record<string, string>;
+export type RelayPublishCompleteHandler = (
+  url: string,
+  success: boolean,
+  feedback?: string,
+) => void;
 
 export interface ICalendarEvent {
   begin: number;

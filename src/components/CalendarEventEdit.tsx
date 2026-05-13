@@ -299,6 +299,7 @@ export function CalendarEventEdit({
   const [processing, setProcessing] = useState(false);
   const {
     relayStatus,
+    relayFeedback,
     publishingRelays,
     initRelays,
     onRelayComplete,
@@ -554,10 +555,11 @@ export function CalendarEventEdit({
         handleClose();
       }
     } catch (e) {
-      console.error(e instanceof Error ? e.message : "Unknown error");
+      const message = e instanceof Error ? e.message : "Unknown error";
+      console.error(message);
       const failedRelays = getFailedRelays(relaysToPublish);
       for (const relayUrl of failedRelays) {
-        onRelayComplete(relayUrl, false);
+        onRelayComplete(relayUrl, false, message);
       }
       setProcessing(false);
     }
@@ -1390,6 +1392,7 @@ export function CalendarEventEdit({
       open={relayDetailsOpen}
       relays={publishingRelays}
       relayStatus={relayStatus}
+      relayFeedback={relayFeedback}
       onClose={() => setRelayDetailsOpen(false)}
       onRetry={handleRetryFailedRelays}
       retrying={retryingRelays}

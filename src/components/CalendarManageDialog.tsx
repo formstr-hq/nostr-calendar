@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -48,7 +49,7 @@ interface CalendarManageDialogProps {
     description: string;
     color: string;
     notificationPreference: NotificationPreference;
-  }) => void;
+  }) => void | Promise<void>;
   onDelete?: () => void;
   /** When true, the dialog cannot be dismissed — used for onboarding when no calendars exist. */
   blocking?: boolean;
@@ -72,19 +73,31 @@ export function CalendarManageDialog({
     useState<NotificationPreference>(
       calendar?.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
     );
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) return;
-    onSave({
-      title: title.trim(),
-      description: description.trim(),
-      color,
-      notificationPreference,
-    });
-    onClose();
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        color,
+        notificationPreference,
+      });
+      onClose();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to save calendar",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isEdit = !!calendar;
@@ -136,6 +149,7 @@ export function CalendarManageDialog({
               )}
             </>
           )}
+          {saveError && <Alert severity="error">{saveError}</Alert>}
           <TextField
             fullWidth
             label={intl.formatMessage({ id: "calendarManage.calendarName" })}
@@ -217,18 +231,20 @@ export function CalendarManageDialog({
           </Button>
         )}
         {!blocking && (
-          <Button onClick={onClose} color="inherit">
+          <Button onClick={onClose} color="inherit" disabled={saving}>
             {intl.formatMessage({ id: "navigation.cancel" })}
           </Button>
         )}
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={!title.trim()}
+          disabled={!title.trim() || saving}
         >
-          {isEdit
-            ? intl.formatMessage({ id: "navigation.save" })
-            : intl.formatMessage({ id: "navigation.create" })}
+          {saving
+            ? intl.formatMessage({ id: "event.saving" })
+            : isEdit
+              ? intl.formatMessage({ id: "navigation.save" })
+              : intl.formatMessage({ id: "navigation.create" })}
         </Button>
       </DialogActions>
     </Dialog>

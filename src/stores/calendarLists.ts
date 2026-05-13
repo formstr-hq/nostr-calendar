@@ -37,6 +37,7 @@ import {
 } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { isNative } from "../utils/platform";
+import type { RelayPublishCompleteHandler } from "../utils/types";
 
 const CALENDAR_LISTS_STORAGE_KEY = "cal:calendar_lists";
 const CALENDAR_VISIBILITY_KEY = "cal:calendar_visibility";
@@ -83,11 +84,19 @@ interface CalendarListsState {
     description?: string,
     color?: string,
     notificationPreference?: "enabled" | "disabled",
+    onRelayComplete?: RelayPublishCompleteHandler,
   ) => Promise<ICalendarList>;
-  updateCalendar: (calendar: ICalendarList) => Promise<void>;
+  updateCalendar: (
+    calendar: ICalendarList,
+    onRelayComplete?: RelayPublishCompleteHandler,
+  ) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;
   toggleVisibility: (calendarId: string) => void;
-  addEventToCalendar: (calendarId: string, eventRef: string[]) => Promise<void>;
+  addEventToCalendar: (
+    calendarId: string,
+    eventRef: string[],
+    onRelayComplete?: RelayPublishCompleteHandler,
+  ) => Promise<void>;
   removeEventFromCalendar: (
     calendarId: string,
     eventRef: string[],
@@ -96,6 +105,7 @@ interface CalendarListsState {
     targetCalendarId: string,
     eventCoordinate: string,
     eventRef: string[],
+    onRelayComplete?: RelayPublishCompleteHandler,
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
   getAllEventIds: () => string[];
@@ -218,18 +228,23 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     description = "",
     color = "#4285f4",
     notificationPreference = DEFAULT_NOTIFICATION_PREFERENCE,
+    onRelayComplete,
   ) => {
-    const newCalendar = await createCalendar({
-      title,
-      description,
-      color,
-      notificationPreference: normalizePreferenceForPublish(
-        notificationPreference,
-      ),
-      eventId: "",
-      eventRefs: [],
-      isVisible: true,
-    });
+    const newCalendar = await createCalendar(
+      {
+        title,
+        description,
+        color,
+        notificationPreference: normalizePreferenceForPublish(
+          notificationPreference,
+        ),
+        eventId: "",
+        eventRefs: [],
+        isVisible: true,
+      },
+      undefined,
+      onRelayComplete,
+    );
     const calendarWithDefaults = withNotificationPreference(newCalendar);
 
     set((state) => {
@@ -244,7 +259,7 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   /**
    * Updates calendar metadata (title, description, color) and republishes.
    */
-  updateCalendar: async (calendar) => {
+  updateCalendar: async (calendar, onRelayComplete) => {
     const updatedForPublish = {
       ...calendar,
       notificationPreference: normalizePreferenceForPublish(
@@ -252,7 +267,11 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       ),
       createdAt: Math.floor(Date.now() / 1000),
     };
-    const publishedEvent = await publishCalendarList(updatedForPublish);
+    const publishedEvent = await publishCalendarList(
+      updatedForPublish,
+      undefined,
+      onRelayComplete,
+    );
     const updatedForState = withNotificationPreference({
       ...updatedForPublish,
       eventId: publishedEvent.id,
@@ -315,13 +334,18 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   /**
    * Adds an event reference to a specific calendar and republishes.
    */
-  addEventToCalendar: async (calendarId, eventRef) => {
+  addEventToCalendar: async (calendarId, eventRef, onRelayComplete) => {
     const calendar = get().calendars.find((c) => c.id === calendarId);
     if (!calendar) {
       throw new Error(`Calendar not found: ${calendarId}`);
     }
 
-    const updated = await addEventToCalList(calendar, eventRef);
+    const updated = await addEventToCalList(
+      calendar,
+      eventRef,
+      undefined,
+      onRelayComplete,
+    );
 
     set((state) => {
       const calendars = state.calendars.map((c) =>
@@ -354,7 +378,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
    * Moves an event from its current calendar to a different one.
    * If the event is already in the target calendar, this is a no-op.
    */
-  moveEventToCalendar: async (targetCalendarId, eventCoordinate, eventRef) => {
+  moveEventToCalendar: async (
+    targetCalendarId,
+    eventCoordinate,
+    eventRef,
+    onRelayComplete,
+  ) => {
     const { calendars } = get();
 
     const result = await moveEventBetweenCalendarLists(
@@ -362,6 +391,8 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       targetCalendarId,
       eventCoordinate,
       eventRef,
+      undefined,
+      onRelayComplete,
     );
 
     if (result) {

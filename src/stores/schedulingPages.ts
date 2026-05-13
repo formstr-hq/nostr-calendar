@@ -29,6 +29,7 @@ import {
   schedulingPageToTags,
 } from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
+import type { RelayPublishCompleteHandler } from "../utils/types";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { nostrRuntime } from "../common/nostrRuntime";
 import { signerManager } from "../common/signer";
@@ -88,7 +89,10 @@ function getOwnSchedulingPageKeyIndex(): Map<string, string> {
   return ownSchedulingPageKeyIndex ?? new Map();
 }
 
-async function publishSchedulingPage(page: ISchedulingPage): Promise<{
+async function publishSchedulingPage(
+  page: ISchedulingPage,
+  onRelayComplete?: RelayPublishCompleteHandler,
+): Promise<{
   event: Event;
   viewKey: string;
 }> {
@@ -121,7 +125,10 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
   const signedEvent = await signer.signEvent(baseEvent);
   signedEvent.id = getEventHash(baseEvent);
 
-  await publishToRelays(signedEvent);
+  await publishToRelays(signedEvent, undefined, undefined, {
+    waitForAll: true,
+    onRelayComplete,
+  });
   nostrRuntime.addEvent(signedEvent);
 
   // Publish a self-encrypted kind-32680 record so the page is recoverable
@@ -189,8 +196,12 @@ interface SchedulingPagesState {
   fetchPages: () => Promise<void>;
   createPage: (
     page: Omit<ISchedulingPage, "id" | "eventId" | "user" | "createdAt">,
+    onRelayComplete?: RelayPublishCompleteHandler,
   ) => Promise<ISchedulingPage>;
-  updatePage: (page: ISchedulingPage) => Promise<ISchedulingPage>;
+  updatePage: (
+    page: ISchedulingPage,
+    onRelayComplete?: RelayPublishCompleteHandler,
+  ) => Promise<ISchedulingPage>;
   deletePage: (pageId: string) => Promise<void>;
   getPageById: (pageId: string) => ISchedulingPage | undefined;
   getNAddr: (page: ISchedulingPage) => string;
@@ -283,7 +294,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     );
   },
 
-  createPage: async (pageData) => {
+  createPage: async (pageData, onRelayComplete) => {
     const userPubkey = await getUserPublicKey();
     const dTagRoot = `${JSON.stringify(pageData)}-${Date.now()}`;
     const id = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
@@ -296,7 +307,10 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
       createdAt: Math.floor(Date.now() / 1000),
     };
 
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      onRelayComplete,
+    );
     page.eventId = signedEvent.id;
     page.viewKey = viewKey;
 
@@ -309,8 +323,11 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     return page;
   },
 
-  updatePage: async (page) => {
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+  updatePage: async (page, onRelayComplete) => {
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      onRelayComplete,
+    );
     const updated = {
       ...page,
       eventId: signedEvent.id,

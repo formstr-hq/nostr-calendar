@@ -30,6 +30,7 @@ import { signerManager } from "./signer";
 import { EventKinds } from "./EventConfigs";
 import { nostrRuntime } from "./nostrRuntime";
 import { getRelays, publishToRelays, getUserPublicKey } from "./nostr";
+import type { RelayPublishCompleteHandler } from "../utils/types";
 import type { ICalendarList } from "../utils/calendarListTypes";
 import {
   DEFAULT_CALENDAR_COLOR,
@@ -162,6 +163,8 @@ export async function decryptCalendarList(
  */
 export async function publishCalendarList(
   calendarList: ICalendarList,
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ): Promise<Event> {
   const userPubkey = await getUserPublicKey();
   const encryptedContent = await encryptCalendarList(calendarList);
@@ -178,7 +181,10 @@ export async function publishCalendarList(
   const signedEvent = await signer.signEvent(unsignedEvent);
   signedEvent.id = getEventHash(unsignedEvent);
 
-  await publishToRelays(signedEvent);
+  await publishToRelays(signedEvent, onAcceptedRelays, undefined, {
+    waitForAll: true,
+    onRelayComplete,
+  });
 
   // Also add to the local event store for cache
   nostrRuntime.addEvent(signedEvent);
@@ -230,6 +236,8 @@ export function fetchCalendarLists(
 
 export async function createCalendar(
   calendarData: Omit<ICalendarList, "id" | "createdAt">,
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ): Promise<ICalendarList> {
   const idRoot = `${JSON.stringify(calendarData)}-${Date.now()}`;
   const id = bytesToHex(sha256(utf8ToBytes(idRoot))).substring(0, 30);
@@ -240,7 +248,11 @@ export async function createCalendar(
     createdAt: Math.floor(Date.now() / 1000),
   };
 
-  const publishedEvent = await publishCalendarList(calendar);
+  const publishedEvent = await publishCalendarList(
+    calendar,
+    onAcceptedRelays,
+    onRelayComplete,
+  );
   calendar.eventId = publishedEvent.id;
 
   return calendar;
@@ -275,6 +287,8 @@ export async function createDefaultCalendar(): Promise<ICalendarList> {
 export async function addEventToCalendarList(
   calendarList: ICalendarList,
   eventRef: string[],
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ): Promise<ICalendarList> {
   // Avoid duplicate refs (compare by coordinate, i.e. first element)
   if (calendarList.eventRefs.some((ref) => ref[0] === eventRef[0])) {
@@ -287,7 +301,7 @@ export async function addEventToCalendarList(
     createdAt: Math.floor(Date.now() / 1000),
   };
 
-  await publishCalendarList(updated);
+  await publishCalendarList(updated, onAcceptedRelays, onRelayComplete);
   return updated;
 }
 
@@ -301,6 +315,8 @@ export async function addEventToCalendarList(
 export async function removeEventFromCalendarList(
   calendarList: ICalendarList,
   eventRef: string[],
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ): Promise<ICalendarList> {
   const updated: ICalendarList = {
     ...calendarList,
@@ -308,7 +324,7 @@ export async function removeEventFromCalendarList(
     createdAt: Math.floor(Date.now() / 1000),
   };
 
-  await publishCalendarList(updated);
+  await publishCalendarList(updated, onAcceptedRelays, onRelayComplete);
   return updated;
 }
 
@@ -328,6 +344,8 @@ export async function moveEventBetweenCalendarLists(
   targetCalendarId: string,
   eventCoordinate: string,
   eventRef: string[],
+  onAcceptedRelays?: (url: string) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ): Promise<{ source?: ICalendarList; target: ICalendarList } | null> {
   // Find which calendar currently contains the event
   const sourceCalendar = calendars.find(
@@ -349,13 +367,21 @@ export async function moveEventBetweenCalendarLists(
   // Remove from source calendar if found
   let updatedSource: ICalendarList | undefined;
   if (sourceCalendar) {
-    updatedSource = await removeEventFromCalendarList(sourceCalendar, [
-      eventCoordinate,
-    ]);
+    updatedSource = await removeEventFromCalendarList(
+      sourceCalendar,
+      [eventCoordinate],
+      onAcceptedRelays,
+      onRelayComplete,
+    );
   }
 
   // Add to target calendar
-  const updatedTarget = await addEventToCalendarList(targetCalendar, eventRef);
+  const updatedTarget = await addEventToCalendarList(
+    targetCalendar,
+    eventRef,
+    onAcceptedRelays,
+    onRelayComplete,
+  );
 
   return { source: updatedSource, target: updatedTarget };
 }

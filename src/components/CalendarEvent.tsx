@@ -41,7 +41,7 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
-import { encodeNAddr } from "../common/nostr";
+import { encodeNAddr, getRelays } from "../common/nostr";
 import {
   getDuplicateEventPage,
   getEditEventPage,
@@ -78,6 +78,8 @@ import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
 import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -501,6 +503,14 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const locations = event.location.filter((location) => !!location?.trim?.());
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
   const isDeviceEvent = event.source === "device";
   const eventCoordinate = isDeviceEvent
     ? ""
@@ -536,7 +546,16 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
       throw new Error("Event reference not found");
     }
 
-    await moveEventToCalendar(nextCalendarId, eventCoordinate, eventRef);
+    const relaysToPublish = getRelays();
+    initRelays(relaysToPublish);
+    setRelayDetailsOpen(true);
+
+    await moveEventToCalendar(
+      nextCalendarId,
+      eventCoordinate,
+      eventRef,
+      onRelayComplete,
+    );
     updateEvent({
       ...event,
       calendarId: nextCalendarId,
@@ -544,109 +563,119 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   };
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        gap: theme.spacing(4),
-        height: "100%",
-        flexDirection: isMobile ? "column" : "row",
-      }}
-    >
-      {event.image && (
-        <Box
-          sx={{
-            flex: 1,
-            backgroundImage: `url(${event.image})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            borderRadius: "8px",
-          }}
-        />
-      )}
+    <>
       <Box
         sx={{
-          overflowY: "auto",
-          flex: "1",
-          padding: 3,
+          display: "flex",
+          gap: theme.spacing(4),
+          height: "100%",
+          flexDirection: isMobile ? "column" : "row",
         }}
       >
-        <Stack spacing={2}>
-          <TimeRenderer
-            begin={event.begin}
-            end={event.end}
-            repeat={event.repeat}
-            allDay={event.allDay}
-          ></TimeRenderer>
+        {event.image && (
+          <Box
+            sx={{
+              flex: 1,
+              backgroundImage: `url(${event.image})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              borderRadius: "8px",
+            }}
+          />
+        )}
+        <Box
+          sx={{
+            overflowY: "auto",
+            flex: "1",
+            padding: 3,
+          }}
+        >
+          <Stack spacing={2}>
+            <TimeRenderer
+              begin={event.begin}
+              end={event.end}
+              repeat={event.repeat}
+              allDay={event.allDay}
+            ></TimeRenderer>
 
-          <EventBusyListToggle event={event} />
+            <EventBusyListToggle event={event} />
 
-          {event.description && (
-            <>
-              <Typography variant="subtitle1">
-                {intl.formatMessage({ id: "navigation.description" })}
+            {event.description && (
+              <>
+                <Typography variant="subtitle1">
+                  {intl.formatMessage({ id: "navigation.description" })}
+                </Typography>
+                <Typography variant="body2">
+                  <Markdown remarkPlugins={[remarkGfm]}>
+                    {event.description}
+                  </Markdown>
+                </Typography>
+
+                <Divider />
+              </>
+            )}
+
+            {locations.length > 0 && (
+              <>
+                <Typography variant="subtitle1">
+                  {intl.formatMessage({ id: "navigation.location" })}
+                </Typography>
+                <Typography>{locations.join(", ")}</Typography>
+
+                <Divider />
+              </>
+            )}
+
+            <Box display={"flex"} flexWrap={"wrap"} gap={1}>
+              <Typography width={"100%"} fontWeight={600}>
+                {intl.formatMessage({ id: "navigation.participants" })}
               </Typography>
-              <Typography variant="body2">
-                <Markdown remarkPlugins={[remarkGfm]}>
-                  {event.description}
-                </Markdown>
-              </Typography>
+              <Stack direction="row" gap={0.5} flexWrap="wrap">
+                {event.participants.map((p) => (
+                  <Box width={"100%"} key={p}>
+                    <Participant pubKey={p} isAuthor={p === event.user} />
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
 
-              <Divider />
-            </>
-          )}
+            {calendar ? (
+              <>
+                <Divider />
+                <EventCalendarListManagement
+                  calendarId={event.calendarId || ""}
+                  onCalendarUpdate={handleCalendarUpdate}
+                />
+              </>
+            ) : isDeviceEvent ? (
+              <>
+                <Divider />
+                <Typography variant="caption" color="text.secondary">
+                  {intl.formatMessage({ id: "event.deviceReadOnly" })}
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Divider />
+                <InvitationAcceptBar event={event} />
+              </>
+            )}
 
-          {locations.length > 0 && (
-            <>
-              <Typography variant="subtitle1">
-                {intl.formatMessage({ id: "navigation.location" })}
-              </Typography>
-              <Typography>{locations.join(", ")}</Typography>
-
-              <Divider />
-            </>
-          )}
-
-          <Box display={"flex"} flexWrap={"wrap"} gap={1}>
-            <Typography width={"100%"} fontWeight={600}>
-              {intl.formatMessage({ id: "navigation.participants" })}
-            </Typography>
-            <Stack direction="row" gap={0.5} flexWrap="wrap">
-              {event.participants.map((p) => (
-                <Box width={"100%"} key={p}>
-                  <Participant pubKey={p} isAuthor={p === event.user} />
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-
-          {calendar ? (
-            <>
-              <Divider />
-              <EventCalendarListManagement
-                calendarId={event.calendarId || ""}
-                onCalendarUpdate={handleCalendarUpdate}
-              />
-            </>
-          ) : isDeviceEvent ? (
-            <>
-              <Divider />
-              <Typography variant="caption" color="text.secondary">
-                {intl.formatMessage({ id: "event.deviceReadOnly" })}
-              </Typography>
-            </>
-          ) : (
-            <>
-              <Divider />
-              <InvitationAcceptBar event={event} />
-            </>
-          )}
-
-          {!isDeviceEvent && (
-            <ScheduledNotificationsSection eventId={event.id} />
-          )}
-        </Stack>
+            {!isDeviceEvent && (
+              <ScheduledNotificationsSection eventId={event.id} />
+            )}
+          </Stack>
+        </Box>
       </Box>
-    </Box>
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={intl.formatMessage({ id: "addToCalendar.publishingAdd" })}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
+    </>
   );
 }
 
@@ -705,6 +734,14 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
   const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
 
   // Sync selected calendar once calendars load (e.g. right after login)
   useEffect(() => {
@@ -729,6 +766,9 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
 
   const handleAccept = async () => {
     if (!selectedCalendarId) return;
+    const relaysToPublish = getRelays();
+    initRelays(relaysToPublish);
+    setRelayDetailsOpen(true);
     setAccepting(true);
     try {
       // If there is a matching gift-wrap invitation in the store, use the full
@@ -741,6 +781,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
         await acceptInvitation(
           matchingInvitation.giftWrapId,
           selectedCalendarId,
+          onRelayComplete,
         );
       } else {
         const eventRef = buildEventRef({
@@ -749,7 +790,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           eventDTag: event.id,
           viewKey: event.viewKey || "",
         });
-        await addEventToCalendar(selectedCalendarId, eventRef);
+        await addEventToCalendar(selectedCalendarId, eventRef, onRelayComplete);
         updateEvent({
           ...event,
           calendarId: selectedCalendarId,
@@ -964,6 +1005,14 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
           </Button>
         </DialogActions>
       </Dialog>
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={intl.formatMessage({ id: "addToCalendar.publishingAdd" })}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
     </>
   );
 }

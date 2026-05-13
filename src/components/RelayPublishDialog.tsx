@@ -12,13 +12,20 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { normalizeURL } from "nostr-tools/utils";
 import { useIntl } from "react-intl";
-import type { RelayLineStatus, RelayStatusMap } from "../utils/types";
+import type {
+  RelayFeedbackMap,
+  RelayLineStatus,
+  RelayStatusMap,
+} from "../utils/types";
 
 interface RelayPublishDialogProps {
   open: boolean;
+  title?: string;
+  statusLabel?: string;
   relays: string[];
   /** Keys must be normalizeURL(relay) */
   relayStatus: RelayStatusMap;
+  relayFeedback?: RelayFeedbackMap;
   onClose: () => void;
   /** Re-publish only to relays that did not accept */
   onRetry?: () => void | Promise<void>;
@@ -36,8 +43,11 @@ function statusForUrl(
 
 export function RelayPublishDialog({
   open,
+  title,
+  statusLabel,
   relays,
   relayStatus,
+  relayFeedback = {},
   onClose,
   onRetry,
   retrying = false,
@@ -49,31 +59,46 @@ export function RelayPublishDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {intl.formatMessage({ id: "event.publishingEvent" })}
+        {title ?? intl.formatMessage({ id: "event.publishingEvent" })}
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-          {intl.formatMessage(
-            { id: "event.relaysPublishStatus" },
-            { complete: "" },
-          )}
+          {statusLabel ??
+            intl.formatMessage(
+              { id: "event.relaysPublishStatus" },
+              { complete: "" },
+            )}
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
           {normalizedRelays.map((url) => {
             const st = statusForUrl(url, relayStatus);
+            const feedback = relayFeedback[normalizeURL(url)];
             return (
               <Box
                 key={url}
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}
               >
                 {st === "ok" ? (
                   <CheckCircleIcon sx={{ color: "success.main" }} />
                 ) : st === "error" ? (
                   <ErrorIcon sx={{ color: "error.main" }} />
                 ) : (
-                  <CircularProgress size={20} />
+                  <CircularProgress size={20} sx={{ mt: 0.25 }} />
                 )}
-                <Typography variant="body2">{url}</Typography>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                    {url}
+                  </Typography>
+                  {feedback && (
+                    <Typography
+                      variant="caption"
+                      color={st === "error" ? "error" : "text.secondary"}
+                      sx={{ display: "block", wordBreak: "break-word" }}
+                    >
+                      {feedback}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
             );
           })}
