@@ -11,6 +11,7 @@ This NIP extends [NIP-52](https://github.com/nostr-protocol/nips/blob/master/52.
 - **Private calendar lists** — self-encrypted personal collections of event references (kind `32123`)
 - **Private RSVPs** encrypted with the same pattern as private events (kind `32069`)
 - **Participant removal** events to opt out of a private event (kind `84`)
+- **Public busy lists** for declaring unavailability without leaking event details (kind `31926`)
 
 ---
 
@@ -34,6 +35,7 @@ NIP-52E uses a **view key** pattern: event content is encrypted with a randomly 
 | 1055  | RSVP Gift Wrap | Regular (NIP-59) |
 | 55    | RSVP Rumor | Unsigned (inside RSVP gift wrap) |
 | 84    | Participant Removal | Regular |
+| 31926 | Public Busy List | Parameterized replaceable |
 
 ---
 
@@ -309,7 +311,109 @@ Whether a calendar list is shown or hidden in the UI is **client-side only** and
 
 ---
 
-## 4. Private RSVP (kind `32069`)
+## 4. Public Busy List (kind `31926`)
+
+A public busy list declares when a user is unavailable — without revealing why or with whom. It is a parameterized replaceable event with an empty `content` field so no private details are ever leaked.
+
+Any calendar client that knows a user's pubkey can fetch their busy list and render unavailable blocks. This enables free/busy visibility across clients without sharing event content.
+
+There are two forms: **monthly** (one event per calendar month, updated whenever a new event is added or removed) and **recurring** (a single event holding repeating busy blocks expressed as RRULE strings, useful for standing commitments like weekly meetings or working hours).
+
+### Monthly Busy List
+
+One event per author per month. The `d` tag is the month in `YYYY-MM` format.
+
+```json
+{
+  "kind": 31926,
+  "pubkey": "<user hex pubkey>",
+  "created_at": 1700000000,
+  "tags": [
+    ["d", "2024-12"],
+    ["t", "2024-12"],
+    ["t", "busy"],
+    ["block", "1733230800", "1733232600"],
+    ["block", "1733320800", "1733323200"]
+  ],
+  "content": ""
+}
+```
+
+| Tag | Values | Required | Description |
+|-----|--------|----------|-------------|
+| `d` | `YYYY-MM` | Yes | Replacement key; one event per author per month |
+| `t` | `YYYY-MM` | Yes | Queryable month hashtag for relay-side filtering |
+| `t` | `"busy"` | Yes | Secondary tag for discovery |
+| `block` | `<start-unix-sec>`, `<end-unix-sec>` | Repeated | Unavailable time range. All values in Unix seconds. Repeat for multiple blocks within the month |
+
+`content` MUST be the empty string. No titles, descriptions, or participant information may appear anywhere in the event.
+
+Since this is parameterized replaceable, publishing a new version replaces the old one. Clients MUST include all blocks for the month in each published version — partial updates are not supported.
+
+### Recurring Busy List
+
+A single event holds standing commitments that repeat indefinitely. The `d` tag is the literal string `"recurring"`, distinguishing it from month-keyed events.
+
+```json
+{
+  "kind": 31926,
+  "pubkey": "<user hex pubkey>",
+  "created_at": 1700000000,
+  "tags": [
+    ["d", "recurring"],
+    ["t", "busy"],
+    ["block", "1733230800", "1733232600", "FREQ=WEEKLY;BYDAY=MO,WE,FR"],
+    ["block", "1733284800", "1733288400", "FREQ=DAILY"]
+  ],
+  "content": ""
+}
+```
+
+| Tag | Values | Required | Description |
+|-----|--------|----------|-------------|
+| `d` | `"recurring"` | Yes | Identifies this as the recurring busy list |
+| `t` | `"busy"` | Yes | Secondary tag for discovery |
+| `block` | `<start-unix-sec>`, `<end-unix-sec>`, `<rrule>` | Repeated | A recurring unavailable range. `start` and `end` define the **first occurrence**. `rrule` is a bare RFC 5545 RRULE value (no `RRULE:` prefix). The duration of each occurrence equals `end − start` seconds |
+
+The `rrule` value follows [RFC 5545 §3.8.5.3](https://www.rfc-editor.org/rfc/rfc5545#section-3.8.5.3). The `start` timestamp of the `block` tag serves as `DTSTART`; clients MUST NOT include `DTSTART` inside the RRULE string itself.
+
+#### Example expansion
+
+```
+["block", "1733230800", "1733232600", "FREQ=WEEKLY;BYDAY=MO"]
+```
+
+`end − start = 1800 s` (30 minutes). Starting from Unix timestamp `1733230800` (a Monday), this block recurs every Monday for 30 minutes. Clients expand all occurrences within the date range they are querying and treat each as an unavailable block.
+
+### Querying Busy Lists
+
+Fetch both monthly and recurring busy lists for a user in one subscription:
+
+```json
+{ "kinds": [31926], "authors": ["<user-pubkey>"] }
+```
+
+Filter client-side: events whose `d` tag matches `YYYY-MM` are monthly; the event with `d = "recurring"` contains RRULE-based blocks.
+
+To fetch only specific months (e.g. December 2024):
+
+```json
+{ "kinds": [31926], "authors": ["<user-pubkey>"], "#t": ["2024-12", "busy"] }
+```
+
+Note: this filter will not return the recurring event, so always fetch it separately or use the unfiltered query when checking availability.
+
+### Client Directives
+
+- Clients MUST NOT include any private details (titles, participants, locations) in busy list events. `content` MUST always be the empty string.
+- Clients SHOULD update the relevant monthly busy list whenever a private event that occupies a time block is created, edited, or deleted.
+- Clients SHOULD publish or update the recurring busy list whenever the user creates or removes a recurring private event.
+- When evaluating whether a time slot is free, clients MUST expand all recurring `block` entries for the date range under consideration and union them with the relevant monthly blocks.
+- Clients SHOULD fetch the recurring busy list alongside monthly busy lists whenever computing availability for any date range.
+
+---
+
+## 5. Private RSVP (kind `32069`)
 
 A private RSVP uses the same view-key encryption as kind `32678`. It is the private equivalent of NIP-52's kind `31925`.
 
@@ -352,7 +456,7 @@ The RSVP view key is distributed the same way as calendar event keys, using kind
 
 ---
 
-## 5. Participant Removal (kind `84`)
+## 6. Participant Removal (kind `84`)
 
 Published by a participant who opts out of a private event. This notifies the event author and other participants that this person is no longer attending.
 
@@ -386,7 +490,8 @@ Published by a participant who opts out of a private event. This notifies the ev
 4. Publish: { kind: 32678, tags: [["d", dTag]], content }
 5. Build event ref: ["32678:{authorPubkey}:{dTag}", "{relayHint}", "{nsec(viewSecretKey)}"]
 6. Add event ref to creator's calendar list (kind 32123), re-encrypt, re-publish
-7. For each participant (including creator):
+7. Update the relevant month's busy list (kind 31926) with the event's time block
+8. For each participant (including creator):
    a. Create rumor (kind 52):
       tags: [["a", "32678:{authorPubkey}:{dTag}", "{relayHint}"],
              ["viewKey", "{nsec(viewSecretKey)}"]]
@@ -451,3 +556,4 @@ This NIP extends and corrects the proposal in [nostr-protocol/nips#2027](https:/
 - **Calendar list privacy**: Self-encryption (encrypted to own pubkey) means no one else can read the list — but it also means losing the private key means losing all calendar data.
 - **Gift wrap sender privacy**: NIP-59 gift wraps use ephemeral keys for the outer wrap, obscuring the sender's identity from relay operators. The seal layer uses the sender's actual key to authenticate to the recipient.
 - **No forward secrecy**: If a `viewKey` is compromised, all past and future versions of the event (same `d-tag`) are readable. Rotating the key requires publishing a new event with a new `viewKey` and re-sharing it.
+- **Busy list granularity**: Monthly busy lists reveal *when* a user is unavailable but not the reason. Publishing very short or very precise blocks may allow inference about the nature of events. Clients MAY round block boundaries to reduce this risk.
