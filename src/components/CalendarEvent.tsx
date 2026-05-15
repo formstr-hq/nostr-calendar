@@ -73,6 +73,10 @@ import {
   buildEventRef,
   getCalendarEventCoordinate,
 } from "../utils/calendarListTypes";
+import {
+  getEventDisplayRange,
+  getEventOccurrenceRange,
+} from "../utils/eventOccurrence";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { EventCalendarListManagement } from "./EventCalendarListManagement";
 import { signerManager } from "../common/signer";
@@ -376,6 +380,7 @@ function ActionButtons({
     );
   }
 
+  const occurrenceRange = getEventOccurrenceRange(event);
   const linkToEvent = getEventPage(
     encodeNAddr(
       {
@@ -386,6 +391,7 @@ function ActionButtons({
       event.relayHint ? [event.relayHint] : undefined,
     ),
     event.viewKey,
+    occurrenceRange,
   );
   const eventUrl = `${getAppBaseUrl()}${linkToEvent}`;
   const copyLinkToEvent = () => {
@@ -498,6 +504,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const eventDisplayRange = getEventDisplayRange(event);
   const locations = event.location.filter((location) => !!location?.trim?.());
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
@@ -572,8 +579,8 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
       >
         <Stack spacing={2}>
           <TimeRenderer
-            begin={event.begin}
-            end={event.end}
+            begin={eventDisplayRange.begin}
+            end={eventDisplayRange.end}
             repeat={event.repeat}
             allDay={event.allDay}
           ></TimeRenderer>
@@ -788,7 +795,7 @@ function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
 
   const handleViewInCalendar = () => {
     setSuccessDialogOpen(false);
-    const d = dayjs(event.begin);
+    const d = dayjs(getEventDisplayRange(event).begin);
     navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
   };
 

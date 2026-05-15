@@ -8,6 +8,12 @@ import { Header } from "./Header";
 import { Alert, Box, CircularProgress, Toolbar } from "@mui/material";
 import { CalendarEventView } from "./CalendarEvent";
 import { useIntl } from "react-intl";
+import {
+  applyEventOccurrenceRange,
+  getEventOccurrenceRangeFromQuery,
+  OCCURRENCE_END_PARAM,
+  OCCURRENCE_START_PARAM,
+} from "../utils/eventOccurrence";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -65,6 +71,8 @@ export const ViewEventPage = () => {
   const { naddr } = useParams<{ naddr: string }>();
   const [queryParams] = useSearchParams();
   const viewKey = queryParams.get("viewKey");
+  const occurrenceStartParam = queryParams.get(OCCURRENCE_START_PARAM);
+  const occurrenceEndParam = queryParams.get(OCCURRENCE_END_PARAM);
   const [calendarEventLoadState, updateCalendarEventLoadState] =
     React.useState<ILoadState>(getInitialLoadState);
 
@@ -84,9 +92,14 @@ export const ViewEventPage = () => {
         } else {
           parsedEvent = nostrEventToCalendar(event, { relayHint });
         }
+        const occurrenceRange = getEventOccurrenceRangeFromQuery(
+          occurrenceStartParam,
+          occurrenceEndParam,
+          parsedEvent,
+        );
         updateCalendarEventLoadState((state) => ({
           ...state,
-          event: parsedEvent,
+          event: applyEventOccurrenceRange(parsedEvent, occurrenceRange),
           fetchState: "fetched",
         }));
       })
@@ -98,7 +111,13 @@ export const ViewEventPage = () => {
         }));
         console.error(e);
       });
-  }, [naddr, viewKey, updateCalendarEventLoadState]);
+  }, [
+    naddr,
+    viewKey,
+    occurrenceStartParam,
+    occurrenceEndParam,
+    updateCalendarEventLoadState,
+  ]);
   if (!naddr) {
     return null;
   }
