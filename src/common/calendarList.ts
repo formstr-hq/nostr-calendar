@@ -16,7 +16,7 @@
  *     ["title", "..."],
  *     ["content", "..."],         // optional description
  *     ["color", "#4285f4"],       // optional hex color
- *     ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"],
+ *     ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"],
  *     ...more "a" tags
  *   ]))
  * read protocol.md for details
@@ -131,7 +131,7 @@ export async function decryptCalendarList(
         notificationPreference = tag[1] === "disabled" ? "disabled" : "enabled";
         break;
       case "a":
-        // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+        // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
         eventRefs.push([tag[1], tag[2], tag[3]]);
         break;
     }
@@ -269,7 +269,7 @@ export async function createDefaultCalendar(): Promise<ICalendarList> {
  * Adds an event reference to a calendar list and republishes the updated list.
  *
  * @param calendarList - The calendar list to update
- * @param eventRef - Event reference array ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+ * @param eventRef - Event reference array ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
  * @returns The updated calendar list
  */
 export async function addEventToCalendarList(
@@ -295,7 +295,7 @@ export async function addEventToCalendarList(
  * Removes an event reference from a calendar list and republishes the updated list.
  *
  * @param calendarList - The calendar list to update
- * @param eventRef - Event reference array to remove (matched by coordinate)
+ * @param eventRef - Event reference array to remove (matched by coordinate string)
  * @returns The updated calendar list
  */
 export async function removeEventFromCalendarList(
