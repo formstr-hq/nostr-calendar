@@ -6,10 +6,10 @@
 
 This NIP extends [NIP-52](https://github.com/nostr-protocol/nips/blob/master/52.md) with a privacy layer, adding:
 
-- **Private calendar events** visible only to invited participants (kind `32678`)
+- **Private time-based events** visible only to invited participants (kind `32678`)
+- **Private day events** visible only to invited participants (kind `32681`)
 - **Calendar event gift wraps** that deliver decryption keys to participants (kind `1052`)
 - **Private calendar lists** — self-encrypted personal collections of event references (kind `32123`)
-- **Private RSVPs** encrypted with the same pattern as private events (kind `32069`)
 - **Participant removal** events to opt out of a private event (kind `84`)
 - **Public busy lists** for declaring unavailability without leaking event details (kind `31926`)
 
@@ -27,13 +27,11 @@ NIP-52E uses a **view key** pattern: event content is encrypted with a randomly 
 
 | Kind  | Name | Type |
 |-------|------|------|
-| 32678 | Private Calendar Event | Parameterized replaceable |
+| 32678 | Private Time-Based Calendar Event | Parameterized replaceable |
+| 32681 | Private Day Event | Parameterized replaceable |
 | 1052  | Calendar Event Gift Wrap | Regular (NIP-59) |
 | 52    | Calendar Event Rumor | Unsigned (inside gift wrap) |
 | 32123 | Private Calendar List | Parameterized replaceable |
-| 32069 | Private RSVP | Parameterized replaceable |
-| 1055  | RSVP Gift Wrap | Regular (NIP-59) |
-| 55    | RSVP Rumor | Unsigned (inside RSVP gift wrap) |
 | 84    | Participant Removal | Regular |
 | 31926 | Public Busy List | Parameterized replaceable |
 
@@ -63,7 +61,7 @@ innerTags = JSON.parse(nip44.decrypt(event.content, ck))
 
 ---
 
-## 1. Private Calendar Event (kind `32678`)
+## 1. Private Time-Based Calendar Event (kind `32678`)
 
 A private time-based calendar event. The equivalent of NIP-52 kind `31923`, but fully encrypted.
 
@@ -143,7 +141,86 @@ Decrypted inner tags (after applying the view key):
 
 ---
 
-## 2. Calendar Event Gift Wrap (kind `1052`)
+## 2. Private Day Event (kind `32681`)
+
+A private date-based calendar event spanning one or more whole days. The equivalent of NIP-52 kind `31922`, but fully encrypted using the same view-key pattern as kind `32678`.
+
+### Event Structure
+
+```json
+{
+  "kind": 32681,
+  "pubkey": "<author hex pubkey>",
+  "created_at": <unix timestamp>,
+  "tags": [["d", "<event d-tag>"]],
+  "content": "<NIP-44 encrypted blob>",
+  "id": "<event id>",
+  "sig": "<signature>"
+}
+```
+
+Only the `d` tag is public. All event data lives in the encrypted `content`.
+
+### Encrypted Content
+
+The plaintext is a JSON array of tags, serialized and then encrypted. Dates use the `YYYY-MM-DD` format from NIP-52 — not Unix timestamps:
+
+```json
+[
+  ["title", "<event title>"],
+  ["description", "<event description>"],
+  ["start", "<YYYY-MM-DD>"],
+  ["end", "<YYYY-MM-DD>"],
+  ["image", "<optional image URL>"],
+  ["d", "<event d-tag>"],
+  ["location", "<optional location>"],
+  ["p", "<author hex pubkey>"],
+  ["p", "<participant hex pubkey>"],
+  ["L", "rrule"],
+  ["l", "<RRULE string, e.g. FREQ=YEARLY>"],
+  ["notification", "<enabled|disabled>"]
+]
+```
+
+Required inner tags: `title`, `start`, `d`.
+Optional inner tags: `description`, `end` (exclusive end date; if absent the event spans only `start`), `image`, `location`, `p` (participants), `L`/`l` (RRULE for recurring events), `notification`.
+
+The `end` date is **exclusive** (following NIP-52 convention): an event with `start: 2024-12-24` and `end: 2024-12-26` spans December 24–25.
+
+### Example
+
+Published event (only `d` tag visible):
+
+```json
+{
+  "kind": 32681,
+  "pubkey": "ab12cd34ef56...",
+  "created_at": 1700000000,
+  "tags": [["d", "4a1b2c3d0f"]],
+  "content": "CqHzYw8...<NIP-44 ciphertext>...Rn2kS",
+  "id": "...",
+  "sig": "..."
+}
+```
+
+Decrypted inner tags (after applying the view key):
+
+```json
+[
+  ["title", "Company Offsite"],
+  ["description", "Annual team offsite"],
+  ["start", "2024-12-09"],
+  ["end", "2024-12-13"],
+  ["d", "4a1b2c3d0f"],
+  ["location", "Lisbon, Portugal"],
+  ["p", "ab12cd34ef56..."],
+  ["p", "12ab34cd56ef..."]
+]
+```
+
+---
+
+## 3. Calendar Event Gift Wrap (kind `1052`)
 
 When a private event is created, the author sends a [NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md) gift wrap to each participant (including themselves). The gift wrap carries the `viewKey` so participants can decrypt the event.
 
@@ -159,7 +236,7 @@ Recipients see incoming gift wraps as **invitations** — they must explicitly a
   "pubkey": "<sender hex pubkey>",
   "created_at": <unix timestamp>,
   "tags": [
-    ["a", "32678:<author hex pubkey>:<event d-tag>", "<relay hint URL>"],
+    ["a", "<32678|32681>:<author hex pubkey>:<event d-tag>", "<relay hint URL>"],
     ["viewKey", "<nsec-encoded view secret key>"]
   ],
   "content": "",
@@ -167,7 +244,7 @@ Recipients see incoming gift wraps as **invitations** — they must explicitly a
 }
 ```
 
-The `a` tag uses the standard NIP-01 parameterized address format: `kind:pubkey:d-tag`. The relay hint is the URL of a relay that accepted the private event, so the recipient can fetch it.
+The `a` tag uses the standard NIP-01 parameterized address format: `kind:pubkey:d-tag`. Use `32678` for time-based events and `32681` for day events. The relay hint is the URL of a relay that accepted the private event, so the recipient can fetch it.
 
 **Layer 2 — Seal** (kind `13`, signed by sender):
 - `content`: `nip44Encrypt(recipientPubkey, JSON.stringify(rumor))`
@@ -190,7 +267,7 @@ Unwrap: gift wrap → seal → rumor → extract the `a` tag coordinate and `vie
 
 When the user accepts an invitation:
 
-1. Build an event reference: `["{32678}:{authorPubkey}:{dTag}", "{relayHint}", "{nsecViewKey}"]`
+1. Build an event reference: `["{32678|32681}:{authorPubkey}:{dTag}", "{relayHint}", "{nsecViewKey}"]`
 2. Add the reference to the user's chosen calendar list (kind `32123`)
 3. Re-publish the updated calendar list
 
@@ -202,7 +279,7 @@ Before displaying an invitation, check if the event's `d-tag` already exists in 
 
 ---
 
-## 3. Private Calendar List (kind `32123`)
+## 4. Private Calendar List (kind `32123`)
 
 A private calendar list is a **self-encrypted**, parameterized replaceable event that organizes a user's private events into a named, colored collection. A user can have multiple calendar lists (e.g. "Work", "Personal", "Travel").
 
@@ -215,12 +292,24 @@ A private calendar list is a **self-encrypted**, parameterized replaceable event
   "kind": 32123,
   "pubkey": "<user hex pubkey>",
   "created_at": <unix timestamp>,
-  "tags": [["d", "<calendar UUID>"]],
+  "tags": [["d", "<calendar d-tag>"]],
   "content": "<NIP-44 self-encrypted blob>",
   "id": "<event id>",
   "sig": "<signature>"
 }
 ```
+
+### d-tag Derivation
+
+The `d` tag can be the first 16 hex characters (8 bytes) of the SHA-256 hash of `"<title>:<created_at>"`:
+
+```
+d = SHA-256("<title>:<created_at>").slice(0, 16)
+```
+
+Because parameterized replaceable events are scoped to `kind:pubkey:d`, the `d` tag only needs to be unique per author — a short, deterministic hash is sufficient. Using the title and creation time (rather than a random UUID) makes the identifier stable and reproducible from the same inputs.
+
+Example: title `"Work"`, `created_at` `1700000000` → `d = SHA-256("Work:1700000000").slice(0, 16)`
 
 ### Encryption and Decryption
 
@@ -242,7 +331,7 @@ plaintext = signer.nip44Decrypt(event.pubkey, event.content)
   ["color", "<hex color code, e.g. #4285f4>"],
   ["notifications", "disabled"],
   ["a", "32678:<authorPubkey>:<eventDTag>", "<relayUrl>", "<nsecViewKey>"],
-  ["a", "32678:<authorPubkey>:<eventDTag>", "<relayUrl>", "<nsecViewKey>"]
+  ["a", "32681:<authorPubkey>:<eventDTag>", "<relayUrl>", "<nsecViewKey>"]
 ]
 ```
 
@@ -280,7 +369,7 @@ Raw event on relay (only `d` tag visible to anyone):
   "kind": 32123,
   "pubkey": "ab12cd34...",
   "created_at": 1700000000,
-  "tags": [["d", "550e8400-e29b-41d4-a716-446655440000"]],
+  "tags": [["d", "a3f8c21b4d7e9012"]],
   "content": "Bx7Tz2...<NIP-44 ciphertext>...kR3mP",
   "id": "...",
   "sig": "..."
@@ -311,13 +400,13 @@ Whether a calendar list is shown or hidden in the UI is **client-side only** and
 
 ---
 
-## 4. Public Busy List (kind `31926`)
+## 5. Public Busy List (kind `31926`)
 
 A public busy list declares when a user is unavailable — without revealing why or with whom. It is a parameterized replaceable event with an empty `content` field so no private details are ever leaked.
 
 Any calendar client that knows a user's pubkey can fetch their busy list and render unavailable blocks. This enables free/busy visibility across clients without sharing event content.
 
-There are two forms: **monthly** (one event per calendar month, updated whenever a new event is added or removed) and **recurring** (a single event holding repeating busy blocks expressed as RRULE strings, useful for standing commitments like weekly meetings or working hours).
+There are two forms: **monthly** (one event per calendar month, updated whenever a new event is added or removed) and **recurring** (a single event holding repeating busy blocks expressed as RRULE strings, useful for standing commitments like weekly meetings or working hours). This is done to keep the event size reasonable.
 
 ### Monthly Busy List
 
@@ -408,51 +497,9 @@ Note: this filter will not return the recurring event, so always fetch it separa
 - Clients MUST NOT include any private details (titles, participants, locations) in busy list events. `content` MUST always be the empty string.
 - Clients SHOULD update the relevant monthly busy list whenever a private event that occupies a time block is created, edited, or deleted.
 - Clients SHOULD publish or update the recurring busy list whenever the user creates or removes a recurring private event.
+- For the above 2 cases, clients SHOULD ideally ask the user if they want a calendar event added to their public busy list.
 - When evaluating whether a time slot is free, clients MUST expand all recurring `block` entries for the date range under consideration and union them with the relevant monthly blocks.
 - Clients SHOULD fetch the recurring busy list alongside monthly busy lists whenever computing availability for any date range.
-
----
-
-## 5. Private RSVP (kind `32069`)
-
-A private RSVP uses the same view-key encryption as kind `32678`. It is the private equivalent of NIP-52's kind `31925`.
-
-### Event Structure
-
-Same pattern as private calendar events — all RSVP data encrypted in `content`, only `d` tag public:
-
-```json
-{
-  "kind": 32069,
-  "pubkey": "<author hex pubkey>",
-  "created_at": <unix timestamp>,
-  "tags": [["d", "<rsvp d-tag>"]],
-  "content": "<NIP-44 encrypted blob>",
-  "id": "<event id>",
-  "sig": "<signature>"
-}
-```
-
-### RSVP Gift Wrap (kind `1055`) and Rumor (kind `55`)
-
-The RSVP view key is distributed the same way as calendar event keys, using kind `1055` for the gift wrap and kind `55` for the rumor.
-
-**Rumor** (kind `55`, unsigned):
-
-```json
-{
-  "kind": 55,
-  "pubkey": "<sender hex pubkey>",
-  "created_at": <unix timestamp>,
-  "tags": [
-    ["a", "32069:<rsvp-author-pubkey>:<rsvp-d-tag>"],
-    ["viewKey", "<nsec-encoded view secret key>"]
-  ],
-  "content": ""
-}
-```
-
-**Gift Wrap**: kind `1055`, same three-layer NIP-59 structure as kind `1052`.
 
 ---
 
@@ -466,9 +513,9 @@ Published by a participant who opts out of a private event. This notifies the ev
   "pubkey": "<departing participant hex pubkey>",
   "created_at": <unix timestamp>,
   "tags": [
-    ["a", "32678:<author-pubkey>:<event-d-tag>"],
+    ["a", "<32678|32681>:<author-pubkey>:<event-d-tag>"],
     ["e", "<private event id>"],
-    ["k", "32678"]
+    ["k", "<32678|32681>"]
   ],
   "content": "<optional reason>",
   "id": "<event id>",
@@ -478,27 +525,65 @@ Published by a participant who opts out of a private event. This notifies the ev
 
 ---
 
+## Relay Hints
+
+Private events, gift wraps, and calendar lists span multiple parties and relays. Correct relay selection is critical: a stale or missing hint means participants cannot fetch the event.
+
+### Publishing Private Events
+
+When publishing a private event (kind `32678` or `32681`), the author MUST choose relays that all participants can read. The recommended strategy is:
+
+1. Fetch each participant's NIP-65 relay list (kind `10002`).
+2. Collect their **inbox** (read) relays.
+3. Publish the event to the union of the author's own write relays and all participants' inbox relays.
+
+The **relay hint** stored in the gift wrap rumor and in the calendar list MUST be one of the relays that accepted the event. Prefer a relay that all participants are likely to have read access to.
+
+### Sending Gift Wraps
+
+Each gift wrap (kind `1052`) is addressed to a single recipient and MUST be published to that recipient's inbox relays (from their NIP-65 kind `10002` relay list). Do not publish gift wraps to the author's own relays — the recipient may never see them.
+
+The rumor inside the gift wrap carries a relay hint in its `a` tag. This hint MUST point to a relay that currently hosts the private event, so the recipient can fetch it immediately after unwrapping.
+
+### Relay Hints in Calendar Lists
+
+The relay hint stored in each `a` tag inside a kind `32123` calendar list must remain accurate over time:
+
+- **At creation**: store the relay hint returned from the event publish step above.
+- **After editing**: if the event is re-published (e.g., to additional relays), update the calendar list's relay hint to a relay that has the latest version.
+- **At acceptance**: when a recipient accepts an invitation, they MUST extract the relay hint from the gift wrap's rumor `a` tag and store it verbatim in their calendar list entry. This is the relay the author chose as the canonical fetch point.
+- **Stale hints**: if a fetch against the stored hint fails, clients SHOULD retry against their known relay set before treating the event as missing. Clients SHOULD then update the stored hint to a relay that responded successfully.
+
+---
+
 ## Complete Protocol Flows
 
 ### Creating a Private Event
 
+Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and kind `32681` for day events (`start`/`end` as `YYYY-MM-DD` dates).
+
 ```
 1. Generate viewSecretKey (random)
 2. Build inner tags array: [["title", ...], ["start", ...], ...]
+   (use Unix timestamps for 32678; use YYYY-MM-DD strings for 32681)
 3. content = nip44.encrypt(JSON.stringify(innerTags),
              nip44.getConversationKey(viewSecretKey, getPublicKey(viewSecretKey)))
-4. Publish: { kind: 32678, tags: [["d", dTag]], content }
-5. Build event ref: ["32678:{authorPubkey}:{dTag}", "{relayHint}", "{nsec(viewSecretKey)}"]
-6. Add event ref to creator's calendar list (kind 32123), re-encrypt, re-publish
-7. Update the relevant month's busy list (kind 31926) with the event's time block
-8. For each participant (including creator):
+4. Determine target relays:
+   - Fetch NIP-65 relay lists (kind 10002) for all participants
+   - targetRelays = union(author write relays, all participant inbox relays)
+5. Publish { kind: 32678|32681, tags: [["d", dTag]], content } to targetRelays
+   - relayHint = one relay from targetRelays that accepted the event
+6. Build event ref: ["32678|32681:{authorPubkey}:{dTag}", "{relayHint}", "{nsec(viewSecretKey)}"]
+7. Add event ref to creator's calendar list (kind 32123), re-encrypt, re-publish
+8. Update the relevant month's busy list (kind 31926) with the event's time block
+9. For each participant (including creator):
    a. Create rumor (kind 52):
-      tags: [["a", "32678:{authorPubkey}:{dTag}", "{relayHint}"],
+      tags: [["a", "32678|32681:{authorPubkey}:{dTag}", "{relayHint}"],
              ["viewKey", "{nsec(viewSecretKey)}"]]
       content: ""
    b. Seal (kind 13): encrypt rumor for recipient using sender's key
    c. Gift Wrap (kind 1052): encrypt seal using ephemeral key, tag with recipient pubkey
-   d. Publish gift wrap to recipient's relays
+   d. Fetch recipient's NIP-65 inbox relays → publish gift wrap there
 ```
 
 ### Receiving and Accepting an Invitation
@@ -507,12 +592,14 @@ Published by a participant who opts out of a private event. This notifies the ev
 1. Subscribe: { kinds: [1052], "#p": [myPubkey] }
 2. For each gift wrap received:
    a. Unwrap: gift wrap → seal → rumor
-   b. Extract event coordinate and viewKey from rumor tags
+   b. Extract event coordinate, relayHint, and viewKey from rumor tags
    c. Check if event d-tag already exists in any calendar list → skip if so
-   d. Fetch: { kinds: [32678], "#d": [eventDTag], authors: [authorPubkey] }
+   d. Fetch from relayHint first, then fall back to known relays:
+      { kinds: [32678, 32681], "#d": [eventDTag], authors: [authorPubkey] }
    e. Decrypt with viewKey → display as pending invitation
 3. User accepts:
    a. Build event ref: [coordinate, relayHint, nsecViewKey]
+      (relayHint comes from the rumor's a tag — the author's chosen fetch relay)
    b. Add to chosen calendar list (kind 32123), re-publish
 4. User dismisses: hide locally, do not add to calendar
 ```
@@ -523,29 +610,17 @@ Published by a participant who opts out of a private event. This notifies the ev
 1. Fetch own calendar lists: { kinds: [32123], authors: [myPubkey] }
 2. Self-decrypt each list → extract event refs
 3. Parse each ref to get: kind, authorPubkey, eventDTag, relayUrl, viewKey
-4. Fetch events: { kinds: [32678], "#d": [dTags], authors: [authorPubkeys] }
-   (merge relay hints into the relay list for better fetch coverage)
+4. Fetch events, prioritising the stored relay hint per event:
+   { kinds: [32678, 32681], "#d": [dTags], authors: [authorPubkeys] }
+   (send each request to its relay hint first; merge fallback relays for any misses)
 5. Decrypt each event: viewPrivateKey = decode(nsecViewKey),
    innerTags = JSON.parse(nip44.decrypt(event.content,
                           getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey))))
 6. Associate each event with its calendar (for color theming, visibility)
 7. Deduplicate by event d-tag, keeping the higher created_at version
+8. For any event that was fetched from a relay other than its stored hint,
+   update the calendar list entry with the new relay hint and re-publish
 ```
-
----
-
-## Relationship to NIP-52 PR #2027
-
-This NIP extends and corrects the proposal in [nostr-protocol/nips#2027](https://github.com/nostr-protocol/nips/pull/2027). Key differences:
-
-| Topic | PR #2027 | NIP-52E |
-|-------|----------|---------|
-| `a` tag in rumor | `kind:viewerPubkey:dTag` (viewer pubkey) | `kind:authorPubkey:dTag` (standard NIP-01 format) |
-| Content encryption | Description separate tag; rest in content | **All** tags encrypted in content; nothing plaintext except `d` |
-| Private date-based event | kind `32677` | Not implemented; kind `32678` handles all time-based private events |
-| Private Calendar List | Not mentioned | Fully specified (kind `32123`) |
-| RSVP gift wrap kind | Same `1052` for all | Separate kinds: `1055` (RSVP) vs `1052` (event invitations) |
-| RSVP rumor kind | Implied `1052` | Separate kind: `55` |
 
 ---
 

@@ -2,6 +2,8 @@
 
 This document defines the appointment scheduling protocol implemented in this repository. It covers scheduling pages (kind `31927`), booking requests/responses over NIP-59 gift wraps, and the approval handoff into the existing private calendar-event flow.
 
+> **Protocol proposal:** This protocol is formalized in [NIP-Appointment-Scheduling](nips/NIP-Appointment-Scheduling.md). The private calendar event kinds used for confirmed appointments (`32678`, `1052`) are defined in [NIP-52E](nips/NIP-52E.md).
+
 ## Event Kinds
 
 | Kind | Name | Type | Description |
@@ -293,6 +295,13 @@ Expiry behavior:
 - **Public busy list opt-in:** The toggle is shown on event creation and invitation accept; the user's choice is persisted locally under `cal:busy_list_default_optout` and applied to subsequent flows. Booking approvals always emit a busy entry regardless of the toggle.
 
 ## Implementation References
+
+### NIP Proposals
+
+- [NIP-Appointment-Scheduling](nips/NIP-Appointment-Scheduling.md) — Full protocol specification for scheduling pages, booking requests, and booking responses
+- [NIP-52E](nips/NIP-52E.md) — Private calendar event kinds (`32678`, `1052`, `32123`, `31926`) used for confirmed appointments
+
+### Source Files
 
 - [src/common/EventConfigs.ts](src/common/EventConfigs.ts)
 - [src/utils/parser.ts](src/utils/parser.ts)

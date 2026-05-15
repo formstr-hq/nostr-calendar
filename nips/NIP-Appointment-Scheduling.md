@@ -2,7 +2,7 @@
 
 ## Appointment Scheduling
 
-`draft` `optional`
+`optional`
 
 This NIP defines a decentralized appointment scheduling system built on top of Nostr. It enables a host to publish their availability and booking rules, and bookers to request appointments — all without a central scheduling service.
 
@@ -87,7 +87,7 @@ The encrypted `content` is `JSON.stringify` of the following tag array:
 | `duration_mode` | `"fixed"\|"free"` | yes | `"fixed"` = booker picks from `slot_duration` values; `"free"` = booker picks any range within windows |
 | `avail` | `"recurring", <weekday-0-6>, <HH:MM>, <HH:MM>` | no | Weekly recurring window: `0` = Sunday, `6` = Saturday, start and end in 24-hour `HH:MM` |
 | `avail` | `"date", <YYYY-MM-DD>, <HH:MM>, <HH:MM>` | no | One-off date window |
-| `blocked` | `<YYYY-MM-DD>` | no | Override: block this date even if it falls inside a recurring window |
+| `blocked` | `<YYYY-MM-DD>` | no | Override: block this date even if it falls inside a recurring window. This takes precedence over `avail` |
 | `timezone` | `<IANA-tz>` | yes | IANA timezone string, e.g. `"America/New_York"`. Availability windows are interpreted in this timezone |
 | `min_notice` | `<seconds>` | no | Minimum lead time before a slot can be booked (default 0) |
 | `max_advance` | `<seconds>` | no | How far into the future slots are visible (default 30 days) |
@@ -159,34 +159,9 @@ A **tombstone** is an empty-content event with the same `d` tag. Clients that en
 
 ## Public Busy List (kind `31926`)
 
-A host publishes their **free/busy** state as a parameterized replaceable event — one per calendar month. This lets visiting bookers exclude already-taken slots without learning what those slots are.
+A host publishes their **free/busy** state as per NIP-52E. This lets visiting bookers exclude already-taken slots without learning what those slots are.
 
-```jsonc
-{
-  "kind": 31926,
-  "pubkey": "<host-pubkey>",
-  "created_at": 1700000000,
-  "tags": [
-    ["d", "2024-11"],
-    ["t", "2024-11"],
-    ["t", "busy"],
-    ["block", "1700000000", "1700003600"],
-    ["block", "1700100000", "1700103600"]
-  ],
-  "content": ""
-}
-```
-
-| Tag | Values | Description |
-|-----|--------|-------------|
-| `d` | `YYYY-MM` | Replacement key; one event per author per month |
-| `t` | `YYYY-MM` | Queryable month hashtag |
-| `t` | `"busy"` | Secondary tag for discovery |
-| `block` | `<start-unix-sec>`, `<end-unix-sec>` | Unavailable time range. Repeat for multiple blocks |
-
-Content is always the empty string — no private details are leaked.
-
-When a booking is approved, the host client MUST add a `block` entry to the relevant month's busy list and republish it.
+When a booking is approved, the host client MAY add a `block` entry to the relevant month's busy list and republish it, depending on whether the user wants it or not.
 
 ---
 
@@ -196,7 +171,7 @@ When a booker selects a slot, they send a **NIP-59 gift wrap** (kind `1057`) to 
 
 Crucially, the booker generates both the `d` tag and the **view key** for the future private event *before* sending the request. This means:
 
-1. The booker can add the event to their calendar immediately, with the correct view key — no placeholder needed.
+1. The booker can add the event to their calendar immediately, with the correct view key.
 2. The host uses the booker's key directly, so the booker never needs to receive and store a key from the host.
 
 ### Outer gift wrap (kind `1057`)
@@ -319,14 +294,14 @@ Standard NIP-59 gift wrap addressed to the booker. The `status` tag is left in p
 
 ## Private Calendar Event (kind `32678`)
 
-When a booking is approved, the host publishes a private calendar event as defined in NIP-52E. The host MUST:
+When a booking is approved, the host publishes a private calendar event as defined in NIP-52E. The host SHOULD:
 
 - Use the `d` tag supplied by the booker in the booking request.
 - Use the `viewKey` supplied by the booker in the booking request to encrypt the event content.
 - Include the booker's pubkey as a participant (`["p", "<booker-pubkey>"]`) in the encrypted content.
-- Send a kind `1052` **calendar event gift wrap** to the booker (per NIP-52E) so the booker's invitation inbox is notified and the booking status can be auto-approved.
+- Send a kind `1052` **calendar event gift wrap** to the booker (per NIP-52E) so the booker receives the viewKey as a fallback.
 
-The `1052` gift wrap MUST include a `["booking", "true"]` tag on the outer event so booker clients can distinguish booking confirmations from ordinary event invitations and auto-approve them without user interaction.
+The `1052` gift wrap MAY include a `["booking", "true"]` tag on the outer event so booker clients can distinguish booking confirmations from ordinary event invitations.
 
 ---
 
@@ -354,7 +329,7 @@ Alice generates `viewSecretKey_A`, encrypts the page body, and publishes:
 
 Alice also publishes a kind `32680` self-encrypted key record and shares the URL:
 ```
-https://app.example/book/naddr1.../alice-30min?viewKey=abcdef1234...
+https://calendar.formstr.app/schedule/naddr1...fds32?viewKey=abcdef1234...
 ```
 
 Alice publishes her December 2024 busy list with one existing block:
@@ -614,7 +589,6 @@ BOOKER                                       HOST
 - Relays SHOULD support `"#p"` tag filtering for kinds `1052`, `1057`, and `1058` so clients can efficiently retrieve only their own gift wraps.
 - Relays SHOULD apply standard NIP-01 parameterized-replaceable semantics to kinds `31926`, `31927`, and `32680` (keep only the latest version per `pubkey + d`).
 - Relays MAY support `"#t"` tag filtering for kind `31926` to allow clients to query busy lists by month (`"#t": ["2024-12"]`).
-- Relays SHOULD NOT require authentication to publish or subscribe to kind `1057` or `1058` gift wraps — the NIP-59 encryption provides confidentiality at the application layer.
 - Relays MAY limit the number of gift wraps stored per `#p` recipient to prevent storage abuse.
 - Relays SHOULD retain kind `31926` busy list replacements for at least as long as the month they represent, allowing late-arriving booker clients to catch up.
 
@@ -624,9 +598,8 @@ BOOKER                                       HOST
 
 - The scheduling page body (title, availability, location) is NIP-44 encrypted. Only someone with the share URL can read it.
 - Booking request and response messages are NIP-59 gift-wrapped — they are encrypted to the recipient and authored by an ephemeral key. Relays cannot link them to either party's Nostr identity.
-- The confirmed appointment (`kind 32678`) is encrypted with a key chosen by the *booker*. The host cannot modify the key after the booking is accepted. Neither the relay nor any observer learns the appointment details.
+- The confirmed appointment (`kind 32678`) is encrypted with a key chosen by the *booker*. Neither the relay nor any observer learns the appointment details.
 - The busy list (`kind 31926`) reveals *when* the host is unavailable but not *why* or *with whom*.
-- Clients SHOULD randomize gift wrap `created_at` per NIP-59 to resist timing correlation between the booking request and the confirmed appointment.
 
 ---
 

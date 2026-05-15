@@ -2,6 +2,8 @@
 
 This document describes the Nostr event kinds, encryption schemes, and data flows used by this calendar application for private events and calendars.
 
+> **Protocol proposals:** The event kinds and flows in this document are formalized as NIP proposals. See [NIP-52E](nips/NIP-52E.md) for private events, calendar lists, gift wraps, busy lists, and RSVPs; and [NIP-52R](nips/NIP-52R.md) for recurring event support.
+
 ## Event Kinds
 
 | Kind  | Name | Type | Description |
@@ -297,3 +299,13 @@ On startup, cached data is loaded first for immediate display, then relay fetche
 ## Migration
 
 Existing users who upgrade will have their events accessible only via gift wraps. On first load after upgrade, existing gift wraps appear as invitations. The user can accept them into their default calendar. This is intentional — it lets users organize events into calendars rather than auto-migrating everything.
+
+---
+
+## Protocol Proposals
+
+The event kinds and flows described in this document are formalized as Nostr protocol proposals:
+
+- [NIP-52E](nips/NIP-52E.md) — Private Calendar Events (kind `32678`), Calendar Event Gift Wraps (kind `1052`), Private Calendar Lists (kind `32123`), Public Busy Lists (kind `31926`), Private RSVPs (kind `32069`), and Participant Removal (kind `84`)
+- [NIP-52R](nips/NIP-52R.md) — Recurring Calendar Events via RRULE labels (addendum to NIP-52)
+- [NIP-09-PR](nips/NIP-09-PR.md) — Participant Self-Removal (kind `84`, extends NIP-09)
