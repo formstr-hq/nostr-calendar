@@ -166,6 +166,8 @@ export interface IBookingRequest {
   note: string;
   /** Pre-generated d-tag for the calendar event */
   dTag: string;
+  /** Pre-generated view key the host must use when publishing the event */
+  viewKey?: string;
   /** When this request was received (ms) */
   receivedAt: number;
   /** Current status */

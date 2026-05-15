@@ -177,19 +177,24 @@ export async function publishPrivateCalendarEvent(
     onAcceptedRelays,
     onRelayComplete,
     existingDTag,
+    existingViewKey,
     invitationGiftWrapTags = [],
     waitForAll = true
   }: {
-    onAcceptedRelays?: (url: string) => void; 
+    onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
     /** Optional pre-generated d-tag (e.g. from a booking request) */
     existingDTag?: string;
+    /** Optional nsec view key provided by the booker — reuse instead of generating a new one */
+    existingViewKey?: string;
     /** Optional public tags to place on the invitation gift wraps. */
     invitationGiftWrapTags?: string[][];
     waitForAll?: boolean,
   }
 ) {
-  const viewSecretKey = generateSecretKey();
+  const viewSecretKey = existingViewKey
+    ? (nip19.decode(existingViewKey as `nsec1${string}`).data as Uint8Array)
+    : generateSecretKey();
   const dTag =
     existingDTag ||
     bytesToHex(

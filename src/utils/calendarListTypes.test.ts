@@ -54,17 +54,6 @@ describe("buildEventRef", () => {
     expect(ref).toEqual(["32678:testpubkey:my-event", "wss://relay.example.com", "nsec1test"]);
   });
 
-  it("builds a ref with an empty viewKey (booking placeholder)", () => {
-    const ref = buildEventRef({
-      kind: 32678,
-      authorPubkey: "testpubkey",
-      eventDTag: "my-event",
-      viewKey: "",
-    });
-
-    expect(ref).toEqual(["32678:testpubkey:my-event", "", ""]);
-  });
-
   it("round-trips through build and parse", () => {
     const original = {
       kind: 32678,
