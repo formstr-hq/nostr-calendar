@@ -277,6 +277,7 @@ export async function publishPrivateCalendarEvent(
 export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
+  previousParticipants: string[] = [],
   onAcceptedRelays?: (url: string) => void,
   onRelayComplete?: (url: string, success: boolean) => void,
 ) {
@@ -285,10 +286,53 @@ export async function editPrivateCalendarEvent(
   const { signedEvent, eventKind, userPublicKey } =
     await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
-  await publishToRelays(signedEvent, onAcceptedRelays, undefined, {
-    waitForAll: true,
-    onRelayComplete,
-  });
+  let publishedRelayHint = "";
+  await publishToRelays(
+    signedEvent,
+    (url) => {
+      if (!publishedRelayHint) publishedRelayHint = url;
+      onAcceptedRelays?.(url);
+    },
+    undefined,
+    { waitForAll: true, onRelayComplete },
+  );
+
+  // Send gift wraps to participants that weren't in the previous version.
+  const previousSet = new Set(previousParticipants);
+  const newParticipants = event.participants.filter((p) => !previousSet.has(p));
+  if (newParticipants.length > 0) {
+    const [participantRelayMap, ...giftWraps] = await Promise.all([
+      fetchRelayLists(newParticipants),
+      ...newParticipants.map(async (participant) => {
+        const giftWrap = await nip59.wrapEvent(
+          {
+            pubkey: userPublicKey,
+            created_at: Math.floor(Date.now() / 1000),
+            kind: EventKinds.CalendarEventRumor,
+            content: "",
+            tags: [
+              [
+                "a",
+                `${eventKind}:${userPublicKey}:${dTag}`,
+                publishedRelayHint,
+              ],
+              ["viewKey", nip19.nsecEncode(viewSecretKey)],
+            ],
+          },
+          participant,
+          EventKinds.CalendarEventGiftWrap,
+        );
+        return { giftWrap, participant };
+      }),
+    ]);
+    await Promise.all(
+      giftWraps.map(async ({ giftWrap, participant }) => {
+        const relays = participantRelayMap.get(participant) ?? defaultRelays;
+        console.log(`Publishing invitation for ${participant} to ${relays}`);
+        await publishToRelays(giftWrap, undefined, relays);
+      }),
+    );
+  }
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
   const eventRef = buildEventRef({
