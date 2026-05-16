@@ -2,6 +2,7 @@
  * Calendar Sidebar
  *
  * Renders inside the hamburger menu drawer. Shows:
+ * - User profile + login/logout
  * - DatePicker for navigation
  * - List of calendars with color dots and visibility checkboxes
  * - "Add Calendar" button
@@ -22,12 +23,18 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  Avatar,
+  Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import CircleIcon from "@mui/icons-material/Circle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import LogoutIcon from "@mui/icons-material/Logout";
+import LoginIcon from "@mui/icons-material/Login";
+import PersonIcon from "@mui/icons-material/Person";
+import { npubEncode } from "nostr-tools/nip19";
 import { DatePicker } from "./DatePicker";
 import { useCalendarLists } from "../stores/calendarLists";
 import { CalendarManageDialog } from "./CalendarManageDialog";
@@ -41,6 +48,7 @@ import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { deviceCalendarColor } from "../utils/deviceCalendarAdapter";
 import { useUser } from "../stores/user";
 import { SchedulingPagesList } from "./SchedulingPagesList";
+import { isIOSNative } from "../utils/platform";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -50,7 +58,18 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { isInitialized } = useUser();
+  const { isInitialized, user, logout, updateLoginModal } = useUser();
+  const showProfileSection = !isIOSNative();
+
+  // Build a short display label for the logged-in user
+  const [imgFailed, setImgFailed] = useState(false);
+  let displayName = "";
+  if (user?.name) {
+    displayName = user.name;
+  } else if (user?.pubkey) {
+    const npub = npubEncode(user.pubkey);
+    displayName = `${npub.substring(0, 8)}…${npub.slice(-5)}`;
+  }
   const {
     calendars,
     toggleVisibility,
@@ -110,9 +129,12 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
 
   return (
     <Box
-      padding={theme.spacing(2)}
       sx={{
+        px: 2,
+        pb: 2,
+        pt: `calc(${theme.spacing(2)} + var(--safe-area-top))`,
         width: "100%",
+        minWidth: 260,
         maxHeight: "100vh",
         overflowY: "auto",
         overflowX: "hidden",
@@ -126,6 +148,78 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           </IconButton>
         )}
       </Box>
+
+      {showProfileSection && (
+        <>
+          {/* ── Profile / Login section ── */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              px: 0.5,
+              py: 1,
+              mb: 1,
+            }}
+          >
+            {/* Avatar */}
+            {user?.picture && !imgFailed ? (
+              <Avatar
+                src={user.picture}
+                alt={user.name}
+                onError={() => setImgFailed(true)}
+                sx={{ width: 40, height: 40 }}
+              />
+            ) : (
+              <Avatar sx={{ width: 40, height: 40, bgcolor: "grey.200" }}>
+                <PersonIcon sx={{ color: "grey.600" }} />
+              </Avatar>
+            )}
+
+            {/* Name / npub */}
+            <Box flex={1} minWidth={0}>
+              {user ? (
+                <Typography variant="body2" fontWeight={600} noWrap>
+                  {displayName}
+                </Typography>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {intl.formatMessage({ id: "navigation.login" })}
+                </Typography>
+              )}
+            </Box>
+
+            {/* Login / Logout button */}
+            {user ? (
+              <IconButton
+                size="small"
+                title={intl.formatMessage({ id: "navigation.logout" })}
+                onClick={async () => {
+                  await logout();
+                  onClose();
+                }}
+                sx={{ color: "error.main" }}
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            ) : (
+              <IconButton
+                size="small"
+                title={intl.formatMessage({ id: "navigation.login" })}
+                onClick={() => {
+                  updateLoginModal(true);
+                  onClose();
+                }}
+                sx={{ color: "primary.main" }}
+              >
+                <LoginIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          {/* ─────────────────────────── */}
+        </>
+      )}
 
       <DatePicker onSelect={onClose} />
 

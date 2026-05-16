@@ -5,9 +5,10 @@ import type { ICalendarEvent } from "../utils/types";
 import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import { Header } from "./Header";
-import { Alert, Box, CircularProgress, Toolbar } from "@mui/material";
+import { Alert, Box, CircularProgress } from "@mui/material";
 import { CalendarEventView } from "./CalendarEvent";
 import { useIntl } from "react-intl";
+import { HEADER_HEIGHT } from "./Header";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -109,7 +110,7 @@ export const ViewEventPage = () => {
         component={"main"}
         style={{ width: "100%", minHeight: `max(100vh, 100%)` }}
       >
-        <Toolbar />
+        <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
         {calendarEventLoadState.fetchState === "loading" ? (
           <LoaderRenderer />
         ) : null}

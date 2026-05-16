@@ -1,9 +1,9 @@
 import { useNavigate, useParams } from "react-router";
 import { useTimeBasedEvents } from "../stores/events";
 import { CalendarEvent } from "./CalendarEvent";
-import { Box, IconButton, Toolbar, Typography } from "@mui/material";
+import { Box, IconButton, Typography } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
-import { Header } from "./Header";
+import { Header, HEADER_HEIGHT } from "./Header";
 import { useIntl } from "react-intl";
 
 export const NotificationEventPage = () => {
@@ -16,7 +16,7 @@ export const NotificationEventPage = () => {
   return (
     <>
       <Header />
-      <Toolbar />
+      <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <IconButton onClick={() => navigate(-1)}>

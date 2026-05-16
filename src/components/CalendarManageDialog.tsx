@@ -97,7 +97,11 @@ export function CalendarManageDialog({
       maxWidth="sm"
       fullWidth
     >
-      <DialogTitle>
+      <DialogTitle
+        sx={{
+          pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2,
+        }}
+      >
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" fontWeight={600}>
             {isEdit
@@ -210,7 +214,13 @@ export function CalendarManageDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ padding: 2 }}>
+      <DialogActions
+        sx={{
+          px: 2,
+          pt: 2,
+          pb: isMobile ? "calc(16px + var(--safe-area-bottom))" : 2,
+        }}
+      >
         {isEdit && onDelete && (
           <Button color="error" onClick={onDelete} sx={{ mr: "auto" }}>
             {intl.formatMessage({ id: "navigation.delete" })}

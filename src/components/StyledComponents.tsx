@@ -9,19 +9,19 @@ export const StyledSecondaryHeader = styled(Box, {
 })<SecondaryHeaderProps>(({ topOffset = 0 }) => ({
   position: "sticky",
   // mobile portrait
-  top: 56 + topOffset,
+  top: `calc(var(--safe-area-top) + ${56 + topOffset}px)`,
 
   background: "#fff",
   zIndex: 1,
 
   // mobile landscape
   "@media (min-width:0px) and (orientation: landscape)": {
-    top: 48 + topOffset,
+    top: `calc(var(--safe-area-top) + ${48 + topOffset}px)`,
   },
 
   // desktop
   "@media (min-width:600px)": {
-    top: 64 + topOffset,
+    top: `calc(var(--safe-area-top) + ${64 + topOffset}px)`,
   },
 }));
 

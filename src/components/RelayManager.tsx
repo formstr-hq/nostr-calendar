@@ -130,7 +130,11 @@ export function RelayManager() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle
+          sx={{
+            pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2,
+          }}
+        >
           <Box
             style={{
               display: "flex",
@@ -228,7 +232,13 @@ export function RelayManager() {
           </Box>
         </DialogContent>
 
-        <DialogActions style={{ padding: 16 }}>
+        <DialogActions
+          sx={{
+            px: 2,
+            pt: 2,
+            pb: isMobile ? "calc(16px + var(--safe-area-bottom))" : 2,
+          }}
+        >
           <Button onClick={handleClose} color="inherit">
             {intl.formatMessage({ id: "navigation.cancel" })}
           </Button>
