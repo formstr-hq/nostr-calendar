@@ -16,7 +16,6 @@ import {
 import { createLocalSigner } from "./LocalSigner";
 import { NostrSigner } from "./types";
 import { DeferredSigner } from "./DeferredSigner";
-import { createNIP55Signer } from "./NIP55Signer";
 import { fetchUserProfile } from "../nostr";
 import { ANONYMOUS_USER_NAME, DEFAULT_IMAGE_URL } from "../../utils/constants";
 import { IUser } from "../../stores/user";
@@ -28,7 +27,7 @@ import {
   saveNip55Credentials,
   saveNsec,
 } from "../../utils/secureKeyStorage";
-import { isNative } from "../../utils/platform";
+import { isAndroidNative, isNative } from "../../utils/platform";
 import { nip19 } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
 
@@ -73,7 +72,7 @@ class Signer {
           restored = true;
         }
       }
-      if (!restored && nip55Creds) {
+      if (!restored && isAndroidNative() && nip55Creds) {
         console.log(
           "Restoring NIP-55 session with cached pubkey:",
           nip55Creds.pubkey,
@@ -190,6 +189,11 @@ class Signer {
   }
 
   async loginWithNip55(packageName: string, cachedPubkey?: string) {
+    if (!isAndroidNative()) {
+      throw new Error("NIP-55 login only supported on Android");
+    }
+
+    const { createNIP55Signer } = await import("./NIP55Signer");
     const signer = createNIP55Signer(packageName, cachedPubkey);
 
     // Step 1: ask Amber for pubkey (skipped if cachedPubkey provided)
