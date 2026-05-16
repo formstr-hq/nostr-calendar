@@ -43,6 +43,8 @@ export interface ICalendarEvent {
   description: string;
   kind: number;
   end: number;
+  occurrenceBegin?: number;
+  occurrenceEnd?: number;
   id: string;
   eventId: string;
   title: string;

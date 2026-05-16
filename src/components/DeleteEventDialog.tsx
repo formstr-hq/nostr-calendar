@@ -28,6 +28,7 @@ import { useBusyList } from "../stores/busyList";
 import type { ICalendarEvent } from "../utils/types";
 import { EventKinds } from "../common/EventConfigs";
 import { TimeRenderer } from "./TimeRenderer";
+import { getEventDisplayRange } from "../utils/eventOccurrence";
 import { useIntl } from "react-intl";
 
 type DeleteOption = "deleteForEveryone" | "removeFromCalendar" | "ignore";
@@ -142,6 +143,8 @@ export function DeleteEventDialog({
     return "inherit";
   };
 
+  const eventDisplayRange = getEventDisplayRange(event);
+
   return (
     <Dialog
       fullScreen={isMobile}
@@ -169,8 +172,8 @@ export function DeleteEventDialog({
               {event.title}
             </Typography>
             <TimeRenderer
-              begin={event.begin}
-              end={event.end}
+              begin={eventDisplayRange.begin}
+              end={eventDisplayRange.end}
               repeat={event.repeat}
               allDay={event.allDay}
             />

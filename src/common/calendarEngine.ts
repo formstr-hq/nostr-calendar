@@ -16,6 +16,8 @@ const DAY_MS = DAY_MINUTES * 60 * 1000;
 
 export interface CalendarEventSegment extends ICalendarEvent {
   renderKey: string;
+  occurrenceBegin: number;
+  occurrenceEnd: number;
   renderBegin: number;
   renderEnd: number;
 }
@@ -46,6 +48,8 @@ const buildSegment = (
   return {
     ...event,
     renderKey: `${event.eventId || event.id}:${occurrenceBegin}:${dayStart}`,
+    occurrenceBegin,
+    occurrenceEnd,
     renderBegin,
     renderEnd,
   };
@@ -127,7 +131,10 @@ export function layoutDayEvents(
     col.map((e) => {
       const startMinutes =
         dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute();
-      const rawDuration = dayjs(e.renderEnd).diff(dayjs(e.renderBegin), "minute");
+      const rawDuration = dayjs(e.renderEnd).diff(
+        dayjs(e.renderBegin),
+        "minute",
+      );
 
       // renderEnd may be exactly at the next midnight, so clamp the drawn
       // height to the current day to avoid spilling into the next column.

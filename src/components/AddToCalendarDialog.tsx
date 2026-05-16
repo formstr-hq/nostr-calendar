@@ -17,6 +17,7 @@ import type { ICalendarEvent } from "../utils/types";
 import { TimeRenderer } from "./TimeRenderer";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useIntl } from "react-intl";
+import { getEventDisplayRange } from "../utils/eventOccurrence";
 
 interface AddToCalendarDialogProps {
   open: boolean;
@@ -38,6 +39,7 @@ export function AddToCalendarDialog({
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const eventDisplayRange = getEventDisplayRange(event);
 
   const handleAccept = () => {
     if (selectedCalendarId) {
@@ -73,8 +75,8 @@ export function AddToCalendarDialog({
               {event.title}
             </Typography>
             <TimeRenderer
-              begin={event.begin}
-              end={event.end}
+              begin={eventDisplayRange.begin}
+              end={eventDisplayRange.end}
               repeat={event.repeat}
               allDay={event.allDay}
             />
