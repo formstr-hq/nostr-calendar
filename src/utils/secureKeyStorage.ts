@@ -1,38 +1,57 @@
 import { Preferences } from "@capacitor/preferences";
-import SecureKeyStorage from "@khadarvsk/capacitor-secure-storage";
-import { isAndroidNative } from "./platform";
+import { isNative } from "./platform";
+import SecureKeyStorage from "../plugins/secureKeyStorage";
 
 const NSEC_KEY = "nostr_nsec";
 
-async function setNsecValue(nsec: string) {
-  if (isAndroidNative()) {
-    await SecureKeyStorage.set({ key: NSEC_KEY, value: nsec });
-    return;
+async function trySecureStorage<T>(
+  secureAction: () => Promise<T>,
+  fallbackAction: () => Promise<T>,
+): Promise<T> {
+  if (!isNative) {
+    return fallbackAction();
   }
 
-  await Preferences.set({
-    key: NSEC_KEY,
-    value: nsec,
-  });
+  try {
+    return await secureAction();
+  } catch (error) {
+    console.warn(
+      "SecureKeyStorage unavailable, falling back to Preferences",
+      error,
+    );
+    return fallbackAction();
+  }
+}
+
+async function setNsecValue(nsec: string) {
+  await trySecureStorage(
+    () => SecureKeyStorage.set({ key: NSEC_KEY, value: nsec }),
+    () =>
+      Preferences.set({
+        key: NSEC_KEY,
+        value: nsec,
+      }),
+  );
 }
 
 async function getNsecValue(): Promise<string | null> {
-  if (isAndroidNative()) {
-    const { value } = await SecureKeyStorage.get({ key: NSEC_KEY });
-    return value;
-  }
-
-  const { value } = await Preferences.get({ key: NSEC_KEY });
-  return value;
+  return trySecureStorage(
+    async () => {
+      const { value } = await SecureKeyStorage.get({ key: NSEC_KEY });
+      return value;
+    },
+    async () => {
+      const { value } = await Preferences.get({ key: NSEC_KEY });
+      return value;
+    },
+  );
 }
 
 async function removeNsecValue() {
-  if (isAndroidNative()) {
-    await SecureKeyStorage.remove({ key: NSEC_KEY });
-    return;
-  }
-
-  await Preferences.remove({ key: NSEC_KEY });
+  await trySecureStorage(
+    () => SecureKeyStorage.remove({ key: NSEC_KEY }),
+    () => Preferences.remove({ key: NSEC_KEY }),
+  );
 }
 
 export async function saveNsec(nsec: string) {
