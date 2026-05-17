@@ -467,6 +467,7 @@ export function CalendarEventEdit({
           const updates = await editPrivateCalendarEvent(
             eventToSave,
             selectedCalendarId,
+            initialEvent?.participants ?? [],
             undefined,
             onRelayComplete,
           );
