@@ -62,6 +62,7 @@ import { CalendarListSelect } from "./CalendarListSelect";
 import { RelayPublishDialog } from "./RelayPublishDialog";
 import { RelayDots } from "./RelayDots";
 import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
+import { getRelayPublishCounts } from "../utils/relayPublishStatus";
 import {
   useBusyList,
   getBusyListDefaultOptIn,
@@ -697,14 +698,25 @@ export function CalendarEventEdit({
   const showRelayDetailsButton =
     hasRelayErrors && !processing && publishingRelays.length > 0;
   /** Save succeeded for the network, but at least one relay failed (event is already on the calendar). */
-  const hasRelaySuccess = publishingRelays.some((relayUrl) => {
-    return relayStatus[relayUrl] === "ok";
-  });
+  const { acceptedCount, failedCount, totalCount } = getRelayPublishCounts(
+    publishingRelays,
+    relayStatus,
+  );
+  const hasRelaySuccess = acceptedCount > 0;
   const partialSaveRelayIssues =
     !processing &&
     publishingRelays.length > 0 &&
     hasRelayErrors &&
     hasRelaySuccess;
+  const relayDotsLabel = partialSaveRelayIssues
+    ? intl.formatMessage(
+        { id: "event.relaysPartialPublishSummary" },
+        { acceptedCount, totalCount },
+      )
+    : intl.formatMessage(
+        { id: "event.publishingToRelays" },
+        { count: getRelays().length },
+      );
 
   if (!open || !eventDetails) {
     return null;
@@ -1318,10 +1330,7 @@ export function CalendarEventEdit({
         <RelayDots
           relays={publishingRelays}
           relayStatus={relayStatus}
-          label={intl.formatMessage(
-            { id: "event.publishingToRelays" },
-            { count: getRelays().length },
-          )}
+          label={relayDotsLabel}
           onDetailsClick={
             showRelayDetailsButton && !partialSaveRelayIssues
               ? () => setRelayDetailsOpen(true)
@@ -1379,9 +1388,12 @@ export function CalendarEventEdit({
         sx={{ lineHeight: 1.5 }}
       >
         <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
-          {intl.formatMessage({ id: "event.note" })}:{" "}
+          {intl.formatMessage({ id: "event.eventSaved" })}:{" "}
         </Box>
-        {intl.formatMessage({ id: "event.partialPublishHint" })}
+        {intl.formatMessage(
+          { id: "event.partialPublishHint" },
+          { acceptedCount, failedCount, totalCount },
+        )}
       </Typography>
     </Box>
   ) : null;

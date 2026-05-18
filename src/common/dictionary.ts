@@ -102,13 +102,16 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "No relays accepted the event. Please check your relay configuration and try again.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Some relays did not accept the event. You can try again for failed relays only.",
+      relayPartialSuccess: "Saved to {acceptedCount} of {totalCount} relay(s).",
+      relaysPartialPublishSummary:
+        "Saved to {acceptedCount}/{totalCount} relay(s)",
+      relayRetryHint:
+        "Retry failed relays to publish to relays that did not accept it.",
       retryFailedRelays: "Retry failed relays",
       closeEditor: "Close",
       note: "Note",
       partialPublishHint:
-        "The event is on your calendar. Retry to publish to relays that did not accept.",
+        "{acceptedCount} of {totalCount} relay(s) accepted it. You can retry the {failedCount} failed relay(s) only.",
       saving: "Saving...",
       saveEvent: "Save Event",
       copyLink: "Copy link to this event",
@@ -265,7 +268,8 @@ const dictionary: NestedObject = {
       author: "Organiser",
     },
     scheduling: {
-      featureDescription: "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
+      featureDescription:
+        "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
       sidebarTitle: "Booking Links",
       createSchedulingPage: "Create a booking page",
       createSchedulingPageButton: "Create page",
@@ -304,7 +308,8 @@ const dictionary: NestedObject = {
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
       eventTitle: "Event Title",
-      eventTitleHelp: "Title for calendar events created from bookings. You will be able to update it later on",
+      eventTitleHelp:
+        "Title for calendar events created from bookings. You will be able to update it later on",
       eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
@@ -453,13 +458,17 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "Kein Relay hat den Termin akzeptiert. Bitte überprüfen Sie Ihre Relay-Konfiguration und versuchen Sie es erneut.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Einige Relays haben den Termin nicht akzeptiert. Sie können nur fehlgeschlagene Relays erneut versuchen.",
+      relayPartialSuccess:
+        "Gespeichert auf {acceptedCount} von {totalCount} Relay(s).",
+      relaysPartialPublishSummary:
+        "Gespeichert auf {acceptedCount}/{totalCount} Relay(s)",
+      relayRetryHint:
+        "Fehlgeschlagene Relays erneut versuchen, um an Relays zu senden, die nicht angenommen haben.",
       retryFailedRelays: "Fehlgeschlagene Relays erneut senden",
       closeEditor: "Schließen",
       note: "Hinweis",
       partialPublishHint:
-        "Der Termin ist in Ihrem Kalender. Wiederholen, um an Relays zu senden, die nicht angenommen haben.",
+        "{acceptedCount} von {totalCount} Relay(s) haben ihn akzeptiert. Sie können nur die {failedCount} fehlgeschlagenen Relay(s) erneut versuchen.",
       saving: "Speichern...",
       saveEvent: "Termin speichern",
       copyLink: "Link zu diesem Termin kopieren",
@@ -621,7 +630,8 @@ const dictionary: NestedObject = {
       author: "Organisator",
     },
     scheduling: {
-      featureDescription: "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
+      featureDescription:
+        "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
       createSchedulingPage: "Terminseite erstellen",
       editSchedulingPage: "Terminseite bearbeiten",
       schedulingPages: "Terminplanung",
