@@ -163,6 +163,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           const invitation = batch.find((inv) => inv.eventId === eventId);
           if (!invitation) return;
           const decrypted = viewPrivateEvent(event, invitation.viewKey);
+          if (!decrypted) return;
           const parsed = nostrEventToCalendar(decrypted, {
             viewKey: invitation.viewKey,
             isPrivateEvent: true,

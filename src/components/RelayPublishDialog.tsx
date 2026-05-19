@@ -17,6 +17,7 @@ import type {
   RelayLineStatus,
   RelayStatusMap,
 } from "../utils/types";
+import { getRelayPublishCounts } from "../utils/relayPublishStatus";
 
 interface RelayPublishDialogProps {
   open: boolean;
@@ -54,14 +55,48 @@ export function RelayPublishDialog({
   showRetry = false,
 }: RelayPublishDialogProps) {
   const intl = useIntl();
-  const normalizedRelays = Array.from(new Set(relays.map(normalizeURL)));
+  const {
+    normalizedRelays,
+    acceptedCount,
+    failedCount,
+    pendingCount,
+    totalCount,
+  } = getRelayPublishCounts(relays, relayStatus);
+  const hasAcceptedRelays = acceptedCount > 0;
+  const hasFailedRelays = failedCount > 0;
+  const completed = totalCount > 0 && pendingCount === 0;
+  const partialSuccess = hasAcceptedRelays && acceptedCount < totalCount;
+  const titleId = hasAcceptedRelays
+    ? "event.eventSaved"
+    : "event.publishingEvent";
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {title ?? intl.formatMessage({ id: "event.publishingEvent" })}
-      </DialogTitle>
+      <DialogTitle>{title ?? intl.formatMessage({ id: titleId })}</DialogTitle>
       <DialogContent dividers>
+        {partialSuccess && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            <CheckCircleIcon sx={{ color: "success.main", mt: 0.25 }} />
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {intl.formatMessage(
+                  { id: "event.relayPartialSuccess" },
+                  { acceptedCount, totalCount },
+                )}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {intl.formatMessage({ id: "event.relayRetryHint" })}
+              </Typography>
+            </Box>
+          </Box>
+        )}
         <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
           {statusLabel ??
             intl.formatMessage(
@@ -103,9 +138,14 @@ export function RelayPublishDialog({
             );
           })}
         </Box>
-        {showRetry && (
+        {showRetry && !partialSuccess && (
+          <Typography color="warning.main" variant="body2" sx={{ mt: 2 }}>
+            {intl.formatMessage({ id: "event.relayRetryHint" })}
+          </Typography>
+        )}
+        {!hasAcceptedRelays && completed && hasFailedRelays && (
           <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-            {intl.formatMessage({ id: "event.relayPartialFailure" })}
+            {intl.formatMessage({ id: "event.noRelaysAccepted" })}
           </Typography>
         )}
       </DialogContent>

@@ -39,6 +39,7 @@ import {
 } from "../utils/parser";
 import type { IBusyList } from "../utils/types";
 import { relayPublishFeedbackMessage } from "../utils/relayFeedback";
+import { createLogger } from "../utils/logger";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -49,6 +50,8 @@ export const defaultRelays = [
   "wss://relay.snort.social",
   "wss://nostr21.com",
 ];
+
+const logger = createLogger("NOSTR_CORE");
 
 const _onAcceptedRelays = console.log.bind(
   console,
@@ -175,12 +178,21 @@ async function preparePrivateCalendarEvent(
 
 export async function publishPrivateCalendarEvent(
   event: ICalendarEvent,
-  onAcceptedRelays?: (url: string) => void,
-  onRelayComplete?: RelayPublishCompleteHandler,
-  /** Optional pre-generated d-tag (e.g. from a booking request) */
-  existingDTag?: string,
-  /** Optional public tags to place on the invitation gift wraps. */
-  invitationGiftWrapTags: string[][] = [],
+  {
+    onAcceptedRelays,
+    onRelayComplete,
+    existingDTag,
+    invitationGiftWrapTags = [],
+    waitForAll = true,
+  }: {
+    onAcceptedRelays?: (url: string) => void;
+    onRelayComplete?: RelayPublishCompleteHandler;
+    /** Optional pre-generated d-tag (e.g. from a booking request) */
+    existingDTag?: string;
+    /** Optional public tags to place on the invitation gift wraps. */
+    invitationGiftWrapTags?: string[][];
+    waitForAll?: boolean;
+  },
 ) {
   const viewSecretKey = generateSecretKey();
   const dTag =
@@ -201,7 +213,7 @@ export async function publishPrivateCalendarEvent(
       onAcceptedRelays?.(url);
     },
     undefined,
-    { waitForAll: true, onRelayComplete },
+    { waitForAll, onRelayComplete },
   );
 
   // Gift-wrap the event keys to each participant (including the creator).
@@ -267,6 +279,7 @@ export async function publishPrivateCalendarEvent(
 export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
+  previousParticipants: string[] = [],
   onAcceptedRelays?: (url: string) => void,
   onRelayComplete?: RelayPublishCompleteHandler,
 ) {
@@ -275,10 +288,53 @@ export async function editPrivateCalendarEvent(
   const { signedEvent, eventKind, userPublicKey } =
     await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
 
-  await publishToRelays(signedEvent, onAcceptedRelays, undefined, {
-    waitForAll: true,
-    onRelayComplete,
-  });
+  let publishedRelayHint = "";
+  await publishToRelays(
+    signedEvent,
+    (url) => {
+      if (!publishedRelayHint) publishedRelayHint = url;
+      onAcceptedRelays?.(url);
+    },
+    undefined,
+    { waitForAll: true, onRelayComplete },
+  );
+
+  // Send gift wraps to participants that weren't in the previous version.
+  const previousSet = new Set(previousParticipants);
+  const newParticipants = event.participants.filter((p) => !previousSet.has(p));
+  if (newParticipants.length > 0) {
+    const [participantRelayMap, ...giftWraps] = await Promise.all([
+      fetchRelayLists(newParticipants),
+      ...newParticipants.map(async (participant) => {
+        const giftWrap = await nip59.wrapEvent(
+          {
+            pubkey: userPublicKey,
+            created_at: Math.floor(Date.now() / 1000),
+            kind: EventKinds.CalendarEventRumor,
+            content: "",
+            tags: [
+              [
+                "a",
+                `${eventKind}:${userPublicKey}:${dTag}`,
+                publishedRelayHint,
+              ],
+              ["viewKey", nip19.nsecEncode(viewSecretKey)],
+            ],
+          },
+          participant,
+          EventKinds.CalendarEventGiftWrap,
+        );
+        return { giftWrap, participant };
+      }),
+    ]);
+    await Promise.all(
+      giftWraps.map(async ({ giftWrap, participant }) => {
+        const relays = participantRelayMap.get(participant) ?? defaultRelays;
+        console.log(`Publishing invitation for ${participant} to ${relays}`);
+        await publishToRelays(giftWrap, undefined, relays);
+      }),
+    );
+  }
 
   const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
   const eventRef = buildEventRef({
@@ -473,15 +529,20 @@ export const fetchAndDecryptPrivateRSVPEvents = (
 
 export function viewPrivateEvent(calendarEvent: Event, viewKey: string) {
   const viewPrivateKey = nip19.decode(viewKey as NSec).data;
-  const decryptedContent = nip44.decrypt(
-    calendarEvent.content,
-    nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
-  );
+  try {
+    const decryptedContent = nip44.decrypt(
+      calendarEvent.content,
+      nip44.getConversationKey(viewPrivateKey, getPublicKey(viewPrivateKey)),
+    );
 
-  return {
-    ...calendarEvent,
-    tags: JSON.parse(decryptedContent),
-  }; // Return the decrypted event details
+    return {
+      ...calendarEvent,
+      tags: JSON.parse(decryptedContent),
+    }; // Return the decrypted event details
+  } catch (error) {
+    logger.error("Could not decrypt event", calendarEvent, viewKey, error);
+  }
+  return null;
 }
 
 /**
