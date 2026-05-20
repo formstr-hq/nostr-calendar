@@ -25,6 +25,7 @@ import AddIcon from "@mui/icons-material/Add";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
+import { useIntl } from "react-intl";
 import { useBookingRequests } from "../stores/bookingRequests";
 import { useSchedulingPages } from "../stores/schedulingPages";
 import { useCalendarLists } from "../stores/calendarLists";
@@ -33,6 +34,9 @@ import { Header } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { ROUTES } from "../utils/routingHelper";
 import type { IBookingRequest, IOutgoingBooking } from "../utils/types";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
+import { getRelays } from "../common/nostr";
 
 const STATUS_COLORS: Record<
   string,
@@ -51,12 +55,8 @@ export const BookingNotifications = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tab, setTab] = useState(0);
 
-  const {
-    incomingRequests,
-    outgoingBookings,
-    isLoaded,
-    loadCached,
-  } = useBookingRequests();
+  const { incomingRequests, outgoingBookings, isLoaded, loadCached } =
+    useBookingRequests();
 
   const { pages } = useSchedulingPages();
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
@@ -207,6 +207,7 @@ function IncomingRequestCard({
   calendars: IncomingTabProps["calendars"];
   calendarsLoaded: boolean;
 }) {
+  const { formatMessage } = useIntl();
   const { participant, loading } = useGetParticipant({
     pubKey: request.bookerPubkey,
   });
@@ -220,6 +221,14 @@ function IncomingRequestCard({
   );
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
 
   // Find which scheduling page this request is for
   const pageRef = request.schedulingPageRef;
@@ -233,10 +242,13 @@ function IncomingRequestCard({
       );
       return;
     }
+    const relaysToPublish = getRelays();
+    initRelays(relaysToPublish);
+    setRelayDetailsOpen(true);
     setProcessing(true);
     setErrorMsg("");
     try {
-      await approveRequest(request.id, selectedCalendarId);
+      await approveRequest(request.id, selectedCalendarId, onRelayComplete);
       setApproveDialogOpen(false);
     } catch (e) {
       console.error(e);
@@ -441,6 +453,15 @@ function IncomingRequestCard({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={formatMessage({ id: "scheduling.publishingBookingApproval" })}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
     </Paper>
   );
 }

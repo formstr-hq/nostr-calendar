@@ -28,6 +28,9 @@ import { Participant } from "./Participant";
 import type { ICalendarEvent } from "../utils/types";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
+import { getRelays } from "../common/nostr";
+import { RelayPublishDialog } from "./RelayPublishDialog";
+import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
 
 export function InvitationPanel() {
   const intl = useIntl();
@@ -36,6 +39,14 @@ export function InvitationPanel() {
   const navigate = useNavigate();
   const { invitations, acceptInvitation, dismissInvitation } = useInvitations();
   const { fetchCalendars } = useCalendarLists();
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const {
+    relayStatus,
+    relayFeedback,
+    publishingRelays,
+    initRelays,
+    onRelayComplete,
+  } = useRelayPublishStatus();
 
   useEffect(() => {
     fetchCalendars();
@@ -58,7 +69,10 @@ export function InvitationPanel() {
   };
 
   const handleAcceptConfirm = async (calendarId: string) => {
-    await acceptInvitation(addDialogGiftWrapId, calendarId);
+    const relaysToPublish = getRelays();
+    initRelays(relaysToPublish);
+    setRelayDetailsOpen(true);
+    await acceptInvitation(addDialogGiftWrapId, calendarId, onRelayComplete);
     setAddDialogEvent(null);
   };
 
@@ -175,6 +189,14 @@ export function InvitationPanel() {
           onAccept={handleAcceptConfirm}
         />
       )}
+      <RelayPublishDialog
+        open={relayDetailsOpen}
+        title={intl.formatMessage({ id: "addToCalendar.publishingAdd" })}
+        relays={publishingRelays}
+        relayStatus={relayStatus}
+        relayFeedback={relayFeedback}
+        onClose={() => setRelayDetailsOpen(false)}
+      />
     </Box>
   );
 }

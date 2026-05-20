@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { normalizeURL } from "nostr-tools/utils";
-import type { RelayStatusMap } from "../utils/types";
+import type { RelayFeedbackMap, RelayStatusMap } from "../utils/types";
 
 function normalizeRelays(relays: string[]): string[] {
   return Array.from(new Set(relays.map(normalizeURL)));
@@ -8,6 +8,7 @@ function normalizeRelays(relays: string[]): string[] {
 
 export function useRelayPublishStatus() {
   const [relayStatus, setRelayStatus] = useState<RelayStatusMap>({});
+  const [relayFeedback, setRelayFeedback] = useState<RelayFeedbackMap>({});
   const [publishingRelays, setPublishingRelays] = useState<string[]>([]);
   const outcomesRef = useRef<Record<string, boolean>>({});
 
@@ -22,16 +23,24 @@ export function useRelayPublishStatus() {
         normalized.map((relayUrl) => [relayUrl, "pending" as const]),
       ) as RelayStatusMap,
     );
+    setRelayFeedback({});
   }, []);
 
-  const onRelayComplete = useCallback((url: string, ok: boolean) => {
-    const normalized = normalizeURL(url);
-    outcomesRef.current[normalized] = ok;
-    setRelayStatus((prev) => ({
-      ...prev,
-      [normalized]: ok ? "ok" : "error",
-    }));
-  }, []);
+  const onRelayComplete = useCallback(
+    (url: string, ok: boolean, feedback = "") => {
+      const normalized = normalizeURL(url);
+      outcomesRef.current[normalized] = ok;
+      setRelayStatus((prev) => ({
+        ...prev,
+        [normalized]: ok ? "ok" : "error",
+      }));
+      setRelayFeedback((prev) => ({
+        ...prev,
+        [normalized]: feedback,
+      }));
+    },
+    [],
+  );
 
   const getFailedRelays = useCallback(
     (relays?: string[]) => {
@@ -53,6 +62,13 @@ export function useRelayPublishStatus() {
       }
       return next;
     });
+    setRelayFeedback((prev) => {
+      const next = { ...prev };
+      for (const relayUrl of normalized) {
+        delete next[relayUrl];
+      }
+      return next;
+    });
   }, []);
 
   const hasRelayErrors = useMemo(
@@ -63,11 +79,13 @@ export function useRelayPublishStatus() {
   const reset = useCallback(() => {
     outcomesRef.current = {};
     setRelayStatus({});
+    setRelayFeedback({});
     setPublishingRelays([]);
   }, []);
 
   return {
     relayStatus,
+    relayFeedback,
     publishingRelays,
     initRelays,
     onRelayComplete,

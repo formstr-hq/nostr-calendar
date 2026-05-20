@@ -24,6 +24,7 @@ import {
 } from "nostr-tools/nip19";
 import { signerManager } from "./signer";
 import { RSVPStatus } from "../utils/types";
+import type { RelayPublishCompleteHandler } from "../utils/types";
 import { EventKinds } from "./EventConfigs";
 import { nostrRuntime } from "./nostrRuntime";
 import { useRelayStore } from "../stores/relays";
@@ -37,6 +38,7 @@ import {
   nostrEventToBusyList,
 } from "../utils/parser";
 import type { IBusyList } from "../utils/types";
+import { relayPublishFeedbackMessage } from "../utils/relayFeedback";
 import { createLogger } from "../utils/logger";
 
 export const defaultRelays = [
@@ -184,7 +186,7 @@ export async function publishPrivateCalendarEvent(
     waitForAll = true,
   }: {
     onAcceptedRelays?: (url: string) => void;
-    onRelayComplete?: (url: string, success: boolean) => void;
+    onRelayComplete?: RelayPublishCompleteHandler;
     /** Optional pre-generated d-tag (e.g. from a booking request) */
     existingDTag?: string;
     /** Optional public tags to place on the invitation gift wraps. */
@@ -279,7 +281,7 @@ export async function editPrivateCalendarEvent(
   calendarId: string,
   previousParticipants: string[] = [],
   onAcceptedRelays?: (url: string) => void,
-  onRelayComplete?: (url: string, success: boolean) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
@@ -592,7 +594,7 @@ export const publishToRelays = (
   relays?: string[],
   options: {
     waitForAll?: boolean;
-    onRelayComplete?: (url: string, success: boolean) => void;
+    onRelayComplete?: RelayPublishCompleteHandler;
   } = {},
 ) => {
   const { onRelayComplete } = options;
@@ -609,13 +611,13 @@ export const publishToRelays = (
           return r;
         }),
         new Promise<string>((_, reject) =>
-          setTimeout(() => reject("timeout"), 5000),
+          setTimeout(() => reject(new Error("timeout")), 5000),
         ),
       ]);
-      onRelayComplete?.(url, true);
+      onRelayComplete?.(url, true, relayPublishFeedbackMessage(reason));
       return reason;
     } catch (e) {
-      onRelayComplete?.(url, false);
+      onRelayComplete?.(url, false, relayPublishFeedbackMessage(e));
       throw e;
     } finally {
       if (relay) {
@@ -653,7 +655,7 @@ export const republishEventToRelays = (
   event: Event,
   relayUrls: string[],
   onAcceptedRelays?: (url: string) => void,
-  onRelayComplete?: (url: string, success: boolean) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ) =>
   publishToRelays(event, onAcceptedRelays ?? (() => {}), relayUrls, {
     waitForAll: true,
@@ -681,7 +683,7 @@ export const fetchCalendarEvents = (
 export const publishPublicCalendarEvent = async (
   event: ICalendarEvent,
   onAcceptedRelays?: (url: string) => void,
-  onRelayComplete?: (url: string, success: boolean) => void,
+  onRelayComplete?: RelayPublishCompleteHandler,
 ) => {
   const pubKey = await getUserPublicKey();
   const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();

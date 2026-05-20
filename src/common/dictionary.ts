@@ -162,6 +162,7 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
+      publishingCalendar: "Publishing calendar",
     },
     sidebar: {
       calendars: "Calendars",
@@ -196,6 +197,7 @@ const dictionary: NestedObject = {
       addToCalendar: "Add to Calendar",
       selectCalendar: "Select Calendar",
       addNewCalendar: "Add new calendar",
+      publishingAdd: "Publishing calendar update",
     },
     busyList: {
       publishToggle: "Show this time as busy on my public availability",
@@ -304,6 +306,9 @@ const dictionary: NestedObject = {
       sending: "Sending...",
       bookingRequestSent:
         "Booking request sent! You'll be notified when it's approved.",
+      publishingBookingApproval: "Publishing booking approval",
+      publishingBookingRequest: "Publishing booking request",
+      publishingPage: "Publishing booking page",
       selectDuration: "Select duration",
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
@@ -520,6 +525,7 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
+      publishingCalendar: "Kalender wird veröffentlicht",
     },
     sidebar: {
       calendars: "Kalender",
@@ -555,6 +561,7 @@ const dictionary: NestedObject = {
       addToCalendar: "Zum Kalender hinzufügen",
       selectCalendar: "Kalender auswählen",
       addNewCalendar: "Neuen Kalender hinzufügen",
+      publishingAdd: "Kalenderaktualisierung wird veröffentlicht",
     },
     busyList: {
       publishToggle:
@@ -663,6 +670,9 @@ const dictionary: NestedObject = {
       sending: "Wird gesendet...",
       bookingRequestSent:
         "Buchungsanfrage gesendet! Sie werden benachrichtigt, sobald sie genehmigt wird.",
+      publishingBookingApproval: "Buchungsgenehmigung wird veröffentlicht",
+      publishingBookingRequest: "Buchungsanfrage wird veröffentlicht",
+      publishingPage: "Terminseite wird veröffentlicht",
       selectDuration: "Dauer auswählen",
       noSlotsThisWeek:
         "Keine verfügbaren Zeitfenster diese Woche. Versuchen Sie eine andere Woche.",

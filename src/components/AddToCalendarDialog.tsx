@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -23,7 +24,7 @@ interface AddToCalendarDialogProps {
   open: boolean;
   onClose: () => void;
   event: ICalendarEvent;
-  onAccept: (calendarId: string) => void;
+  onAccept: (calendarId: string) => void | Promise<void>;
 }
 
 export function AddToCalendarDialog({
@@ -37,13 +38,26 @@ export function AddToCalendarDialog({
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     calendars[0]?.id || "",
   );
+  const [accepting, setAccepting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const eventDisplayRange = getEventDisplayRange(event);
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     if (selectedCalendarId) {
-      onAccept(selectedCalendarId);
+      setAccepting(true);
+      setErrorMsg("");
+      try {
+        await onAccept(selectedCalendarId);
+      } catch (error) {
+        setErrorMsg(
+          error instanceof Error ? error.message : "Failed to add event",
+        );
+        return;
+      } finally {
+        setAccepting(false);
+      }
       onClose();
     }
   };
@@ -87,6 +101,7 @@ export function AddToCalendarDialog({
             value={selectedCalendarId}
             onChange={setSelectedCalendarId}
           />
+          {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
         </Box>
       </DialogContent>
 
@@ -97,7 +112,7 @@ export function AddToCalendarDialog({
         <Button
           onClick={handleAccept}
           variant="contained"
-          disabled={!selectedCalendarId}
+          disabled={!selectedCalendarId || accepting}
         >
           {intl.formatMessage({ id: "navigation.add" })}
         </Button>

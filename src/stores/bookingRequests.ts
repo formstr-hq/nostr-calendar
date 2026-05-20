@@ -28,6 +28,7 @@ import type {
   IBookingRequest,
   IOutgoingBooking,
   ICalendarEvent,
+  RelayPublishCompleteHandler,
 } from "../utils/types";
 import { TEMP_CALENDAR_ID } from "./eventDetails";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
@@ -192,7 +193,11 @@ interface BookingRequestsState {
   fetchIncomingRequests: () => Promise<void>;
   fetchOutgoingBookings: () => Promise<void>;
   addOutgoingBooking: (booking: IOutgoingBooking) => void;
-  approveRequest: (requestId: string, calendarId: string) => Promise<void>;
+  approveRequest: (
+    requestId: string,
+    calendarId: string,
+    onRelayComplete?: RelayPublishCompleteHandler,
+  ) => Promise<void>;
   declineRequest: (requestId: string, reason?: string) => Promise<void>;
   markOutgoingApprovedByDTag: (dTag: string, viewKey: string) => void;
   checkExpiry: () => void;
@@ -354,7 +359,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     );
   },
 
-  approveRequest: async (requestId, calendarId) => {
+  approveRequest: async (requestId, calendarId, onRelayComplete) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
 
@@ -387,14 +392,13 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // publishPrivateCalendarEvent already sends invitation gift wraps
     // with viewKey to all participants (including booker), so the
     // booker's calendar will pick it up automatically.
-    const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
-      event,
-      {
-        existingDTag: request.dTag,
+    const { eventRef, authorPubkey, viewKey } =
+      await publishPrivateCalendarEvent(event, {
+        onRelayComplete,
+        existingDTag: request.dTag || undefined,
         invitationGiftWrapTags: [["booking", "true"]],
-        waitForAll: false
-      }
-    );
+        waitForAll: false,
+      });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
@@ -402,7 +406,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     // for a relay round-trip.
     await useCalendarLists
       .getState()
-      .addEventToCalendar(calendarId, eventRef);
+      .addEventToCalendar(calendarId, eventRef, onRelayComplete);
     const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
@@ -456,11 +460,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
           ? {
-            ...r,
-            status: "declined" as const,
-            respondedAt: Date.now(),
-            declineReason: reason,
-          }
+              ...r,
+              status: "declined" as const,
+              respondedAt: Date.now(),
+              declineReason: reason,
+            }
           : r,
       );
       const incomingUnreadCount = incomingRequests.filter(

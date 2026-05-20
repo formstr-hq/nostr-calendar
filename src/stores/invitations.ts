@@ -1,3 +1,4 @@
+import type { RelayPublishCompleteHandler } from "../utils/types";
 /**
  * Invitations Store
  *
@@ -58,7 +59,11 @@ interface InvitationsState {
   loadCachedInvitations: () => Promise<void>;
   fetchInvitations: () => void;
   stopInvitations: () => void;
-  acceptInvitation: (giftWrapId: string, calendarId: string) => Promise<void>;
+  acceptInvitation: (
+    giftWrapId: string,
+    calendarId: string,
+    onRelayComplete?: RelayPublishCompleteHandler,
+  ) => Promise<void>;
   dismissInvitation: (giftWrapId: string) => void;
   clearCachedInvitations: () => Promise<void>;
 }
@@ -274,7 +279,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
    * Builds the event reference from the invitation data and adds it
    * to the target calendar list.
    */
-  acceptInvitation: async (giftWrapId, calendarId) => {
+  acceptInvitation: async (giftWrapId, calendarId, onRelayComplete) => {
     const { invitations } = get();
     const invitation = invitations.find((i) => i.giftWrapId === giftWrapId);
     if (!invitation) return;
@@ -298,7 +303,9 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     });
 
     // Add to the selected calendar
-    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
+    await useCalendarLists
+      .getState()
+      .addEventToCalendar(calendarId, eventRef, onRelayComplete);
 
     // Update the event in the events store so it reflects the calendar assignment
     // and is no longer treated as an invitation. This prevents duplication when
