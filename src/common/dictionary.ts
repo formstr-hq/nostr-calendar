@@ -266,6 +266,8 @@ const dictionary: NestedObject = {
       clickToCopy: "Click to copy",
       copied: "Copied!",
       author: "Organiser",
+      alreadyAdded: "Participant already added",
+      invalid: "Enter a valid npub, NIP-05, or hex pubkey",
     },
     scheduling: {
       featureDescription:
@@ -628,6 +630,8 @@ const dictionary: NestedObject = {
       clickToCopy: "Klicken zum Kopieren",
       copied: "Kopiert!",
       author: "Organisator",
+      alreadyAdded: "Teilnehmer bereits hinzugefügt",
+      invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
     },
     scheduling: {
       featureDescription:
