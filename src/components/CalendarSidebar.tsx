@@ -10,7 +10,7 @@
  * Clicking a calendar name opens the management dialog for editing.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Alert,
   Box,
@@ -39,7 +39,6 @@ import { useIntl } from "react-intl";
 import { useTimeBasedEvents } from "../stores/events";
 import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { deviceCalendarColor } from "../utils/deviceCalendarAdapter";
-import { useUser } from "../stores/user";
 import { SchedulingPagesList } from "./SchedulingPagesList";
 
 interface CalendarSidebarProps {
@@ -50,7 +49,6 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { isInitialized } = useUser();
   const {
     calendars,
     toggleVisibility,
@@ -110,9 +108,12 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
 
   return (
     <Box
-      padding={theme.spacing(2)}
       sx={{
+        px: 2,
+        pb: 2,
+        pt: `calc(${theme.spacing(2)} + var(--safe-area-top))`,
         width: "100%",
+        minWidth: 260,
         maxHeight: "100vh",
         overflowY: "auto",
         overflowX: "hidden",

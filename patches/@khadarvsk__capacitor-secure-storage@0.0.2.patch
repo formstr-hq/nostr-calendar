@@ -1,0 +1,32 @@
+diff --git a/Package.swift b/Package.swift
+index 9c14a21fffdb49f4c7af3740b468373c7e1c906d..6f1851ce9922afda3662e17af9deba60ee75211e 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -2,11 +2,11 @@
+ import PackageDescription
+ 
+ let package = Package(
+-    name: "CapacitorSecureKeyStorage",
++    name: "KhadarvskCapacitorSecureStorage",
+     platforms: [.iOS(.v13)],
+     products: [
+         .library(
+-            name: "CapacitorSecureKeyStorage",
++            name: "KhadarvskCapacitorSecureStorage",
+             targets: ["SecureKeyStoragePlugin"]
+         )
+     ],
+diff --git a/package.json b/package.json
+index 81c0026684510bb6d9163f3402f67ab0cc49dee1..ffed251bb5e0b979e9072f3caffaa7cccd94c6d9 100644
+--- a/package.json
++++ b/package.json
+@@ -53,7 +53,8 @@
+   },
+   "capacitor": {
+     "ios": {
+-      "src": "ios"
++      "src": "ios",
++      "name": "CapacitorSecureKeyStorage"
+     },
+     "android": {
+       "src": "android",

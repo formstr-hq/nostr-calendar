@@ -1,4 +1,4 @@
-import { ThemeProvider, CssBaseline, Box, Toolbar } from "@mui/material";
+import { ThemeProvider, CssBaseline, Box } from "@mui/material";
 import { theme } from "./theme";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -8,14 +8,14 @@ import { flattenMessages } from "./common/utils";
 import dictionary from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
 import RelayManager from "./components/RelayManager";
-import { BrowserRouter, useNavigate } from "react-router";
+import { BrowserRouter, useLocation, useNavigate } from "react-router";
 import { Routing } from "./components/Routing";
 import { Header } from "./components/Header";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
-import { isNative } from "./utils/platform";
+import { isIOSNative, isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
 import {
   BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
@@ -34,6 +34,8 @@ import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
 import { useDateWithRouting } from "./hooks/useDateWithRouting";
+import { isPublicAppPath, usesStandaloneHeader } from "./utils/deepLinks";
+import { useNativeDeepLinks } from "./hooks/useNativeDeepLinks";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -56,6 +58,7 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
+  const location = useLocation();
   const events = useTimeBasedEvents((state) => state);
   const {
     calendars,
@@ -64,9 +67,17 @@ function Application() {
     fetchCalendars,
   } = useCalendarLists();
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
+  const publicRoute = isPublicAppPath(location.pathname);
+  const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
 
   useEffect(() => {
     initializeUser();
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.platform = isIOSNative()
+      ? "ios-native"
+      : "";
   }, []);
 
   const { fetchInvitations, stopInvitations } = useInvitations();
@@ -195,10 +206,16 @@ function Application() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!user && isInitialized) {
-      updateLoginModal(true);
+    if (!isInitialized || user) return;
+
+    if (publicRoute) {
+      updateLoginModal(false);
+      return;
     }
-  }, [user, isInitialized, updateLoginModal]);
+
+    updateLoginModal(true);
+  }, [user, isInitialized, updateLoginModal, publicRoute]);
+  useNativeDeepLinks();
 
   // Show onboarding dialog when user is logged in but has no calendars
   useEffect(() => {
@@ -226,7 +243,7 @@ function Application() {
 
   return (
     <>
-      <Header onImportEvent={setImportedEvent} />
+      {!standaloneHeaderRoute && <Header onImportEvent={setImportedEvent} />}
 
       <ICSListener
         importedEvent={importedEvent}
@@ -249,11 +266,20 @@ function Application() {
       )}
 
       <RelayManager />
-      <Toolbar />
+      {!standaloneHeaderRoute && (
+        <Box
+          sx={{
+            height: `calc(${56}px + var(--safe-area-top))`,
+            flexShrink: 0,
+          }}
+        />
+      )}
 
       <AppLoadingBar />
 
-      <Box>{user && <Routing />}</Box>
+      <Box>
+        <Routing />
+      </Box>
     </>
   );
 }

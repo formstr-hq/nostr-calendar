@@ -31,7 +31,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useIntl } from "react-intl";
 import { bytesToHex } from "nostr-tools/utils";
-import { isAndroidNative, isNative } from "../utils/platform";
+import { getAppBaseUrl, isAndroidNative, isNative } from "../utils/platform";
 
 const Nip46Section: React.FC<{
   onSuccess: () => void;
@@ -59,7 +59,7 @@ const Nip46Section: React.FC<{
       secret,
       perms,
       name: "Calendar",
-      url: window.location.origin,
+      url: getAppBaseUrl(),
     });
   });
 
@@ -524,7 +524,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
           <Nip55Section onClose={onClose} onError={setError} />
         )}
 
-        {isAndroidNative() && (
+        {isNative && (
           <Box>
             <OptionButton
               icon={<VpnKeyOutlinedIcon />}
@@ -557,9 +557,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             showChevron
             chevronRotated={showNip46}
           />
-          {showNip46 && (
-            <Nip46Section onSuccess={onClose} onError={setError} />
-          )}
+          {showNip46 && <Nip46Section onSuccess={onClose} onError={setError} />}
         </Box>
 
         <OptionButton

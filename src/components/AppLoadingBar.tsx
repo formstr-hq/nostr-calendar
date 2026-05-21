@@ -12,7 +12,7 @@ export function AppLoadingBar() {
     <Box
       sx={{
         position: "fixed",
-        top: 0,
+        top: "var(--safe-area-top)",
         left: 0,
         right: 0,
         opacity: visible ? 1 : 0,

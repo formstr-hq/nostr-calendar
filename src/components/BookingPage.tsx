@@ -375,7 +375,7 @@ export const BookingPage = () => {
     return (
       <>
         <Header />
-        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+        <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
         <Box
           sx={{
             display: "flex",
@@ -394,7 +394,7 @@ export const BookingPage = () => {
     return (
       <>
         <Header />
-        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+        <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
             {!viewKey
@@ -409,7 +409,7 @@ export const BookingPage = () => {
   return (
     <>
       <Header />
-      <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+      <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
       <Box
         sx={{
           maxWidth: 900,

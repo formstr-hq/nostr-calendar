@@ -1420,6 +1420,7 @@ export function CalendarEventEdit({
             maxWidth: 900,
             margin: "0 auto",
             padding: 24,
+            paddingTop: "calc(24px + var(--safe-area-top))",
           }}
         >
           <Box style={{ marginBottom: 24 }}>{titleBar}</Box>
@@ -1451,7 +1452,15 @@ export function CalendarEventEdit({
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>{titleBar}</DialogTitle>
+        <DialogTitle
+          style={{
+            paddingTop: isMobile
+              ? "calc(16px + var(--safe-area-top))"
+              : undefined,
+          }}
+        >
+          {titleBar}
+        </DialogTitle>
         <DialogContent dividers>
           {formContent}
           {partialPublishNote}
