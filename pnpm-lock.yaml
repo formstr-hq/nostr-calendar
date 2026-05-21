@@ -44,8 +44,8 @@ importers:
         specifier: ^11.14.1
         version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.3))(@types/react@19.2.7)(react@19.2.3)
       '@khadarvsk/capacitor-secure-storage':
-        specifier: github:khadar1020/secure_keystorage#0318d0e
-        version: https://codeload.github.com/khadar1020/secure_keystorage/tar.gz/0318d0e796b70c02114b16942e0c8fe7fafaf3f7(patch_hash=f65e5bd94568ebe73d4de50ef5e835902c7f995fa0be805ca03294745fcbf2e1)(@capacitor/core@8.0.0)
+        specifier: 0.0.2
+        version: 0.0.2(patch_hash=f65e5bd94568ebe73d4de50ef5e835902c7f995fa0be805ca03294745fcbf2e1)(@capacitor/core@8.0.0)
       '@mui/icons-material':
         specifier: ^7.2.0
         version: 7.2.0(@mui/material@7.2.0(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.3))(@types/react@19.2.7)(react@19.2.3))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@types/react@19.2.7)(react@19.2.3)
@@ -671,9 +671,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.29':
     resolution: {integrity: sha512-uw6guiW/gcAGPDhLmd77/6lW8QLeiV5RUTsAX46Db6oLhGaVj4lhnPwb184s1bkc8kdVg/+h988dro8GRDpmYQ==}
 
-  '@khadarvsk/capacitor-secure-storage@https://codeload.github.com/khadar1020/secure_keystorage/tar.gz/0318d0e796b70c02114b16942e0c8fe7fafaf3f7':
-    resolution: {tarball: https://codeload.github.com/khadar1020/secure_keystorage/tar.gz/0318d0e796b70c02114b16942e0c8fe7fafaf3f7}
-    version: 0.0.2
+  '@khadarvsk/capacitor-secure-storage@0.0.2':
+    resolution: {integrity: sha512-zDaU5pi2pD2q7nUnYdRk0+S3KDD8B4sERCjkzhOamvMmW/eAkpXcnE6T7fI0LqjTbbbNJwIR1gZW6wY6BKjXYQ==}
     peerDependencies:
       '@capacitor/core': ^8.0.0
 
@@ -3179,7 +3178,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.4
 
-  '@khadarvsk/capacitor-secure-storage@https://codeload.github.com/khadar1020/secure_keystorage/tar.gz/0318d0e796b70c02114b16942e0c8fe7fafaf3f7(patch_hash=f65e5bd94568ebe73d4de50ef5e835902c7f995fa0be805ca03294745fcbf2e1)(@capacitor/core@8.0.0)':
+  '@khadarvsk/capacitor-secure-storage@0.0.2(patch_hash=f65e5bd94568ebe73d4de50ef5e835902c7f995fa0be805ca03294745fcbf2e1)(@capacitor/core@8.0.0)':
     dependencies:
       '@capacitor/core': 8.0.0
 

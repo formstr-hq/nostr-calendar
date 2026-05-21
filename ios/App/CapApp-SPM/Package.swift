@@ -15,7 +15,7 @@ let package = Package(
         .package(name: "CapacitorApp", path: "../../../node_modules/.pnpm/@capacitor+app@8.0.1_@capacitor+core@8.0.0/node_modules/@capacitor/app"),
         .package(name: "CapacitorLocalNotifications", path: "../../../node_modules/.pnpm/@capacitor+local-notifications@8.0.1_@capacitor+core@8.0.0/node_modules/@capacitor/local-notifications"),
         .package(name: "CapacitorPreferences", path: "../../../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.0/node_modules/@capacitor/preferences"),
-        .package(name: "KhadarvskCapacitorSecureStorage", path: "../../../node_modules/.pnpm/@khadarvsk+capacitor-secure-storage@https+++codeload.github.com+khadar1020+secure_keyst_f90cf45e6156812c3974846eb14dbe15/node_modules/@khadarvsk/capacitor-secure-storage"),
+        .package(name: "KhadarvskCapacitorSecureStorage", path: "../../../node_modules/.pnpm/@khadarvsk+capacitor-secure-storage@0.0.2_patch_hash=f65e5bd94568ebe73d4de50ef5e835902c_27f60116bb409beae1c74b9c3ae75b97/node_modules/@khadarvsk/capacitor-secure-storage"),
         .package(name: "NostrSignerCapacitorPlugin", path: "../../../node_modules/.pnpm/nostr-signer-capacitor-plugin@0.0.5_patch_hash=02913e3c2941eee20a2c373e6f312de15f140907_c1f40da3e83cc0119c83ae057b4f451e/node_modules/nostr-signer-capacitor-plugin")
     ],
     targets: [
