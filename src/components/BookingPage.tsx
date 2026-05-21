@@ -49,7 +49,7 @@ import { Header, HEADER_HEIGHT } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { nip44, getPublicKey } from "nostr-tools";
+import { nip44, getPublicKey, generateSecretKey, nip19 } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import type { Event, Filter } from "nostr-tools";
 import type {
@@ -79,6 +79,7 @@ async function sendBookingRequest({
   title,
   note,
   dTag,
+  viewKey,
   relayHints,
 }: {
   schedulingPageRef: string;
@@ -88,6 +89,7 @@ async function sendBookingRequest({
   title: string;
   note: string;
   dTag: string;
+  viewKey: string;
   relayHints?: string[];
 }): Promise<Event> {
   const userPublicKey = await getUserPublicKey();
@@ -104,6 +106,7 @@ async function sendBookingRequest({
         ["title", title],
         ["note", note],
         ["d", dTag],
+        ["viewKey", viewKey],
       ],
     },
     creatorPubkey,
@@ -288,11 +291,13 @@ export const BookingPage = () => {
       const titleText =
         bookingTitle || page.eventTitle || `Meeting with ${page.title}`;
 
-      // Generate a d-tag for the future calendar event.
-      // The creator will use this d-tag when creating the event so it
-      // automatically resolves in the booker's calendar list.
+      // Generate a d-tag and view key for the future calendar event.
+      // The creator will use both when publishing the event so it
+      // appears correctly in the booker's calendar list from the start.
       const dTagRoot = `booking-${schedulingPageRef}-${selectedSlot.start.getTime()}-${Date.now()}`;
       const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
+      const viewSecretKey = generateSecretKey();
+      const viewKey = nip19.nsecEncode(viewSecretKey);
 
       // Extract relay hints from the scheduling page event tags
       const relayHints = page.relayHints;
@@ -305,19 +310,19 @@ export const BookingPage = () => {
         title: titleText,
         note: bookingNote,
         dTag,
+        viewKey,
         relayHints,
       });
 
-      // Add a placeholder event reference to the booker's calendar list.
-      // When the creator approves and publishes the event using this d-tag,
-      // the invitation gift wrap will provide the viewKey for decryption.
+      // Add the event reference to the booker's calendar list with the real
+      // view key immediately — no placeholder needed since the key is known.
       if (selectedCalendarId) {
         const calendarLists = useCalendarLists.getState();
         const eventRef = buildEventRef({
           kind: EventKinds.PrivateCalendarEvent,
           authorPubkey: page.user,
           eventDTag: dTag,
-          viewKey: "",
+          viewKey,
         });
         await calendarLists.addEventToCalendar(selectedCalendarId, eventRef);
       }
@@ -335,6 +340,7 @@ export const BookingPage = () => {
         sentAt: Date.now(),
         status: "pending",
         dTag,
+        viewKey,
       };
       useBookingRequests.getState().addOutgoingBooking(outgoing);
 
