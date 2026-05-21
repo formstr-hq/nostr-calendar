@@ -34,11 +34,8 @@ import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
 import { useDateWithRouting } from "./hooks/useDateWithRouting";
-import {
-  extractAppRouteFromUrl,
-  isPublicAppPath,
-  usesStandaloneHeader,
-} from "./utils/deepLinks";
+import { isPublicAppPath, usesStandaloneHeader } from "./utils/deepLinks";
+import { useNativeDeepLinks } from "./hooks/useNativeDeepLinks";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -218,47 +215,7 @@ function Application() {
 
     updateLoginModal(true);
   }, [user, isInitialized, updateLoginModal, publicRoute]);
-
-  useEffect(() => {
-    if (!isNative) return;
-
-    let cancelled = false;
-    let lastHandledUrl: string | null = null;
-    let cleanup: (() => void) | undefined;
-
-    const handleIncomingUrl = (
-      incomingUrl: string | undefined,
-      options?: { replace?: boolean },
-    ) => {
-      if (!incomingUrl || incomingUrl === lastHandledUrl) return;
-      const route = extractAppRouteFromUrl(incomingUrl);
-      if (!route) return;
-      lastHandledUrl = incomingUrl;
-      navigate(route, { replace: options?.replace ?? false });
-    };
-
-    import("@capacitor/app").then(async ({ App: CapApp }) => {
-      const launchUrl = await CapApp.getLaunchUrl();
-      if (!cancelled) {
-        handleIncomingUrl(launchUrl?.url, { replace: true });
-      }
-
-      const listener = CapApp.addListener("appUrlOpen", ({ url }) => {
-        if (!cancelled) {
-          handleIncomingUrl(url);
-        }
-      });
-
-      cleanup = () => {
-        listener.then((l) => l.remove());
-      };
-    });
-
-    return () => {
-      cancelled = true;
-      cleanup?.();
-    };
-  }, [navigate]);
+  useNativeDeepLinks();
 
   // Show onboarding dialog when user is logged in but has no calendars
   useEffect(() => {
