@@ -109,6 +109,11 @@ const WEEKDAY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: "SA", label: "S" },
 ];
 
+const uniqueParticipants = (participants: string[]) =>
+  Array.from(
+    new Set(participants.map((participant) => participant.toLowerCase())),
+  );
+
 function toRRuleBody(rule: string): string {
   const trimmed = rule.trim();
   if (trimmed.toUpperCase().startsWith("RRULE:")) {
@@ -331,7 +336,10 @@ export function CalendarEventEdit({
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
-      return { ...initialEvent };
+      return {
+        ...initialEvent,
+        participants: uniqueParticipants(initialEvent.participants),
+      };
     }
 
     const begin = initialDateTime || Date.now();
@@ -406,6 +414,7 @@ export function CalendarEventEdit({
     existingEvents,
     user?.pubkey,
   );
+  const displayParticipants = uniqueParticipants(eventDetails.participants);
 
   const handleClose = () => {
     resetRelayStatus();
@@ -460,6 +469,7 @@ export function CalendarEventEdit({
       const eventToSave = {
         ...eventDetails,
         isPrivateEvent: isPrivate,
+        participants: uniqueParticipants(eventDetails.participants),
         repeat: { rrule },
       };
 
@@ -1186,17 +1196,19 @@ export function CalendarEventEdit({
         <PeopleIcon />
         <Box style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <ParticipantAdd
+            participants={eventDetails.participants}
             onAdd={(pubKey) => {
-              const newParticipants = Array.from(
-                new Set([...eventDetails.participants, pubKey]),
-              );
+              const newParticipants = uniqueParticipants([
+                ...eventDetails.participants,
+                pubKey,
+              ]);
               updateField("participants", newParticipants);
             }}
           />
 
-          {eventDetails.participants.length > 0 && (
+          {displayParticipants.length > 0 && (
             <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {eventDetails.participants.map((participant) => (
+              {displayParticipants.map((participant) => (
                 <Box
                   key={participant}
                   style={{
