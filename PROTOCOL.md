@@ -2,13 +2,14 @@
 
 This document describes the Nostr event kinds, encryption schemes, and data flows used by this calendar application for private events and calendars.
 
+> **Protocol proposals:** The event kinds and flows in this document are formalized as NIP proposals. See [NIP-52E](nips/NIP-52E.md) for private events, calendar lists, gift wraps, busy lists, and RSVPs; and [NIP-52R](nips/NIP-52R.md) for recurring event support.
+
 ## Event Kinds
 
 | Kind  | Name | Type | Description |
 |-------|------|------|-------------|
 | 31923 | Public Calendar Event | Parameterized replaceable | NIP-52 time-based calendar event. Content and tags are plaintext. |
-| 32678 | Private Calendar Event | Parameterized replaceable | Single encrypted calendar event. Content is NIP-44 encrypted with a view key. |
-| 32679 | Private Recurring Event | Parameterized replaceable | Encrypted recurring calendar event (has RRULE). Same encryption as 32678. |
+| 32678 | Private Calendar Event | Parameterized replaceable | Encrypted calendar event (regular or recurring). Content is NIP-44 encrypted with a view key. Recurring events include an RRULE tag in the encrypted payload. |
 | 32123 | Calendar List | Parameterized replaceable | Self-encrypted list of event references, organized into named colored collections. |
 | 1052  | Calendar Event Gift Wrap | Regular | NIP-59 gift wrap containing a sealed rumor with a view key for a private event. Used for invitations. |
 | 13    | Seal | Regular | NIP-59 seal. Intermediate layer: sender encrypts the rumor for the recipient, then signs it. |
@@ -21,7 +22,7 @@ This document describes the Nostr event kinds, encryption schemes, and data flow
 
 ---
 
-## Private Event Encryption (kind 32678 / 32679)
+## Private Event Encryption (kind 32678)
 
 Private events use **view-key encryption**: a randomly generated NIP-44 keypair that is independent of the author's Nostr identity.
 
@@ -51,7 +52,7 @@ Private events use **view-key encryption**: a randomly generated NIP-44 keypair 
    ```
 5. Publish as a signed Nostr event:
    ```
-   kind: 32678 (or 32679 if recurring)
+   kind: 32678
    tags: [["d", "<uuid>"]]
    content: <encrypted blob>
    ```
@@ -84,7 +85,7 @@ content: nip44_encrypt_to_self(JSON.stringify([
   ["title", "My Calendar"],
   ["content", "Optional description"],
   ["color", "#4285f4"],
-  ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"],
+  ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"],
   ["a", ...],
   ...
 ]))
@@ -110,17 +111,17 @@ Since the event author is the user themselves, `event.pubkey` equals the user's 
 
 ### Event Reference Format
 
-Each `"a"` tag in the decrypted content follows a standard NIP `a`-tag coordinate with additional metadata:
+Each `"a"` tag in the decrypted content follows a standard NIP `a`-tag coordinate:
 
 ```
-["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
 ```
 
 **First value** (standard `a`-tag coordinate):
 
 | Field | Description |
 |-------|-------------|
-| `kind` | Nostr event kind (`32678` or `32679`) |
+| `kind` | Nostr event kind (`32678`) |
 | `authorPubkey` | Hex public key of the event author |
 | `eventDTag` | The event's unique `"d"` tag identifier |
 
@@ -130,15 +131,11 @@ Each `"a"` tag in the decrypted content follows a standard NIP `a`-tag coordinat
 |-------|-------------|
 | `relayUrl` | Relay URL where the event can be found (empty string if not specified) |
 
-**Third value** (colon-delimited metadata):
+**Third value**:
 
 | Field | Description |
 |-------|-------------|
 | `viewKey` | nsec-encoded key for decrypting the event |
-| `beginTimeSecs` | Event start time as unix timestamp (seconds) |
-| *(empty)* | Reserved field (empty between the two `::`) |
-| `endTimeSecs` | Event end time as unix timestamp (seconds) |
-| `isRecurring` | `"true"` or `"false"` — recurring events bypass time-range filters |
 
 ### Visibility
 
@@ -174,7 +171,7 @@ The three-layer NIP-59 structure:
 
 ### Invitation Flow
 
-1. **Creator** publishes a private event (kind 32678/32679) to relays
+1. **Creator** publishes a private event (kind 32678) to relays
 2. **Creator** adds the event reference (with viewKey) to their selected calendar list (kind 32123)
 3. **Creator** gift-wraps the viewKey and sends a kind 1052 event to each participant (including themselves)
 4. **Recipient** fetches recent gift wraps filtered by `#p` (limited to last 50)
@@ -197,19 +194,15 @@ Private events are fetched based on **calendar list references**, not gift wraps
 ### Fetch Strategy
 
 1. Collect all event refs from **visible** calendar lists via `getVisibleEventRefs()`
-2. Parse each ref to extract `eventDTag`, `authorPubkey`, `viewKey`, `beginTimeSecs`, and `isRecurring`
-3. Split refs into two groups:
-   - **Non-recurring** (`isRecurring=false`): include only if `beginTimeSecs` falls within the time range (default: −14 days to +28 days from now)
-   - **Recurring** (`isRecurring=true`): **always include** regardless of time range, since old recurring events may have future occurrences
-4. Skip any events already fetched in this session (tracked by `processedEventIds` set)
-5. Fetch all matching events in a **single relay subscription** using filters:
+2. Parse each ref to extract `eventDTag`, `authorPubkey`, `viewKey`, and `relayUrl`
+3. Skip any events already fetched in this session (tracked by `processedEventIds` set)
+4. Fetch all matching events in a **single relay subscription** using a filter:
    ```
    kinds: [32678], "#d": [eventIds], authors: [authorPubkeys]
-   kinds: [32679], "#d": [eventIds], authors: [authorPubkeys]
    ```
-6. For each received event, look up its `viewKey` from the ref map and decrypt
-7. Parse the decrypted tags into an `ICalendarEvent` and attach the `calendarId` for color theming
-8. Deduplicate by keeping the version with the newer `created_at` timestamp
+5. For each received event, look up its `viewKey` from the ref map and decrypt
+6. Parse the decrypted tags into an `ICalendarEvent` and attach the `calendarId` for color theming
+7. Deduplicate by keeping the version with the newer `created_at` timestamp
 
 ---
 
@@ -221,8 +214,8 @@ Private events are fetched based on **calendar list references**, not gift wraps
 User creates private event
   → Generate random viewSecretKey
   → Encrypt event data with viewKey (NIP-44)
-  → Sign and publish encrypted event to relays (kind 32678/32679)
-  → Build event ref (includes viewKey, timestamps, recurring flag)
+  → Sign and publish encrypted event to relays (kind 32678)
+  → Build event ref (coordinate, relay hint, viewKey)
   → Add event ref to selected calendar list
   → Re-encrypt and republish calendar list to relays (kind 32123)
   → Gift-wrap viewKey to each participant + self (kind 1052)
@@ -256,8 +249,7 @@ App starts / user logs in
   → Merge with cache (keep newer versions)
   → Auto-create default calendar if none exist (after 5s timeout)
   → Collect event refs from visible calendars
-  → Split into recurring / non-recurring
-  → Fetch private events by d-tag (kind 32678 + 32679)
+  → Fetch private events by d-tag (kind 32678)
   → Decrypt each with its viewKey
   → Fetch invitations from recent gift wraps (kind 1052)
   → Deduplicate against calendar contents
@@ -272,7 +264,7 @@ Calendar List (kind 32123)
   │
   └─ contains event refs with viewKeys
        │
-       └─ Private Event (kind 32678/32679)
+       └─ Private Event (kind 32678)
             │ encrypted with viewKey (NIP-44, key-to-self pattern)
             │
             └─ Decrypted event tags (title, description, start, end, etc.)
@@ -307,3 +299,13 @@ On startup, cached data is loaded first for immediate display, then relay fetche
 ## Migration
 
 Existing users who upgrade will have their events accessible only via gift wraps. On first load after upgrade, existing gift wraps appear as invitations. The user can accept them into their default calendar. This is intentional — it lets users organize events into calendars rather than auto-migrating everything.
+
+---
+
+## Protocol Proposals
+
+The event kinds and flows described in this document are formalized as Nostr protocol proposals:
+
+- [NIP-52E](nips/NIP-52E.md) — Private Calendar Events (kind `32678`), Calendar Event Gift Wraps (kind `1052`), Private Calendar Lists (kind `32123`), Public Busy Lists (kind `31926`), Private RSVPs (kind `32069`), and Participant Removal (kind `84`)
+- [NIP-52R](nips/NIP-52R.md) — Recurring Calendar Events via RRULE labels (addendum to NIP-52)
+- [NIP-09-PR](nips/NIP-09-PR.md) — Participant Self-Removal (kind `84`, extends NIP-09)

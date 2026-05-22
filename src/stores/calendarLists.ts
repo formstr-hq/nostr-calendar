@@ -27,7 +27,6 @@ import {
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
   createCalendar,
-  updateEventRefViewKey,
 } from "../common/calendarList";
 import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
 import { EventKinds } from "../common/EventConfigs";
@@ -99,7 +98,6 @@ interface CalendarListsState {
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
   getAllEventIds: () => string[];
-  updateEventViewKey: (eventDTag: string, viewKey: string) => Promise<void>;
   clearCachedCalendars: () => Promise<void>;
 }
 
@@ -400,29 +398,6 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     return calendars.flatMap((c) =>
       c.eventRefs.map((ref) => ref[0].split(":")[2]),
     );
-  },
-
-  /**
-   * Updates the viewKey for an event reference that has an empty viewKey (placeholder).
-   * Called when an invitation gift wrap arrives for an event the user already
-   * added to their calendar (e.g. via booking flow with empty viewKey).
-   */
-  updateEventViewKey: async (eventDTag, viewKey) => {
-    const { calendars } = get();
-
-    for (const calendar of calendars) {
-      const updated = await updateEventRefViewKey(calendar, eventDTag, viewKey);
-      if (updated) {
-        set((state) => {
-          const cals = state.calendars.map((c) =>
-            c.id === updated.id ? updated : c,
-          );
-          saveCalendarsToStorage(cals);
-          return { calendars: cals };
-        });
-        return;
-      }
-    }
   },
 
   /**

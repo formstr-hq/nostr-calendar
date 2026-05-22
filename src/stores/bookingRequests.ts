@@ -78,6 +78,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
   title: string;
   note: string;
   dTag: string;
+  viewKey?: string;
 }> {
   const rumor = await nip59.unwrapEvent(giftWrap);
   const getTag = (name: string) =>
@@ -90,6 +91,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
     title: getTag("title"),
     note: getTag("note"),
     dTag: getTag("d"),
+    viewKey: getTag("viewKey") || undefined,
   };
 }
 
@@ -255,6 +257,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             title: details.title,
             note: details.note,
             dTag: details.dTag,
+            viewKey: details.viewKey,
             receivedAt: giftWrap.created_at * 1000,
             status: "pending",
           };
@@ -383,14 +386,13 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       image: undefined,
     };
 
-    // Pass the booker's d-tag so the published event uses it.
-    // publishPrivateCalendarEvent already sends invitation gift wraps
-    // with viewKey to all participants (including booker), so the
-    // booker's calendar will pick it up automatically.
+    // Use the booker's pre-generated d-tag and view key so the published
+    // event matches exactly what the booker already added to their calendar.
     const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
       event,
       {
         existingDTag: request.dTag,
+        existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
         waitForAll: false
       }

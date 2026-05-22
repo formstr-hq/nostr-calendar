@@ -16,7 +16,7 @@
  *     ["title", "..."],
  *     ["content", "..."],         // optional description
  *     ["color", "#4285f4"],       // optional hex color
- *     ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"],
+ *     ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"],
  *     ...more "a" tags
  *   ]))
  * read protocol.md for details
@@ -131,7 +131,7 @@ export async function decryptCalendarList(
         notificationPreference = tag[1] === "disabled" ? "disabled" : "enabled";
         break;
       case "a":
-        // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+        // a-tag format: ["a", "{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
         eventRefs.push([tag[1], tag[2], tag[3]]);
         break;
     }
@@ -269,7 +269,7 @@ export async function createDefaultCalendar(): Promise<ICalendarList> {
  * Adds an event reference to a calendar list and republishes the updated list.
  *
  * @param calendarList - The calendar list to update
- * @param eventRef - Event reference array ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+ * @param eventRef - Event reference array ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
  * @returns The updated calendar list
  */
 export async function addEventToCalendarList(
@@ -295,7 +295,7 @@ export async function addEventToCalendarList(
  * Removes an event reference from a calendar list and republishes the updated list.
  *
  * @param calendarList - The calendar list to update
- * @param eventRef - Event reference array to remove (matched by coordinate)
+ * @param eventRef - Event reference array to remove (matched by coordinate string)
  * @returns The updated calendar list
  */
 export async function removeEventFromCalendarList(
@@ -360,40 +360,3 @@ export async function moveEventBetweenCalendarLists(
   return { source: updatedSource, target: updatedTarget };
 }
 
-/**
- * Updates the viewKey of an event reference in a calendar list and republishes.
- * Used when a placeholder ref (empty viewKey) needs to be filled with the real
- * viewKey received from an invitation gift wrap.
- *
- * @param calendarList - The calendar list containing the ref to update
- * @param eventDTag - The d-tag of the event whose viewKey should be updated
- * @param viewKey - The new viewKey to set
- * @returns The updated calendar list, or null if no matching ref was found
- */
-export async function updateEventRefViewKey(
-  calendarList: ICalendarList,
-  eventDTag: string,
-  viewKey: string,
-): Promise<ICalendarList | null> {
-  const refIndex = calendarList.eventRefs.findIndex(
-    (ref) => ref[0].split(":")[2] === eventDTag && (!ref[2] || ref[2] === ""),
-  );
-
-  if (refIndex === -1) return null;
-
-  const updatedRefs = [...calendarList.eventRefs];
-  updatedRefs[refIndex] = [
-    updatedRefs[refIndex][0],
-    updatedRefs[refIndex][1],
-    viewKey,
-  ];
-
-  const updated: ICalendarList = {
-    ...calendarList,
-    eventRefs: updatedRefs,
-    createdAt: Math.floor(Date.now() / 1000),
-  };
-
-  await publishCalendarList(updated);
-  return updated;
-}

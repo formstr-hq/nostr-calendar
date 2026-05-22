@@ -30,22 +30,18 @@ export interface ICalendarList {
   notificationPreference?: NotificationPreference;
   /**
    * References to calendar events as standard NIP a-tag arrays:
-   * ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+   * ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
    *
    * First element (a-tag coordinate):
-   * - kind: Nostr event kind (32678 or 32679)
+   * - kind: Nostr event kind (32678)
    * - authorPubkey: hex public key of the event author
    * - eventDTag: the event's unique "d" tag identifier
    *
    * Second element (optional relay URL):
    * - Relay URL where the event can be found (empty string if not specified)
    *
-   * Third element (metadata):
+   * Third element:
    * - viewKey: nsec-encoded key for decrypting the event
-   * - beginTimeSecs: event start time as unix timestamp (seconds)
-   * - (empty): reserved field
-   * - endTimeSecs: event end time as unix timestamp (seconds)
-   * - isRecurring: "true" or "false" — recurring events bypass time-range filters
    */
   eventRefs: string[][];
   /** Nostr event created_at timestamp */
@@ -90,7 +86,7 @@ export const DEFAULT_CALENDAR_TITLE = "My Calendar";
 /**
  * Parses an event reference array from a calendar list into its components.
  *
- * Format: ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+ * Format: ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
  */
 export function parseEventRef(ref: string[]): {
   kind: number;
@@ -100,20 +96,19 @@ export function parseEventRef(ref: string[]): {
   viewKey: string;
 } {
   const coordinateParts = ref[0].split(":");
-  const metadataParts = ref[2].split(":");
   return {
     kind: parseInt(coordinateParts[0], 10),
     authorPubkey: coordinateParts[1],
     eventDTag: coordinateParts[2],
-    relayUrl: ref[1],
-    viewKey: metadataParts[0],
+    relayUrl: ref[1] ?? "",
+    viewKey: ref[2] ?? "",
   };
 }
 
 /**
  * Builds an event reference array for storage in a calendar list.
  *
- * Returns: ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}:{beginTimeSecs}::{endTimeSecs}:{isRecurring}"]
+ * Returns: ["{kind}:{authorPubkey}:{eventDTag}", "{relayUrl}", "{viewKey}"]
  */
 export function buildEventRef(params: {
   kind: number;
@@ -125,7 +120,7 @@ export function buildEventRef(params: {
   return [
     `${params.kind}:${params.authorPubkey}:${params.eventDTag}`,
     params.relayUrl || "",
-    `${params.viewKey}`,
+    params.viewKey,
   ];
 }
 
