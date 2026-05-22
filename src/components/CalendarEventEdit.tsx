@@ -483,7 +483,7 @@ export function CalendarEventEdit({
               eventToSave,
               {
                 onRelayComplete,
-                waitForAll: true
+                waitForAll: false
               }
             );
           setSignedEventForRetry(calendarEvent);
