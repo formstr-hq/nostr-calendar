@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { Route, Routes } from "react-router";
 import { ViewEventPage } from "./ViewEventPage";
 import { EditEventPage } from "./EditEventPage";
@@ -11,17 +10,6 @@ import { InvitationPanel } from "./InvitationPanel";
 import { SchedulingPageEdit } from "./SchedulingPageEdit";
 import { BookingPage } from "./BookingPage";
 import { BookingNotifications } from "./BookingNotifications";
-import { useUser } from "../stores/user";
-
-const Protected = ({ children }: { children: ReactNode }) => {
-  const { user, isInitialized } = useUser();
-
-  if (!isInitialized || !user) {
-    return null;
-  }
-
-  return <>{children}</>;
-};
 
 export const Routing = () => {
   return (
@@ -31,95 +19,17 @@ export const Routing = () => {
         path={ROUTES.SchedulingPagePublic}
         element={<BookingPage />}
       />
-
-      <Route
-        path={ROUTES.EditEventPage}
-        element={
-          <Protected>
-            <EditEventPage />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.DuplicateEventPage}
-        element={
-          <Protected>
-            <DuplicateEventPage />
-          </Protected>
-        }
-      />
-      <Route
-        path="/notification-event/:eventId"
-        element={
-          <Protected>
-            <NotificationEventPage />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.Notifications}
-        element={
-          <Protected>
-            <InvitationPanel />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.SchedulingPageEdit}
-        element={
-          <Protected>
-            <SchedulingPageEdit />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.SchedulingPageCreate}
-        element={
-          <Protected>
-            <SchedulingPageEdit />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.Bookings}
-        element={
-          <Protected>
-            <BookingNotifications />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.WeekCalendar}
-        element={
-          <Protected>
-            <Calendar />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.MonthCalendar}
-        element={
-          <Protected>
-            <Calendar />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.DayCalendar}
-        element={
-          <Protected>
-            <Calendar />
-          </Protected>
-        }
-      />
-      <Route
-        path="*"
-        element={
-          <Protected>
-            <Index />
-          </Protected>
-        }
-      />
+      <Route path={ROUTES.EditEventPage} element={<EditEventPage />} />
+      <Route path={ROUTES.DuplicateEventPage} element={<DuplicateEventPage />} />
+      <Route path="/notification-event/:eventId" element={<NotificationEventPage />} />
+      <Route path={ROUTES.Notifications} element={<InvitationPanel />} />
+      <Route path={ROUTES.SchedulingPageEdit} element={<SchedulingPageEdit />} />
+      <Route path={ROUTES.SchedulingPageCreate} element={<SchedulingPageEdit />} />
+      <Route path={ROUTES.Bookings} element={<BookingNotifications />} />
+      <Route path={ROUTES.WeekCalendar} element={<Calendar />} />
+      <Route path={ROUTES.MonthCalendar} element={<Calendar />} />
+      <Route path={ROUTES.DayCalendar} element={<Calendar />} />
+      <Route path="*" element={<Index />} />
     </Routes>
   );
 };

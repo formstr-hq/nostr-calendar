@@ -69,6 +69,7 @@ function Application() {
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
   const publicRoute = isPublicAppPath(location.pathname);
   const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
+  const shouldRenderRouting = isInitialized && (Boolean(user) || publicRoute);
 
   useEffect(() => {
     initializeUser();
@@ -277,9 +278,7 @@ function Application() {
 
       <AppLoadingBar />
 
-      <Box>
-        <Routing />
-      </Box>
+      <Box>{shouldRenderRouting ? <Routing /> : null}</Box>
     </>
   );
 }

@@ -10,7 +10,7 @@
  * Clicking a calendar name opens the management dialog for editing.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -40,6 +40,7 @@ import { useTimeBasedEvents } from "../stores/events";
 import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { deviceCalendarColor } from "../utils/deviceCalendarAdapter";
 import { SchedulingPagesList } from "./SchedulingPagesList";
+import { useUser } from "../stores/user";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -49,6 +50,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { isInitialized } = useUser();
   const {
     calendars,
     toggleVisibility,
