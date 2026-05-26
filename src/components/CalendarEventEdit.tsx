@@ -479,13 +479,10 @@ export function CalendarEventEdit({
             .updateEvent({ ...updates.event, calendarId: updates.calendarId });
         } else {
           const { eventRef, authorPubkey, calendarEvent } =
-            await publishPrivateCalendarEvent(
-              eventToSave,
-              {
-                onRelayComplete,
-                waitForAll: true
-              }
-            );
+            await publishPrivateCalendarEvent(eventToSave, {
+              onRelayComplete,
+              waitForAll: true,
+            });
           setSignedEventForRetry(calendarEvent);
           await addEventToCalendar(selectedCalendarId, eventRef);
           const { eventDTag, viewKey } = parseEventRef(eventRef);
@@ -598,7 +595,13 @@ export function CalendarEventEdit({
 
   const onChangeBeginDate = (value: Dayjs | null) => {
     if (!value) return;
-    updateField("begin", value.unix() * 1000);
+    const nextBegin = value.valueOf();
+    setEventDetails((prev) => {
+      const duration = Math.max(prev.end - prev.begin, 60 * 60 * 1000);
+      const nextEnd = prev.end <= nextBegin ? nextBegin + duration : prev.end;
+
+      return { ...prev, begin: nextBegin, end: nextEnd };
+    });
 
     const beginDay = value.startOf("day");
     if (
@@ -625,7 +628,7 @@ export function CalendarEventEdit({
 
   const onChangeEndDate = (value: Dayjs | null) => {
     if (!value) return;
-    updateField("end", value.unix() * 1000);
+    updateField("end", value.valueOf());
   };
 
   const handleFrequencyChange = (event: SelectChangeEvent<string>) => {

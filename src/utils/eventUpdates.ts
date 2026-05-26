@@ -24,11 +24,40 @@ const sameStringList = (a: string[], b: string[]) => {
   );
 };
 
+const formatDate = (timestamp: number) =>
+  new Date(timestamp).toLocaleDateString(undefined, {
+    dateStyle: "medium",
+  });
+
+const formatTime = (timestamp: number) =>
+  new Date(timestamp).toLocaleTimeString(undefined, {
+    timeStyle: "short",
+  });
+
 const formatDateTime = (timestamp: number) =>
   new Date(timestamp).toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   });
+
+const isSameLocalDate = (left: number, right: number) => {
+  const leftDate = new Date(left);
+  const rightDate = new Date(right);
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear() &&
+    leftDate.getMonth() === rightDate.getMonth() &&
+    leftDate.getDate() === rightDate.getDate()
+  );
+};
+
+const formatTimeRange = (begin: number, end: number) => {
+  if (isSameLocalDate(begin, end)) {
+    return `${formatDate(begin)}, ${formatTime(begin)} - ${formatTime(end)}`;
+  }
+
+  return `${formatDateTime(begin)} - ${formatDateTime(end)}`;
+};
 
 function getAddedParticipants(
   previous: ICalendarEvent,
@@ -90,7 +119,7 @@ export function getEventUpdateSummary(
   const shouldNotify = changedAttributes.length > 0;
   let body = "";
   if (timeChanged) {
-    body = `New time: ${formatDateTime(fresh.begin)} - ${formatDateTime(fresh.end)}`;
+    body = `New time: ${formatTimeRange(fresh.begin, fresh.end)}`;
   } else if (addedParticipants.length > 0 && changedAttributes.length === 1) {
     body =
       addedParticipants.length === 1

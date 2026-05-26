@@ -136,6 +136,36 @@ const getTimeRange = (customConfig?: {
   };
 };
 
+const normalizePubkey = (pubkey: string) => pubkey.toLowerCase();
+
+const notifyEventUpdateIfNeeded = async (
+  previousEvent: ICalendarEvent,
+  freshEvent: ICalendarEvent,
+): Promise<void> => {
+  let currentUserPubkey = "";
+  try {
+    currentUserPubkey = await getUserPublicKey();
+  } catch {
+    return;
+  }
+
+  const summary = getEventUpdateSummary(previousEvent, freshEvent);
+  const normalizedCurrentUser = normalizePubkey(currentUserPubkey);
+  const cachedParticipants = previousEvent.participants.map(normalizePubkey);
+  const freshParticipants = freshEvent.participants.map(normalizePubkey);
+  const currentUserWasRemoved =
+    cachedParticipants.includes(normalizedCurrentUser) &&
+    !freshParticipants.includes(normalizedCurrentUser);
+  const shouldNotify =
+    normalizePubkey(freshEvent.user) !== normalizedCurrentUser &&
+    !currentUserWasRemoved &&
+    summary.shouldNotify;
+
+  if (shouldNotify) {
+    await scheduleEventUpdateNotification(freshEvent, summary);
+  }
+};
+
 /**
  * Processes a decrypted private event and adds it to the store.
  * Handles deduplication by keeping the newer version if the event already exists.
@@ -174,6 +204,7 @@ const processPrivateEvent = (
     if (store.allKeys.includes(parsedEvent.id)) {
       const previousEvent = store.byKey[parsedEvent.id];
       if (parsedEvent.createdAt > previousEvent.createdAt) {
+        void notifyEventUpdateIfNeeded(previousEvent, parsedEvent);
         store = removeOne(store, parsedEvent.id);
         store = appendOne(store, parsedEvent.id, parsedEvent);
       }
@@ -345,9 +376,8 @@ export const useTimeBasedEvents = create<{
 
     if (cachedEvents.length === 0) return;
 
-    let currentUserPubkey = "";
     try {
-      currentUserPubkey = await getUserPublicKey();
+      await getUserPublicKey();
     } catch {
       return;
     }
@@ -393,18 +423,7 @@ export const useTimeBasedEvents = create<{
       });
       parsedFreshEvent.calendarId = cachedEvent.calendarId;
 
-      const summary = getEventUpdateSummary(cachedEvent, parsedFreshEvent);
-      const currentUserWasRemoved =
-        cachedEvent.participants.includes(currentUserPubkey) &&
-        !parsedFreshEvent.participants.includes(currentUserPubkey);
-      const shouldNotify =
-        parsedFreshEvent.user !== currentUserPubkey &&
-        !currentUserWasRemoved &&
-        summary.shouldNotify;
-
-      if (shouldNotify) {
-        await scheduleEventUpdateNotification(parsedFreshEvent, summary);
-      }
+      await notifyEventUpdateIfNeeded(cachedEvent, parsedFreshEvent);
 
       useTimeBasedEvents.getState().updateEvent(parsedFreshEvent);
     }

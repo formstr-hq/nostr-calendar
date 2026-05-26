@@ -64,6 +64,7 @@ describe("getEventUpdateSummary", () => {
     expect(summary.timeChanged).toBe(true);
     expect(summary.changedAttributes).toContain("date/time");
     expect(summary.body).toContain("New time:");
+    expect(summary.body).toMatch(/ - \d{1,2}:\d{2}/);
   });
 
   it("mentions changed non-time attributes", () => {

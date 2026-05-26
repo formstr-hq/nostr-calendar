@@ -52,6 +52,8 @@ async function ensureEventUpdatesChannel(): Promise<void> {
         name: string;
         description?: string;
         importance?: number;
+        visibility?: number;
+        vibration?: boolean;
       }) => Promise<void>;
     }
   ).createChannel;
@@ -64,6 +66,8 @@ async function ensureEventUpdatesChannel(): Promise<void> {
       name: "Event updates",
       description: "Notifications when calendar events are updated",
       importance: 4,
+      visibility: 1,
+      vibration: true,
     });
   } catch (err) {
     console.warn("Failed to create event updates notification channel", err);
@@ -188,15 +192,18 @@ export async function scheduleEventUpdateNotification(
     const permResult = await LocalNotifications.requestPermissions();
     if (permResult.display !== "granted") return;
 
+    const notificationKey = `event-update:${event.kind}:${event.user}:${event.id}:${event.createdAt}`;
+    const title = `${event.title || "Calendar event"} was updated`;
+    const body = summary.body || "This event was updated";
+
     await ensureEventUpdatesChannel();
 
-    const notificationKey = `event-update:${event.kind}:${event.user}:${event.id}:${event.createdAt}`;
     await LocalNotifications.schedule({
       notifications: [
         {
           id: hashToNumber(notificationKey),
-          title: `Updated: ${event.title || "Calendar event"}`,
-          body: summary.body || "This event was updated",
+          title,
+          body,
           schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
           channelId: EVENT_UPDATES_CHANNEL_ID,
           extra: {
