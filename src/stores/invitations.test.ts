@@ -182,13 +182,7 @@ describe("useInvitations store", () => {
           title: "My Calendar",
           description: "",
           color: "#4285f4",
-          eventRefs: [
-            [
-              "32678:testpubkey:existing-event",
-              "",
-              "nsec1key:1700000000::1700003600:false",
-            ],
-          ],
+          eventRefs: [["32678:testpubkey:existing-event", "", "nsec1key"]],
           createdAt: 1700000000,
           isVisible: true,
         },
@@ -224,8 +218,7 @@ describe("useInvitations store", () => {
     expect(state.isLoaded).toBe(false);
   });
 
-  it("correctly builds event ref with isRecurring flag on accept", async () => {
-    // Invitation with a recurring event
+  it("correctly builds event ref for a recurring event on accept", async () => {
     useInvitations.setState({
       invitations: [
         {
@@ -241,7 +234,7 @@ describe("useInvitations store", () => {
             description: "",
             begin: 1700000000000,
             end: 1700003600000,
-            kind: 32679,
+            kind: 32678,
             createdAt: 1700000000,
             categories: [],
             participants: [],
@@ -267,11 +260,9 @@ describe("useInvitations store", () => {
     );
     expect(ref).toBeDefined();
     // Coordinate should contain kind:authorPubkey:eventDTag
-    expect(ref![0]).toContain("32679");
+    expect(ref![0]).toContain("32678");
     expect(ref![0]).toContain("recurring-event");
-    // Metadata (third element) should end with :true for recurring
-    expect(ref![2].endsWith(":true")).toBe(true);
-    // Metadata should contain the viewKey
-    expect(ref![2]).toContain("nsec1recur");
+    // viewKey should be in the third element
+    expect(ref![2]).toBe("nsec1recur");
   });
 });

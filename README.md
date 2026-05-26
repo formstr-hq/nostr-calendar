@@ -96,6 +96,24 @@ pnpm release-android     # signed APK + GitHub release
 | 32069 | Encrypted private RSVP            |
 | 1052  | Gift wrap for private events      |
 | 1055  | Gift wrap for private RSVPs       |
+| 31927 | Scheduling page                   |
+| 32680 | Scheduling page key index         |
+| 31926 | Public busy list                  |
+| 1057  | Booking request gift wrap         |
+| 1058  | Booking response gift wrap        |
+
+## Protocol Proposals
+
+The protocols used by this app are formalized as NIP proposals:
+
+| Proposal | Description |
+| -------- | ----------- |
+| [NIP-52E](nips/NIP-52E.md) | Private Calendar Events, Gift Wraps, Calendar Lists, Busy Lists, Private RSVPs |
+| [NIP-52R](nips/NIP-52R.md) | Recurring Calendar Events via RRULE (addendum to NIP-52) |
+| [NIP-Appointment-Scheduling](nips/NIP-Appointment-Scheduling.md) | Scheduling pages and booking request/response flow |
+| [nip09x](nips/NIP-09-PR.md) | Participant Self-Removal (kind `84`) |
+
+For implementation details see [PROTOCOL.md](PROTOCOL.md) and [SCHEDULING_PROTOCOL.md](SCHEDULING_PROTOCOL.md).
 
 ## Contributing
 

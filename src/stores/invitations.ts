@@ -199,30 +199,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           useCalendarLists.getState().getAllEventIds(),
         );
 
-        // If already in a calendar, check if its viewKey needs updating
+        // If already in a calendar, the event was added when the booking was
+        // submitted (with the pre-generated view key). Auto-approve the matching
+        // outgoing booking so the UI updates without waiting for the separate
+        // booking-response gift wrap.
         if (existingEventIds.has(rumor.eventId)) {
-          // Find if the ref has an empty viewKey (placeholder from booking flow)
-          const calendars = useCalendarLists.getState().calendars;
-          const hasEmptyViewKey = calendars.some((cal) =>
-            cal.eventRefs.some(
-              (ref) =>
-                ref[0].split(":")[2] === rumor.eventId &&
-                (!ref[2] || ref[2] === ""),
-            ),
-          );
-          if (hasEmptyViewKey && rumor.viewKey) {
-            useCalendarLists
-              .getState()
-              .updateEventViewKey(rumor.eventId, rumor.viewKey);
-            // The placeholder ref was created by the booking flow when the
-            // user submitted a request. The host has now approved by
-            // publishing the calendar event with the booker's d-tag, so
-            // flip the matching outgoing booking to "approved" without
-            // requiring a separate booking-response gift wrap.
-            useBookingRequests
-              .getState()
-              .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
-          }
+          useBookingRequests
+            .getState()
+            .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
           return;
         }
         // Skip if already processed

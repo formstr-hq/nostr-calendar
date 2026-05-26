@@ -481,7 +481,7 @@ export function CalendarEventEdit({
           const { eventRef, authorPubkey, calendarEvent } =
             await publishPrivateCalendarEvent(eventToSave, {
               onRelayComplete,
-              waitForAll: true,
+              waitForAll: false,
             });
           setSignedEventForRetry(calendarEvent);
           await addEventToCalendar(selectedCalendarId, eventRef);
