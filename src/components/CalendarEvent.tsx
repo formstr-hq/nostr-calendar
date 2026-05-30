@@ -183,11 +183,6 @@ function getEventDisplayTitle(
   return intl.formatMessage({ id: "event.untitled" });
 }
 
-const uniqueParticipants = (participants: string[]) =>
-  Array.from(
-    new Set(participants.map((participant) => participant.toLowerCase())),
-  );
-
 export function CalendarEventCard({
   event,
   offset = "0px",
@@ -506,7 +501,6 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const eventDisplayRange = getEventDisplayRange(event);
   const locations = event.location.filter((location) => !!location?.trim?.());
-  const participants = uniqueParticipants(event.participants);
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
   const { user } = useUser();
