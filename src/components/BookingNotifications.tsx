@@ -51,12 +51,8 @@ export const BookingNotifications = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tab, setTab] = useState(0);
 
-  const {
-    incomingRequests,
-    outgoingBookings,
-    isLoaded,
-    loadCached,
-  } = useBookingRequests();
+  const { incomingRequests, outgoingBookings, isLoaded, loadCached } =
+    useBookingRequests();
 
   const { pages } = useSchedulingPages();
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();

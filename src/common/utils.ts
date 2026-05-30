@@ -179,6 +179,7 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
     id: "",
     eventId: "",
     kind: 0,
+    calendarId: "",
     title: title || "Imported Event",
     createdAt: Date.now(),
     description,

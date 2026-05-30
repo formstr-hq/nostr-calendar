@@ -135,3 +135,20 @@ export function getCalendarEventCoordinate(event: {
 }): string {
   return `${event.kind}:${event.user}:${event.id}`;
 }
+
+/**
+ * Resolves which calendar currently contains an event.
+ *
+ * Calendar list refs are authoritative for current membership and let the UI
+ * react immediately after an accept/add/move flow without denormalizing the
+ * calendar ID onto each event object.
+ */
+export function findCalendarForEvent(
+  calendars: ICalendarList[],
+  event: Pick<ICalendarEvent, "kind" | "user" | "id">,
+): ICalendarList | undefined {
+  const coordinate = getCalendarEventCoordinate(event);
+  return calendars.find((calendar) =>
+    calendar.eventRefs.some((ref) => ref[0] === coordinate),
+  );
+}

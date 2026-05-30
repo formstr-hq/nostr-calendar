@@ -8,7 +8,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import EventBusyIcon from "@mui/icons-material/EventBusy";
 import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useBusyList } from "../stores/busyList";
@@ -127,7 +126,6 @@ export function EventBusyListToggle({ event }: EventBusyListToggleProps) {
     <>
       <Box sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}>
         <Stack direction="row" spacing={1} alignItems="flex-start">
-          <EventBusyIcon color="action" fontSize="small" sx={{ mt: 0.75 }} />
           <Box flex={1} minWidth={0}>
             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
               <FormControlLabel

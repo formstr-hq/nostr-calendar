@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router";
 import {
   Box,
@@ -36,7 +36,10 @@ import * as nip59 from "../common/nip59";
 import { nostrRuntime } from "../common/nostrRuntime";
 import { EventKinds } from "../common/EventConfigs";
 import { nostrEventToSchedulingPage } from "../utils/parser";
-import { getDisplaySlots, type IDisplaySlot } from "../utils/availabilityHelper";
+import {
+  getDisplaySlots,
+  type IDisplaySlot,
+} from "../utils/availabilityHelper";
 import { useBusyList, collectBusyRanges } from "../stores/busyList";
 import { busyListMonthKeysForRange } from "../utils/dateHelper";
 import type { IBusyList } from "../utils/types";

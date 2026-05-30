@@ -18,6 +18,7 @@ function makeEvent(
   return {
     id: "test-id",
     eventId: "test-event-id",
+    calendarId: "",
     title: "Test Event",
     description: "",
     kind: 31923,
@@ -88,7 +89,9 @@ describe("rruleToFrequency", () => {
       RepeatingFrequency.Weekly,
     );
     expect(
-      rruleToFrequency("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20250131T100000Z"),
+      rruleToFrequency(
+        "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20250131T100000Z",
+      ),
     ).toBe(RepeatingFrequency.Weekday);
   });
 

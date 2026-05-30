@@ -85,7 +85,11 @@ describe("parseEventRef", () => {
   });
 
   it("parses a ref with a relay URL", () => {
-    const ref = ["32678:testpubkey:weekly-standup", "wss://relay.example.com", "nsec1recur"];
+    const ref = [
+      "32678:testpubkey:weekly-standup",
+      "wss://relay.example.com",
+      "nsec1recur",
+    ];
     const parsed = parseEventRef(ref);
 
     expect(parsed.kind).toBe(32678);
@@ -166,6 +170,7 @@ describe("useTimeBasedEvents store", () => {
           geoHash: [],
           website: "",
           user: "someone",
+          calendarId: "",
           isPrivateEvent: false,
           repeat: { rrule: null },
         },
@@ -182,6 +187,7 @@ describe("useTimeBasedEvents store", () => {
           participants: [],
           rsvpResponses: [],
           reference: [],
+          calendarId: "",
           location: [],
           geoHash: [],
           website: "",
@@ -204,6 +210,7 @@ describe("useTimeBasedEvents store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "Empty",
           description: "",
           color: "#4285f4",
@@ -226,6 +233,7 @@ describe("useTimeBasedEvents store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "Hidden",
           description: "",
           color: "#4285f4",
@@ -268,6 +276,7 @@ describe("useTimeBasedEvents store", () => {
           participants: [],
           rsvpResponses: [],
           reference: [],
+          calendarId: "",
           location: [],
           geoHash: [],
           website: "",

@@ -115,7 +115,7 @@ export class EventStore {
 
     // Check for exact duplicate
     if (this.eventsById.has(event.id)) {
-      return false;
+      return true;
     }
 
     // Add to primary store

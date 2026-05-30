@@ -69,7 +69,8 @@ export async function createSeal(rumor: Rumor, recipientPublicKey: string) {
     content,
     created_at: now(),
     tags: [],
-  });
+    // manual typecasting as its a seal and seals do not contain pubkey
+  } as unknown as UnsignedEvent);
 }
 
 export function createWrap(

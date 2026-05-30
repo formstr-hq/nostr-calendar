@@ -11,11 +11,16 @@ import { getRelays } from "../common/nostr";
 
 export const nostrEventToCalendar = (
   event: Event,
+  calendarId: string,
   {
     viewKey,
     isPrivateEvent,
     relayHint,
-  }: { viewKey?: string; isPrivateEvent?: boolean; relayHint?: string } = {},
+  }: {
+    viewKey?: string;
+    isPrivateEvent?: boolean;
+    relayHint?: string;
+  } = {},
 ): ICalendarEvent => {
   const parsedEvent: ICalendarEvent = {
     description: event.content,
@@ -36,6 +41,7 @@ export const nostrEventToCalendar = (
     viewKey: viewKey,
     isPrivateEvent: !!isPrivateEvent,
     relayHint: relayHint,
+    calendarId: calendarId,
     repeat: {
       rrule: null,
     },
@@ -80,6 +86,16 @@ export const nostrEventToCalendar = (
       case "notification":
         if (value === "enabled" || value === "disabled") {
           parsedEvent.notificationPreference = value;
+        }
+        break;
+      case "form":
+        if (value) {
+          const viewKey = event.tags[index]?.[2];
+          if (!parsedEvent.forms) parsedEvent.forms = [];
+          parsedEvent.forms.push({
+            naddr: value,
+            ...(viewKey ? { viewKey } : {}),
+          });
         }
         break;
       case "L":

@@ -82,6 +82,7 @@ describe("useInvitations store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "My Calendar",
           description: "",
           color: "#4285f4",
@@ -105,6 +106,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -127,6 +131,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-123",
           viewKey: "nsec1testkey",
@@ -135,6 +142,7 @@ describe("useInvitations store", () => {
           event: {
             id: "event-123",
             eventId: "event-123",
+            calendarId: "",
             title: "Meeting",
             description: "",
             begin: 1700000000000,
@@ -179,6 +187,7 @@ describe("useInvitations store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "My Calendar",
           description: "",
           color: "#4285f4",
@@ -199,6 +208,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -222,6 +234,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-recurring",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-recurring",
           eventId: "recurring-event",
           viewKey: "nsec1recur",
@@ -229,6 +244,7 @@ describe("useInvitations store", () => {
           status: "pending",
           event: {
             id: "recurring-event",
+            calendarId: "",
             eventId: "recurring-event",
             title: "Weekly Standup",
             description: "",

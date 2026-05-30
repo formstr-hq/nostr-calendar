@@ -84,13 +84,13 @@ export const ViewEventPage = () => {
         if (viewKey) {
           const privateEvent = viewPrivateEvent(event, viewKey);
           if (!privateEvent) throw new Error("Failed to decrypt event");
-          parsedEvent = nostrEventToCalendar(privateEvent, {
+          parsedEvent = nostrEventToCalendar(privateEvent, "", {
             viewKey,
             isPrivateEvent: true,
             relayHint,
           });
         } else {
-          parsedEvent = nostrEventToCalendar(event, { relayHint });
+          parsedEvent = nostrEventToCalendar(event, "", { relayHint });
         }
         const occurrenceRange = getEventOccurrenceRangeFromQuery(
           occurrenceStartParam,

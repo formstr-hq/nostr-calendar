@@ -25,5 +25,7 @@ export function shouldScheduleNotifications(
   eventPreference?: NotificationPreference,
   listPreference?: NotificationPreference,
 ): boolean {
-  return resolveNotificationPreference(eventPreference, listPreference) === "enabled";
+  return (
+    resolveNotificationPreference(eventPreference, listPreference) === "enabled"
+  );
 }

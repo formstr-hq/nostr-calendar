@@ -4,12 +4,6 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
-    rsvp: {
-      accepted: "Accepted",
-      declined: "Declined",
-      maybe: "Maybe",
-      pending: "Pending",
-    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -65,6 +59,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      forms: "Attached forms",
       duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
@@ -134,6 +129,52 @@ const dictionary: NestedObject = {
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
     },
+    form: {
+      attachments: "Forms",
+      inputPlaceholder: "Paste form naddr or Formstr URL",
+      addAttachment: "Add",
+      removeAttachment: "Remove form",
+      invalidInput: "Could not recognize a form naddr in that input.",
+      duplicateAttachment: "That form is already attached.",
+      privateOnly: "Forms can only be attached to private events.",
+      fillTitle: "Fill out form",
+      fillOut: "Fill out",
+      responsesLoading: "Checking your previous responses",
+      viewOrUpdate: "View / update response",
+      submit: "Submit",
+      cancel: "Cancel",
+      submitting: "Submitting…",
+      retry: "Retry",
+      openExternal: "Open in Formstr",
+      fetchError: "Could not load the form. Please try again.",
+      submitError: "Could not submit your response. Please try again.",
+      alreadySubmitted: "You've already responded to this form.",
+      yourResponse: "Your response",
+      responseUnavailable:
+        "We found your submission, and we're still collecting your answers.",
+      noAnswer: "No answer",
+      unknownQuestion: "Question",
+      submitAgain: "Submit again",
+    },
+    formResponses: {
+      viewButton: "View responses",
+    },
+    rsvp: {
+      yourResponse: "Will you be attending?",
+      yes: "Yes",
+      no: "No",
+      maybe: "Maybe",
+      toggleDetails: "Show RSVP details",
+      alternateTimeTitle: "Can't attend at this time? Suggest a new time",
+      suggestedStart: "Suggested start",
+      suggestedEnd: "Suggested end",
+      comment: "Comment",
+      detailsHint:
+        "Share another time that works, or leave a note for the host and participants.",
+      addNote: "Add a note",
+      suggestionsHeading: "Time suggestions from participants",
+      applySuggestion: "Move event to this time",
+    },
     deleteEvent: {
       title: "Delete Event",
       deleteForEveryone: "Delete for all participants",
@@ -158,6 +199,7 @@ const dictionary: NestedObject = {
       notifications: "Notifications",
       notificationsOn: "Enabled for this calendar",
       notificationsOff: "Disabled for this calendar",
+      submit: "Absenden",
       notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
@@ -166,6 +208,11 @@ const dictionary: NestedObject = {
     sidebar: {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Antwort gefunden, aber die Details synchronisieren noch von den Relays.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
       createCalendar: "Create Calendar",
     },
     deviceCalendar: {
@@ -358,12 +405,6 @@ const dictionary: NestedObject = {
     },
   },
   "de-DE": {
-    rsvp: {
-      accepted: "Angenommen",
-      declined: "Abgelehnt",
-      maybe: "Vielleicht",
-      pending: "Ausstehend",
-    },
     navigation: {
       today: "Heute",
       previousDay: "Vortag",
@@ -423,6 +464,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Termin bearbeiten",
+      forms: "Angehängte Formulare",
       duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
@@ -493,6 +535,54 @@ const dictionary: NestedObject = {
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
       scheduledNotifications: "Geplante Benachrichtigungen",
+    },
+    form: {
+      attachments: "Formulare",
+      inputPlaceholder: "Formular-naddr oder Formstr-URL einfügen",
+      addAttachment: "Hinzufügen",
+      removeAttachment: "Formular entfernen",
+      invalidInput: "In der Eingabe wurde keine Formular-naddr erkannt.",
+      duplicateAttachment: "Dieses Formular ist bereits angehängt.",
+      privateOnly: "Formulare können nur an private Termine angehängt werden.",
+      fillTitle: "Formular ausfüllen",
+      fillOut: "Ausfüllen",
+      viewOrUpdate: "Antwort ansehen / aktualisieren",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet…",
+      retry: "Erneut versuchen",
+      openExternal: "In Formstr öffnen",
+      fetchError:
+        "Das Formular konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+      submitError:
+        "Ihre Antwort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Einreichung gefunden und sammeln noch Ihre Antworten.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
+      submitAgain: "Erneut absenden",
+      continue: "Weiter",
+    },
+    formResponses: {
+      viewButton: "Antworten in Formstr ansehen",
+    },
+    rsvp: {
+      yourResponse: "Nimmst du teil?",
+      yes: "Ja",
+      no: "Nein",
+      maybe: "Vielleicht",
+      toggleDetails: "RSVP-Details anzeigen",
+      alternateTimeTitle:
+        "Kannst du zu dieser Zeit nicht? Schlage eine neue Zeit vor",
+      suggestedStart: "Vorgeschlagener Beginn",
+      suggestedEnd: "Vorgeschlagenes Ende",
+      comment: "Kommentar",
+      detailsHint:
+        "Teile eine andere passende Zeit oder hinterlasse eine Notiz für Gastgeber und Teilnehmer.",
+      addNote: "Eine Notiz hinzufügen",
+      suggestionsHeading: "Zeitvorschläge von Teilnehmern",
+      applySuggestion: "Termin auf diese Zeit verschieben",
     },
     deleteEvent: {
       title: "Termin löschen",

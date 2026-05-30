@@ -360,7 +360,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   approveRequest: async (requestId, calendarId) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
-
+    const pubkey = await getUserPublicKey();
     // Create a private calendar event for this appointment
     // using the booker's pre-generated d-tag so the event
     // auto-appears in the booker's calendar list.
@@ -372,7 +372,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       begin: request.start,
       end: request.end,
       kind: 0,
-      user: "",
+      calendarId,
+      user: pubkey,
       participants: [request.bookerPubkey],
       categories: [],
       reference: [],
@@ -388,23 +389,19 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
 
     // Use the booker's pre-generated d-tag and view key so the published
     // event matches exactly what the booker already added to their calendar.
-    const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
-      event,
-      {
+    const { eventRef, authorPubkey, viewKey } =
+      await publishPrivateCalendarEvent(event, {
         existingDTag: request.dTag,
         existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
-        waitForAll: false
-      }
-    );
+        waitForAll: false,
+      });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
     // approved booking shows up on the host's calendar without waiting
     // for a relay round-trip.
-    await useCalendarLists
-      .getState()
-      .addEventToCalendar(calendarId, eventRef);
+    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
     const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
@@ -458,11 +455,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
           ? {
-            ...r,
-            status: "declined" as const,
-            respondedAt: Date.now(),
-            declineReason: reason,
-          }
+              ...r,
+              status: "declined" as const,
+              respondedAt: Date.now(),
+              declineReason: reason,
+            }
           : r,
       );
       const incomingUnreadCount = incomingRequests.filter(

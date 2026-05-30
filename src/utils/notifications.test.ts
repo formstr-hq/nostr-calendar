@@ -40,6 +40,7 @@ function makeEvent(
 ): ICalendarEvent {
   return {
     id: "test-id",
+    calendarId: "",
     eventId: overrides.eventId ?? "evt-123",
     title: "Test Event",
     description: "",

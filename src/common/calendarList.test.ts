@@ -62,9 +62,7 @@ const makeCalendar = (overrides?: Partial<ICalendarList>): ICalendarList => ({
   title: "My Calendar",
   description: "Personal events",
   color: "#4285f4",
-  eventRefs: [
-    ["32678:testpubkey:event-1", "", "nsec1key"],
-  ],
+  eventRefs: [["32678:testpubkey:event-1", "", "nsec1key"]],
   createdAt: 1700000000,
   isVisible: true,
   ...overrides,
@@ -88,7 +86,12 @@ describe("calendarList protocol layer", () => {
       expect(tags).toContainEqual(["content", "Personal events"]);
       expect(tags).toContainEqual(["color", "#4285f4"]);
       expect(tags).not.toContainEqual(["notifications", "enabled"]);
-      expect(tags).toContainEqual(["a", "32678:testpubkey:event-1", "", "nsec1key"]);
+      expect(tags).toContainEqual([
+        "a",
+        "32678:testpubkey:event-1",
+        "",
+        "nsec1key",
+      ]);
     });
 
     it("encrypts with the user's own pubkey (self-encryption)", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { buildDuplicatedEventDraft } from "./duplicateEvent";
 import { TEMP_CALENDAR_ID } from "../stores/eventDetails";
-import type { ICalendarEvent } from "./types";
+import { RSVPStatus, type ICalendarEvent } from "./types";
 
 function makeEvent(overrides: Partial<ICalendarEvent> = {}): ICalendarEvent {
   return {
@@ -18,7 +18,7 @@ function makeEvent(overrides: Partial<ICalendarEvent> = {}): ICalendarEvent {
     rsvpResponses: [
       {
         participantId: "npub1participant",
-        response: "accepted",
+        response: RSVPStatus.accepted,
         timestamp: Date.UTC(2026, 3, 2, 12),
       },
     ],

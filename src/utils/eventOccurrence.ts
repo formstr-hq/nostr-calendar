@@ -12,9 +12,13 @@ const isValidTimestamp = (value: number | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
 const isValidRange = (
-  range: EventOccurrenceRange | undefined,
+  range: Partial<EventOccurrenceRange> | undefined,
 ): range is EventOccurrenceRange =>
-  !!range && isValidTimestamp(range.begin) && range.end > range.begin;
+  !!range &&
+  !!range.end &&
+  !!range.begin &&
+  isValidTimestamp(range.begin) &&
+  range.end > range.begin;
 
 const parseTimestampParam = (value: string | null): number | undefined => {
   if (!value) return undefined;

@@ -1,21 +1,14 @@
 // import { useDraggable } from "@dnd-kit/core";
 import {
   alpha,
-  Alert,
   Box,
-  Button,
-  Checkbox,
-  CircularProgress,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  FormControlLabel,
   IconButton,
   Link,
   Paper,
-  Snackbar,
   Stack,
   Theme,
   Tooltip,
@@ -26,8 +19,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState, useEffect } from "react";
-import { Participant } from "./Participant";
+import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CloseIcon from "@mui/icons-material/Close";
@@ -41,7 +33,8 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
-import { encodeNAddr } from "../common/nostr";
+import { editPrivateCalendarEvent, encodeNAddr } from "../common/nostr";
+import type { RSVPRecord } from "../common/nostr";
 import {
   getDuplicateEventPage,
   getEditEventPage,
@@ -57,31 +50,29 @@ import {
   DEVICE_CALENDAR_ID_PREFIX,
   deviceCalendarColor,
 } from "../utils/deviceCalendarAdapter";
-import { FormattedMessage, useIntl, type IntlShape } from "react-intl";
+import { useIntl, type IntlShape } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
-import { CalendarListSelect } from "./CalendarListSelect";
 import { EventBusyListToggle } from "./EventBusyListToggle";
 
-import { useInvitations } from "../stores/invitations";
-import {
-  useBusyList,
-  getBusyListDefaultOptIn,
-  setBusyListDefaultOptIn,
-} from "../stores/busyList";
 import {
   buildEventRef,
+  findCalendarForEvent,
   getCalendarEventCoordinate,
 } from "../utils/calendarListTypes";
 import {
   getEventDisplayRange,
   getEventOccurrenceRange,
 } from "../utils/eventOccurrence";
-import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { EventCalendarListManagement } from "./EventCalendarListManagement";
-import { signerManager } from "../common/signer";
-import { generateSecretKey } from "nostr-tools";
-import { bytesToHex } from "nostr-tools/utils";
+import { FormFillerDialog } from "./FormFillerDialog";
+import { FormAttachmentRow } from "./FormAttachmentRow";
+import type { IFormAttachment } from "../utils/types";
+import { useEventRsvps } from "../hooks/useEventRsvps";
+import { RSVPBar } from "./RSVPBar";
+import { RespondPanel } from "./RespondPanel";
+import { RSVPParticipantList } from "./RSVPParticipantList";
+import { CalendarEventState } from "../common/types";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -417,7 +408,11 @@ function ActionButtons({
       event.viewKey,
     );
     closeModal();
-    navigate(editLink);
+    navigate(editLink, {
+      state: {
+        calendarEvent: event,
+      } satisfies CalendarEventState,
+    });
   };
 
   const duplicateEvent = () => {
@@ -514,23 +509,35 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
   const participants = uniqueParticipants(event.participants);
   const { calendars, moveEventToCalendar } = useCalendarLists();
   const { updateEvent } = useTimeBasedEvents();
+  const { user } = useUser();
   const isDeviceEvent = event.source === "device";
   const eventCoordinate = isDeviceEvent
     ? ""
     : getCalendarEventCoordinate(event);
+  const [activeForm, setActiveForm] = useState<IFormAttachment | null>(null);
 
-  const calendar = event.calendarId
-    ? calendars.find((c) => c.id === event.calendarId)
-    : undefined;
+  const calendar = findCalendarForEvent(calendars, event);
+  const isEditable = !!user && event.user === user.pubkey;
+
+  // Subscribe once at this level so both the participants list and the
+  // suggestions panel render off the same RSVP record set without
+  // duplicating relay subscriptions.
+  const {
+    byPubkey: rsvpByPubkey,
+    allParticipants: rsvpAllParticipants,
+    myRsvp,
+    isSubmitting: isRsvpSubmitting,
+    submit: submitRsvp,
+  } = useEventRsvps(event);
+  const standaloneForms = calendar ? (event.forms ?? []) : [];
+  const showStandaloneForms = standaloneForms.length > 0;
 
   const handleCalendarUpdate = async (nextCalendarId: string) => {
-    const sourceCalendarId = event.calendarId;
-    if (!sourceCalendarId) {
+    if (!calendar) {
       throw new Error("Event is not in any calendar");
     }
 
-    const sourceCalendar = calendars.find((c) => c.id === sourceCalendarId);
-    const currentEventRef = sourceCalendar?.eventRefs.find(
+    const currentEventRef = calendar.eventRefs.find(
       (ref) => ref[0] === eventCoordinate,
     );
 
@@ -541,6 +548,7 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             kind: event.kind,
             authorPubkey: event.user,
             eventDTag: event.id,
+            relayUrl: event.relayHint ?? "",
             viewKey: event.viewKey,
           })
         : undefined);
@@ -552,8 +560,29 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
     await moveEventToCalendar(nextCalendarId, eventCoordinate, eventRef);
     updateEvent({
       ...event,
-      calendarId: nextCalendarId,
     });
+  };
+
+  const handleApplyRSVPSuggestion = async (record: RSVPRecord) => {
+    if (
+      !calendar ||
+      !event.isPrivateEvent ||
+      (record.suggestedStart === undefined && record.suggestedEnd === undefined)
+    ) {
+      return;
+    }
+
+    const eventStartSecs = Math.floor(event.begin / 1000);
+    const eventDurationSecs = Math.floor((event.end - event.begin) / 1000);
+    const nextStartSecs = record.suggestedStart ?? eventStartSecs;
+    const updated = {
+      ...event,
+      begin: nextStartSecs * 1000,
+      end: (record.suggestedEnd ?? nextStartSecs + eventDurationSecs) * 1000,
+    };
+
+    await editPrivateCalendarEvent(updated, calendar.id);
+    updateEvent(updated);
   };
 
   return (
@@ -598,7 +627,9 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
               <Typography variant="subtitle1">
                 {intl.formatMessage({ id: "navigation.description" })}
               </Typography>
-              <Typography variant="body2">
+              {/* component="div" avoids <p> nesting: Typography defaults to <p>
+                  but react-markdown also wraps paragraphs in <p> tags */}
+              <Typography component="div" variant="body2">
                 <Markdown remarkPlugins={[remarkGfm]}>
                   {event.description}
                 </Markdown>
@@ -619,27 +650,65 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
             </>
           )}
 
+          {!calendar && (
+            <>
+              <RespondPanel event={event} />
+              <Divider />
+            </>
+          )}
+
+          {showStandaloneForms && (
+            <>
+              <Typography variant="subtitle1">
+                {intl.formatMessage({ id: "form.attachments" })}
+              </Typography>
+              <Stack spacing={1}>
+                {standaloneForms.map((attachment) => (
+                  <FormAttachmentRow
+                    key={attachment.naddr}
+                    attachment={attachment}
+                    eventAuthor={event.user}
+                    onFill={setActiveForm}
+                  />
+                ))}
+              </Stack>
+              <Divider />
+            </>
+          )}
+
           <Box display={"flex"} flexWrap={"wrap"} gap={1}>
             <Typography width={"100%"} fontWeight={600}>
               {intl.formatMessage({ id: "navigation.participants" })}
             </Typography>
-            <Stack direction="row" gap={0.5} flexWrap="wrap">
-              {participants.map((p) => (
-                <Box width={"100%"} key={p}>
-                  <Participant
-                    pubKey={p}
-                    isAuthor={p === event.user.toLowerCase()}
-                  />
-                </Box>
-              ))}
-            </Stack>
+            <RSVPParticipantList
+              event={event}
+              participants={rsvpAllParticipants}
+              recordsByPubkey={rsvpByPubkey}
+              canApplySuggestions={
+                isEditable && event.isPrivateEvent && !!calendar
+              }
+              onApplySuggestion={handleApplyRSVPSuggestion}
+            />
           </Box>
+
+          {calendar && (
+            <>
+              <Divider />
+              <RSVPBar
+                isAuthor={event.user === user?.pubkey}
+                event={event}
+                myRsvp={myRsvp}
+                isSubmitting={isRsvpSubmitting}
+                onSubmit={submitRsvp}
+              />
+            </>
+          )}
 
           {calendar ? (
             <>
               <Divider />
               <EventCalendarListManagement
-                calendarId={event.calendarId || ""}
+                calendarId={calendar.id}
                 onCalendarUpdate={handleCalendarUpdate}
               />
             </>
@@ -650,18 +719,21 @@ export function CalendarEvent({ event }: CalendarEventViewProps) {
                 {intl.formatMessage({ id: "event.deviceReadOnly" })}
               </Typography>
             </>
-          ) : (
-            <>
-              <Divider />
-              <InvitationAcceptBar event={event} />
-            </>
-          )}
+          ) : null}
 
           {!isDeviceEvent && (
             <ScheduledNotificationsSection eventId={event.id} />
           )}
         </Stack>
       </Box>
+      {activeForm && (
+        <FormFillerDialog
+          open
+          attachment={activeForm}
+          onClose={() => setActiveForm(null)}
+          onSubmitted={() => setActiveForm(null)}
+        />
+      )}
     </Box>
   );
 }
@@ -695,291 +767,6 @@ function ScheduledNotificationsSection({ eventId }: { eventId: string }) {
           ))}
         </Stack>
       </Box>
-    </>
-  );
-}
-
-function InvitationAcceptBar({ event }: { event: ICalendarEvent }) {
-  const intl = useIntl();
-  const navigate = useNavigate();
-  const { user, updateLoginModal } = useUser();
-  const {
-    calendars,
-    addEventToCalendar,
-    isLoaded: calendarsLoaded,
-    fetchCalendars,
-  } = useCalendarLists();
-  const { invitations, acceptInvitation } = useInvitations();
-  const [publishBusy, setPublishBusy] = useState<boolean>(() =>
-    getBusyListDefaultOptIn(),
-  );
-  const { events, updateEvent } = useTimeBasedEvents();
-  const [selectedCalendarId, setSelectedCalendarId] = useState(
-    calendars[0]?.id || "",
-  );
-  const [accepting, setAccepting] = useState(false);
-  const [creatingGuest, setCreatingGuest] = useState(false);
-  const [errorOpen, setErrorOpen] = useState(false);
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-
-  // Sync selected calendar once calendars load (e.g. right after login)
-  useEffect(() => {
-    if (!selectedCalendarId && calendars[0]?.id) {
-      setSelectedCalendarId(calendars[0].id);
-    }
-  }, [calendars, selectedCalendarId]);
-
-  // On ViewEventPage the Calendar component is never mounted, so
-  // fetchCalendars() is never called. Trigger it here when needed.
-  useEffect(() => {
-    if (user && !calendarsLoaded) {
-      fetchCalendars();
-    }
-  }, [user, calendarsLoaded, fetchCalendars]);
-
-  const supportsBusyListPublish = isBusyListRangeSupportedForEvent(
-    event,
-    events,
-    user?.pubkey,
-  );
-
-  const handleAccept = async () => {
-    if (!selectedCalendarId) return;
-    setAccepting(true);
-    try {
-      // If there is a matching gift-wrap invitation in the store, use the full
-      // invitation flow so the record is removed from the notifications panel.
-      // Otherwise (shared-link context) build the event reference directly.
-      const matchingInvitation = invitations.find(
-        (inv) => inv.eventId === event.id && inv.pubkey === event.user,
-      );
-      if (matchingInvitation) {
-        await acceptInvitation(
-          matchingInvitation.giftWrapId,
-          selectedCalendarId,
-        );
-      } else {
-        const eventRef = buildEventRef({
-          kind: event.kind,
-          authorPubkey: event.user,
-          eventDTag: event.id,
-          viewKey: event.viewKey || "",
-        });
-        await addEventToCalendar(selectedCalendarId, eventRef);
-        updateEvent({
-          ...event,
-          calendarId: selectedCalendarId,
-          isInvitation: false,
-        });
-      }
-      // Persist the user's preference and (best-effort) publish a busy entry
-      // for the accepted slot.
-      setBusyListDefaultOptIn(publishBusy);
-      if (publishBusy && supportsBusyListPublish) {
-        void useBusyList
-          .getState()
-          .addBusyRange({ start: event.begin, end: event.end });
-      }
-      setSuccessDialogOpen(true);
-    } catch {
-      setErrorOpen(true);
-    } finally {
-      setAccepting(false);
-    }
-  };
-
-  const handleContinueAsGuest = async () => {
-    setCreatingGuest(true);
-    try {
-      await signerManager.createGuestAccount(
-        bytesToHex(generateSecretKey()),
-        {},
-      );
-    } catch {
-      setErrorOpen(true);
-    } finally {
-      setCreatingGuest(false);
-    }
-  };
-
-  const handleViewInCalendar = () => {
-    setSuccessDialogOpen(false);
-    const d = dayjs(getEventDisplayRange(event).begin);
-    navigate(`/d/${d.year()}/${d.month() + 1}/${d.date()}`);
-  };
-
-  // ── Login gate ─────────────────────────────────────────────────────────────
-  if (!user) {
-    return (
-      <>
-        <Stack
-          spacing={1.5}
-          sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
-        >
-          <Typography variant="body2" color="text.secondary">
-            {intl.formatMessage({ id: "invitation.loginToAdd" })}
-          </Typography>
-          <Box display="flex" gap={1} flexWrap="wrap">
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => updateLoginModal(true)}
-            >
-              {intl.formatMessage({ id: "message.modeSelection_loginButton" })}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={creatingGuest}
-              onClick={handleContinueAsGuest}
-              startIcon={
-                creatingGuest ? (
-                  <CircularProgress size={14} color="inherit" />
-                ) : undefined
-              }
-            >
-              {intl.formatMessage({ id: "message.modeSelection_guestButton" })}
-            </Button>
-          </Box>
-        </Stack>
-        <Snackbar
-          open={errorOpen}
-          autoHideDuration={4000}
-          onClose={() => setErrorOpen(false)}
-        >
-          <Alert severity="error" onClose={() => setErrorOpen(false)}>
-            {intl.formatMessage({ id: "event.calendarMoveError" })}
-          </Alert>
-        </Snackbar>
-      </>
-    );
-  }
-
-  // ── Calendars still loading after login ────────────────────────────────────
-  if (calendars.length === 0) {
-    return (
-      <Stack
-        spacing={1.5}
-        sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 1.5 }}
-      >
-        <Box display="flex" alignItems="center" gap={1}>
-          <CircularProgress size={16} />
-          <Typography variant="body2" color="text.secondary">
-            {intl.formatMessage({ id: "startup.fetchingEvents" })}
-          </Typography>
-        </Box>
-      </Stack>
-    );
-  }
-
-  return (
-    <>
-      <Stack
-        spacing={1.5}
-        sx={{
-          backgroundColor: "action.hover",
-          borderRadius: 1,
-          p: 1.5,
-        }}
-      >
-        <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
-          <Typography
-            variant="body1"
-            color="text.primary"
-            sx={{
-              display: "flex",
-              gap: "4px",
-              alignItems: "center",
-            }}
-            component="span"
-          >
-            <FormattedMessage
-              id={
-                event.isInvitation
-                  ? "invitation.invitedBy"
-                  : "invitation.createdBy"
-              }
-              values={{
-                participant: (
-                  <Participant pubKey={event.user} isAuthor={false} />
-                ),
-              }}
-            />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {intl.formatMessage({ id: "event.notInCalendar" })}
-          </Typography>
-        </Box>
-        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-          <Box maxWidth={500} flex={1} minWidth={150}>
-            <CalendarListSelect
-              value={selectedCalendarId}
-              onChange={setSelectedCalendarId}
-              size="small"
-            />
-          </Box>
-          <Button
-            variant="contained"
-            size="small"
-            disabled={!selectedCalendarId || accepting}
-            onClick={handleAccept}
-            sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
-            startIcon={
-              accepting ? (
-                <CircularProgress size={14} color="inherit" />
-              ) : undefined
-            }
-          >
-            {intl.formatMessage({ id: "invitation.acceptInvitation" })}
-          </Button>
-        </Box>
-        {supportsBusyListPublish && (
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={publishBusy}
-                onChange={(e) => setPublishBusy(e.target.checked)}
-                size="small"
-              />
-            }
-            label={
-              <Typography variant="body2">
-                {intl.formatMessage({ id: "busyList.publishToggle" })}
-              </Typography>
-            }
-          />
-        )}
-      </Stack>
-
-      <Snackbar
-        open={errorOpen}
-        autoHideDuration={4000}
-        onClose={() => setErrorOpen(false)}
-      >
-        <Alert severity="error" onClose={() => setErrorOpen(false)}>
-          {intl.formatMessage({ id: "event.calendarMoveError" })}
-        </Alert>
-      </Snackbar>
-
-      {/* Success: stay here or navigate to calendar day view */}
-      <Dialog
-        open={successDialogOpen}
-        onClose={() => setSuccessDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>
-          {intl.formatMessage({ id: "invitation.addedToCalendar" })}
-        </DialogTitle>
-        <DialogActions>
-          <Button onClick={() => setSuccessDialogOpen(false)}>
-            {intl.formatMessage({ id: "invitation.stayHere" })}
-          </Button>
-          <Button variant="contained" onClick={handleViewInCalendar}>
-            {intl.formatMessage({ id: "invitation.viewInCalendar" })}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

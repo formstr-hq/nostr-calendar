@@ -7,37 +7,37 @@ import HelpIcon from "@mui/icons-material/Help";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { nip19 } from "nostr-tools";
-import { RSVPResponse } from "../stores/events";
+import { RSVPStatus } from "../utils/types";
 import { useState } from "react";
 import { useIntl } from "react-intl";
 
 interface ParticipantProps {
   pubKey: string;
-  rsvpResponse?: RSVPResponse;
+  rsvpResponse?: RSVPStatus;
   isAuthor: boolean;
 }
 
-const getRSVPIcon = (response: RSVPResponse, theme: Theme) => {
+const getRSVPIcon = (response: RSVPStatus, theme: Theme) => {
   switch (response) {
-    case RSVPResponse.accepted:
+    case RSVPStatus.accepted:
       return (
         <CheckCircleIcon
           style={{ color: theme.palette.success.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.declined:
+    case RSVPStatus.declined:
       return (
         <CancelIcon
           style={{ color: theme.palette.error.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.tentative:
+    case RSVPStatus.tentative:
       return (
         <HelpIcon
           style={{ color: theme.palette.warning.main, fontSize: "16px" }}
         />
       );
-    case RSVPResponse.pending:
+    case RSVPStatus.pending:
       return (
         <ScheduleIcon
           style={{ color: theme.palette.text.secondary, fontSize: "16px" }}
@@ -74,12 +74,11 @@ export const Participant = ({
   );
 
   const displayName = participant?.name || npub;
-  const isLongText = displayName.length > 20;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(displayName);
+      await navigator.clipboard.writeText(npub);
       setCopyTooltip(intl.formatMessage({ id: "participant.copied" }));
       setTimeout(
         () =>
@@ -169,17 +168,15 @@ export const Participant = ({
               ({intl.formatMessage({ id: "participant.author" })})
             </span>
           )}
-          {isLongText && (
-            <Tooltip title={copyTooltip} arrow>
-              <IconButton
-                size="small"
-                onClick={handleCopy}
-                style={{ padding: "2px" }}
-              >
-                <ContentCopyIcon style={{ fontSize: "14px" }} />
-              </IconButton>
-            </Tooltip>
-          )}
+          <Tooltip title={copyTooltip} arrow>
+            <IconButton
+              size="small"
+              onClick={handleCopy}
+              style={{ padding: "2px" }}
+            >
+              <ContentCopyIcon style={{ fontSize: "14px" }} />
+            </IconButton>
+          </Tooltip>
         </div>
       </div>
     </div>
