@@ -19,6 +19,8 @@ import { create } from "zustand";
 import {
   fetchCalendarEvents,
   fetchPrivateCalendarEvents,
+  getRelays,
+  getUserPublicKey,
   viewPrivateEvent,
 } from "../common/nostr";
 import { isValid } from "date-fns";
@@ -34,6 +36,7 @@ import type { ICalendarEvent } from "../utils/types";
 import {
   scheduleEventNotifications,
   cancelEventNotifications,
+  scheduleEventUpdateNotification,
 } from "../utils/notifications";
 import { useNotifications } from "./notifications";
 import {
@@ -44,8 +47,10 @@ import {
 import { useCalendarLists } from "./calendarLists";
 import { parseEventRef } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
+import { nostrRuntime } from "../common/nostrRuntime";
 import { getDTag } from "../common/nostrRuntime/utils/helpers";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
+import { getEventUpdateSummary } from "../utils/eventUpdates";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
@@ -95,7 +100,6 @@ const syncEventNotifications = async (
 };
 
 let publicSubscription: SubscriptionHandle | undefined;
-let privateSubscription: SubscriptionHandle | undefined;
 
 export { ICalendarEvent, RSVPResponse };
 
@@ -130,6 +134,36 @@ const getTimeRange = (customConfig?: {
     daysBefore: config.daysBefore,
     daysAfter: config.daysAfter,
   };
+};
+
+const normalizePubkey = (pubkey: string) => pubkey.toLowerCase();
+
+const notifyEventUpdateIfNeeded = async (
+  previousEvent: ICalendarEvent,
+  freshEvent: ICalendarEvent,
+): Promise<void> => {
+  let currentUserPubkey = "";
+  try {
+    currentUserPubkey = await getUserPublicKey();
+  } catch {
+    return;
+  }
+
+  const summary = getEventUpdateSummary(previousEvent, freshEvent);
+  const normalizedCurrentUser = normalizePubkey(currentUserPubkey);
+  const cachedParticipants = previousEvent.participants.map(normalizePubkey);
+  const freshParticipants = freshEvent.participants.map(normalizePubkey);
+  const currentUserWasRemoved =
+    cachedParticipants.includes(normalizedCurrentUser) &&
+    !freshParticipants.includes(normalizedCurrentUser);
+  const shouldNotify =
+    normalizePubkey(freshEvent.user) !== normalizedCurrentUser &&
+    !currentUserWasRemoved &&
+    summary.shouldNotify;
+
+  if (shouldNotify) {
+    await scheduleEventUpdateNotification(freshEvent, summary);
+  }
 };
 
 /**
@@ -170,6 +204,7 @@ const processPrivateEvent = (
     if (store.allKeys.includes(parsedEvent.id)) {
       const previousEvent = store.byKey[parsedEvent.id];
       if (parsedEvent.createdAt > previousEvent.createdAt) {
+        void notifyEventUpdateIfNeeded(previousEvent, parsedEvent);
         store = removeOne(store, parsedEvent.id);
         store = appendOne(store, parsedEvent.id, parsedEvent);
       }
@@ -191,6 +226,21 @@ const processPrivateEvent = (
  */
 const processedEventIds = new Set<string>();
 
+const getEventCoordinate = (
+  event: Pick<ICalendarEvent, "kind" | "user" | "id">,
+) => `${event.kind}:${event.user}:${event.id}`;
+
+const shouldCheckEventForUpdates = (event: ICalendarEvent, now = Date.now()) =>
+  event.source !== "device" &&
+  !event.isInvitation &&
+  !!event.id &&
+  !!event.user &&
+  event.kind > 0 &&
+  (!!event.repeat?.rrule || event.end > now);
+
+const toCreatedAtSeconds = (createdAt: number) =>
+  createdAt > 10_000_000_000 ? Math.floor(createdAt / 1000) : createdAt;
+
 export const useTimeBasedEvents = create<{
   events: ICalendarEvent[];
   eventById: Record<string, ICalendarEvent>;
@@ -205,6 +255,7 @@ export const useTimeBasedEvents = create<{
     daysBefore?: number;
     daysAfter?: number;
   }) => void;
+  checkForEventUpdates: () => Promise<void>;
   addEvent: (event: ICalendarEvent) => void;
   updateEvent: (event: ICalendarEvent) => void;
   removeEvent: (id: string) => void;
@@ -315,6 +366,70 @@ export const useTimeBasedEvents = create<{
   },
 
   /**
+   * Checks cached future/recurring events against fresh relay versions and
+   * shows native "Event updates" notifications for participant-visible changes.
+   */
+  checkForEventUpdates: async () => {
+    const cachedEvents = useTimeBasedEvents
+      .getState()
+      .events.filter((event) => shouldCheckEventForUpdates(event));
+
+    if (cachedEvents.length === 0) return;
+
+    try {
+      await getUserPublicKey();
+    } catch {
+      return;
+    }
+
+    const cachedByCoordinate = new Map(
+      cachedEvents.map((event) => [getEventCoordinate(event), event]),
+    );
+    const relayHints = cachedEvents
+      .map((event) => event.relayHint)
+      .filter((relay): relay is string => !!relay);
+    const relays = Array.from(new Set([...relayHints, ...getRelays()]));
+    const freshEvents = await nostrRuntime.querySync(relays, {
+      kinds: Array.from(new Set(cachedEvents.map((event) => event.kind))),
+      authors: Array.from(new Set(cachedEvents.map((event) => event.user))),
+      "#d": Array.from(new Set(cachedEvents.map((event) => event.id))),
+    });
+
+    for (const freshEvent of freshEvents) {
+      const dTag = getDTag(freshEvent);
+      if (!dTag) continue;
+
+      const cachedEvent = cachedByCoordinate.get(
+        `${freshEvent.kind}:${freshEvent.pubkey}:${dTag}`,
+      );
+      if (
+        !cachedEvent ||
+        freshEvent.created_at <= toCreatedAtSeconds(cachedEvent.createdAt)
+      ) {
+        continue;
+      }
+
+      const eventForParsing = cachedEvent.isPrivateEvent
+        ? cachedEvent.viewKey
+          ? viewPrivateEvent(freshEvent, cachedEvent.viewKey)
+          : null
+        : freshEvent;
+      if (!eventForParsing) continue;
+
+      const parsedFreshEvent = nostrEventToCalendar(eventForParsing, {
+        viewKey: cachedEvent.viewKey,
+        isPrivateEvent: cachedEvent.isPrivateEvent,
+        relayHint: cachedEvent.relayHint,
+      });
+      parsedFreshEvent.calendarId = cachedEvent.calendarId;
+
+      await notifyEventUpdateIfNeeded(cachedEvent, parsedFreshEvent);
+
+      useTimeBasedEvents.getState().updateEvent(parsedFreshEvent);
+    }
+  },
+
+  /**
    * Fetches private events from calendar list references.
    *
    * Instead of subscribing to gift wraps, this reads event refs from
@@ -374,7 +489,7 @@ export const useTimeBasedEvents = create<{
 
     // Fetch all matching events in a single subscription, using stored relay
     // hints first so events are retrieved from where they were published.
-    privateSubscription = fetchPrivateCalendarEvents(
+    fetchPrivateCalendarEvents(
       {
         eventIds: eventIdsToFetch,
         authors: Array.from(authorPubkeys),

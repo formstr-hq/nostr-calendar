@@ -2,9 +2,11 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
 import { getNextOccurrenceInRange } from "./repeatingEventsHelper";
+import type { EventUpdateSummary } from "./eventUpdates";
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
+const EVENT_UPDATES_CHANNEL_ID = "event-updates";
 
 /**
  * Load already-pending notification IDs so we don't re-schedule
@@ -38,6 +40,38 @@ function hashToNumber(str: string): number {
   }
   // Ensure positive and leave room for +1 (at-time notification)
   return (Math.abs(hash) >> 1) * 2;
+}
+
+async function ensureEventUpdatesChannel(): Promise<void> {
+  if (!isNative) return;
+
+  const createChannel = (
+    LocalNotifications as unknown as {
+      createChannel?: (channel: {
+        id: string;
+        name: string;
+        description?: string;
+        importance?: number;
+        visibility?: number;
+        vibration?: boolean;
+      }) => Promise<void>;
+    }
+  ).createChannel;
+
+  if (!createChannel) return;
+
+  try {
+    await createChannel({
+      id: EVENT_UPDATES_CHANNEL_ID,
+      name: "Event updates",
+      description: "Notifications when calendar events are updated",
+      importance: 4,
+      visibility: 1,
+      vibration: true,
+    });
+  } catch (err) {
+    console.warn("Failed to create event updates notification channel", err);
+  }
 }
 
 /**
@@ -145,6 +179,43 @@ export async function scheduleEventNotifications(
   } catch (err) {
     console.warn("Failed to schedule notification", err);
     return [];
+  }
+}
+
+export async function scheduleEventUpdateNotification(
+  event: ICalendarEvent,
+  summary: EventUpdateSummary,
+): Promise<void> {
+  if (!isNative || !summary.shouldNotify) return;
+
+  try {
+    const permResult = await LocalNotifications.requestPermissions();
+    if (permResult.display !== "granted") return;
+
+    const notificationKey = `event-update:${event.kind}:${event.user}:${event.id}:${event.createdAt}`;
+    const title = `${event.title || "Calendar event"} was updated`;
+    const body = summary.body || "This event was updated";
+
+    await ensureEventUpdatesChannel();
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: hashToNumber(notificationKey),
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
+          channelId: EVENT_UPDATES_CHANNEL_ID,
+          extra: {
+            eventId: event.id,
+            notificationKey,
+            channelId: EVENT_UPDATES_CHANNEL_ID,
+          },
+        },
+      ],
+    });
+  } catch (err) {
+    console.warn("Failed to schedule event update notification", err);
   }
 }
 

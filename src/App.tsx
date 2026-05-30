@@ -56,7 +56,12 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
-  const events = useTimeBasedEvents((state) => state);
+  const fetchPrivateEvents = useTimeBasedEvents(
+    (state) => state.fetchPrivateEvents,
+  );
+  const checkForEventUpdates = useTimeBasedEvents(
+    (state) => state.checkForEventUpdates,
+  );
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -84,10 +89,22 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      void events.fetchPrivateEvents();
-      fetchInvitations();
+      void (async () => {
+        if (isNative) {
+          await checkForEventUpdates();
+        }
+        fetchPrivateEvents();
+        fetchInvitations();
+      })();
     }
-  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+  }, [
+    user,
+    calendarsLoaded,
+    checkForEventUpdates,
+    fetchInvitations,
+    fetchPrivateEvents,
+    isInitialized,
+  ]);
 
   // Refetch the user's own public busy lists whenever the visible month
   // changes, so add/remove operations merge with the latest remote state
@@ -163,12 +180,10 @@ function Application() {
       const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
           const now = Math.floor(Date.now() / 1000);
-          setSecureItem(
-            BG_KEY_LAST_INVITATION_FETCH_TIME,
-            now,
-          );
+          setSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME, now);
           setSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME, now);
           setSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME, now);
+          void useTimeBasedEvents.getState().checkForEventUpdates();
         }
       });
       cleanup = () => {
