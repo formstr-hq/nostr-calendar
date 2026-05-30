@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchPrivateEventRSVPs,
   fetchPublicEventRSVPs,
+  getAllResponsesForForm,
   publishPrivateRSVPEvent,
   publishPublicRSVPEvent,
   RSVPPayload,
@@ -25,6 +26,7 @@ import {
 import { EventKinds } from "../common/EventConfigs";
 import { ICalendarEvent } from "../utils/types";
 import { useUser } from "../stores/user";
+import { getFormAddress } from "../utils/formLink";
 
 export interface UseEventRsvpsResult {
   byPubkey: Record<string, RSVPRecord>;
@@ -44,6 +46,20 @@ export function useEventRsvps(
   const [byPubkey, setByPubkey] = useState<Record<string, RSVPRecord>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formResponsesNpubs, updateFormResponsesNPubs] = useState<string[]>([]);
+
+  useEffect(() => {
+    const form = event?.forms?.[0];
+    if (form) {
+      const address = getFormAddress(form.naddr);
+      if (address) {
+        const { coordinate, relayHints } = address;
+        getAllResponsesForForm(coordinate, relayHints).then((responses) => {
+          updateFormResponsesNPubs(responses.map((resp) => resp.pubkey));
+        });
+      }
+    }
+  }, [event?.id]);
 
   const eventCoord = useMemo(() => {
     if (!event) return null;
@@ -149,8 +165,9 @@ export function useEventRsvps(
     if (!event) return [];
     const set = new Set<string>(event.participants ?? []);
     Object.keys(byPubkey).forEach((p) => set.add(p));
+    formResponsesNpubs.forEach((p) => set.add(p));
     return [...set];
-  }, [event, byPubkey]);
+  }, [event, byPubkey, formResponsesNpubs]);
 
   const myRsvp = myPubkey ? byPubkey[myPubkey] : undefined;
   return {

@@ -1385,3 +1385,15 @@ export const fetchUserFormResponse = async (
     current.created_at > latest.created_at ? current : latest,
   );
 };
+
+export const getAllResponsesForForm = async (
+  formCoordinate: string,
+  extraRelays: string[] = [],
+): Promise<Event[]> => {
+  const relays = getDiscoveryRelays(extraRelays);
+  const events = await nostrRuntime.querySync(relays, {
+    kinds: [EventKinds.FormResponse],
+    "#a": [formCoordinate],
+  });
+  return events;
+};
