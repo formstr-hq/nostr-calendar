@@ -14,7 +14,11 @@ describe("parseEventRef", () => {
   });
 
   it("parses a ref with a relay URL", () => {
-    const ref = ["32678:abc123pubkey:my-event-id", "wss://relay.example.com", "nsec1abc123"];
+    const ref = [
+      "32678:abc123pubkey:my-event-id",
+      "wss://relay.example.com",
+      "nsec1abc123",
+    ];
     const result = parseEventRef(ref);
 
     expect(result.relayUrl).toBe("wss://relay.example.com");
@@ -51,7 +55,11 @@ describe("buildEventRef", () => {
       viewKey: "nsec1test",
     });
 
-    expect(ref).toEqual(["32678:testpubkey:my-event", "wss://relay.example.com", "nsec1test"]);
+    expect(ref).toEqual([
+      "32678:testpubkey:my-event",
+      "wss://relay.example.com",
+      "nsec1test",
+    ]);
   });
 
   it("round-trips through build and parse", () => {

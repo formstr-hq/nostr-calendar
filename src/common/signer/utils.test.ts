@@ -151,7 +151,6 @@ describe("setUserDataInLocalStorage / getUserDataFromLocalStorage", () => {
     // Store with a TTL of 0 hours (immediately expired)
     setUserDataInLocalStorage(user, 0);
     // We need to advance time slightly for expiration check
-    const result = getUserDataFromLocalStorage();
     // With TTL 0, the expiresAt is set to now, so it might be equal
     // Let's manually set an expired entry
     store["calendar:userData"] = JSON.stringify({

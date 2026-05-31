@@ -41,12 +41,10 @@ import { EventKinds } from "../EventConfigs";
  * ```
  */
 export class NostrRuntime {
-  private pool: SimplePool;
   public eventStore: EventStore;
   private subscriptionManager: SubscriptionManager;
 
   constructor(pool: SimplePool) {
-    this.pool = pool;
     this.eventStore = new EventStore();
     this.subscriptionManager = new SubscriptionManager(pool, this.eventStore);
   }
@@ -263,7 +261,7 @@ export class NostrRuntime {
         const event = eventMap.get(id) || null;
         resolvers.forEach((resolve) => resolve(event));
       });
-    } catch (err) {
+    } catch (_err) {
       // Resolve all with null on error
       idToResolvers.forEach((resolvers) => {
         resolvers.forEach((resolve) => resolve(null));

@@ -48,6 +48,7 @@ import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
+import AssignmentIcon from "@mui/icons-material/Assignment";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
@@ -56,7 +57,10 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { useUser } from "../stores/user";
-import { parseEventRef } from "../utils/calendarListTypes";
+import {
+  findCalendarForEvent,
+  parseEventRef,
+} from "../utils/calendarListTypes";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { RelayPublishDialog } from "./RelayPublishDialog";
@@ -68,6 +72,8 @@ import {
   getBusyListDefaultOptIn,
   setBusyListDefaultOptIn,
 } from "../stores/busyList";
+import { parseFormInput } from "../utils/formLink";
+import type { IFormAttachment } from "../utils/types";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -331,15 +337,21 @@ export function CalendarEventEdit({
   const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
-    initialEvent?.calendarId || calendars[0]?.id || "",
+    (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
+      calendars[0]?.id ||
+      "",
   );
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
-      return {
+      const evt = {
         ...initialEvent,
         participants: uniqueParticipants(initialEvent.participants),
       };
+      if (!evt.calendarId) {
+        evt.calendarId = selectedCalendarId;
+      }
+      return evt;
     }
 
     const begin = initialDateTime || Date.now();
@@ -354,6 +366,7 @@ export function CalendarEventEdit({
       title: "",
       createdAt: Date.now(),
       description: "",
+      calendarId: selectedCalendarId,
       location: [],
       categories: [],
       reference: [],
@@ -366,7 +379,7 @@ export function CalendarEventEdit({
       repeat: {
         rrule: null,
       },
-    } as ICalendarEvent;
+    };
   });
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RepeatingFrequency>(
@@ -415,6 +428,8 @@ export function CalendarEventEdit({
     user?.pubkey,
   );
   const displayParticipants = uniqueParticipants(eventDetails.participants);
+  const [formInput, setFormInput] = useState("");
+  const [formInputError, setFormInputError] = useState<string | null>(null);
 
   const handleClose = () => {
     resetRelayStatus();
@@ -430,6 +445,30 @@ export function CalendarEventEdit({
     value: ICalendarEvent[K],
   ) => {
     setEventDetails((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
+
+  const handleAddForm = () => {
+    const parsed = parseFormInput(formInput);
+    if (!parsed) {
+      setFormInputError(intl.formatMessage({ id: "form.invalidInput" }));
+      return;
+    }
+    if (attachedForms.some((f) => f.naddr === parsed.naddr)) {
+      setFormInputError(intl.formatMessage({ id: "form.duplicateAttachment" }));
+      return;
+    }
+    updateField("forms", [...attachedForms, parsed]);
+    setFormInput("");
+    setFormInputError(null);
+  };
+
+  const handleRemoveForm = (naddr: string) => {
+    updateField(
+      "forms",
+      attachedForms.filter((f) => f.naddr !== naddr),
+    );
   };
 
   const openCustomDialog = () => {
@@ -484,27 +523,25 @@ export function CalendarEventEdit({
           );
           setSignedEventForRetry(updates.signedEvent);
 
-          useTimeBasedEvents
-            .getState()
-            .updateEvent({ ...updates.event, calendarId: updates.calendarId });
+          useTimeBasedEvents.getState().updateEvent(updates.event);
         } else {
           const { eventRef, authorPubkey, calendarEvent } =
-            await publishPrivateCalendarEvent(
-              eventToSave,
-              {
-                onRelayComplete,
-                waitForAll: false
-              }
-            );
+            await publishPrivateCalendarEvent(eventToSave, {
+              onRelayComplete,
+              waitForAll: false,
+            });
+
           setSignedEventForRetry(calendarEvent);
           await addEventToCalendar(selectedCalendarId, eventRef);
-          const { eventDTag, viewKey } = parseEventRef(eventRef);
+          const { eventDTag, relayUrl, viewKey, kind } =
+            parseEventRef(eventRef);
           useTimeBasedEvents.getState().addEvent({
             ...eventToSave,
             id: eventDTag,
+            kind,
             viewKey,
+            relayHint: relayUrl,
             user: authorPubkey,
-            calendarId: selectedCalendarId,
           });
         }
       } else {
@@ -562,11 +599,11 @@ export function CalendarEventEdit({
         onSave(eventToSave);
       }
 
-      const allOk = getFailedRelays(relaysToPublish).length === 0;
-      setProcessing(false);
-      if (allOk) {
-        handleClose();
-      }
+      // const allOk = getFailedRelays(relaysToPublish).length === 0;
+      // setProcessing(false);
+      // if (allOk) {
+      handleClose();
+      // }
     } catch (e) {
       console.error(e instanceof Error ? e.message : "Unknown error");
       const failedRelays = getFailedRelays(relaysToPublish);
@@ -1243,6 +1280,96 @@ export function CalendarEventEdit({
         </Box>
       </Box>
       <Divider />
+      {/* Attached Forms (private events only) */}
+      {isPrivate && (
+        <>
+          <Box>
+            <AssignmentIcon />
+            <Box style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Typography variant="body2" style={{ fontWeight: 500 }}>
+                {intl.formatMessage({ id: "form.attachments" })}
+              </Typography>
+
+              {attachedForms.length > 0 && (
+                <Box
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {attachedForms.map((form) => (
+                    <Box
+                      key={form.naddr}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "8px 12px",
+                        backgroundColor: "#f5f5f5",
+                        borderRadius: 4,
+                        gap: 8,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          flex: 1,
+                          fontFamily: "monospace",
+                        }}
+                        title={form.naddr}
+                      >
+                        {form.naddr}
+                      </Typography>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveForm(form.naddr)}
+                      >
+                        {intl.formatMessage({ id: "form.removeAttachment" })}
+                      </Button>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              <Box
+                style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder={intl.formatMessage({
+                    id: "form.inputPlaceholder",
+                  })}
+                  value={formInput}
+                  onChange={(e) => {
+                    setFormInput(e.target.value);
+                    if (formInputError) setFormInputError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddForm();
+                    }
+                  }}
+                  error={!!formInputError}
+                  helperText={formInputError ?? undefined}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleAddForm}
+                  disabled={!formInput.trim()}
+                  style={{ marginTop: 0 }}
+                >
+                  {intl.formatMessage({ id: "form.addAttachment" })}
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+          <Divider />
+        </>
+      )}
       {/* Description */}
       <Box>
         <DescriptionIcon />

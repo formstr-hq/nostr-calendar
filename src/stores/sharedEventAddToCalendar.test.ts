@@ -31,7 +31,9 @@ vi.mock("../common/localStorage", () => ({
 vi.mock("../common/nostr", () => ({
   fetchCalendarGiftWraps: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
   fetchPrivateCalendarEvents: vi.fn(),
-  getUserPublicKey: vi.fn().mockResolvedValue("author-pubkey-" + "0".repeat(50)),
+  getUserPublicKey: vi
+    .fn()
+    .mockResolvedValue("author-pubkey-" + "0".repeat(50)),
   viewPrivateEvent: vi.fn().mockReturnValue({
     tags: [],
     content: "",
@@ -99,7 +101,6 @@ function makePublicEvent() {
     website: "",
     isPrivateEvent: false,
     repeat: { rrule: null },
-    calendarId: undefined,
     isInvitation: false,
   };
 }
@@ -111,6 +112,7 @@ function makePrivateEvent(viewKey = "nsec1privateviewkey") {
     eventId: "nostr-event-id-private",
     kind: 32678,
     isPrivateEvent: true,
+    calendarId: "",
     viewKey,
   };
 }
@@ -123,7 +125,11 @@ describe("shared-link add-to-calendar (direct store path)", () => {
       calendars: [{ ...BASE_CALENDAR, eventRefs: [] }],
       isLoaded: true,
     });
-    useInvitations.setState({ invitations: [], unreadCount: 0, isLoaded: true });
+    useInvitations.setState({
+      invitations: [],
+      unreadCount: 0,
+      isLoaded: true,
+    });
   });
 
   it("adds a public event to the calendar with an empty viewKey", async () => {
@@ -171,8 +177,18 @@ describe("shared-link add-to-calendar (direct store path)", () => {
   // dedup logic would kick in when called twice with the same event.
   it("buildEventRef creates consistent coordinates so dedup works correctly", () => {
     const event = makePublicEvent();
-    const ref1 = buildEventRef({ kind: event.kind, authorPubkey: event.user, eventDTag: event.id, viewKey: "" });
-    const ref2 = buildEventRef({ kind: event.kind, authorPubkey: event.user, eventDTag: event.id, viewKey: "" });
+    const ref1 = buildEventRef({
+      kind: event.kind,
+      authorPubkey: event.user,
+      eventDTag: event.id,
+      viewKey: "",
+    });
+    const ref2 = buildEventRef({
+      kind: event.kind,
+      authorPubkey: event.user,
+      eventDTag: event.id,
+      viewKey: "",
+    });
     // Same inputs → same coordinate → dedup in addEventToCalendarList will match
     expect(ref1[0]).toBe(ref2[0]);
   });
@@ -203,7 +219,9 @@ describe("shared-link add-to-calendar (direct store path)", () => {
     expect(match!.giftWrapId).toBe("gift-wrap-nostr-event-id");
 
     // Calling acceptInvitation via the giftWrapId removes it from the store
-    await useInvitations.getState().acceptInvitation(match!.giftWrapId, CALENDAR_ID);
+    await useInvitations
+      .getState()
+      .acceptInvitation(match!.giftWrapId, CALENDAR_ID);
 
     const { invitations: remaining } = useInvitations.getState();
     expect(remaining).toHaveLength(0);

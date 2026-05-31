@@ -1,4 +1,4 @@
-import { Event, EventTemplate } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 import { NostrSigner } from "./types";
 
 /**
@@ -22,7 +22,7 @@ export class DeferredSigner implements NostrSigner {
     return this.pubkey;
   }
 
-  async signEvent(event: EventTemplate): Promise<Event> {
+  async signEvent(event: UnsignedEvent): Promise<Event> {
     const signer = await this.waitForReal();
     return signer.signEvent(event);
   }

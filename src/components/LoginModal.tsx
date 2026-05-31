@@ -557,9 +557,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             showChevron
             chevronRotated={showNip46}
           />
-          {showNip46 && (
-            <Nip46Section onSuccess={onClose} onError={setError} />
-          )}
+          {showNip46 && <Nip46Section onSuccess={onClose} onError={setError} />}
         </Box>
 
         <OptionButton

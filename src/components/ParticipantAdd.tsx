@@ -6,9 +6,7 @@ import { nip19 } from "nostr-tools";
 import { NPub } from "nostr-tools/nip19";
 import { NIP05_REGEX } from "nostr-tools/nip05";
 
-const resolveNip05 = async (
-  nip05: string,
-): Promise<string | null> => {
+const resolveNip05 = async (nip05: string): Promise<string | null> => {
   const match = nip05.match(NIP05_REGEX);
   if (!match) return null;
 
@@ -18,9 +16,7 @@ const resolveNip05 = async (
     const url = `https://${domain}/.well-known/nostr.json?name=${name}`;
     const res = await (await fetch(url, { redirect: "error" })).json();
     const pubkey = res.names?.[name];
-    return typeof pubkey === "string" && pubkey.length === 64
-      ? pubkey
-      : null;
+    return typeof pubkey === "string" && pubkey.length === 64 ? pubkey : null;
   } catch {
     return null;
   }

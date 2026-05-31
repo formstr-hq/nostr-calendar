@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { DeferredSigner } from "./DeferredSigner";
 import { NostrSigner } from "./types";
-import { Event, EventTemplate } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 
 const FAKE_PUBKEY = "a".repeat(64);
 const FAKE_PEER_PUBKEY = "b".repeat(64);
@@ -20,10 +20,11 @@ function makeMockSigner(overrides: Partial<NostrSigner> = {}): NostrSigner {
   };
 }
 
-const FAKE_EVENT: EventTemplate = {
+const FAKE_EVENT: UnsignedEvent = {
   kind: 1,
   created_at: 1000000,
   tags: [],
+  pubkey: "",
   content: "hello",
 };
 

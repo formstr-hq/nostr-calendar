@@ -359,4 +359,3 @@ export async function moveEventBetweenCalendarLists(
 
   return { source: updatedSource, target: updatedTarget };
 }
-

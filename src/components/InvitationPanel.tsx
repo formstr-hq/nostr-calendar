@@ -9,13 +9,14 @@
  * and dashed border styling. Users can accept (add to calendar) or dismiss.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
   Button,
   Paper,
   IconButton,
+  Stack,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -23,11 +24,14 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate } from "react-router";
 import { useInvitations } from "../stores/invitations";
 import { AddToCalendarDialog } from "./AddToCalendarDialog";
+import { FormFillerDialog } from "./FormFillerDialog";
 import { TimeRenderer } from "./TimeRenderer";
 import { Participant } from "./Participant";
 import type { ICalendarEvent } from "../utils/types";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
+import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
+import { FormAttachmentRow } from "./FormAttachmentRow";
 
 export function InvitationPanel() {
   const intl = useIntl();
@@ -39,27 +43,76 @@ export function InvitationPanel() {
 
   useEffect(() => {
     fetchCalendars();
-  }, []);
+  }, [fetchCalendars]);
 
   const [addDialogEvent, setAddDialogEvent] = useState<ICalendarEvent | null>(
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
+  const [addDialogDefaultCalendarId, setAddDialogDefaultCalendarId] =
+    useState("");
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
     .sort((a, b) => b.receivedAt - a.receivedAt);
-  console.log(pendingInvitations);
+
+  const finalizeAccept = useCallback(
+    async ({
+      calendarId,
+      giftWrapId,
+    }: {
+      calendarId: string;
+      giftWrapId?: string;
+    }) => {
+      if (!giftWrapId) {
+        throw new Error("Missing gift wrap id for invitation acceptance");
+      }
+
+      await acceptInvitation(giftWrapId, calendarId);
+    },
+    [acceptInvitation],
+  );
+
+  const {
+    pendingAccept,
+    pendingForm,
+    formCount,
+    startAccept,
+    advanceAccept,
+    cancelAccept,
+  } = useAcceptWithFormsFlow<ICalendarEvent>({
+    onFinalize: finalizeAccept,
+    onCancel: (currentPendingAccept) => {
+      setAddDialogDefaultCalendarId(currentPendingAccept.calendarId);
+      setAddDialogGiftWrapId(currentPendingAccept.giftWrapId ?? "");
+      setAddDialogEvent(currentPendingAccept.context);
+    },
+  });
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
+      setAddDialogDefaultCalendarId("");
       setAddDialogEvent(event);
       setAddDialogGiftWrapId(giftWrapId);
     }
   };
 
-  const handleAcceptConfirm = async (calendarId: string) => {
-    await acceptInvitation(addDialogGiftWrapId, calendarId);
+  const closeAddDialog = () => {
     setAddDialogEvent(null);
+    setAddDialogGiftWrapId("");
+    setAddDialogDefaultCalendarId("");
+  };
+
+  const handleAcceptConfirm = async (calendarId: string) => {
+    const event = addDialogEvent;
+    const giftWrapId = addDialogGiftWrapId;
+    closeAddDialog();
+    if (!event) return;
+    await startAccept({
+      calendarId,
+      giftWrapId,
+      attachments: event.forms ?? [],
+      context: event,
+    });
   };
 
   return (
@@ -137,6 +190,27 @@ export function InvitationPanel() {
                   }}
                 />
               </Box>
+              {invitation.event.forms && invitation.event.forms.length > 0 && (
+                <Box mt={1.5}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    mb={0.75}
+                  >
+                    {intl.formatMessage({ id: "form.attachments" })}
+                  </Typography>
+                  <Stack spacing={0.75}>
+                    {invitation.event.forms.map((attachment) => (
+                      <FormAttachmentRow
+                        key={attachment.naddr}
+                        attachment={attachment}
+                        showSubmissionStatus={false}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
@@ -170,9 +244,24 @@ export function InvitationPanel() {
       {addDialogEvent && (
         <AddToCalendarDialog
           open={!!addDialogEvent}
-          onClose={() => setAddDialogEvent(null)}
+          onClose={closeAddDialog}
           event={addDialogEvent}
           onAccept={handleAcceptConfirm}
+          defaultCalendarId={addDialogDefaultCalendarId || undefined}
+        />
+      )}
+
+      {/* Form filler — runs after calendar selection, before accept finalizes */}
+      {pendingForm && (
+        <FormFillerDialog
+          open
+          attachment={pendingForm}
+          index={pendingAccept ? pendingAccept.formIndex + 1 : undefined}
+          total={formCount}
+          onClose={cancelAccept}
+          onSubmitted={() => {
+            void advanceAccept();
+          }}
         />
       )}
     </Box>
