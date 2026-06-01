@@ -41,6 +41,7 @@ import {
   removeSecureItem,
 } from "../common/localStorage";
 import { useCalendarLists } from "./calendarLists";
+import { useInaccessibleEvents } from "./inaccessibleEvents";
 import {
   findCalendarForEvent,
   getCalendarEventCoordinate,
@@ -186,6 +187,15 @@ const processPrivateEvent = (
  */
 const processedEventIds = new Set<string>();
 
+/**
+ * Clears an event's d-tag from the processed set so the next
+ * {@link fetchPrivateEvents} call re-fetches and re-decrypts it. Used after an
+ * access update rewrites the stored view key for an event already seen.
+ */
+export const resetProcessedEvent = (dTag: string) => {
+  processedEventIds.delete(dTag);
+};
+
 export const useTimeBasedEvents = create<{
   events: ICalendarEvent[];
   eventById: Record<string, ICalendarEvent>;
@@ -256,6 +266,10 @@ export const useTimeBasedEvents = create<{
     useNotifications.getState().removeNotifications(id);
   },
   resetPrivateEvents: () => {
+    // Drop fetch dedup + "no access" tracking so a newly logged-in user
+    // re-fetches and re-evaluates access for their own events.
+    processedEventIds.clear();
+    void useInaccessibleEvents.getState().clearCached();
     set(({ events }) => {
       const publicEvents = events.filter((evt) => !evt.isPrivateEvent);
       saveEventsToStorage([]);
@@ -390,17 +404,33 @@ export const useTimeBasedEvents = create<{
         }
         const meta = dTag ? viewKeyMap.get(dTag) : undefined;
         if (meta) {
-          if (meta.viewKey) {
-            const decrypted = viewPrivateEvent(event, meta.viewKey);
-            if (decrypted) {
-              processPrivateEvent(
-                decrypted,
-                timeRange,
-                meta.viewKey,
-                meta.calendarId,
-                meta.relayUrl,
-              );
-            }
+          const coordinate = `${event.kind}:${event.pubkey}:${dTag}`;
+          const decrypted = meta.viewKey
+            ? viewPrivateEvent(event, meta.viewKey)
+            : null;
+          if (decrypted) {
+            processPrivateEvent(
+              decrypted,
+              timeRange,
+              meta.viewKey,
+              meta.calendarId,
+              meta.relayUrl,
+            );
+            // Regained/has access — drop any stale "no access" record.
+            useInaccessibleEvents.getState().remove(coordinate);
+          } else {
+            // Could not decrypt with the stored key (missing key or the author
+            // rotated it). Record it so the user can request access via the
+            // "Events Without Access" page instead of the event silently
+            // disappearing.
+            useInaccessibleEvents.getState().record({
+              coordinate,
+              kind: event.kind,
+              authorPubkey: event.pubkey,
+              dTag,
+              calendarId: meta.calendarId,
+              relayHint: meta.relayUrl,
+            });
           }
           processedEventIds.add(dTag);
         }
