@@ -129,6 +129,8 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
+      removeParticipantWarning:
+        "Removing a participant rotates this event's key. The removed person loses access, and the remaining participants are re-invited with the new key.",
     },
     form: {
       attachments: "Forms",

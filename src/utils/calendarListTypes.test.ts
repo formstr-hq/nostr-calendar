@@ -4,6 +4,8 @@ import {
   buildEventRef,
   replaceEventRefViewKey,
   resolveRotationRecipients,
+  getRemovedParticipants,
+  resolveRemovalRekeyRecipients,
 } from "./calendarListTypes";
 
 describe("parseEventRef", () => {
@@ -172,5 +174,65 @@ describe("resolveRotationRecipients", () => {
 
     expect(recipients).not.toContain("me");
     expect(recipients.sort()).toEqual(["alice", "carol"]);
+  });
+});
+
+describe("getRemovedParticipants", () => {
+  it("returns participants present before but not after", () => {
+    const removed = getRemovedParticipants(
+      ["alice", "bob", "carol"],
+      ["alice", "carol"],
+      "me",
+    );
+    expect(removed).toEqual(["bob"]);
+  });
+
+  it("never counts the author as removed", () => {
+    const removed = getRemovedParticipants(["me", "alice"], ["alice"], "me");
+    expect(removed).toEqual([]);
+  });
+
+  it("compares case-insensitively", () => {
+    const removed = getRemovedParticipants(["AbC", "DeF"], ["abc"], "me");
+    expect(removed).toEqual(["def"]);
+  });
+
+  it("returns empty when nobody was removed", () => {
+    const removed = getRemovedParticipants(["alice"], ["alice", "bob"], "me");
+    expect(removed).toEqual([]);
+  });
+});
+
+describe("resolveRemovalRekeyRecipients", () => {
+  it("keeps remaining invited and responders, drops the removed person", () => {
+    const recipients = resolveRemovalRekeyRecipients({
+      remainingParticipants: ["bob"],
+      rsvpResponders: ["carol"],
+      removedParticipants: ["alice"],
+      selfPubkey: "me",
+    });
+    expect(recipients.sort()).toEqual(["bob", "carol"]);
+  });
+
+  it("excludes a removed participant even if they also RSVP'd", () => {
+    const recipients = resolveRemovalRekeyRecipients({
+      remainingParticipants: ["bob"],
+      rsvpResponders: ["alice", "carol"],
+      removedParticipants: ["alice"],
+      selfPubkey: "me",
+    });
+    expect(recipients).not.toContain("alice");
+    expect(recipients.sort()).toEqual(["bob", "carol"]);
+  });
+
+  it("excludes the author and de-duplicates across both sources", () => {
+    const recipients = resolveRemovalRekeyRecipients({
+      remainingParticipants: ["bob", "me"],
+      rsvpResponders: ["bob", "carol"],
+      removedParticipants: [],
+      selfPubkey: "me",
+    });
+    expect(recipients).not.toContain("me");
+    expect(recipients.sort()).toEqual(["bob", "carol"]);
   });
 });

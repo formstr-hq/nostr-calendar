@@ -236,3 +236,55 @@ export function resolveRotationRecipients(params: {
   recipients.delete(params.selfPubkey);
   return [...recipients];
 }
+
+/**
+ * Diffs the previous participant list against the current one to find who was
+ * removed. Comparison is case-insensitive (pubkeys may arrive as mixed-case
+ * npub-decoded hex) and the author's own pubkey is never counted as removed.
+ */
+export function getRemovedParticipants(
+  previousParticipants: string[],
+  currentParticipants: string[],
+  selfPubkey: string,
+): string[] {
+  const self = selfPubkey.toLowerCase();
+  const current = new Set(
+    currentParticipants.map((pubkey) => pubkey.toLowerCase()),
+  );
+  const removed = new Set<string>();
+  for (const pubkey of previousParticipants) {
+    const normalized = pubkey.toLowerCase();
+    if (normalized === self) continue;
+    if (!current.has(normalized)) removed.add(normalized);
+  }
+  return [...removed];
+}
+
+/**
+ * Builds the recipient set for a key rotation triggered by removing a
+ * participant: everyone who should keep access — the remaining invited
+ * participants plus anyone who RSVP'd (e.g. link invitees) — minus the
+ * removed person(s) and the author. Comparison is case-insensitive.
+ */
+export function resolveRemovalRekeyRecipients(params: {
+  remainingParticipants: string[];
+  rsvpResponders: string[];
+  removedParticipants: string[];
+  selfPubkey: string;
+}): string[] {
+  const removed = new Set(
+    params.removedParticipants.map((pubkey) => pubkey.toLowerCase()),
+  );
+  const self = params.selfPubkey.toLowerCase();
+  const recipients = new Set<string>();
+  for (const pubkey of [
+    ...params.remainingParticipants,
+    ...params.rsvpResponders,
+  ]) {
+    const normalized = pubkey.toLowerCase();
+    if (normalized === self) continue;
+    if (removed.has(normalized)) continue;
+    recipients.add(normalized);
+  }
+  return [...recipients];
+}

@@ -31,6 +31,8 @@ import { useCalendarLists } from "../stores/calendarLists";
 import {
   buildEventRef,
   resolveRotationRecipients,
+  getRemovedParticipants,
+  resolveRemovalRekeyRecipients,
 } from "../utils/calendarListTypes";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
@@ -507,6 +509,24 @@ export async function publishPrivateCalendarEvent(
   };
 }
 
+/**
+ * Returns the distinct pubkeys that have published a private RSVP (kind 32069)
+ * for the given event coordinate. The responder's identity is the RSVP event's
+ * author (plaintext), so no view key or decryption is needed — we only care
+ * *who* responded, which is enough to keep them in the loop on a key rotation.
+ */
+export async function fetchPrivateRSVPResponderPubkeys(
+  eventCoord: string,
+  relayHint?: string,
+): Promise<string[]> {
+  const relays = getDiscoveryRelays(relayHint ? [relayHint] : []);
+  const events = await nostrRuntime.querySync(relays, {
+    kinds: [EventKinds.PrivateRSVPEvent],
+    "#a": [eventCoord],
+  });
+  return [...new Set(events.map((event) => event.pubkey))];
+}
+
 export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
@@ -515,9 +535,67 @@ export async function editPrivateCalendarEvent(
   onRelayComplete?: (url: string, success: boolean) => void,
 ) {
   const dTag = event.id;
+  const userPublicKey = await getUserPublicKey();
+  const eventKind = EventKinds.PrivateCalendarEvent;
+  const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
+
+  // Removing a participant must actually revoke their access — republishing
+  // under the same key leaves them able to decrypt and keep receiving updates.
+  // When a removal is detected, rotate the key and re-share it with everyone
+  // who should keep access (remaining invited participants + RSVP responders,
+  // e.g. link invitees), minus the removed person(s).
+  const removedParticipants = getRemovedParticipants(
+    previousParticipants,
+    event.participants,
+    userPublicKey,
+  );
+
+  if (removedParticipants.length > 0) {
+    const responders = await fetchPrivateRSVPResponderPubkeys(
+      eventCoordinate,
+      event.relayHint,
+    );
+    const recipients = resolveRemovalRekeyRecipients({
+      remainingParticipants: event.participants,
+      rsvpResponders: responders,
+      removedParticipants,
+      selfPubkey: userPublicKey,
+    });
+
+    // If this edit also moved the event to a different calendar, relocate the
+    // reference (with the current key) first so the in-place key update inside
+    // rotatePrivateEventKey lands on the target calendar. No-op if unchanged.
+    const currentRef = buildEventRef({
+      kind: eventKind,
+      authorPubkey: userPublicKey,
+      eventDTag: dTag,
+      relayUrl: event.relayHint ?? "",
+      viewKey: event.viewKey ?? "",
+    });
+    await useCalendarLists
+      .getState()
+      .moveEventToCalendar(calendarId, eventCoordinate, currentRef);
+
+    const { viewKey, signedEvent } = await rotatePrivateEventKey(
+      event,
+      calendarId,
+      recipients,
+      { onAcceptedRelays, onRelayComplete },
+    );
+
+    return {
+      event: { ...event, viewKey },
+      calendarId,
+      signedEvent,
+    };
+  }
+
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
-  const { signedEvent, eventKind, userPublicKey } =
-    await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
+  const { signedEvent } = await preparePrivateCalendarEvent(
+    event,
+    dTag,
+    viewSecretKey,
+  );
 
   let publishedRelayHint = "";
   await publishToRelays(
@@ -567,7 +645,6 @@ export async function editPrivateCalendarEvent(
     );
   }
 
-  const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
   // Preserve the relay hint from the existing event so the updated ref still
   // points to the relay where the event lives.  Without this the relay URL is
   // dropped on every edit, making subsequent fetches miss the event.
