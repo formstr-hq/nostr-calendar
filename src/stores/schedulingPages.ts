@@ -34,7 +34,7 @@ import { nostrRuntime } from "../common/nostrRuntime";
 import { signerManager } from "../common/signer";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { isNative } from "../utils/platform";
+import { getAppBaseUrl, isNative } from "../utils/platform";
 import type { Event, UnsignedEvent, Filter } from "nostr-tools";
 import {
   generateSecretKey,
@@ -221,7 +221,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     // Make sure the kind-32680 scheduling-page-key index is loaded so we
     // can decrypt pages we authored on another device (or after a web
     // refresh, where secure storage is a no-op).
-    void ensureOwnSchedulingPageKeyIndexLoaded();
+    await ensureOwnSchedulingPageKeyIndexLoaded();
 
     subscriptionHandle = fetchUserSchedulingPages(
       userPubkey,
@@ -229,7 +229,6 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
         // All scheduling pages we publish are NIP-44 encrypted: the outer
         // event carries only `["d", id]` plus ciphertext in `content`.
         // Decrypt unconditionally via the kind-32680 page-key index.
-        await ensureOwnSchedulingPageKeyIndexLoaded();
         const dTag = event.tags.find((t) => t[0] === "d")?.[1];
         if (!dTag) return;
         const viewKey = getOwnSchedulingPageKeyIndex().get(dTag);
@@ -369,7 +368,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
 
   getPageUrl: (page) => {
     const naddr = get().getNAddr(page);
-    const base = `${window.location.origin}/schedule/${naddr}`;
+    const base = `${getAppBaseUrl()}/schedule/${naddr}`;
     // viewKey is mandatory after vNEXT. If it is missing (e.g. a stale
     // legacy entry surfaced before recovery completed), return the bare
     // naddr URL so the unsupported notice is shown rather than a literal

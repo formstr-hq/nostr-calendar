@@ -3,8 +3,6 @@ export enum EventKinds {
   CalendarEventGiftWrap = 1052,
   CalendarEventRumor = 52,
   PrivateRSVPEvent = 32069,
-  RSVPGiftWrap = 1055,
-  RSVPRumor = 55,
   // Public Events
   PublicCalendarEvent = 31923,
   PublicRSVPEvent = 31925,
@@ -39,4 +37,8 @@ export enum EventKinds {
   // viewKey for one scheduling page authored by the user). Parameterized-
   // replaceable per (pubkey, page d-tag); empty content = tombstone.
   SchedulingPagesList = 32680,
+
+  // Formstr / NIP-101
+  FormTemplate = 30168,
+  FormResponse = 1069,
 }

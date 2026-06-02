@@ -14,7 +14,7 @@
  */
 
 import { create } from "zustand";
-import { getItem, setItem } from "../common/localStorage";
+import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import {
   getUserPublicKey,
   publishPrivateCalendarEvent,
@@ -37,6 +37,10 @@ import { useBusyList } from "./busyList";
 import { useTimeBasedEvents } from "./events";
 import { parseEventRef } from "../utils/calendarListTypes";
 import { Event } from "nostr-tools";
+import {
+  BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+} from "../utils/constants";
 
 function subscribeBookingRequests(
   pubkey: string,
@@ -74,6 +78,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
   title: string;
   note: string;
   dTag: string;
+  viewKey?: string;
 }> {
   const rumor = await nip59.unwrapEvent(giftWrap);
   const getTag = (name: string) =>
@@ -86,6 +91,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
     title: getTag("title"),
     note: getTag("note"),
     dTag: getTag("d"),
+    viewKey: getTag("viewKey") || undefined,
   };
 }
 
@@ -129,7 +135,7 @@ async function sendBookingResponse({
   start: number;
   end: number;
   status: "approved" | "declined";
-  eventRef?: string;
+  eventRef?: string[];
   viewKey?: string;
   reason?: string;
 }): Promise<Event> {
@@ -140,7 +146,7 @@ async function sendBookingResponse({
     ["end", String(Math.floor(end / 1000))],
     ["status", status],
   ];
-  if (status === "approved" && eventRef) tags.push(["event_ref", eventRef]);
+  if (status === "approved" && eventRef) tags.push(["event_ref", ...eventRef]);
   if (status === "approved" && viewKey) tags.push(["viewKey", viewKey]);
   if (status === "declined" && reason) tags.push(["reason", reason]);
 
@@ -154,6 +160,7 @@ async function sendBookingResponse({
     },
     bookerPubkey,
     EventKinds.BookingResponseGiftWrap,
+    [["status", status]],
   );
   await publishToRelays(giftWrap);
   return giftWrap;
@@ -250,6 +257,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             title: details.title,
             note: details.note,
             dTag: details.dTag,
+            viewKey: details.viewKey,
             receivedAt: giftWrap.created_at * 1000,
             status: "pending",
           };
@@ -262,6 +270,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             saveIncomingToStorage(incomingRequests);
             return { incomingRequests, incomingUnreadCount };
           });
+          void setSecureItem(
+            BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         } catch (error) {
           console.error("Failed to unwrap booking request:", error);
         }
@@ -334,6 +346,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             saveOutgoingToStorage(outgoingBookings);
             return { outgoingBookings, outgoingUnreadCount };
           });
+          void setSecureItem(
+            BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+            Math.floor(Date.now() / 1000),
+          );
         } catch (error) {
           console.error("Failed to unwrap booking response:", error);
         }
@@ -344,7 +360,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   approveRequest: async (requestId, calendarId) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
-
+    const pubkey = await getUserPublicKey();
     // Create a private calendar event for this appointment
     // using the booker's pre-generated d-tag so the event
     // auto-appears in the booker's calendar list.
@@ -356,7 +372,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       begin: request.start,
       end: request.end,
       kind: 0,
-      user: "",
+      calendarId,
+      user: pubkey,
       participants: [request.bookerPubkey],
       categories: [],
       reference: [],
@@ -370,27 +387,26 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       image: undefined,
     };
 
-    // Pass the booker's d-tag so the published event uses it.
-    // publishPrivateCalendarEvent already sends invitation gift wraps
-    // with viewKey to all participants (including booker), so the
-    // booker's calendar will pick it up automatically.
-    const { eventRef, authorPubkey } = await publishPrivateCalendarEvent(
-      event,
-      request.dTag || undefined,
-    );
+    // Use the booker's pre-generated d-tag and view key so the published
+    // event matches exactly what the booker already added to their calendar.
+    const { eventRef, authorPubkey, viewKey } =
+      await publishPrivateCalendarEvent(event, {
+        existingDTag: request.dTag,
+        existingViewKey: request.viewKey,
+        invitationGiftWrapTags: [["booking", "true"]],
+        waitForAll: false,
+      });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
     // approved booking shows up on the host's calendar without waiting
     // for a relay round-trip.
-    await useCalendarLists
-      .getState()
-      .addEventToCalendar(calendarId, eventRef);
-    const { eventDTag, viewKey } = parseEventRef(eventRef);
+    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
+    const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
       id: eventDTag,
-      viewKey,
+      viewKey: parsedViewKey,
       user: authorPubkey,
       calendarId,
     });
@@ -417,10 +433,17 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       return { incomingRequests, incomingUnreadCount };
     });
 
-    // No booking-response gift wrap is sent: the published calendar event
-    // arrives at the booker via the existing CalendarEventGiftWrap (kind
-    // 1052) flow, which carries the viewKey and triggers the booker's
-    // outgoing-booking status flip in `useInvitations`.
+    sendBookingResponse({
+      schedulingPageRef: request.schedulingPageRef,
+      bookerPubkey: request.bookerPubkey,
+      start: request.start,
+      end: request.end,
+      status: "approved",
+      eventRef,
+      viewKey,
+    }).catch((err) => {
+      console.error("Failed to send booking approval response:", err);
+    });
   },
 
   declineRequest: async (requestId, reason) => {

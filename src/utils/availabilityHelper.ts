@@ -323,7 +323,10 @@ export function expandAvailabilitySlots(
         // Keep the window at its original grid-aligned start so that
         // splitIntoBookableSlots produces clean slots (09:00, 09:45 …).
         // Filtering by minNotice / "now" is done per-slot in getBookableSlots.
-        if (unblockedSlot.end > earliestStart && unblockedSlot.start < effectiveTo) {
+        if (
+          unblockedSlot.end > earliestStart &&
+          unblockedSlot.start < effectiveTo
+        ) {
           slots.push(unblockedSlot);
         }
       }
@@ -528,7 +531,14 @@ export function getDisplaySlots(
           startMin,
           timezone,
         ).getTime(),
-        end: dateInTimezone(year, month, day, endHours, endMin, timezone).getTime(),
+        end: dateInTimezone(
+          year,
+          month,
+          day,
+          endHours,
+          endMin,
+          timezone,
+        ).getTime(),
       };
     });
 

@@ -17,18 +17,8 @@ const { mockEncrypt, mockDecrypt, mockSignEvent } = vi.hoisted(() => ({
       ["content", "A test calendar"],
       ["color", "#d50000"],
       ["notifications", "disabled"],
-      [
-        "a",
-        "32678:testpubkey:event-1",
-        "",
-        "nsec1key1:1700000000::1700003600:false",
-      ],
-      [
-        "a",
-        "32679:testpubkey:event-2",
-        "",
-        "nsec1key2:1700100000::1700103600:true",
-      ],
+      ["a", "32678:testpubkey:event-1", "", "nsec1key1"],
+      ["a", "32678:testpubkey:event-2", "", "nsec1key2"],
     ]),
   ),
   mockSignEvent: vi.fn().mockImplementation((e: any) => ({ ...e, sig: "sig" })),
@@ -72,9 +62,7 @@ const makeCalendar = (overrides?: Partial<ICalendarList>): ICalendarList => ({
   title: "My Calendar",
   description: "Personal events",
   color: "#4285f4",
-  eventRefs: [
-    ["32678:testpubkey:event-1", "", "nsec1key:1700000000::1700003600:false"],
-  ],
+  eventRefs: [["32678:testpubkey:event-1", "", "nsec1key"]],
   createdAt: 1700000000,
   isVisible: true,
   ...overrides,
@@ -102,7 +90,7 @@ describe("calendarList protocol layer", () => {
         "a",
         "32678:testpubkey:event-1",
         "",
-        "nsec1key:1700000000::1700003600:false",
+        "nsec1key",
       ]);
     });
 
@@ -119,9 +107,9 @@ describe("calendarList protocol layer", () => {
     it("includes all event refs as 'a' tags", async () => {
       const cal = makeCalendar({
         eventRefs: [
-          ["32678:pub1:e1", "", "nsec1a:1700000000::1700003600:false"],
-          ["32679:pub2:e2", "", "nsec1b:1700100000::1700103600:true"],
-          ["32678:pub3:e3", "", "nsec1c:1700200000::1700203600:false"],
+          ["32678:pub1:e1", "", "nsec1a"],
+          ["32678:pub2:e2", "", "nsec1b"],
+          ["32678:pub3:e3", "", "nsec1c"],
         ],
       });
       await encryptCalendarList(cal);
@@ -169,16 +157,8 @@ describe("calendarList protocol layer", () => {
       expect(result.color).toBe("#d50000");
       expect(result.notificationPreference).toBe("disabled");
       expect(result.eventRefs).toEqual([
-        [
-          "32678:testpubkey:event-1",
-          "",
-          "nsec1key1:1700000000::1700003600:false",
-        ],
-        [
-          "32679:testpubkey:event-2",
-          "",
-          "nsec1key2:1700100000::1700103600:true",
-        ],
+        ["32678:testpubkey:event-1", "", "nsec1key1"],
+        ["32678:testpubkey:event-2", "", "nsec1key2"],
       ]);
       expect(result.createdAt).toBe(1700000000);
       expect(result.isVisible).toBe(true);
@@ -224,11 +204,7 @@ describe("calendarList protocol layer", () => {
   describe("addEventToCalendarList", () => {
     it("adds a new event ref to the calendar", async () => {
       const cal = makeCalendar({ eventRefs: [] });
-      const newRef = [
-        "32678:testpubkey:new-event",
-        "",
-        "nsec1new:1700000000::1700003600:false",
-      ];
+      const newRef = ["32678:testpubkey:new-event", "", "nsec1new"];
 
       const result = await addEventToCalendarList(cal, newRef);
 
@@ -237,11 +213,7 @@ describe("calendarList protocol layer", () => {
     });
 
     it("does not add duplicate refs (matched by coordinate)", async () => {
-      const existingRef = [
-        "32678:testpubkey:event-1",
-        "",
-        "nsec1key:1700000000::1700003600:false",
-      ];
+      const existingRef = ["32678:testpubkey:event-1", "", "nsec1key"];
       const cal = makeCalendar({ eventRefs: [existingRef] });
 
       const result = await addEventToCalendarList(cal, existingRef);
@@ -251,11 +223,7 @@ describe("calendarList protocol layer", () => {
 
     it("updates createdAt timestamp when adding a ref", async () => {
       const cal = makeCalendar({ createdAt: 1000 });
-      const ref = [
-        "32678:testpubkey:new-event",
-        "",
-        "nsec1new:1700000000::1700003600:false",
-      ];
+      const ref = ["32678:testpubkey:new-event", "", "nsec1new"];
 
       const result = await addEventToCalendarList(cal, ref);
 
@@ -265,11 +233,7 @@ describe("calendarList protocol layer", () => {
 
   describe("removeEventFromCalendarList", () => {
     it("removes an event ref from the calendar", async () => {
-      const ref = [
-        "32678:testpubkey:event-1",
-        "",
-        "nsec1key:1700000000::1700003600:false",
-      ];
+      const ref = ["32678:testpubkey:event-1", "", "nsec1key"];
       const cal = makeCalendar({ eventRefs: [ref] });
 
       const result = await removeEventFromCalendarList(cal, ref);
@@ -279,19 +243,13 @@ describe("calendarList protocol layer", () => {
 
     it("does nothing when removing a non-existent ref", async () => {
       const cal = makeCalendar({
-        eventRefs: [
-          [
-            "32678:testpubkey:event-1",
-            "",
-            "nsec1key:1700000000::1700003600:false",
-          ],
-        ],
+        eventRefs: [["32678:testpubkey:event-1", "", "nsec1key"]],
       });
 
       const result = await removeEventFromCalendarList(cal, [
         "32678:testpubkey:nonexistent",
         "",
-        "nsec1:1700000000::1700003600:false",
+        "nsec1other",
       ]);
 
       expect(result.eventRefs).toHaveLength(1);

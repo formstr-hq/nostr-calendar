@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { useUser } from "./stores/user";
 import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
-import dictionary from "./common/dictionary";
+import dictionary, { NestedObject } from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
 import RelayManager from "./components/RelayManager";
 import { BrowserRouter, useNavigate } from "react-router";
@@ -17,7 +17,11 @@ import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
 import { isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
-import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "./utils/constants";
+import {
+  BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
+  BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
+  BG_KEY_LAST_INVITATION_FETCH_TIME,
+} from "./utils/constants";
 import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
@@ -158,10 +162,10 @@ function Application() {
     import("@capacitor/app").then(({ App: CapApp }) => {
       const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
-          setSecureItem(
-            BG_KEY_LAST_INVITATION_FETCH_TIME,
-            Math.floor(Date.now() / 1000),
-          );
+          const now = Math.floor(Date.now() / 1000);
+          setSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME, now);
+          setSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME, now);
+          setSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME, now);
         }
       });
       cleanup = () => {
@@ -281,8 +285,8 @@ export default function App() {
   const i18nLocale = _locale;
   const dayjsLocale = useDayjsLocale();
   const locale_dictionary = {
-    ...flattenMessages(dictionary["en-US"]),
-    ...flattenMessages(dictionary[i18nLocale]),
+    ...flattenMessages(dictionary["en-US"] as NestedObject),
+    ...flattenMessages(dictionary[i18nLocale] as NestedObject),
   };
   return (
     <IntlProvider locale={i18nLocale} messages={locale_dictionary}>

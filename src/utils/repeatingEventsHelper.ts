@@ -85,7 +85,9 @@ function parseRuleParts(rule: string): ParsedRuleParts {
   return parsed;
 }
 
-function getFrequencyFromParts(parts: ParsedRuleParts): RepeatingFrequency | null {
+function getFrequencyFromParts(
+  parts: ParsedRuleParts,
+): RepeatingFrequency | null {
   if (parts.hasUnsupportedParts || !parts.freq) {
     return null;
   }
@@ -105,11 +107,7 @@ function getFrequencyFromParts(parts: ParsedRuleParts): RepeatingFrequency | nul
     return RepeatingFrequency.Weekday;
   }
 
-  if (
-    parts.freq === "MONTHLY" &&
-    parts.interval === "3" &&
-    !parts.byDay
-  ) {
+  if (parts.freq === "MONTHLY" && parts.interval === "3" && !parts.byDay) {
     return RepeatingFrequency.Quarterly;
   }
 
@@ -256,9 +254,16 @@ export function buildRecurrenceRule({
   const ruleParts = [normalizeRule(baseRule)];
 
   if (endMode === "count") {
-    const safeCount = Math.max(1, parsePositiveInteger(String(count ?? "")) ?? 1);
+    const safeCount = Math.max(
+      1,
+      parsePositiveInteger(String(count ?? "")) ?? 1,
+    );
     ruleParts.push(`COUNT=${safeCount}`);
-  } else if (endMode === "until" && untilDate !== null && untilDate !== undefined) {
+  } else if (
+    endMode === "until" &&
+    untilDate !== null &&
+    untilDate !== undefined
+  ) {
     const alignedUntil = Math.max(
       alignUntilDateWithEventStart(untilDate, eventStart),
       eventStart,

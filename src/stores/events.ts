@@ -29,7 +29,6 @@ import {
   removeOne,
 } from "@voiceflow/normal-store";
 import { nostrEventToCalendar } from "../utils/parser";
-import { RSVPResponse } from "../utils/types";
 import type { ICalendarEvent } from "../utils/types";
 import {
   scheduleEventNotifications,
@@ -43,7 +42,11 @@ import {
   removeSecureItem,
 } from "../common/localStorage";
 import { useCalendarLists } from "./calendarLists";
-import { parseEventRef } from "../utils/calendarListTypes";
+import {
+  findCalendarForEvent,
+  getCalendarEventCoordinate,
+  parseEventRef,
+} from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { getDTag } from "../common/nostrRuntime/utils/helpers";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
@@ -55,12 +58,12 @@ const saveEventsToStorage = (events: ICalendarEvent[]) => {
 };
 
 const getCalendarNotificationPreference = (
-  calendarId?: string,
+  event: ICalendarEvent,
 ): "enabled" | "disabled" | undefined => {
-  if (!calendarId) return undefined;
-  const calendar = useCalendarLists
-    .getState()
-    .calendars.find((c) => c.id === calendarId);
+  const calendar = findCalendarForEvent(
+    useCalendarLists.getState().calendars,
+    event,
+  );
   return calendar?.notificationPreference;
 };
 
@@ -68,9 +71,7 @@ const syncEventNotifications = async (
   event: ICalendarEvent,
   { cancelExisting = false }: { cancelExisting?: boolean } = {},
 ): Promise<void> => {
-  const calendarPreference = getCalendarNotificationPreference(
-    event.calendarId,
-  );
+  const calendarPreference = getCalendarNotificationPreference(event);
   const shouldSchedule = shouldScheduleNotifications(
     event.notificationPreference,
     calendarPreference,
@@ -96,9 +97,8 @@ const syncEventNotifications = async (
 };
 
 let publicSubscription: SubscriptionHandle | undefined;
-let privateSubscription: SubscriptionHandle | undefined;
 
-export { ICalendarEvent, RSVPResponse };
+export { ICalendarEvent };
 
 interface TimeRangeConfig {
   daysBefore: number;
@@ -146,16 +146,11 @@ const processPrivateEvent = (
 ) => {
   const { events } = useTimeBasedEvents.getState();
   let store = normalize(events);
-  const parsedEvent = nostrEventToCalendar(event, {
+  const parsedEvent = nostrEventToCalendar(event, calendarId ?? "", {
     viewKey,
     isPrivateEvent: true,
     relayHint,
   });
-
-  // Attach the calendar ID so events can be themed by calendar color
-  if (calendarId) {
-    parsedEvent.calendarId = calendarId;
-  }
 
   // Check if we have valid begin/end times after processing all tags
   if (parsedEvent.begin === 0 || parsedEvent.end === 0) {
@@ -299,8 +294,16 @@ export const useTimeBasedEvents = create<{
   },
   refreshNotificationPreferencesForCalendar: (calendarId) => {
     const { events } = useTimeBasedEvents.getState();
-    const relevantEvents = events.filter(
-      (event) => event.calendarId === calendarId,
+    const calendar = useCalendarLists
+      .getState()
+      .calendars.find((cal) => cal.id === calendarId);
+    if (!calendar) return;
+
+    const calendarCoordinates = new Set(
+      calendar.eventRefs.map((ref) => ref[0]),
+    );
+    const relevantEvents = events.filter((event) =>
+      calendarCoordinates.has(getCalendarEventCoordinate(event)),
     );
 
     void (async () => {
@@ -329,17 +332,16 @@ export const useTimeBasedEvents = create<{
    */
   fetchPrivateEvents(customTimeRange) {
     const timeRange = getTimeRange(customTimeRange);
-    const visibleRefs = useCalendarLists.getState().getVisibleEventRefs();
+    const visibleCalendars = useCalendarLists
+      .getState()
+      .calendars.filter((c) => c.isVisible);
+    const visibleRefs = visibleCalendars.flatMap((c) => c.eventRefs);
 
     if (visibleRefs.length === 0) return;
 
-    // Get calendar ID for each ref so events can be colored by their calendar
-    // Key by coordinate (first element of ref array) since it uniquely identifies the event
-    const calendars = useCalendarLists
-      .getState()
-      .calendars.filter((c) => c.isVisible);
+    // Map ref coordinate (ref[0]) → calendarId
     const refToCalendarId = new Map<string, string>();
-    for (const cal of calendars) {
+    for (const cal of visibleCalendars) {
       for (const ref of cal.eventRefs) {
         refToCalendarId.set(ref[0], cal.id);
       }
@@ -376,7 +378,7 @@ export const useTimeBasedEvents = create<{
 
     // Fetch all matching events in a single subscription, using stored relay
     // hints first so events are retrieved from where they were published.
-    privateSubscription = fetchPrivateCalendarEvents(
+    fetchPrivateCalendarEvents(
       {
         eventIds: eventIdsToFetch,
         authors: Array.from(authorPubkeys),
@@ -392,13 +394,15 @@ export const useTimeBasedEvents = create<{
         if (meta) {
           if (meta.viewKey) {
             const decrypted = viewPrivateEvent(event, meta.viewKey);
-            processPrivateEvent(
-              decrypted,
-              timeRange,
-              meta.viewKey,
-              meta.calendarId,
-              meta.relayUrl,
-            );
+            if (decrypted) {
+              processPrivateEvent(
+                decrypted,
+                timeRange,
+                meta.viewKey,
+                meta.calendarId,
+                meta.relayUrl,
+              );
+            }
           }
           processedEventIds.add(dTag);
         }
@@ -424,7 +428,7 @@ export const useTimeBasedEvents = create<{
       (event: Event) => {
         set(({ events, eventById }) => {
           let store = normalize(events);
-          const parsedEvent = nostrEventToCalendar(event);
+          const parsedEvent = nostrEventToCalendar(event, "");
 
           // Check if we have valid begin/end times after processing all tags
           if (parsedEvent.begin === 0 || parsedEvent.end === 0) {

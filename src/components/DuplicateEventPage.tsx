@@ -38,13 +38,14 @@ export const DuplicateEventPage = () => {
         let parsedEvent: ICalendarEvent;
         if (viewKey) {
           const privateEvent = viewPrivateEvent(event, viewKey);
-          parsedEvent = nostrEventToCalendar(privateEvent, {
+          if (!privateEvent) throw new Error("Failed to decrypt event");
+          parsedEvent = nostrEventToCalendar(privateEvent, "", {
             viewKey,
             isPrivateEvent: true,
             relayHint,
           });
         } else {
-          parsedEvent = nostrEventToCalendar(event, { relayHint });
+          parsedEvent = nostrEventToCalendar(event, "", { relayHint });
         }
         setLoadState({ event: parsedEvent, fetchState: "fetched" });
       })

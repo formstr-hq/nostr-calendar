@@ -3,10 +3,14 @@ description: Your calendar is one of the most personal things you own — it kno
 summary: A private, decentralized calendar powered by Nostr. Your schedule, your keys.
 website: https://calendar.formstr.app
 images:
-  - assets/login.png
   - assets/event-view.png
-  - assets/week-view.png
+  - assets/booking-request.png
+  - assets/booking-create-1.png
+  - assets/booking-create-2.png
+  - assets/booking-notifications.png
+  - assets/login.png
   - assets/month-view.png
+  - assets/week-view.png
   - assets/day-view.png
   - assets/setup.png
   - assets/calendar-list.png

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,12 +17,14 @@ import type { ICalendarEvent } from "../utils/types";
 import { TimeRenderer } from "./TimeRenderer";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { useIntl } from "react-intl";
+import { getEventDisplayRange } from "../utils/eventOccurrence";
 
 interface AddToCalendarDialogProps {
   open: boolean;
   onClose: () => void;
   event: ICalendarEvent;
   onAccept: (calendarId: string) => void;
+  defaultCalendarId?: string;
 }
 
 export function AddToCalendarDialog({
@@ -30,14 +32,22 @@ export function AddToCalendarDialog({
   onClose,
   event,
   onAccept,
+  defaultCalendarId,
 }: AddToCalendarDialogProps) {
   const intl = useIntl();
   const { calendars } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState(
-    calendars[0]?.id || "",
+    defaultCalendarId || calendars[0]?.id || "",
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const eventDisplayRange = getEventDisplayRange(event);
+
+  useEffect(() => {
+    if (!selectedCalendarId && calendars[0]?.id) {
+      setSelectedCalendarId(defaultCalendarId || calendars[0].id);
+    }
+  }, [calendars, defaultCalendarId, selectedCalendarId]);
 
   const handleAccept = () => {
     if (selectedCalendarId) {
@@ -73,8 +83,8 @@ export function AddToCalendarDialog({
               {event.title}
             </Typography>
             <TimeRenderer
-              begin={event.begin}
-              end={event.end}
+              begin={eventDisplayRange.begin}
+              end={eventDisplayRange.end}
               repeat={event.repeat}
               allDay={event.allDay}
             />

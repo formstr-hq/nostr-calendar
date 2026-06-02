@@ -15,16 +15,9 @@ export enum RepeatingFrequency {
   Yearly = "yearly",
 }
 
-export enum RSVPResponse {
-  accepted = "accepted",
-  declined = "declined",
-  tentative = "tentative",
-  pending = "pending",
-}
-
-export interface IRSVPResponse {
+export interface IParticipantRSVP {
   participantId: string;
-  response: RSVPResponse;
+  response: RSVPStatus;
   timestamp: number;
 }
 
@@ -38,18 +31,40 @@ export type NotificationPreference = "enabled" | "disabled";
 export type RelayLineStatus = "pending" | "ok" | "error";
 export type RelayStatusMap = Record<string, RelayLineStatus>;
 
+/**
+ * Reference to a Formstr form attached to a calendar event.
+ *
+ * Stored on a private calendar event as a `form` tag:
+ *   ["form", naddr, viewKey?]
+ *
+ * The naddr is the Nostr address (NIP-19) of the form.
+ *
+ * The optional viewKey is the form's read-only NIP-44 decryption key —
+ * the same value Formstr surfaces in shareable links as `?viewKey=<hex>`
+ * or inside an `#nkeys1...` bech32-TLV blob. It must NEVER be confused
+ * with the form's `responseKey` (a.k.a. admin / edit key), which grants
+ * write access to the form definition itself and must never be embedded
+ * in shared calendar events.
+ */
+export interface IFormAttachment {
+  naddr: string;
+  viewKey?: string;
+}
+
 export interface ICalendarEvent {
   begin: number;
   description: string;
   kind: number;
   end: number;
+  occurrenceBegin?: number;
+  occurrenceEnd?: number;
   id: string;
   eventId: string;
   title: string;
   createdAt: number;
   categories: string[];
   participants: string[];
-  rsvpResponses: IRSVPResponse[];
+  rsvpResponses: IParticipantRSVP[];
   reference: string[];
   image?: string;
   location: string[];
@@ -66,7 +81,6 @@ export interface ICalendarEvent {
    * If undefined, calendar-list preference should be used as fallback.
    */
   notificationPreference?: NotificationPreference;
-  calendarId?: string;
   isInvitation?: boolean;
   relayHint?: string;
   allDay?: boolean;
@@ -76,6 +90,15 @@ export interface ICalendarEvent {
    * Nostr publish/RSVP code paths.
    */
   source?: "nostr" | "device";
+  /**
+   * Forms attached to this event (Formstr).
+   * Authors may attach one or more forms; participants are expected to
+   * fill them when adding the event to their calendar.
+   * Currently only persisted for private events.
+   */
+  forms?: IFormAttachment[];
+  /** The calendar list ID (d-tag) that this event belongs to. */
+  calendarId: string;
 }
 
 // --- Appointment Scheduling Types ---
@@ -166,6 +189,8 @@ export interface IBookingRequest {
   note: string;
   /** Pre-generated d-tag for the calendar event */
   dTag: string;
+  /** Pre-generated view key the host must use when publishing the event */
+  viewKey?: string;
   /** When this request was received (ms) */
   receivedAt: number;
   /** Current status */

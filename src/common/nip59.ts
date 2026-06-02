@@ -69,13 +69,15 @@ export async function createSeal(rumor: Rumor, recipientPublicKey: string) {
     content,
     created_at: now(),
     tags: [],
-  });
+    // manual typecasting as its a seal and seals do not contain pubkey
+  } as unknown as UnsignedEvent);
 }
 
 export function createWrap(
   seal: NostrEvent,
   recipientPublicKey: string,
   kind: number,
+  extraTags: string[][] = [],
 ) {
   const randomKey = generateSecretKey();
 
@@ -84,7 +86,7 @@ export function createWrap(
       kind,
       content: nip44Encrypt(seal, randomKey, recipientPublicKey),
       created_at: now(),
-      tags: [["p", recipientPublicKey]],
+      tags: [["p", recipientPublicKey], ...extraTags],
     },
     randomKey,
   );
@@ -94,11 +96,12 @@ export async function wrapEvent(
   event: Partial<UnsignedEvent>,
   recipientPublicKey: string,
   kind: number,
+  extraTags: string[][] = [],
 ) {
   const rumor = await createRumor(event);
 
   const seal = await createSeal(rumor, recipientPublicKey);
-  return createWrap(seal, recipientPublicKey, kind);
+  return createWrap(seal, recipientPublicKey, kind, extraTags);
 }
 
 export async function wrapManyEvents(

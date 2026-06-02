@@ -1,3 +1,9 @@
+import {
+  OCCURRENCE_END_PARAM,
+  OCCURRENCE_START_PARAM,
+  type EventOccurrenceRange,
+} from "./eventOccurrence";
+
 export enum ROUTES {
   EventPage = "/event/:naddr",
   EditEventPage = "/event/edit/:naddr",
@@ -13,12 +19,22 @@ export enum ROUTES {
   Bookings = "/bookings",
 }
 
-export function getEventPage(naddr: string, viewKey?: string) {
+export function getEventPage(
+  naddr: string,
+  viewKey?: string,
+  occurrenceRange?: EventOccurrenceRange,
+) {
   const urlParam = new URLSearchParams();
   if (viewKey) {
     urlParam.append("viewKey", viewKey);
   }
-  return `/event/${naddr}?${urlParam.toString()}`;
+  if (occurrenceRange) {
+    urlParam.append(OCCURRENCE_START_PARAM, String(occurrenceRange.begin));
+    urlParam.append(OCCURRENCE_END_PARAM, String(occurrenceRange.end));
+  }
+
+  const query = urlParam.toString();
+  return `/event/${naddr}${query ? `?${query}` : ""}`;
 }
 
 export function getEditEventPage(naddr: string, viewKey?: string) {

@@ -16,12 +16,14 @@ let _fetch: any;
 
 try {
   _fetch = fetch;
+  // eslint-disable-next-line no-empty
 } catch {}
 
 export function useFetchImplementation(fetchImplementation: any) {
   _fetch = fetchImplementation;
 }
 
+// eslint-disable-next-line no-useless-escape
 export const BUNKER_REGEX = /^bunker:\/\/([0-9a-f]{64})\??([?\/\w:.=&%-]*)$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -392,7 +394,7 @@ export class BunkerSigner implements Signer {
     params: string[],
     timeout: number = 60_000,
   ): Promise<string> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       try {
         if (!this.isOpen)
           throw new Error("this signer is not open anymore, create a new one");
@@ -441,7 +443,9 @@ export class BunkerSigner implements Signer {
         this.waitingForAuth[id] = true;
 
         // publish the event
-        await Promise.any(this.pool.publish(this.bp.relays, verifiedEvent));
+        Promise.any(this.pool.publish(this.bp.relays, verifiedEvent)).catch(
+          reject,
+        );
       } catch (err) {
         reject(err);
       }
@@ -613,7 +617,7 @@ export async function fetchBunkerProviders(
             ) !== i
           )
             return undefined;
-        } catch (err) {
+        } catch (_err) {
           /***/
         }
 
@@ -630,7 +634,7 @@ export async function fetchBunkerProviders(
             local: false,
           };
         }
-      } catch (err) {
+      } catch (_err) {
         return undefined;
       }
     }),

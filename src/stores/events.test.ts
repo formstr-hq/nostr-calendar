@@ -73,12 +73,8 @@ vi.mock("../utils/notifications", () => ({
 }));
 
 describe("parseEventRef", () => {
-  it("parses a non-recurring event ref", () => {
-    const ref = [
-      "32678:testpubkey:my-event",
-      "",
-      "nsec1viewkey:1700000000::1700003600:false",
-    ];
+  it("parses an event ref", () => {
+    const ref = ["32678:testpubkey:my-event", "", "nsec1viewkey"];
     const parsed = parseEventRef(ref);
 
     expect(parsed.kind).toBe(32678);
@@ -86,27 +82,19 @@ describe("parseEventRef", () => {
     expect(parsed.eventDTag).toBe("my-event");
     expect(parsed.relayUrl).toBe("");
     expect(parsed.viewKey).toBe("nsec1viewkey");
-    expect(parsed.beginTimeSecs).toBe(1700000000);
-    expect(parsed.endTimeSecs).toBe(1700003600);
-    expect(parsed.isRecurring).toBe(false);
   });
 
-  it("parses a recurring event ref", () => {
+  it("parses a ref with a relay URL", () => {
     const ref = [
-      "32679:testpubkey:weekly-standup",
-      "",
-      "nsec1recur:1700000000::1700003600:true",
+      "32678:testpubkey:weekly-standup",
+      "wss://relay.example.com",
+      "nsec1recur",
     ];
     const parsed = parseEventRef(ref);
 
-    expect(parsed.kind).toBe(32679);
-    expect(parsed.authorPubkey).toBe("testpubkey");
-    expect(parsed.eventDTag).toBe("weekly-standup");
-    expect(parsed.relayUrl).toBe("");
+    expect(parsed.kind).toBe(32678);
+    expect(parsed.relayUrl).toBe("wss://relay.example.com");
     expect(parsed.viewKey).toBe("nsec1recur");
-    expect(parsed.beginTimeSecs).toBe(1700000000);
-    expect(parsed.endTimeSecs).toBe(1700003600);
-    expect(parsed.isRecurring).toBe(true);
   });
 });
 
@@ -117,27 +105,17 @@ describe("buildEventRef", () => {
       authorPubkey: "testpubkey",
       eventDTag: "my-event",
       viewKey: "nsec1key",
-      beginTimeSecs: 1700000000,
-      endTimeSecs: 1700003600,
-      isRecurring: false,
     });
 
-    expect(ref).toEqual([
-      "32678:testpubkey:my-event",
-      "",
-      "nsec1key:1700000000::1700003600:false",
-    ]);
+    expect(ref).toEqual(["32678:testpubkey:my-event", "", "nsec1key"]);
   });
 
   it("round-trips with parseEventRef", () => {
     const original = {
-      kind: 32679,
+      kind: 32678,
       authorPubkey: "testpubkey",
       eventDTag: "recurring-event",
       viewKey: "nsec1abc",
-      beginTimeSecs: 1700500000,
-      endTimeSecs: 1700503600,
-      isRecurring: true,
     };
 
     const ref = buildEventRef(original);
@@ -192,6 +170,7 @@ describe("useTimeBasedEvents store", () => {
           geoHash: [],
           website: "",
           user: "someone",
+          calendarId: "",
           isPrivateEvent: false,
           repeat: { rrule: null },
         },
@@ -208,6 +187,7 @@ describe("useTimeBasedEvents store", () => {
           participants: [],
           rsvpResponses: [],
           reference: [],
+          calendarId: "",
           location: [],
           geoHash: [],
           website: "",
@@ -230,6 +210,7 @@ describe("useTimeBasedEvents store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "Empty",
           description: "",
           color: "#4285f4",
@@ -252,6 +233,7 @@ describe("useTimeBasedEvents store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "Hidden",
           description: "",
           color: "#4285f4",
@@ -294,6 +276,7 @@ describe("useTimeBasedEvents store", () => {
           participants: [],
           rsvpResponses: [],
           reference: [],
+          calendarId: "",
           location: [],
           geoHash: [],
           website: "",

@@ -4,12 +4,6 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
-    rsvp: {
-      accepted: "Accepted",
-      declined: "Declined",
-      maybe: "Maybe",
-      pending: "Pending",
-    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -28,6 +22,7 @@ const dictionary: NestedObject = {
       save: "Save",
       cancel: "Cancel",
       delete: "Delete",
+      edit: "Edit",
       create: "Create",
       add: "Add",
       remove: "Remove",
@@ -64,6 +59,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      forms: "Attached forms",
       duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
@@ -105,13 +101,16 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "No relays accepted the event. Please check your relay configuration and try again.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Some relays did not accept the event. You can try again for failed relays only.",
+      relayPartialSuccess: "Saved to {acceptedCount} of {totalCount} relay(s).",
+      relaysPartialPublishSummary:
+        "Saved to {acceptedCount}/{totalCount} relay(s)",
+      relayRetryHint:
+        "Retry failed relays to publish to relays that did not accept it.",
       retryFailedRelays: "Retry failed relays",
       closeEditor: "Close",
       note: "Note",
       partialPublishHint:
-        "The event is on your calendar. Retry to publish to relays that did not accept.",
+        "{acceptedCount} of {totalCount} relay(s) accepted it. You can retry the {failedCount} failed relay(s) only.",
       saving: "Saving...",
       saveEvent: "Save Event",
       copyLink: "Copy link to this event",
@@ -133,6 +132,52 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
+    },
+    form: {
+      attachments: "Forms",
+      inputPlaceholder: "Paste form naddr or Formstr URL",
+      addAttachment: "Add",
+      removeAttachment: "Remove form",
+      invalidInput: "Could not recognize a form naddr in that input.",
+      duplicateAttachment: "That form is already attached.",
+      privateOnly: "Forms can only be attached to private events.",
+      fillTitle: "Fill out form",
+      fillOut: "Fill out",
+      responsesLoading: "Checking your previous responses",
+      viewOrUpdate: "View / update response",
+      submit: "Submit",
+      cancel: "Cancel",
+      submitting: "Submitting…",
+      retry: "Retry",
+      openExternal: "Open in Formstr",
+      fetchError: "Could not load the form. Please try again.",
+      submitError: "Could not submit your response. Please try again.",
+      alreadySubmitted: "You've already responded to this form.",
+      yourResponse: "Your response",
+      responseUnavailable:
+        "We found your submission, and we're still collecting your answers.",
+      noAnswer: "No answer",
+      unknownQuestion: "Question",
+      submitAgain: "Submit again",
+    },
+    formResponses: {
+      viewButton: "View responses",
+    },
+    rsvp: {
+      yourResponse: "Will you be attending?",
+      yes: "Yes",
+      no: "No",
+      maybe: "Maybe",
+      toggleDetails: "Show RSVP details",
+      alternateTimeTitle: "Can't attend at this time? Suggest a new time",
+      suggestedStart: "Suggested start",
+      suggestedEnd: "Suggested end",
+      comment: "Comment",
+      detailsHint:
+        "Share another time that works, or leave a note for the host and participants.",
+      addNote: "Add a note",
+      suggestionsHeading: "Time suggestions from participants",
+      applySuggestion: "Move event to this time",
     },
     deleteEvent: {
       title: "Delete Event",
@@ -158,6 +203,7 @@ const dictionary: NestedObject = {
       notifications: "Notifications",
       notificationsOn: "Enabled for this calendar",
       notificationsOff: "Disabled for this calendar",
+      submit: "Absenden",
       notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
@@ -166,6 +212,11 @@ const dictionary: NestedObject = {
     sidebar: {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Antwort gefunden, aber die Details synchronisieren noch von den Relays.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
       createCalendar: "Create Calendar",
     },
     deviceCalendar: {
@@ -199,8 +250,13 @@ const dictionary: NestedObject = {
     },
     busyList: {
       publishToggle: "Show this time as busy on my public availability",
+      eventToggle: "Show this event as busy on my public availability",
       helperText:
-        "Publishes a public busy entry so others booking with you can see this slot is taken. The entry contains only start/end times — no event details.",
+        "Publishes an event so others booking with you can see that this slot is taken. The entry contains only start/end times and no event details.",
+      eventHelperText:
+        "Adds or removes only this event's time range from your public busy list. Event details stay private.",
+      updateError:
+        "We could not update your public busy list. Please try again.",
     },
     invitation: {
       invitations: "Invitations",
@@ -261,12 +317,19 @@ const dictionary: NestedObject = {
       clickToCopy: "Click to copy",
       copied: "Copied!",
       author: "Organiser",
+      alreadyAdded: "Participant already added",
+      invalid: "Enter a valid npub, NIP-05, or hex pubkey",
     },
     scheduling: {
-      createSchedulingPage: "Create Scheduling Page",
-      editSchedulingPage: "Edit Scheduling Page",
-      schedulingPages: "Scheduling",
-      noSchedulingPages: "No scheduling pages",
+      featureDescription:
+        "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
+      sidebarTitle: "Booking Links",
+      createSchedulingPage: "Create a booking page",
+      createSchedulingPageButton: "Create page",
+      editSchedulingPage: "Edit booking page",
+      updatePageButton: "Edit page",
+      schedulingPages: "Booking Links",
+      noSchedulingPages: "No booking links yet",
       createPage: "Create Page",
       viewBookings: "View Bookings",
       bookings: "Bookings",
@@ -298,7 +361,8 @@ const dictionary: NestedObject = {
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
       eventTitle: "Event Title",
-      eventTitleHelp: "Title for calendar events created from bookings",
+      eventTitleHelp:
+        "Title for calendar events created from bookings. You will be able to update it later on",
       eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
@@ -339,15 +403,12 @@ const dictionary: NestedObject = {
       openLink: "Open link",
       copyLink: "Copy link",
       noBlockedDates: "No blocked dates. Add dates to block them from booking.",
+      deletePageTitle: "Delete Booking Link",
+      deletePageWarning:
+        "Are you sure you want to delete this booking link? Users will not be able to use this link to book more events. Already booked events will remain in the calendars.",
     },
   },
   "de-DE": {
-    rsvp: {
-      accepted: "Angenommen",
-      declined: "Abgelehnt",
-      maybe: "Vielleicht",
-      pending: "Ausstehend",
-    },
     navigation: {
       today: "Heute",
       previousDay: "Vortag",
@@ -368,6 +429,7 @@ const dictionary: NestedObject = {
       save: "Speichern",
       cancel: "Abbrechen",
       delete: "Löschen",
+      edit: "Bearbeiten",
       create: "Erstellen",
       add: "Hinzufügen",
       remove: "Entfernen",
@@ -406,6 +468,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Termin bearbeiten",
+      forms: "Angehängte Formulare",
       duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
@@ -447,13 +510,17 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "Kein Relay hat den Termin akzeptiert. Bitte überprüfen Sie Ihre Relay-Konfiguration und versuchen Sie es erneut.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Einige Relays haben den Termin nicht akzeptiert. Sie können nur fehlgeschlagene Relays erneut versuchen.",
+      relayPartialSuccess:
+        "Gespeichert auf {acceptedCount} von {totalCount} Relay(s).",
+      relaysPartialPublishSummary:
+        "Gespeichert auf {acceptedCount}/{totalCount} Relay(s)",
+      relayRetryHint:
+        "Fehlgeschlagene Relays erneut versuchen, um an Relays zu senden, die nicht angenommen haben.",
       retryFailedRelays: "Fehlgeschlagene Relays erneut senden",
       closeEditor: "Schließen",
       note: "Hinweis",
       partialPublishHint:
-        "Der Termin ist in Ihrem Kalender. Wiederholen, um an Relays zu senden, die nicht angenommen haben.",
+        "{acceptedCount} von {totalCount} Relay(s) haben ihn akzeptiert. Sie können nur die {failedCount} fehlgeschlagenen Relay(s) erneut versuchen.",
       saving: "Speichern...",
       saveEvent: "Termin speichern",
       copyLink: "Link zu diesem Termin kopieren",
@@ -476,6 +543,54 @@ const dictionary: NestedObject = {
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
       scheduledNotifications: "Geplante Benachrichtigungen",
+    },
+    form: {
+      attachments: "Formulare",
+      inputPlaceholder: "Formular-naddr oder Formstr-URL einfügen",
+      addAttachment: "Hinzufügen",
+      removeAttachment: "Formular entfernen",
+      invalidInput: "In der Eingabe wurde keine Formular-naddr erkannt.",
+      duplicateAttachment: "Dieses Formular ist bereits angehängt.",
+      privateOnly: "Formulare können nur an private Termine angehängt werden.",
+      fillTitle: "Formular ausfüllen",
+      fillOut: "Ausfüllen",
+      viewOrUpdate: "Antwort ansehen / aktualisieren",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet…",
+      retry: "Erneut versuchen",
+      openExternal: "In Formstr öffnen",
+      fetchError:
+        "Das Formular konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+      submitError:
+        "Ihre Antwort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Einreichung gefunden und sammeln noch Ihre Antworten.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
+      submitAgain: "Erneut absenden",
+      continue: "Weiter",
+    },
+    formResponses: {
+      viewButton: "Antworten in Formstr ansehen",
+    },
+    rsvp: {
+      yourResponse: "Nimmst du teil?",
+      yes: "Ja",
+      no: "Nein",
+      maybe: "Vielleicht",
+      toggleDetails: "RSVP-Details anzeigen",
+      alternateTimeTitle:
+        "Kannst du zu dieser Zeit nicht? Schlage eine neue Zeit vor",
+      suggestedStart: "Vorgeschlagener Beginn",
+      suggestedEnd: "Vorgeschlagenes Ende",
+      comment: "Kommentar",
+      detailsHint:
+        "Teile eine andere passende Zeit oder hinterlasse eine Notiz für Gastgeber und Teilnehmer.",
+      addNote: "Eine Notiz hinzufügen",
+      suggestionsHeading: "Zeitvorschläge von Teilnehmern",
+      applySuggestion: "Termin auf diese Zeit verschieben",
     },
     deleteEvent: {
       title: "Termin löschen",
@@ -544,8 +659,14 @@ const dictionary: NestedObject = {
     busyList: {
       publishToggle:
         "Diese Zeit in meiner öffentlichen Verfügbarkeit als belegt anzeigen",
+      eventToggle:
+        "Diesen Termin in meiner öffentlichen Verfügbarkeit als belegt anzeigen",
       helperText:
         "Veröffentlicht einen öffentlichen Belegt-Eintrag, sodass andere, die mit Ihnen einen Termin buchen, sehen können, dass dieser Zeitraum vergeben ist. Der Eintrag enthält ausschließlich Start- und Endzeit – keine Termindetails.",
+      eventHelperText:
+        "Fügt nur den Zeitraum dieses Termins zu Ihrer öffentlichen Belegt-Liste hinzu oder entfernt ihn daraus. Termindetails bleiben privat.",
+      updateError:
+        "Ihre öffentliche Belegt-Liste konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
     },
     invitation: {
       invitations: "Einladungen",
@@ -607,8 +728,12 @@ const dictionary: NestedObject = {
       clickToCopy: "Klicken zum Kopieren",
       copied: "Kopiert!",
       author: "Organisator",
+      alreadyAdded: "Teilnehmer bereits hinzugefügt",
+      invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
     },
     scheduling: {
+      featureDescription:
+        "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
       createSchedulingPage: "Terminseite erstellen",
       editSchedulingPage: "Terminseite bearbeiten",
       schedulingPages: "Terminplanung",
@@ -645,7 +770,7 @@ const dictionary: NestedObject = {
         "Keine verfügbaren Zeitfenster diese Woche. Versuchen Sie eine andere Woche.",
       eventTitle: "Ereignistitel",
       eventTitleHelp:
-        "Titel für Kalendereinträge, die aus Buchungen erstellt werden",
+        "Titel für Kalendereinträge, die aus Buchungen erstellt werden. Sie können ihn später noch ändern.",
       eventTitlePlaceholder: "z.B. Besprechung mit {name}",
       basicInformation: "Grundinformationen",
       appointmentDuration: "Termindauer",
@@ -688,6 +813,9 @@ const dictionary: NestedObject = {
       copyLink: "Link kopieren",
       noBlockedDates:
         "Keine gesperrten Tage. Fügen Sie Tage hinzu, um sie für Buchungen zu sperren.",
+      deletePageTitle: "Buchungslink löschen",
+      deletePageWarning:
+        "Möchten Sie diesen Buchungslink wirklich löschen? Über diesen Link können keine neuen Termine mehr gebucht werden. Bereits gebuchte Termine bleiben in den Kalendern erhalten.",
     },
   },
 };

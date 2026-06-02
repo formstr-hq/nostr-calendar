@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getEventSegmentForDay,
-  layoutDayEvents,
-} from "./calendarEngine";
+import { getEventSegmentForDay, layoutDayEvents } from "./calendarEngine";
 import type { ICalendarEvent } from "../utils/types";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -27,7 +24,10 @@ function makeEvent(
     title: "Multi-day Event",
     description: "",
     kind: 32678,
+    calendarId: "",
+    // @ts-expect-error its intentional
     begin: overrides.begin,
+    // @ts-expect-error its intentional
     end: overrides.end,
     createdAt: 1,
     categories: [],
@@ -140,6 +140,25 @@ describe("getEventSegmentForDay", () => {
     ].filter((segment): segment is NonNullable<typeof segment> => !!segment);
 
     expect(new Set(segments.map((segment) => segment.renderKey)).size).toBe(3);
+  });
+
+  it("keeps canonical recurring times while exposing the visible occurrence", () => {
+    const originalDayStart = atLocal(2026, 3, 1);
+    const clickedDayStart = atLocal(2026, 3, 8);
+    const event = makeEvent({
+      begin: originalDayStart + 9 * HOUR_MS,
+      end: originalDayStart + 10 * HOUR_MS,
+      repeat: { rrule: "FREQ=DAILY" },
+    });
+
+    const segment = getEventSegmentForDay(event, clickedDayStart);
+
+    expect(segment?.begin).toBe(event.begin);
+    expect(segment?.end).toBe(event.end);
+    expect(segment?.occurrenceBegin).toBe(clickedDayStart + 9 * HOUR_MS);
+    expect(segment?.occurrenceEnd).toBe(clickedDayStart + 10 * HOUR_MS);
+    expect(segment?.renderBegin).toBe(clickedDayStart + 9 * HOUR_MS);
+    expect(segment?.renderEnd).toBe(clickedDayStart + 10 * HOUR_MS);
   });
 });
 

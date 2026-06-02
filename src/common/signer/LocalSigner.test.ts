@@ -17,6 +17,7 @@ const BASE_EVENT = {
   kind: 1,
   created_at: Math.floor(Date.now() / 1000),
   tags: [],
+  pubkey: "",
   content: "hello world",
 };
 

@@ -28,7 +28,7 @@ public class CalendarWidget extends AppWidgetProvider {
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
     private static final int MAX_EVENTS = 3;
-    private static final long WIDGET_LOOKAHEAD_MS = 365L * 24 * 60 * 60 * 1000;
+    private static final long WIDGET_LOOKAHEAD_MS = 3L * 24 * 60 * 60 * 1000;
 
     private static final class WidgetEvent {
         final JSONObject event;
@@ -128,9 +128,9 @@ public class CalendarWidget extends AppWidgetProvider {
                     continue;
                 }
 
-                // Keep events that have not fully ended yet
+                // Keep events that have not fully ended yet and start within 3 days
                 long effectiveEnd = end > 0 ? end : begin;
-                if (effectiveEnd >= now) {
+                if (effectiveEnd >= now && begin <= now + WIDGET_LOOKAHEAD_MS) {
                     result.add(new WidgetEvent(event, begin));
                 }
             }

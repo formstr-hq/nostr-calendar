@@ -71,7 +71,7 @@ export function CalendarHeader() {
           </Typography>
         </Box>
         <Box display="flex" gap={theme.spacing(2)} alignItems="center">
-<IconButton
+          <IconButton
             onClick={() => {
               const route = getRouteFromDate(dayjs(), layout);
               if (route !== location.pathname) {
