@@ -29,35 +29,44 @@ pnpm build
 echo "Syncing to Android..."
 pnpm cap sync android
 
-echo "Building signed APK..."
+echo "Building signed APK and AAB..."
 ANDROID_STORE_PASSWORD="$STORE_PASS" \
 ANDROID_KEY_PASSWORD="$STORE_PASS" \
-    ./android/gradlew -p android assembleRelease \
+    ./android/gradlew -p android assembleRelease bundleRelease \
     -PkeystorePropertiesFile="$KEYSTORE_PROPS"
 
 APK_BUILD_PATH="android/app/build/outputs/apk/release/app-release.apk"
+AAB_BUILD_PATH="android/app/build/outputs/bundle/release/app-release.aab"
 
 if [ ! -f "$APK_BUILD_PATH" ]; then
     echo "Error: APK not found at $APK_BUILD_PATH"
     exit 1
 fi
 
+if [ ! -f "$AAB_BUILD_PATH" ]; then
+    echo "Error: AAB not found at $AAB_BUILD_PATH"
+    exit 1
+fi
+
 APK_PATH="android/app/build/outputs/apk/release/formstr-calendar-${VERSION}.apk"
+AAB_PATH="android/app/build/outputs/bundle/release/formstr-calendar-${VERSION}.aab"
 cp "$APK_BUILD_PATH" "$APK_PATH"
+cp "$AAB_BUILD_PATH" "$AAB_PATH"
 
 echo ""
 echo "APK built: $APK_PATH"
+echo "AAB built: $AAB_PATH"
 read -p "Create GitHub release $TAG? [y/N] " CONFIRM
 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
     git tag "$TAG"
     git push origin "$TAG"
-    gh release create "$TAG" "$APK_PATH" \
+    gh release create "$TAG" "$APK_PATH" "$AAB_PATH" \
         --title "$TAG" \
         --generate-notes
     echo "Release $TAG created!"
 else
-    echo "Skipped GitHub release. APK is at: $APK_PATH"
+    echo "Skipped GitHub release."
     echo "To release manually later:"
     echo "  git tag $TAG && git push origin $TAG"
-    echo "  gh release create $TAG $APK_PATH --title $TAG --generate-notes"
+    echo "  gh release create $TAG $APK_PATH $AAB_PATH --title $TAG --generate-notes"
 fi
