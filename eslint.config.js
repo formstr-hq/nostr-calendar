@@ -8,7 +8,14 @@ import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended"
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config([
-  globalIgnores(["dist", "src/test_scripts"]),
+  globalIgnores([
+    "dist",
+    "src/test_scripts",
+    "android/**/build/**",
+    "android/app/src/main/assets/public/**",
+    "ios/App/App/public/**",
+    "packages/**",
+  ]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
@@ -32,7 +39,7 @@ export default tseslint.config([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
-      "@typescript-eslint/no-explicit-any": "warn"
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ]);

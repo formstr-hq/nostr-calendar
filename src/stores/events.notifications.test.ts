@@ -50,6 +50,7 @@ describe("event notification lifecycle", () => {
     const event = {
       id: "event-123",
       eventId: "event-123",
+      calendarId: "calendar-123",
       title: "Original Event",
       description: "",
       begin: 1700000000000,
@@ -99,6 +100,7 @@ describe("event notification lifecycle", () => {
         {
           id: "event-123",
           eventId: "event-123",
+          calendarId: "calendar-123",
           title: "Test Event",
           description: "",
           begin: 1700000000000,
