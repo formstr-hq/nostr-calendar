@@ -9,6 +9,8 @@ import {
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
+const NOTIFICATION_KEY_VERSION = "v1";
+const NOTIFICATION_KEY_PREFIX = `${NOTIFICATION_KEY_VERSION}:`;
 
 /**
  * Load already-pending notification IDs so we don't re-schedule
@@ -20,12 +22,24 @@ async function initScheduledIds(): Promise<void> {
 
   try {
     const { notifications } = await LocalNotifications.getPending();
+    const legacyNotifications = [];
+
     for (const notification of notifications) {
       const key = (notification.extra as Record<string, string> | undefined)
         ?.notificationKey;
-      if (key) {
-        scheduledNotificationKeys.add(key);
+      if (!key) {
+        continue;
       }
+
+      if (key.startsWith(NOTIFICATION_KEY_PREFIX)) {
+        scheduledNotificationKeys.add(key);
+      } else {
+        legacyNotifications.push(notification);
+      }
+    }
+
+    if (legacyNotifications.length > 0) {
+      await LocalNotifications.cancel({ notifications: legacyNotifications });
     }
   } catch (err) {
     console.warn("Failed to load pending notifications", err);
@@ -46,7 +60,15 @@ function buildNotificationKey(
   occurrenceStart: number,
   offsetMinutes: number,
 ): string {
-  return `${eventId}:${occurrenceStart}:${offsetMinutes}`;
+  return `${NOTIFICATION_KEY_VERSION}:${eventId}:${occurrenceStart}:m${offsetMinutes}`;
+}
+
+function notificationKeyMatchesEvent(key: string, eventId: string): boolean {
+  return (
+    key === eventId ||
+    key.startsWith(`${eventId}:`) ||
+    key.startsWith(`${NOTIFICATION_KEY_PREFIX}${eventId}:`)
+  );
 }
 
 function getLocationSuffix(event: ICalendarEvent): string {
@@ -207,6 +229,7 @@ export async function cancelAllNotifications(): Promise<void> {
       await LocalNotifications.cancel({ notifications });
     }
     scheduledNotificationKeys.clear();
+    initialized = false;
   } catch (err) {
     console.warn("Failed to cancel all notifications", err);
   }
@@ -227,7 +250,7 @@ export async function cancelEventNotifications(eventId: string): Promise<void> {
     }
 
     for (const key of scheduledNotificationKeys) {
-      if (key === eventId || key.startsWith(`${eventId}:`)) {
+      if (notificationKeyMatchesEvent(key, eventId)) {
         scheduledNotificationKeys.delete(key);
       }
     }

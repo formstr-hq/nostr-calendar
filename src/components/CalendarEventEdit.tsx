@@ -49,8 +49,6 @@ import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
@@ -66,7 +64,6 @@ import {
 } from "../utils/calendarListTypes";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
-import { v4 as uuid } from "uuid";
 import {
   areNotificationOffsetsEqual,
   clearNotificationPreference,
@@ -92,6 +89,7 @@ import {
 } from "../stores/busyList";
 import { parseFormInput } from "../utils/formLink";
 import type { IFormAttachment } from "../utils/types";
+import { NotificationPreferenceEditor } from "./NotificationPreferenceEditor";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -515,32 +513,6 @@ export function CalendarEventEdit({
     };
   }, [initialEvent?.id, open]);
 
-  const handleNotificationOffsetChange = (
-    index: number,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const parsed = Number.parseInt(e.target.value, 10);
-    setNotificationOffsets((previousOffsets) =>
-      previousOffsets.map((offset, currentIndex) =>
-        currentIndex === index
-          ? Number.isFinite(parsed)
-            ? Math.max(0, parsed)
-            : 0
-          : offset,
-      ),
-    );
-  };
-
-  const addNotificationOffset = () => {
-    setNotificationOffsets((previousOffsets) => [...previousOffsets, 0]);
-  };
-
-  const removeNotificationOffset = (index: number) => {
-    setNotificationOffsets((previousOffsets) =>
-      previousOffsets.filter((_, currentIndex) => currentIndex !== index),
-    );
-  };
-
   const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
 
   const handleAddForm = () => {
@@ -601,14 +573,13 @@ export function CalendarEventEdit({
       const normalizedNotificationOffsets =
         normalizeNotificationOffsets(notificationOffsets);
       const rrule = draftRecurrenceRule;
-      const eventId = eventDetails.id || uuid();
       const eventToSave = {
         ...eventDetails,
-        id: eventId,
         isPrivateEvent: isPrivate,
         participants: uniqueParticipants(eventDetails.participants),
         repeat: { rrule },
       };
+      let savedEvent: ICalendarEvent = eventToSave;
 
       if (isPrivate) {
         if (mode === "edit") {
@@ -622,6 +593,7 @@ export function CalendarEventEdit({
           setSignedEventForRetry(updates.signedEvent);
 
           useTimeBasedEvents.getState().updateEvent(updates.event);
+          savedEvent = updates.event;
         } else {
           const { eventRef, authorPubkey, calendarEvent } =
             await publishPrivateCalendarEvent(eventToSave, {
@@ -633,14 +605,15 @@ export function CalendarEventEdit({
           await addEventToCalendar(selectedCalendarId, eventRef);
           const { eventDTag, relayUrl, viewKey, kind } =
             parseEventRef(eventRef);
-          useTimeBasedEvents.getState().addEvent({
+          savedEvent = {
             ...eventToSave,
             id: eventDTag,
             kind,
             viewKey,
             relayHint: relayUrl,
             user: authorPubkey,
-          });
+          };
+          useTimeBasedEvents.getState().addEvent(savedEvent);
         }
       } else {
         const {
@@ -653,13 +626,14 @@ export function CalendarEventEdit({
           onRelayComplete,
         );
         setSignedEventForRetry(signedEvent);
-        useTimeBasedEvents.getState().updateEvent({
+        savedEvent = {
           ...eventToSave,
           id: savedId,
           kind: EventKinds.PublicCalendarEvent,
           user: pubKey,
           isPrivateEvent: false,
-        });
+        };
+        useTimeBasedEvents.getState().updateEvent(savedEvent);
       }
 
       if (
@@ -668,14 +642,17 @@ export function CalendarEventEdit({
           DEFAULT_NOTIFICATION_OFFSETS,
         )
       ) {
-        await clearNotificationPreference(eventId);
+        await clearNotificationPreference(savedEvent.id);
       } else {
-        await setNotificationPreference(eventId, normalizedNotificationOffsets);
+        await setNotificationPreference(
+          savedEvent.id,
+          normalizedNotificationOffsets,
+        );
       }
 
       if (mode === "create" && isPrivate) {
-        await cancelEventNotifications(eventId);
-        useNotifications.getState().removeNotifications(eventId);
+        await cancelEventNotifications(savedEvent.id);
+        useNotifications.getState().removeNotifications(savedEvent.id);
 
         const calendarPreference = calendars.find(
           (calendar) => calendar.id === selectedCalendarId,
@@ -688,10 +665,12 @@ export function CalendarEventEdit({
           )
         ) {
           const notifications = await scheduleEventNotifications({
-            ...eventToSave,
+            ...savedEvent,
             calendarId: selectedCalendarId,
           });
-          useNotifications.getState().setNotifications(eventId, notifications);
+          useNotifications
+            .getState()
+            .setNotifications(savedEvent.id, notifications);
         }
       }
 
@@ -705,8 +684,8 @@ export function CalendarEventEdit({
       const rangeChanged =
         mode === "edit" &&
         !!initialEvent &&
-        (initialEvent.begin !== eventToSave.begin ||
-          initialEvent.end !== eventToSave.end);
+        (initialEvent.begin !== savedEvent.begin ||
+          initialEvent.end !== savedEvent.end);
       if (rangeChanged && initialEvent) {
         void useBusyList.getState().removeBusyRange({
           start: initialEvent.begin,
@@ -720,13 +699,13 @@ export function CalendarEventEdit({
       ) {
         void useBusyList
           .getState()
-          .addBusyRange({ start: eventToSave.begin, end: eventToSave.end });
+          .addBusyRange({ start: savedEvent.begin, end: savedEvent.end });
       }
 
       // Persist preference so future events default to the user's last choice.
       setBusyListDefaultOptIn(publishBusy);
       if (onSave) {
-        onSave(eventToSave);
+        onSave(savedEvent);
       }
 
       // const allOk = getFailedRelays(relaysToPublish).length === 0;
@@ -1378,53 +1357,10 @@ export function CalendarEventEdit({
           <Typography variant="subtitle2">
             {intl.formatMessage({ id: "event.notifications" })}
           </Typography>
-
-          {notificationOffsets.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {intl.formatMessage({ id: "event.noNotifications" })}
-            </Typography>
-          ) : (
-            notificationOffsets.map((offset, index) => (
-              <Box
-                key={`notification-offset-${index}`}
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  alignItems: "center",
-                }}
-              >
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label={intl.formatMessage({
-                    id: "event.reminderMinutesBefore",
-                  })}
-                  value={offset}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleNotificationOffsetChange(index, e)
-                  }
-                  inputProps={{ min: 0 }}
-                />
-                <IconButton
-                  aria-label={intl.formatMessage({ id: "navigation.remove" })}
-                  onClick={() => removeNotificationOffset(index)}
-                  size="small"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ))
-          )}
-
-          <Button
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={addNotificationOffset}
-            sx={{ alignSelf: "flex-start" }}
-          >
-            {intl.formatMessage({ id: "event.addReminder" })}
-          </Button>
+          <NotificationPreferenceEditor
+            offsets={notificationOffsets}
+            onChange={setNotificationOffsets}
+          />
         </Box>
       </EventAttributeEditContainer>
       <Divider />

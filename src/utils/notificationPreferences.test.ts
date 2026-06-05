@@ -20,6 +20,7 @@ const {
   clearNotificationPreference,
   getNotificationOffsetsForEvent,
   getNotificationPreference,
+  formatNotificationOffsetLabel,
   normalizeNotificationOffsets,
   normalizeNotificationPreference,
   resetNotificationPreferencesCache,
@@ -71,6 +72,15 @@ describe("notificationPreferences", () => {
     await expect(getNotificationOffsetsForEvent("event-1")).resolves.toEqual(
       DEFAULT_NOTIFICATION_OFFSETS,
     );
+  });
+
+  it("formats offsets using readable units", () => {
+    expect(formatNotificationOffsetLabel(0)).toBe("At event start");
+    expect(formatNotificationOffsetLabel(1)).toBe("1 minute before");
+    expect(formatNotificationOffsetLabel(60)).toBe("1 hour before");
+    expect(formatNotificationOffsetLabel(120)).toBe("2 hours before");
+    expect(formatNotificationOffsetLabel(1440)).toBe("1 day before");
+    expect(formatNotificationOffsetLabel(2880)).toBe("2 days before");
   });
 });
 

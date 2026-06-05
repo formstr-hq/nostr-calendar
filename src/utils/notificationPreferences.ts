@@ -46,6 +46,16 @@ export function formatNotificationOffsetLabel(offsetMinutes: number): string {
     return "At event start";
   }
 
+  if (offsetMinutes % (24 * 60) === 0) {
+    const days = offsetMinutes / (24 * 60);
+    return `${days} day${days === 1 ? "" : "s"} before`;
+  }
+
+  if (offsetMinutes % 60 === 0) {
+    const hours = offsetMinutes / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"} before`;
+  }
+
   if (offsetMinutes === 1) {
     return "1 minute before";
   }

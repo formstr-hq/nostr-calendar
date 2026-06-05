@@ -196,7 +196,39 @@ describe("scheduleEventNotifications", () => {
 
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     expect(scheduled[0].extra.eventId).toBe("my-event-id");
-    expect(scheduled[0].extra.notificationKey).toMatch(/^my-event-id:\d+:\d+$/);
+    expect(scheduled[0].extra.notificationKey).toMatch(
+      /^v1:my-event-id:\d+:m\d+$/,
+    );
+  });
+
+  it("cancels legacy unversioned pending notifications during startup", async () => {
+    const futureStart = Date.now() + HOUR;
+    const legacyNotification = {
+      id: 1,
+      extra: {
+        eventId: "legacy-event",
+        notificationKey: "legacy-event:1700000000000:10",
+      },
+    };
+    const currentNotification = {
+      id: 2,
+      extra: {
+        eventId: "current-event",
+        notificationKey: `v1:current-event:${futureStart}:m10`,
+      },
+    };
+
+    mockGetPending.mockResolvedValueOnce({
+      notifications: [legacyNotification, currentNotification],
+    });
+
+    await scheduleEventNotifications(
+      makeEvent({ begin: futureStart, id: "migration-event" }),
+    );
+
+    expect(mockCancel).toHaveBeenCalledWith({
+      notifications: [legacyNotification],
+    });
   });
 
   it("supports multiple custom reminder offsets", async () => {
@@ -254,7 +286,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     expect(scheduled.length).toBeGreaterThan(0);
     expect(scheduled[0].extra.eventId).toBe("daily-evt");
     // Notification key should include occurrence timestamp
-    expect(scheduled[0].extra.notificationKey).toContain("daily-evt:");
+    expect(scheduled[0].extra.notificationKey).toContain(":daily-evt:");
   });
 
   it("does not schedule for a weekly recurring event whose next occurrence is > 5 days away", async () => {
@@ -342,7 +374,7 @@ describe("scheduleEventNotifications – recurring events", () => {
 
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     const key = scheduled[0].extra.notificationKey;
-    expect(key).toMatch(/^recurring-key-test:\d+:\d+$/);
+    expect(key).toMatch(/^v1:recurring-key-test:\d+:m\d+$/);
   });
 });
 

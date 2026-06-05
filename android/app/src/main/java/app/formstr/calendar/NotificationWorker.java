@@ -35,6 +35,7 @@ public class NotificationWorker extends Worker {
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
     private static final String NOTIFICATION_PREFERENCES_KEY = "cal:notification-preferences";
+    private static final String NOTIFICATION_KEY_VERSION = "v1";
     private static final long SCHEDULE_WINDOW_MS = 5L * 24 * 60 * 60 * 1000;
     private static final int[] DEFAULT_REMINDER_OFFSETS_MINUTES = new int[]{10, 0};
 
@@ -148,7 +149,12 @@ public class NotificationWorker extends Worker {
                     continue;
                 }
 
-                String notificationKey = eventId + ":" + nextOccurrence + ":" + offsetMinutes;
+                cancelLegacyAlarm(eventId, nextOccurrence, offsetMinutes);
+
+                String notificationKey = NOTIFICATION_KEY_VERSION
+                        + ":" + eventId
+                        + ":" + nextOccurrence
+                        + ":m" + offsetMinutes;
                 int notificationId = hashToNumber(notificationKey);
                 if (existingNotificationIds.contains(notificationId)) {
                     continue;
@@ -241,6 +247,33 @@ public class NotificationWorker extends Worker {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
         } else {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+        }
+    }
+
+    private void cancelLegacyAlarm(String eventId, long occurrenceStart, int offsetMinutes) {
+        Context context = getApplicationContext();
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) return;
+
+        String legacyKey = eventId + ":" + occurrenceStart + ":" + offsetMinutes;
+        int legacyNotificationId = hashToNumber(legacyKey);
+        Intent intent = new Intent(context, NotificationReceiver.class);
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                context,
+                legacyNotificationId,
+                intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent);
+            pendingIntent.cancel();
+        }
+
+        NotificationManager manager = (NotificationManager)
+                context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.cancel(legacyNotificationId);
         }
     }
 
