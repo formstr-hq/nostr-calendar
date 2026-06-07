@@ -27,13 +27,22 @@
         dominant-baseline="middle">JAN</text>
 
   <!-- Date number -->
-  <text x="256" y="311"
+  <text x="256" y="262"
         font-family="system-ui, sans-serif"
         font-weight="bold"
-        font-size="154"
+        font-size="128"
         fill="#ffffff"
         text-anchor="middle"
         dominant-baseline="middle">3</text>
+
+  <!-- Year -->
+  <text x="256" y="376"
+        font-family="system-ui, sans-serif"
+        font-weight="bold"
+        font-size="48"
+        fill="rgba(255,255,255,0.6)"
+        text-anchor="middle"
+        dominant-baseline="middle">2009</text>
     </svg>
   </g>
 </svg>
