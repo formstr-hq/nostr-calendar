@@ -44,10 +44,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Make Gradle executable
-        working-directory: android
-        run: chmod +x gradlew
-
       - name: Compile App
         run: pnpm i && pnpm build
 
@@ -55,8 +51,7 @@ jobs:
         run: pnpm cap sync android
 
       - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./android/gradlew assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
