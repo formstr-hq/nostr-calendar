@@ -5,8 +5,8 @@
     </clipPath>
   </defs>
 
-  <!-- Outer background: white (light mode) -->
-  <rect width="512" height="512" rx="112" fill="#FFFFFF"/>
+  <!-- Outer background: black (dark mode) -->
+  <rect width="512" height="512" rx="112" fill="#000000"/>
 
   <!-- Calendar widget background -->
   <rect x="80" y="80" width="352" height="352" rx="77" fill="#111111"/>
