@@ -221,6 +221,8 @@ const dictionary: NestedObject = {
       noAnswer: "Keine Antwort",
       unknownQuestion: "Frage",
       createCalendar: "Create Calendar",
+      about: "About",
+      privacyPolicy: "Privacy Policy",
     },
     deviceCalendar: {
       title: "Device calendars",
@@ -631,6 +633,8 @@ const dictionary: NestedObject = {
       calendars: "Kalender",
       noCalendarsYet: "Noch keine Kalender",
       createCalendar: "Kalender erstellen",
+      about: "Über uns",
+      privacyPolicy: "Datenschutzrichtlinie",
     },
     deviceCalendar: {
       title: "Gerätekalender",
