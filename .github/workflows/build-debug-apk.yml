@@ -61,7 +61,7 @@ jobs:
         run: corepack enable && corepack prepare pnpm@latest --activate
 
       - name: Install pnpm dependencies
-        run: pnpm install --frozen-lockfile --no-interactive
+        run: pnpm approve-builds esbuild && pnpm install --frozen-lockfile
 
       # ⚠️ your web build
       - name: Build Web App
