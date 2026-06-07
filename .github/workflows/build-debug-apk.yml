@@ -27,12 +27,10 @@ jobs:
           script: |
             let pr;
 
-            // Triggered from label
             if (context.eventName === "pull_request") {
               pr = context.payload.pull_request;
             }
 
-            // Triggered manually
             if (context.eventName === "workflow_dispatch") {
               const prNumber = Number('${{ inputs.pr_number }}');
               pr = (await github.rest.pulls.get({
@@ -53,6 +51,28 @@ jobs:
           ref: ${{ fromJSON(steps.pr.outputs.result).sha }}
           fetch-depth: 0
 
+      # ✅ Node + pnpm setup
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ⚠️ your web build
+      - name: Build Web App
+        run: pnpm build
+
+      # ⚡ Capacitor sync
+      - name: Sync Capacitor
+        run: pnpm cap sync android
+
+      # ✅ Java for Android
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -63,18 +83,19 @@ jobs:
       - name: Debug repo structure
         run: ls -R
 
-      - name: Build App
-        run: pnpm i && pnpm build && pnpm cap sync android
-      
+      # ⚠️ IMPORTANT: correct gradlew path
       - name: Build Debug APK
-        run: ./android/gradlew assembleDebug
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk-pr-${{ fromJSON(steps.pr.outputs.result).number }}
           path: |
-            **/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
       - name: Comment on PR (only for PR trigger)
