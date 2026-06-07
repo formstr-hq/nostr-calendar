@@ -58,10 +58,10 @@ jobs:
           node-version: 22
 
       - name: Enable Corepack (pnpm)
-        run: corepack enable && corepack prepare pnpm@latest --activate
+        run: corepack enable && corepack prepare pnpm@10.26.2 --activate
 
       - name: Install pnpm dependencies
-        run: pnpm approve-builds esbuild && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # ⚠️ your web build
       - name: Build Web App
