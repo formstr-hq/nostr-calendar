@@ -45,6 +45,7 @@ jobs:
           cache: gradle
 
       - name: Make Gradle executable
+        working-directory: android
         run: chmod +x gradlew
 
       - name: Compile App
@@ -54,6 +55,7 @@ jobs:
         run: pnpm cap sync android
 
       - name: Build Debug APK
+        working-directory: android
         run: ./gradlew assembleDebug
 
       - name: Upload APK artifact
