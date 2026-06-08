@@ -40,7 +40,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "app.formstr.calendar"
+        def ciSuffix = project.hasProperty('ciSuffix') ? ".${project.property('ciSuffix')}" : ""
+        applicationId "app.formstr.calendar${ciSuffix}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 
