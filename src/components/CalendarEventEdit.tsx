@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -48,6 +48,7 @@ import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
@@ -63,6 +64,20 @@ import {
 } from "../utils/calendarListTypes";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
+import {
+  areNotificationOffsetsEqual,
+  clearNotificationPreference,
+  DEFAULT_NOTIFICATION_OFFSETS,
+  getNotificationPreference,
+  normalizeNotificationOffsets,
+  setNotificationPreference,
+  shouldScheduleNotifications,
+} from "../utils/notificationPreferences";
+import {
+  cancelEventNotifications,
+  scheduleEventNotifications,
+} from "../utils/notifications";
+import { useNotifications } from "../stores/notifications";
 import { RelayPublishDialog } from "./RelayPublishDialog";
 import { RelayDots } from "./RelayDots";
 import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
@@ -74,6 +89,7 @@ import {
 } from "../stores/busyList";
 import { parseFormInput } from "../utils/formLink";
 import type { IFormAttachment } from "../utils/types";
+import { NotificationPreferenceEditor } from "./NotificationPreferenceEditor";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -381,6 +397,11 @@ export function CalendarEventEdit({
       },
     };
   });
+  const [notificationOffsets, setNotificationOffsets] = useState<number[]>(
+    DEFAULT_NOTIFICATION_OFFSETS,
+  );
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] =
+    useState(!initialEvent?.id);
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RepeatingFrequency>(
       initialIsCustom
@@ -447,6 +468,51 @@ export function CalendarEventEdit({
     setEventDetails((prev) => ({ ...prev, [key]: value }));
   };
 
+  useEffect(() => {
+    let active = true;
+
+    if (!open) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!initialEvent?.id) {
+      setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+      setNotificationPreferencesLoaded(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setNotificationPreferencesLoaded(false);
+    getNotificationPreference(initialEvent.id)
+      .then((preference) => {
+        if (!active) {
+          return;
+        }
+
+        if (preference) {
+          setNotificationOffsets(preference.offsetsMinutes);
+        } else {
+          setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        }
+        setNotificationPreferencesLoaded(true);
+      })
+      .catch((error) => {
+        console.warn("Failed to load notification preferences", error);
+        if (!active) {
+          return;
+        }
+        setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        setNotificationPreferencesLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialEvent?.id, open]);
+
   const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
 
   const handleAddForm = () => {
@@ -504,6 +570,8 @@ export function CalendarEventEdit({
 
     setProcessing(true);
     try {
+      const normalizedNotificationOffsets =
+        normalizeNotificationOffsets(notificationOffsets);
       const rrule = draftRecurrenceRule;
       const eventToSave = {
         ...eventDetails,
@@ -511,6 +579,7 @@ export function CalendarEventEdit({
         participants: uniqueParticipants(eventDetails.participants),
         repeat: { rrule },
       };
+      let savedEvent: ICalendarEvent = eventToSave;
 
       if (isPrivate) {
         if (mode === "edit") {
@@ -524,6 +593,7 @@ export function CalendarEventEdit({
           setSignedEventForRetry(updates.signedEvent);
 
           useTimeBasedEvents.getState().updateEvent(updates.event);
+          savedEvent = updates.event;
         } else {
           const { eventRef, authorPubkey, calendarEvent } =
             await publishPrivateCalendarEvent(eventToSave, {
@@ -535,14 +605,15 @@ export function CalendarEventEdit({
           await addEventToCalendar(selectedCalendarId, eventRef);
           const { eventDTag, relayUrl, viewKey, kind } =
             parseEventRef(eventRef);
-          useTimeBasedEvents.getState().addEvent({
+          savedEvent = {
             ...eventToSave,
             id: eventDTag,
             kind,
             viewKey,
             relayHint: relayUrl,
             user: authorPubkey,
-          });
+          };
+          useTimeBasedEvents.getState().addEvent(savedEvent);
         }
       } else {
         const {
@@ -555,13 +626,52 @@ export function CalendarEventEdit({
           onRelayComplete,
         );
         setSignedEventForRetry(signedEvent);
-        useTimeBasedEvents.getState().updateEvent({
+        savedEvent = {
           ...eventToSave,
           id: savedId,
           kind: EventKinds.PublicCalendarEvent,
           user: pubKey,
           isPrivateEvent: false,
-        });
+        };
+        useTimeBasedEvents.getState().updateEvent(savedEvent);
+      }
+
+      if (
+        areNotificationOffsetsEqual(
+          normalizedNotificationOffsets,
+          DEFAULT_NOTIFICATION_OFFSETS,
+        )
+      ) {
+        await clearNotificationPreference(savedEvent.id);
+      } else {
+        await setNotificationPreference(
+          savedEvent.id,
+          normalizedNotificationOffsets,
+        );
+      }
+
+      if (mode === "create" && isPrivate) {
+        await cancelEventNotifications(savedEvent.id);
+        useNotifications.getState().removeNotifications(savedEvent.id);
+
+        const calendarPreference = calendars.find(
+          (calendar) => calendar.id === selectedCalendarId,
+        )?.notificationPreference;
+
+        if (
+          shouldScheduleNotifications(
+            eventToSave.notificationPreference,
+            calendarPreference,
+          )
+        ) {
+          const notifications = await scheduleEventNotifications({
+            ...savedEvent,
+            calendarId: selectedCalendarId,
+          });
+          useNotifications
+            .getState()
+            .setNotifications(savedEvent.id, notifications);
+        }
       }
 
       // Public busy list maintenance:
@@ -574,8 +684,8 @@ export function CalendarEventEdit({
       const rangeChanged =
         mode === "edit" &&
         !!initialEvent &&
-        (initialEvent.begin !== eventToSave.begin ||
-          initialEvent.end !== eventToSave.end);
+        (initialEvent.begin !== savedEvent.begin ||
+          initialEvent.end !== savedEvent.end);
       if (rangeChanged && initialEvent) {
         void useBusyList.getState().removeBusyRange({
           start: initialEvent.begin,
@@ -589,14 +699,13 @@ export function CalendarEventEdit({
       ) {
         void useBusyList
           .getState()
-          .addBusyRange({ start: eventToSave.begin, end: eventToSave.end });
+          .addBusyRange({ start: savedEvent.begin, end: savedEvent.end });
       }
 
       // Persist preference so future events default to the user's last choice.
       setBusyListDefaultOptIn(publishBusy);
-
       if (onSave) {
-        onSave(eventToSave);
+        onSave(savedEvent);
       }
 
       // const allOk = getFailedRelays(relaysToPublish).length === 0;
@@ -688,6 +797,12 @@ export function CalendarEventEdit({
     setRecurrenceFrequency(value as RepeatingFrequency);
   };
 
+  const notificationsValid =
+    notificationPreferencesLoaded &&
+    notificationOffsets.every(
+      (offset) =>
+        Number.isInteger(offset) && Number.isFinite(offset) && offset >= 0,
+    );
   const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as RecurrenceEndMode;
     setRecurrenceEndMode(value);
@@ -739,7 +854,8 @@ export function CalendarEventEdit({
     eventDetails.begin &&
     eventDetails.end &&
     eventDetails.begin < eventDetails.end &&
-    recurrenceValid
+    recurrenceValid &&
+    notificationsValid
   );
 
   const showRelayDetailsButton =
@@ -1225,6 +1341,26 @@ export function CalendarEventEdit({
               )}
             </Box>
           )}
+        </Box>
+      </EventAttributeEditContainer>
+      <Divider />
+      <EventAttributeEditContainer>
+        <NotificationsActiveIcon />
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Typography variant="subtitle2">
+            {intl.formatMessage({ id: "event.notifications" })}
+          </Typography>
+          <NotificationPreferenceEditor
+            offsets={notificationOffsets}
+            onChange={setNotificationOffsets}
+          />
         </Box>
       </EventAttributeEditContainer>
       <Divider />

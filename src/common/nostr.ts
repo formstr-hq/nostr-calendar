@@ -426,6 +426,7 @@ export async function publishPrivateCalendarEvent(
     : generateSecretKey();
   const dTag =
     existingDTag ||
+    event.id ||
     bytesToHex(
       sha256(utf8ToBytes(`${JSON.stringify(event)}-${Date.now()}`)),
     ).substring(0, 30);
@@ -947,7 +948,7 @@ export const publishPublicCalendarEvent = async (
   onRelayComplete?: (url: string, success: boolean) => void,
 ) => {
   const pubKey = await getUserPublicKey();
-  const id = event?.id !== TEMP_CALENDAR_ID ? event.id : uuid();
+  const id = event.id && event.id !== TEMP_CALENDAR_ID ? event.id : uuid();
   const tags = [
     ["name", event.title],
     ["d", id],
