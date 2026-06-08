@@ -75,6 +75,45 @@ export interface IInvitation {
   receivedAt: number;
   /** Current status of the invitation */
   status: "pending" | "accepted" | "dismissed";
+  /**
+   * True when this entry is an access update rather than a fresh invitation:
+   * the event is already in one of the user's calendars but the author has
+   * rotated the view key and re-shared it. Accepting it updates the stored
+   * view key instead of adding a new event.
+   */
+  isAccessUpdate?: boolean;
+  /** For access updates: the calendar list that already holds this event. */
+  calendarId?: string;
+  /**
+   * True when the referenced event could not be decrypted with the view key
+   * carried by this gift wrap (e.g. the author rotated the key after sending).
+   * The panel renders a "ask the author for access" state instead of looping
+   * on "loading…" forever.
+   */
+  inaccessible?: boolean;
+}
+
+/**
+ * An event reference the client knows about (from a calendar list) but cannot
+ * currently decrypt — typically because the author rotated the view key and
+ * has not (yet) re-shared it with this user. Surfaced on the "Events Without
+ * Access" page so the user can ask the author for access or remove it.
+ */
+export interface IInaccessibleEvent {
+  /** Canonical coordinate "{kind}:{authorPubkey}:{eventDTag}". */
+  coordinate: string;
+  /** Nostr event kind of the referenced event. */
+  kind: number;
+  /** Pubkey of the event's author (who can grant access). */
+  authorPubkey: string;
+  /** The event's d-tag identifier (shown to the user). */
+  dTag: string;
+  /** The calendar list id that holds this reference. */
+  calendarId: string;
+  /** Relay hint where the event was published, if known. */
+  relayHint?: string;
+  /** When this event was last seen as undecryptable (unix seconds). */
+  lastSeenAt: number;
 }
 
 /** Default color for newly created calendars */
@@ -151,4 +190,49 @@ export function findCalendarForEvent(
   return calendars.find((calendar) =>
     calendar.eventRefs.some((ref) => ref[0] === coordinate),
   );
+}
+
+/**
+ * Returns a new event-refs array with the view key (and optionally relay hint)
+ * of the ref matching `coordinate` replaced. All other refs are returned
+ * unchanged. If no ref matches, the original array is returned unchanged.
+ *
+ * Used by key rotation (author updating their own ref) and by access updates
+ * (recipient receiving a rotated key). Kept pure so it can be unit-tested
+ * without touching relays.
+ */
+export function replaceEventRefViewKey(
+  eventRefs: string[][],
+  coordinate: string,
+  newViewKey: string,
+  relayUrl?: string,
+): string[][] {
+  return eventRefs.map((ref) =>
+    ref[0] === coordinate
+      ? [ref[0], relayUrl ?? ref[1] ?? "", newViewKey]
+      : ref,
+  );
+}
+
+/**
+ * Resolves the set of recipients that should receive a rotated view key.
+ *
+ * Always includes the invited participants. When `includeRsvpResponders` is
+ * true, RSVP responders are added too (the issue lets the author choose
+ * "invited" vs "invited + responders"). The author's own pubkey is always
+ * excluded — the author updates their own calendar ref directly rather than
+ * gift-wrapping a key to themselves.
+ */
+export function resolveRotationRecipients(params: {
+  invitedParticipants: string[];
+  rsvpResponders: string[];
+  includeRsvpResponders: boolean;
+  selfPubkey: string;
+}): string[] {
+  const recipients = new Set<string>(params.invitedParticipants);
+  if (params.includeRsvpResponders) {
+    params.rsvpResponders.forEach((pubkey) => recipients.add(pubkey));
+  }
+  recipients.delete(params.selfPubkey);
+  return [...recipients];
 }

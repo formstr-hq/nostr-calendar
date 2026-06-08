@@ -28,7 +28,10 @@ import { EventKinds } from "./EventConfigs";
 import { nostrRuntime } from "./nostrRuntime";
 import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
-import { buildEventRef } from "../utils/calendarListTypes";
+import {
+  buildEventRef,
+  resolveRotationRecipients,
+} from "../utils/calendarListTypes";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import {
@@ -585,6 +588,115 @@ export async function editPrivateCalendarEvent(
     event,
     calendarId,
     signedEvent,
+  };
+}
+
+/**
+ * Rotates the view key of an existing private calendar event so the author can
+ * regain control after the key (or a shared `?viewKey=` link) leaked.
+ *
+ * Mechanism (NIP-52E "Security Considerations"): the event keeps the same
+ * d-tag, so every participant's calendar reference stays valid. The content is
+ * re-encrypted under a freshly generated view key and republished — anyone
+ * still holding the old key can no longer decrypt the current/future version.
+ * The new key is gift-wrapped only to the chosen recipients, and the author's
+ * own calendar reference is updated in place.
+ *
+ * @param event - The private event to re-key (must be authored by the user)
+ * @param calendarId - The calendar list holding the author's reference to it
+ * @param recipientPubkeys - Final set of pubkeys to receive the new key
+ *   (the caller decides "invited" vs "invited + RSVP responders"); the
+ *   author's own pubkey is excluded automatically.
+ */
+export async function rotatePrivateEventKey(
+  event: ICalendarEvent,
+  calendarId: string,
+  recipientPubkeys: string[],
+  {
+    onAcceptedRelays,
+    onRelayComplete,
+  }: {
+    onAcceptedRelays?: (url: string) => void;
+    onRelayComplete?: (url: string, success: boolean) => void;
+  } = {},
+) {
+  const dTag = event.id;
+  const newViewSecretKey = generateSecretKey();
+  const newViewKeyNsec = nip19.nsecEncode(newViewSecretKey);
+
+  // Re-encrypt the same content under the new key and republish (same d-tag).
+  const { signedEvent, eventKind, userPublicKey } =
+    await preparePrivateCalendarEvent(event, dTag, newViewSecretKey);
+
+  let publishedRelayHint = "";
+  await publishToRelays(
+    signedEvent,
+    (url) => {
+      if (!publishedRelayHint) publishedRelayHint = url;
+      onAcceptedRelays?.(url);
+    },
+    undefined,
+    { waitForAll: true, onRelayComplete },
+  );
+
+  // Resolve recipients (excluding self) and gift-wrap the new key to each,
+  // published to the recipient's own relays.
+  const recipients = resolveRotationRecipients({
+    invitedParticipants: recipientPubkeys,
+    rsvpResponders: [],
+    includeRsvpResponders: false,
+    selfPubkey: userPublicKey,
+  });
+
+  if (recipients.length > 0) {
+    const [participantRelayMap, ...giftWraps] = await Promise.all([
+      fetchRelayLists(recipients),
+      ...recipients.map(async (participant) => {
+        const giftWrap = await nip59.wrapEvent(
+          {
+            pubkey: userPublicKey,
+            created_at: Math.floor(Date.now() / 1000),
+            kind: EventKinds.CalendarEventRumor,
+            content: "",
+            tags: [
+              [
+                "a",
+                `${eventKind}:${userPublicKey}:${dTag}`,
+                publishedRelayHint,
+              ],
+              ["viewKey", newViewKeyNsec],
+            ],
+          },
+          participant,
+          EventKinds.CalendarEventGiftWrap,
+        );
+        return { giftWrap, participant };
+      }),
+    ]);
+    await Promise.all(
+      giftWraps.map(async ({ giftWrap, participant }) => {
+        const relays = participantRelayMap.get(participant) ?? defaultRelays;
+        await publishToRelays(giftWrap, undefined, relays);
+      }),
+    );
+  }
+
+  // Update the author's own calendar reference with the new key in place.
+  const eventCoordinate = `${eventKind}:${userPublicKey}:${dTag}`;
+  await useCalendarLists
+    .getState()
+    .updateEventRefViewKey(
+      calendarId,
+      eventCoordinate,
+      newViewKeyNsec,
+      event.relayHint || publishedRelayHint,
+    );
+
+  return {
+    viewKey: newViewKeyNsec,
+    signedEvent,
+    recipients,
+    relayHint: event.relayHint || publishedRelayHint,
   };
 }
 

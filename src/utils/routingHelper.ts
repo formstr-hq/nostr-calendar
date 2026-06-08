@@ -12,6 +12,7 @@ export enum ROUTES {
   DayCalendar = "/d/:year/:month/:day",
   MonthCalendar = "/m/:year/:monthNumber",
   Notifications = "/notifications",
+  EventsWithoutAccess = "/events-without-access",
   // Appointment Scheduling
   SchedulingPageCreate = "/schedule/create",
   SchedulingPageEdit = "/schedule/edit/:naddr",
