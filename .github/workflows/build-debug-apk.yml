@@ -87,7 +87,7 @@ jobs:
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug -PciSuffix=ci-${{ fromJSON(steps.pr.outputs.result).number }}
+          ./gradlew assembleDebug -PciSuffix=ci_${{ fromJSON(steps.pr.outputs.result).number }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
