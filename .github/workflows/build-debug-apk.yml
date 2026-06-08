@@ -51,6 +51,10 @@ jobs:
           ref: ${{ fromJSON(steps.pr.outputs.result).sha }}
           fetch-depth: 0
 
+      - name: Set CI application ID
+        run: |
+          sed -i 's/applicationId "app\.formstr\.calendar"/applicationId "app.formstr.calendar.ci-${{ fromJSON(steps.pr.outputs.result).number }}"/' android/app/build.gradle
+
       # ✅ Node + pnpm setup
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -87,7 +91,7 @@ jobs:
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug -PciSuffix=ci-${{ fromJSON(steps.pr.outputs.result).number }}
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
