@@ -122,6 +122,7 @@ class SignerManager {
         if (cachedData) {
           try {
             this.user = JSON.parse(cachedData) as IUser;
+            // eslint-disable-next-line no-empty
           } catch {}
         }
       }
@@ -283,7 +284,10 @@ class SignerManager {
     this.notify();
   }
 
-  async loginWithNip55(packageName: string, _cachedPubkey?: string): Promise<void> {
+  async loginWithNip55(
+    packageName: string,
+    _cachedPubkey?: string,
+  ): Promise<void> {
     this.localSigner = null;
     const account = await packageSigner.loginWithAndroidSigner({ packageName });
     await this.fetchAndCacheUser(account.pubkey);
@@ -330,9 +334,15 @@ class SignerManager {
     return { ncryptsec };
   }
 
-  async loginWithNcryptsec(ncryptsec: string, passphrase: string): Promise<void> {
+  async loginWithNcryptsec(
+    ncryptsec: string,
+    passphrase: string,
+  ): Promise<void> {
     this.localSigner = null;
-    const account = await packageSigner.loginWithNcryptsec(ncryptsec, passphrase);
+    const account = await packageSigner.loginWithNcryptsec(
+      ncryptsec,
+      passphrase,
+    );
     await this.fetchAndCacheUser(account.pubkey);
     this.notify();
   }

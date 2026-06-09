@@ -62,8 +62,14 @@ describe("generateFilterHash", () => {
   });
 
   it("returns the same hash regardless of relay order", () => {
-    const h1 = generateFilterHash({ kinds: [1] }, ["wss://a.com", "wss://b.com"]);
-    const h2 = generateFilterHash({ kinds: [1] }, ["wss://b.com", "wss://a.com"]);
+    const h1 = generateFilterHash({ kinds: [1] }, [
+      "wss://a.com",
+      "wss://b.com",
+    ]);
+    const h2 = generateFilterHash({ kinds: [1] }, [
+      "wss://b.com",
+      "wss://a.com",
+    ]);
     expect(h1).toBe(h2);
   });
 
