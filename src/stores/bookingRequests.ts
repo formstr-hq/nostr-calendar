@@ -53,7 +53,7 @@ function subscribeBookingRequests(
     "#p": [pubkey],
     limit: 50,
   };
-  return nostrRuntime.subscribe(relayList, [filter], { onEvent, onEose });
+  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
 }
 
 function subscribeBookingResponses(
@@ -67,7 +67,7 @@ function subscribeBookingResponses(
     "#p": [pubkey],
     limit: 50,
   };
-  return nostrRuntime.subscribe(relayList, [filter], { onEvent, onEose });
+  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
 }
 
 async function unwrapBookingRequest(giftWrap: Event): Promise<{

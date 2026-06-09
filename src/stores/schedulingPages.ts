@@ -156,7 +156,7 @@ function fetchUserSchedulingPages(
     authors: [pubkey],
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent,
     onEose,
   });

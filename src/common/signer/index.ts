@@ -1,257 +1,364 @@
-import { nip07Signer } from "./NIP07Signer";
-import { createNip46Signer } from "./NIP46Signer";
-
 import {
-  getBunkerUriInLocalStorage,
-  getKeysFromLocalStorage,
-  setBunkerUriInLocalStorage,
-  setKeysInLocalStorage,
-  removeKeysFromLocalStorage,
-  removeBunkerUriFromLocalStorage,
-  removeAppSecretFromLocalStorage,
-  setUserDataInLocalStorage,
-  getUserDataFromLocalStorage,
-  removeUserDataFromLocalStorage,
-} from "./utils";
-import { createLocalSigner } from "./LocalSigner";
-import { NostrSigner } from "./types";
-import { DeferredSigner } from "./DeferredSigner";
-import { createNIP55Signer } from "./NIP55Signer";
+  createSigner,
+  LocalSigner,
+  hexToBytes,
+  type ActiveSigner,
+} from "@formstr/signer";
+import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
+import { nip19 } from "nostr-tools";
 import { fetchUserProfile } from "../nostr";
 import { ANONYMOUS_USER_NAME, DEFAULT_IMAGE_URL } from "../../utils/constants";
-import { IUser } from "../../stores/user";
+import type { IUser } from "../../stores/user";
+import { isNative } from "../../utils/platform";
 import {
   getNip55Credentials,
   getNsec,
   removeNip55Credentials,
   removeNsec,
-  saveNip55Credentials,
   saveNsec,
 } from "../../utils/secureKeyStorage";
-import { isNative } from "../../utils/platform";
-import { nip19 } from "nostr-tools";
-import { bytesToHex } from "nostr-tools/utils";
 
-class Signer {
-  private signer: NostrSigner | null = null;
+// ─── localStorage keys ──────────────────────────────────────────────────────
+
+const USER_CACHE_KEY = "calendar:userData";
+// Legacy keys from the old custom signer — read during migration, then deleted
+const LEGACY_KEYS_KEY = "calendar:keys";
+const LEGACY_BUNKER_URI_KEY = "calendar:bunkerUri";
+const LEGACY_CLIENT_SECRET_KEY = "calendar:client-secret";
+
+// ─── Package signer (extension / NIP-46 / Android accounts) ─────────────────
+
+const packageSigner = createSigner(
+  // Only pass the Android plugin on native — on web it initializes a bridge
+  // that injects a cross-origin element React 19 crashes on during events.
+  isNative ? { androidSignerPlugin: NostrSignerPlugin as any } : {}, // eslint-disable-line @typescript-eslint/no-explicit-any
+);
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type LegacyKeys = { pubkey?: string; secret?: string };
+type LegacyBunkerUri = { bunkerUri?: string };
+
+// ─── SignerManager ────────────────────────────────────────────────────────────
+
+class SignerManager {
+  private localSigner: ActiveSigner | null = null;
   private user: IUser | null = null;
-  private onChangeCallbacks: Set<() => void> = new Set();
   private loginModalCallback: (() => Promise<void>) | null = null;
+  private onChangeCallbacks = new Set<() => void>();
 
-  constructor() {
-    // restoreFromStorage() is called by initializeUser() in the user store
-    // after the onUserChange callback is registered
+  registerLoginModal(cb: () => Promise<void>) {
+    this.loginModalCallback = cb;
   }
 
-  registerLoginModal(callback: () => Promise<void>) {
-    this.loginModalCallback = callback;
+  // Polls until window.nostr is injected by the browser extension, up to timeoutMs.
+  // Extensions inject asynchronously on page load; without this wait we'd miss
+  // them in the common case where restoreFromStorage runs before injection.
+  private waitForWindowNostr(timeoutMs = 2000): Promise<boolean> {
+    if (window.nostr) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const deadline = Date.now() + timeoutMs;
+      const tick = () => {
+        if (window.nostr) {
+          resolve(true);
+        } else if (Date.now() >= deadline) {
+          resolve(false);
+        } else {
+          setTimeout(tick, 50);
+        }
+      };
+      setTimeout(tick, 50);
+    });
   }
 
   async restoreFromStorage() {
-    const cachedUser = getUserDataFromLocalStorage();
-    if (cachedUser) this.user = cachedUser.user;
-    const keys = getKeysFromLocalStorage();
+    const active = packageSigner.getActiveAccount();
 
-    // Phase 1: If we have a cached pubkey, set up a deferred signer
-    // and notify immediately so the app can start fetching events
-    let deferredSigner: DeferredSigner | null = null;
-    if (keys?.pubkey) {
-      deferredSigner = new DeferredSigner(keys.pubkey);
-      this.signer = deferredSigner;
-      this.notify();
+    if (active) {
+      try {
+        switch (active.method) {
+          case "extension":
+            if (await this.waitForWindowNostr()) {
+              await packageSigner.loginWithExtension();
+              await this.fetchAndCacheUser(active.pubkey);
+            }
+            break;
+          case "android":
+            if (active.androidPackageName) {
+              await packageSigner.loginWithAndroidSigner({
+                packageName: active.androidPackageName,
+              });
+              await this.fetchAndCacheUser(active.pubkey);
+            }
+            break;
+          case "nip46":
+            if (active.nip46) {
+              await packageSigner.loginWithBunkerUri(active.nip46.uri, {
+                clientSecretKey: hexToBytes(active.nip46.clientSecretKey),
+              });
+              await this.fetchAndCacheUser(active.pubkey);
+            }
+            break;
+          case "ncryptsec":
+            // Requires a passphrase — user must log in manually
+            break;
+        }
+      } catch (e) {
+        console.error("Signer auto-unlock failed:", e);
+      }
+    } else {
+      await this.tryLegacyRestore();
     }
 
-    // Phase 2: Restore the real signer in the background
-    const bunkerUri = getBunkerUriInLocalStorage();
-    const nip55Creds = await getNip55Credentials();
-    try {
-      let restored = false;
-      if (isNative) {
-        const nsec = await getNsec();
-        if (nsec) {
-          await this.loginWithNsec(nsec);
-          restored = true;
+    // If the signer couldn't be restored (ncryptsec needs passphrase, extension
+    // never loaded, etc.) notify with no user so the app shows the login modal.
+    if (!this.localSigner && !packageSigner.getActiveSigner()) {
+      this.user = null;
+    } else {
+      // Restore cached profile for cases where fetchAndCacheUser wasn't called
+      // (e.g. guest key in tryLegacyRestore sets localSigner but not this.user)
+      if (!this.user) {
+        const cachedData = localStorage.getItem(USER_CACHE_KEY);
+        if (cachedData) {
+          try {
+            this.user = JSON.parse(cachedData) as IUser;
+          } catch {}
         }
       }
-      if (!restored && nip55Creds) {
-        console.log(
-          "Restoring NIP-55 session with cached pubkey:",
-          nip55Creds.pubkey,
-        );
-        await this.loginWithNip55(nip55Creds.packageName, nip55Creds.pubkey);
-      } else if (!restored && bunkerUri?.bunkerUri) {
-        await this.loginWithNip46(bunkerUri.bunkerUri);
-      } else if (!restored && window.nostr && Object.keys(keys).length != 0) {
-        console.log("Restoring loginWithNip07");
-        await this.loginWithNip07();
-      } else if (!restored && keys?.pubkey && keys?.secret) {
-        console.log("Restoring guest");
-        await this.loginWithGuestKey(keys.pubkey, keys.secret);
-      }
-    } catch (e) {
-      console.error("Signer restore failed:", e);
-    }
-
-    // Resolve the deferred signer now that the real one is ready
-    if (deferredSigner && this.signer !== deferredSigner && this.signer) {
-      deferredSigner.resolve(this.signer);
     }
 
     this.notify();
   }
-  private async loginWithGuestKey(pubkey: string, privkey: string) {
-    this.signer = createLocalSigner(privkey);
 
-    // Restore user data from localStorage cache if not already set
-    if (!this.user) {
-      const cached = getUserDataFromLocalStorage();
-      this.user = cached?.user ?? {
+  // Migrates from the old custom-signer storage format on first launch after upgrade.
+  private async tryLegacyRestore() {
+    // Always discard the old NIP-46 client secret — no longer used
+    localStorage.removeItem(LEGACY_CLIENT_SECRET_KEY);
+
+    // Native nsec stored in secure storage (highest priority on mobile)
+    if (isNative) {
+      const nsec = await getNsec();
+      if (nsec) {
+        try {
+          await this.loginWithNsec(nsec);
+          localStorage.removeItem(LEGACY_KEYS_KEY);
+          return;
+        } catch (e) {
+          console.error("Legacy nsec restore failed:", e);
+        }
+      }
+    }
+
+    // Old NIP-55 credentials (Capacitor Preferences)
+    const nip55Creds = await getNip55Credentials();
+    if (nip55Creds) {
+      try {
+        await this.loginWithNip55(nip55Creds.packageName, nip55Creds.pubkey);
+        await removeNip55Credentials();
+        localStorage.removeItem(LEGACY_KEYS_KEY);
+        return;
+      } catch (e) {
+        console.error("Legacy NIP-55 restore failed:", e);
+      }
+    }
+
+    // Old NIP-46 bunker URI
+    const legacyBunker = JSON.parse(
+      localStorage.getItem(LEGACY_BUNKER_URI_KEY) ?? "{}",
+    ) as LegacyBunkerUri;
+    if (legacyBunker.bunkerUri) {
+      localStorage.removeItem(LEGACY_BUNKER_URI_KEY);
+      try {
+        await this.loginWithNip46(legacyBunker.bunkerUri);
+        localStorage.removeItem(LEGACY_KEYS_KEY);
+        return;
+      } catch (e) {
+        console.error("Legacy NIP-46 restore failed:", e);
+      }
+    }
+
+    // Old guest key (pubkey + secret)
+    const legacyKeys = JSON.parse(
+      localStorage.getItem(LEGACY_KEYS_KEY) ?? "{}",
+    ) as LegacyKeys;
+    if (legacyKeys.pubkey && legacyKeys.secret) {
+      this.localSigner = new LocalSigner(hexToBytes(legacyKeys.secret));
+      return; // Keep LEGACY_KEYS_KEY so the guest session persists across reloads
+    }
+
+    // Old extension login (pubkey only, no secret)
+    if (legacyKeys.pubkey && !legacyKeys.secret) {
+      localStorage.removeItem(LEGACY_KEYS_KEY);
+      if (await this.waitForWindowNostr()) {
+        try {
+          await this.loginWithNip07();
+          return;
+        } catch (e) {
+          console.error("Legacy extension restore failed:", e);
+        }
+      }
+    }
+  }
+
+  private async fetchAndCacheUser(pubkey: string): Promise<IUser> {
+    try {
+      const kind0 = await fetchUserProfile(pubkey);
+      const profile = kind0 ? (JSON.parse(kind0.content) as object) : {};
+      const userData: IUser = { ...profile, pubkey };
+      this.user = userData;
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
+      return userData;
+    } catch {
+      const userData: IUser = {
         pubkey,
         name: ANONYMOUS_USER_NAME,
         picture: DEFAULT_IMAGE_URL,
       };
+      this.user = userData;
+      return userData;
     }
   }
 
-  async loginWithNsec(nsec: string) {
-    if (!isNative) throw new Error("NSEC login only allowed on native");
-
-    let privkey: Uint8Array;
-    try {
-      privkey = nip19.decode(nsec).data as Uint8Array;
-    } catch {
-      throw new Error("Invalid nsec");
-    }
-    if (!privkey) throw new Error("Invalid nsec");
-
-    this.signer = createLocalSigner(bytesToHex(privkey));
-
-    const pubkey = await this.signer.getPublicKey();
-
-    await this.saveUser(pubkey);
-    await saveNsec(nsec);
-
-    this.notify();
+  private notify() {
+    this.onChangeCallbacks.forEach((cb) => cb());
   }
 
-  async createGuestAccount(
-    privkey: string,
-    userMetadata: { name?: string; picture?: string; about?: string },
-  ) {
-    this.signer = createLocalSigner(privkey);
+  // ─── Public API ────────────────────────────────────────────────────────────
 
-    const pubkey = await this.signer.getPublicKey();
-
-    const userData: IUser = {
-      pubkey,
-      name: userMetadata.name || ANONYMOUS_USER_NAME,
-      picture: userMetadata.picture || DEFAULT_IMAGE_URL,
-      about: userMetadata.about,
-    };
-    this.user = userData;
-
-    // Save keys and user data
-    setKeysInLocalStorage(pubkey, privkey);
-    setUserDataInLocalStorage(userData);
-    this.notify();
-  }
-
-  private async saveUser(pubkey: string) {
-    const kind0 = await fetchUserProfile(pubkey);
-    const userData = kind0
-      ? { ...JSON.parse(kind0.content), pubkey }
-      : { pubkey, name: ANONYMOUS_USER_NAME, picture: DEFAULT_IMAGE_URL };
-    this.user = userData;
-    setUserDataInLocalStorage(userData);
-    return userData;
-  }
-
-  async loginWithNip07() {
-    console.log("LOGGIN IN WITH NIP07");
-    if (!window.nostr) throw new Error("NIP-07 extension not found");
-    this.signer = nip07Signer;
-    const pubkey = await window.nostr.getPublicKey();
-    setKeysInLocalStorage(pubkey);
-    await this.saveUser(pubkey);
-    this.notify();
-    console.log("LOGGIN IN WITH NIP07 IS NOW COMPLETE");
-  }
-
-  async loginWithNip46(bunkerUri: string) {
-    const remoteSigner = await createNip46Signer(bunkerUri);
-    const pubkey = await remoteSigner.getPublicKey();
-    setKeysInLocalStorage(pubkey);
-    setBunkerUriInLocalStorage(bunkerUri);
-    await this.saveUser(pubkey);
-
-    this.signer = remoteSigner;
-    this.notify();
-    console.log("LOGIN WITH BUNKER COMPLETE");
-  }
-
-  async loginWithNip55(packageName: string, cachedPubkey?: string) {
-    const signer = createNIP55Signer(packageName, cachedPubkey);
-
-    // Step 1: ask Amber for pubkey (skipped if cachedPubkey provided)
-    const pubkey = await signer.getPublicKey();
-
-    // Step 2: fetch kind0 profile
-    await this.saveUser(pubkey);
-
-    // Step 3: save signer and user
-    this.signer = signer;
-
-    await saveNip55Credentials(packageName, pubkey);
-    this.notify();
-  }
-
-  async logout() {
-    this.signer = null;
-    this.user = null;
-    this.loginModalCallback = null;
-    await removeNsec();
-    removeKeysFromLocalStorage();
-    removeBunkerUriFromLocalStorage();
-    removeAppSecretFromLocalStorage();
-    removeUserDataFromLocalStorage();
-    await removeNip55Credentials();
-
-    console.log("Logged out from everywhere");
-    this.notify();
-  }
-
-  async getSigner(): Promise<NostrSigner> {
-    if (this.signer) return this.signer;
+  async getSigner(): Promise<ActiveSigner> {
+    const signer = this.localSigner ?? packageSigner.getActiveSigner();
+    if (signer) return signer;
 
     if (this.loginModalCallback) {
       await this.loginModalCallback();
-      if (this.signer) return this.signer;
+      const resolved = this.localSigner ?? packageSigner.getActiveSigner();
+      if (resolved) return resolved;
     }
 
     throw new Error("NO_SIGNER_AVAILABLE_AND_NO_LOGIN_REQUEST_REGISTERED");
   }
 
   async getSignerRelays(): Promise<string[]> {
-    if (!this.signer?.getRelays) return [];
-    try {
-      return await this.signer.getRelays();
-    } catch {
-      return [];
-    }
+    if (this.localSigner) return [];
+    const active = packageSigner.getActiveAccount();
+    if (!active || active.method !== "nip46" || !active.nip46) return [];
+    return active.nip46.relays;
   }
 
-  getUser() {
+  getUser(): IUser | null {
     return this.user;
   }
 
-  onChange(cb: () => void) {
+  onChange(cb: () => void): () => void {
     this.onChangeCallbacks.add(cb);
     return () => this.onChangeCallbacks.delete(cb);
   }
 
-  private notify() {
-    this.onChangeCallbacks.forEach((cb) => cb());
+  async loginWithNip07(): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithExtension();
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  async loginWithNip46(bunkerUri: string): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithBunkerUri(bunkerUri);
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  async loginWithNostrConnectQR(options: {
+    relays: string[];
+    onUri: (uri: string) => void;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithNostrConnect({
+      ...options,
+      metadata: { name: "Calendar", url: window.location.origin },
+      perms: ["sign_event", "nip44_encrypt", "nip44_decrypt", "get_public_key"],
+    });
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  async loginWithNip55(packageName: string, _cachedPubkey?: string): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithAndroidSigner({ packageName });
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  async loginWithNsec(nsec: string): Promise<void> {
+    if (!isNative) throw new Error("NSEC login only allowed on native");
+
+    let privkeyBytes: Uint8Array;
+    try {
+      const decoded = nip19.decode(nsec);
+      if (decoded.type !== "nsec") throw new Error("Invalid nsec");
+      privkeyBytes = decoded.data as Uint8Array;
+    } catch {
+      throw new Error("Invalid nsec");
+    }
+
+    this.localSigner = new LocalSigner(privkeyBytes);
+    const pubkey = await this.localSigner.getPublicKey();
+    await this.fetchAndCacheUser(pubkey);
+    await saveNsec(nsec);
+    this.notify();
+  }
+
+  async createAccount(
+    passphrase: string,
+    userMetadata: { name?: string; picture?: string; about?: string },
+  ): Promise<{ ncryptsec: string }> {
+    this.localSigner = null;
+    const { ncryptsec } = await packageSigner.createAccount(passphrase);
+    const active = packageSigner.getActiveAccount()!;
+
+    const userData: IUser = {
+      pubkey: active.pubkey,
+      name: userMetadata.name || ANONYMOUS_USER_NAME,
+      picture: userMetadata.picture || DEFAULT_IMAGE_URL,
+      about: userMetadata.about,
+    };
+    this.user = userData;
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
+    this.notify();
+
+    return { ncryptsec };
+  }
+
+  async loginWithNcryptsec(ncryptsec: string, passphrase: string): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithNcryptsec(ncryptsec, passphrase);
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  getStoredNcryptsec(): string | null {
+    const active = packageSigner.getActiveAccount();
+    if (active?.method === "ncryptsec") return active.ncryptsec ?? null;
+    return null;
+  }
+
+  async logout(): Promise<void> {
+    if (this.localSigner) {
+      this.localSigner = null;
+      localStorage.removeItem(LEGACY_KEYS_KEY);
+      if (isNative) await removeNsec();
+    } else {
+      await packageSigner.logout();
+    }
+
+    this.user = null;
+    localStorage.removeItem(USER_CACHE_KEY);
+    localStorage.removeItem(LEGACY_CLIENT_SECRET_KEY);
+    localStorage.removeItem(LEGACY_BUNKER_URI_KEY);
+
+    this.notify();
   }
 }
 
-export const signerManager = new Signer();
+export const signerManager = new SignerManager();

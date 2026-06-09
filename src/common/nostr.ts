@@ -100,13 +100,8 @@ export async function getUserPublicKey() {
   return pubKey;
 }
 
-export const ensureRelay = async (
-  url: string,
-  params?: { connectionTimeout?: number },
-): Promise<AbstractRelay> => {
+export const ensureRelay = async (url: string): Promise<AbstractRelay> => {
   const relay = new Relay(url);
-  if (params?.connectionTimeout)
-    relay.connectionTimeout = params.connectionTimeout;
   await relay.connect();
   return relay;
 };
@@ -647,7 +642,7 @@ export const fetchCalendarGiftWraps = (
   };
 
   // Use nostrRuntime for subscription management and deduplication
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: async (event: Event) => {
       try {
         const unWrappedEvent = await getDetailsFromGiftWrap(event);
@@ -728,12 +723,10 @@ export const fetchPrivateEventRSVPs = (
   handles.push(
     nostrRuntime.subscribe(
       privateRelayList,
-      [
-        {
-          kinds: [EventKinds.PrivateRSVPEvent],
-          "#a": [params.eventCoord],
-        },
-      ],
+      {
+        kinds: [EventKinds.PrivateRSVPEvent],
+        "#a": [params.eventCoord],
+      },
       {
         onEvent: (event: Event) => {
           try {
@@ -774,7 +767,7 @@ export const fetchPublicEventRSVPs = (
     kinds: [EventKinds.PublicRSVPEvent],
     "#a": [params.eventCoord],
   };
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       const record = parseRSVPTags(
         event.pubkey,
@@ -842,7 +835,7 @@ export function fetchPrivateCalendarEvents(
     ...(until && { until }),
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       onEvent(event);
     },
@@ -866,7 +859,7 @@ export const publishToRelays = (
   const publishPromises = relayList.map(async (url) => {
     let relay: AbstractRelay | null = null;
     try {
-      relay = await ensureRelay(url, { connectionTimeout: 5000 });
+      relay = await ensureRelay(url);
       const reason = await Promise.race<string>([
         relay.publish(event).then((r) => {
           onAcceptedRelays(url);
@@ -935,7 +928,7 @@ export const fetchCalendarEvents = (
     ...(until && { until }),
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       onEvent(event);
     },

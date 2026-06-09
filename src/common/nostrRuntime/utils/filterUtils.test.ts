@@ -50,44 +50,38 @@ describe("normalizeFilter", () => {
 
 describe("generateFilterHash", () => {
   it("returns a string", () => {
-    const hash = generateFilterHash([{ kinds: [1] }], ["wss://relay.com"]);
+    const hash = generateFilterHash({ kinds: [1] }, ["wss://relay.com"]);
     expect(typeof hash).toBe("string");
     expect(hash.length).toBeGreaterThan(0);
   });
 
   it("returns the same hash for the same filters and relays", () => {
-    const h1 = generateFilterHash([{ kinds: [1] }], ["wss://relay.com"]);
-    const h2 = generateFilterHash([{ kinds: [1] }], ["wss://relay.com"]);
+    const h1 = generateFilterHash({ kinds: [1] }, ["wss://relay.com"]);
+    const h2 = generateFilterHash({ kinds: [1] }, ["wss://relay.com"]);
     expect(h1).toBe(h2);
   });
 
   it("returns the same hash regardless of relay order", () => {
-    const h1 = generateFilterHash(
-      [{ kinds: [1] }],
-      ["wss://a.com", "wss://b.com"],
-    );
-    const h2 = generateFilterHash(
-      [{ kinds: [1] }],
-      ["wss://b.com", "wss://a.com"],
-    );
+    const h1 = generateFilterHash({ kinds: [1] }, ["wss://a.com", "wss://b.com"]);
+    const h2 = generateFilterHash({ kinds: [1] }, ["wss://b.com", "wss://a.com"]);
     expect(h1).toBe(h2);
   });
 
   it("returns the same hash regardless of filter array order", () => {
-    const h1 = generateFilterHash([{ kinds: [1, 3] }], ["wss://relay.com"]);
-    const h2 = generateFilterHash([{ kinds: [3, 1] }], ["wss://relay.com"]);
+    const h1 = generateFilterHash({ kinds: [1, 3] }, ["wss://relay.com"]);
+    const h2 = generateFilterHash({ kinds: [3, 1] }, ["wss://relay.com"]);
     expect(h1).toBe(h2);
   });
 
   it("returns different hashes for different filters", () => {
-    const h1 = generateFilterHash([{ kinds: [1] }], ["wss://relay.com"]);
-    const h2 = generateFilterHash([{ kinds: [0] }], ["wss://relay.com"]);
+    const h1 = generateFilterHash({ kinds: [1] }, ["wss://relay.com"]);
+    const h2 = generateFilterHash({ kinds: [0] }, ["wss://relay.com"]);
     expect(h1).not.toBe(h2);
   });
 
   it("returns different hashes for different relays", () => {
-    const h1 = generateFilterHash([{ kinds: [1] }], ["wss://a.com"]);
-    const h2 = generateFilterHash([{ kinds: [1] }], ["wss://b.com"]);
+    const h1 = generateFilterHash({ kinds: [1] }, ["wss://a.com"]);
+    const h2 = generateFilterHash({ kinds: [1] }, ["wss://b.com"]);
     expect(h1).not.toBe(h2);
   });
 });

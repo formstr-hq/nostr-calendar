@@ -159,10 +159,7 @@ export function RespondPanel({ event }: { event: ICalendarEvent }) {
   const handleContinueAsGuest = async () => {
     setCreatingGuest(true);
     try {
-      await signerManager.createGuestAccount(
-        bytesToHex(generateSecretKey()),
-        {},
-      );
+      await signerManager.createAccount(bytesToHex(generateSecretKey()), {});
     } catch {
       setErrorOpen(true);
     } finally {
