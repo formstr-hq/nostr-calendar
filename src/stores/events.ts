@@ -258,6 +258,7 @@ export const useTimeBasedEvents = create<{
     void clearNotificationPreference(id);
   },
   resetPrivateEvents: () => {
+    processedEventIds.clear();
     set(({ events }) => {
       const publicEvents = events.filter((evt) => !evt.isPrivateEvent);
       saveEventsToStorage([]);
