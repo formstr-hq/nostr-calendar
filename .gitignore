@@ -145,4 +145,4 @@ src/test_scripts/*
 keystore.properties
 
 # Editor
-.vscode/
+.vscode/*

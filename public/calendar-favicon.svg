@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#111111"/>
+  <rect width="32" height="10" rx="0" fill="#E24B4A" clip-path="url(#rounded)"/>
+  <clipPath id="rounded">
+    <rect width="32" height="32" rx="7"/>
+  </clipPath>
+  <rect width="32" height="10" fill="#E24B4A" clip-path="url(#rounded)"/>
+  <text x="16" y="5" font-family="system-ui,sans-serif" font-weight="bold" font-size="5" fill="rgba(255,255,255,0.85)" text-anchor="middle" dominant-baseline="middle">JAN</text>
+  <text x="16" y="22" font-family="system-ui,sans-serif" font-weight="bold" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">3</text>
+</svg>

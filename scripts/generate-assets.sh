@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ICON_SVG="$PROJECT_DIR/public/icon.svg"
+ICON_DARK_SVG="$PROJECT_DIR/public/icon-dark.svg"
 ANDROID_RES="$PROJECT_DIR/android/app/src/main/res"
 IOS_ASSETS="$PROJECT_DIR/ios/App/App/Assets.xcassets"
 
@@ -13,19 +14,30 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "=== Generating app icons and splash screens ==="
 
-# --- iOS Icon ---
-echo "  iOS icon (1024x1024)"
+# --- iOS Icons (light + dark) ---
+echo "  iOS icon light (1024x1024)"
 rsvg-convert -w 1024 -h 1024 "$ICON_SVG" \
   -o "$IOS_ASSETS/AppIcon.appiconset/AppIcon-512@2x.png"
 
-# --- Android Launcher Icons ---
+echo "  iOS icon dark (1024x1024)"
+rsvg-convert -w 1024 -h 1024 "$ICON_DARK_SVG" \
+  -o "$IOS_ASSETS/AppIcon.appiconset/AppIcon-Dark-512@2x.png"
+
+# --- Android Launcher Icons (light + dark) ---
 for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
   density="${pair%%:*}"
   size="${pair##*:}"
+
   dir="$ANDROID_RES/mipmap-$density"
-  echo "  Android launcher $density (${size}px)"
+  echo "  Android launcher $density light (${size}px)"
   rsvg-convert -w "$size" -h "$size" "$ICON_SVG" -o "$dir/ic_launcher.png"
   cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+
+  night_dir="$ANDROID_RES/mipmap-night-$density"
+  mkdir -p "$night_dir"
+  echo "  Android launcher $density dark (${size}px)"
+  rsvg-convert -w "$size" -h "$size" "$ICON_DARK_SVG" -o "$night_dir/ic_launcher.png"
+  cp "$night_dir/ic_launcher.png" "$night_dir/ic_launcher_round.png"
 done
 
 # --- Android Adaptive Foreground Icons ---
