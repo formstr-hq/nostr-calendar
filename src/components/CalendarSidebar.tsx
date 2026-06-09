@@ -36,6 +36,7 @@ import { useIntl } from "react-intl";
 import { useTimeBasedEvents } from "../stores/events";
 import { useUser } from "../stores/user";
 import { SchedulingPagesList } from "./SchedulingPagesList";
+import { useAppointmentData } from "../hooks/useAppointmentData";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -46,6 +47,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { isInitialized } = useUser();
+  useAppointmentData();
   const {
     calendars,
     toggleVisibility,
