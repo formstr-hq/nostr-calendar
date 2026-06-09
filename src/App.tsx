@@ -120,7 +120,6 @@ function Application() {
     return () => stopInvitations();
   }, []);
 
-
   useEffect(() => {
     return addNotificationClickListener((eventId) => {
       navigate(`/notification-event/${eventId}`);
