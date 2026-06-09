@@ -342,7 +342,11 @@ function NsecSection({
           type={showNsec ? "text" : "password"}
           autoComplete="off"
           slotProps={{
-            htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false },
+            htmlInput: {
+              autoCapitalize: "none",
+              autoCorrect: "off",
+              spellCheck: false,
+            },
             input: {
               endAdornment: (
                 <InputAdornment position="end">
@@ -414,7 +418,9 @@ function NcryptsecSection({
           onChange={(e) => setNcryptsec(e.target.value)}
           multiline
           minRows={2}
-          slotProps={{ htmlInput: { autoCapitalize: "none", spellCheck: false } }}
+          slotProps={{
+            htmlInput: { autoCapitalize: "none", spellCheck: false },
+          }}
         />
         <TextField
           size="small"
@@ -434,11 +440,7 @@ function NcryptsecSection({
           onClick={() => void handleLogin()}
           disabled={loading || !ncryptsec.trim() || !passphrase}
         >
-          {loading ? (
-            <CircularProgress size={18} color="inherit" />
-          ) : (
-            "Sign in"
-          )}
+          {loading ? <CircularProgress size={18} color="inherit" /> : "Sign in"}
         </Button>
       </Stack>
     </Box>
@@ -604,9 +606,9 @@ function CreateAccountDialog({
         ) : (
           <Stack spacing={2} sx={{ pt: 0.5 }}>
             <Alert severity="warning">
-              Save this encrypted key. Without it and your passphrase you
-              cannot sign in again. It is safe to store — it is already
-              encrypted with your passphrase.
+              Save this encrypted key. Without it and your passphrase you cannot
+              sign in again. It is safe to store — it is already encrypted with
+              your passphrase.
             </Alert>
             <Box
               sx={{
@@ -644,9 +646,7 @@ function CreateAccountDialog({
               variant="contained"
               onClick={() => void handleCreate()}
               disabled={
-                loading ||
-                !passphrase ||
-                passphrase !== confirmPassphrase
+                loading || !passphrase || passphrase !== confirmPassphrase
               }
             >
               {loading ? (
@@ -941,7 +941,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             )}
           </Box>
         </Stack>
-
       </Dialog>
 
       <CreateAccountDialog

@@ -84,7 +84,7 @@ importers:
         specifier: ^0.0.5
         version: 0.0.5(@capacitor/core@8.0.0)
       nostr-tools:
-        specifier: ^2.23.5
+        specifier: ^2.15.0
         version: 2.23.5(typescript@5.8.3)
       qrcode.react:
         specifier: ^4.2.0

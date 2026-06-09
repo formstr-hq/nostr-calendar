@@ -89,7 +89,13 @@ function Application() {
       void fetchPrivateEvents();
       fetchInvitations();
     }
-  }, [user, calendarsLoaded, fetchPrivateEvents, fetchInvitations, isInitialized]);
+  }, [
+    user,
+    calendarsLoaded,
+    fetchPrivateEvents,
+    fetchInvitations,
+    isInitialized,
+  ]);
 
   // Refetch the user's own public busy lists whenever the visible month
   // changes, so add/remove operations merge with the latest remote state
