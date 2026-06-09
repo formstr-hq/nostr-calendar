@@ -95,6 +95,18 @@ export const useUser = create<{
     if (!isInitializing) {
       logger.log("initializeUser: start");
       isInitializing = true;
+      signerManager.registerLoginModal(
+        () =>
+          new Promise<void>((resolve) => {
+            useUser.getState().updateLoginModal(true);
+            const unsubscribe = signerManager.onChange(() => {
+              if (signerManager.getUser()) {
+                unsubscribe();
+                resolve();
+              }
+            });
+          }),
+      );
       signerManager.onChange(onUserChange);
       signerManager.restoreFromStorage();
       logger.log("initializeUser: signer restored from storage");

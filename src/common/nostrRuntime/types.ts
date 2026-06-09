@@ -43,10 +43,10 @@ export interface SubscriptionHandle {
  * Internal representation of a managed subscription
  */
 export interface ManagedSubscription {
-  /** Hash of filters + relays */
+  /** Hash of filter + relays */
   id: string;
-  /** Nostr filters for this subscription */
-  filters: Filter[];
+  /** Nostr filter for this subscription */
+  filter: Filter;
   /** Relay URLs */
   relays: string[];
   /** SimplePool closer function */
@@ -84,7 +84,7 @@ export interface RuntimeStats {
  */
 export interface SubscriptionDebugInfo {
   id: string;
-  filters: Filter[];
+  filter: Filter;
   relays: string[];
   refCount: number;
   callbackCount: number;

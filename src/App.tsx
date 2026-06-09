@@ -56,7 +56,9 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
-  const events = useTimeBasedEvents((state) => state);
+  const fetchPrivateEvents = useTimeBasedEvents(
+    (state) => state.fetchPrivateEvents,
+  );
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -84,10 +86,10 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      void events.fetchPrivateEvents();
+      void fetchPrivateEvents();
       fetchInvitations();
     }
-  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+  }, [user, calendarsLoaded, fetchPrivateEvents, fetchInvitations, isInitialized]);
 
   // Refetch the user's own public busy lists whenever the visible month
   // changes, so add/remove operations merge with the latest remote state

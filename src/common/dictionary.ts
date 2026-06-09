@@ -277,7 +277,7 @@ const dictionary: NestedObject = {
       stayHere: "Stay Here",
     },
     login: {
-      signInToFormstr: "Sign in to Formstr",
+      signInToFormstr: "Sign in to Calendar",
       chooseLoginMethod: "Choose your preferred login method",
       signInWithExtension: "Sign in with Nostr Extension (NIP-07)",
       signInWithNsec: "Sign in with nsec",
@@ -693,7 +693,7 @@ const dictionary: NestedObject = {
       stayHere: "Hier bleiben",
     },
     login: {
-      signInToFormstr: "Bei Formstr anmelden",
+      signInToFormstr: "Bei Calendar anmelden",
       chooseLoginMethod: "Wählen Sie Ihre bevorzugte Anmeldemethode",
       signInWithExtension: "Mit Nostr-Erweiterung anmelden (NIP-07)",
       signInWithNsec: "Mit nsec anmelden",

@@ -1,13 +1,13 @@
-import React, { useEffect, useState, type ReactNode } from "react";
+import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { signerManager } from "../common/signer";
-import { getAppSecretKeyFromLocalStorage } from "../common/signer/utils";
-import { getPublicKey, generateSecretKey } from "nostr-tools";
-import { createNostrConnectURI, Nip46Relays } from "../common/signer/nip46";
 import {
   Button,
   CircularProgress,
   Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Tabs,
   Tab,
   Stack,
@@ -23,15 +23,19 @@ import {
 import { useTheme } from "@mui/material/styles";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import PhonelinkLockOutlinedIcon from "@mui/icons-material/PhonelinkLockOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useIntl } from "react-intl";
-import { bytesToHex } from "nostr-tools/utils";
 import { isAndroidNative, isNative } from "../utils/platform";
+
+const NIP46_RELAYS = ["wss://relay.nsec.app", "wss://nostr.oxtr.dev"];
+
+// ─── Nip46Section ──────────────────────────────────────────────────────────────
 
 const Nip46Section: React.FC<{
   onSuccess: () => void;
@@ -40,33 +44,23 @@ const Nip46Section: React.FC<{
   const intl = useIntl();
   const [activeTab, setActiveTab] = useState("manual");
   const [bunkerUri, setBunkerUri] = useState("");
+  const [relaysText, setRelaysText] = useState(NIP46_RELAYS.join("\n"));
   const [loadingConnect, setLoadingConnect] = useState(false);
   const [loadingQr, setLoadingQr] = useState(false);
+  const [qrUri, setQrUri] = useState<string | null>(null);
+  const qrAbortRef = useRef<AbortController | null>(null);
 
-  const [qrPayload] = useState(() => {
-    const clientSecretKey = getAppSecretKeyFromLocalStorage();
-    const clientPubkey = getPublicKey(clientSecretKey);
-    const secret = Math.random().toString(36).slice(2, 10);
-    const perms = [
-      "nip44_encrypt",
-      "nip44_decrypt",
-      "sign_event",
-      "get_public_key",
-    ];
-    return createNostrConnectURI({
-      clientPubkey,
-      relays: Nip46Relays,
-      secret,
-      perms,
-      name: "Calendar",
-      url: window.location.origin,
-    });
-  });
+  useEffect(() => {
+    return () => {
+      qrAbortRef.current?.abort();
+    };
+  }, []);
 
-  const connectToBunkerUri = async (uri: string) => {
-    await signerManager.loginWithNip46(uri);
-    onSuccess();
-  };
+  const parseRelays = () =>
+    relaysText
+      .split(/[\n,]+/)
+      .map((r) => r.trim())
+      .filter(Boolean);
 
   const handleConnectManual = async () => {
     if (!bunkerUri) {
@@ -75,7 +69,8 @@ const Nip46Section: React.FC<{
     }
     setLoadingConnect(true);
     try {
-      await connectToBunkerUri(bunkerUri);
+      await signerManager.loginWithNip46(bunkerUri);
+      onSuccess();
     } catch {
       onError(intl.formatMessage({ id: "login.connectionFailed" }));
     } finally {
@@ -83,20 +78,59 @@ const Nip46Section: React.FC<{
     }
   };
 
+  const startQrLogin = (val: string) => {
+    if (val !== "qr") {
+      qrAbortRef.current?.abort();
+      qrAbortRef.current = null;
+      setQrUri(null);
+      return;
+    }
+    const relays = parseRelays();
+    if (relays.length === 0) {
+      onError("At least one relay is required for QR login.");
+      return;
+    }
+    setLoadingQr(true);
+    setQrUri(null);
+    const abort = new AbortController();
+    qrAbortRef.current = abort;
+    void signerManager
+      .loginWithNostrConnectQR({
+        relays,
+        onUri: setQrUri,
+        signal: abort.signal,
+      })
+      .then(() => {
+        onSuccess();
+      })
+      .catch(() => {
+        if (!abort.signal.aborted) {
+          onError(intl.formatMessage({ id: "login.connectionFailed" }));
+        }
+      })
+      .finally(() => setLoadingQr(false));
+  };
+
   return (
     <Box sx={{ px: 2, pb: 2, bgcolor: "action.hover" }}>
+      <TextField
+        size="small"
+        fullWidth
+        multiline
+        minRows={2}
+        label="Relays (one per line)"
+        value={relaysText}
+        onChange={(e) => setRelaysText(e.target.value)}
+        disabled={loadingConnect || loadingQr}
+        sx={{ mt: 1.5, mb: 1 }}
+        helperText="Relays used for the nostrconnect QR session"
+      />
+
       <Tabs
         value={activeTab}
-        onChange={(_e, val) => {
+        onChange={(_e, val: string) => {
           setActiveTab(val);
-          if (val === "qr") {
-            setLoadingQr(true);
-            void connectToBunkerUri(qrPayload)
-              .catch(() => {
-                onError(intl.formatMessage({ id: "login.connectionFailed" }));
-              })
-              .finally(() => setLoadingQr(false));
-          }
+          startQrLogin(val);
         }}
         sx={{ mb: 1 }}
       >
@@ -146,7 +180,11 @@ const Nip46Section: React.FC<{
 
       {activeTab === "qr" && (
         <Box textAlign="center">
-          <QRCodeCanvas value={qrPayload} size={160} />
+          {qrUri ? (
+            <QRCodeCanvas value={qrUri} size={160} />
+          ) : (
+            <CircularProgress size={40} sx={{ my: 2 }} />
+          )}
           <Box
             display="flex"
             justifyContent="center"
@@ -162,34 +200,28 @@ const Nip46Section: React.FC<{
                 </Typography>
               </>
             ) : (
-              <>
-                <IconButton
-                  size="small"
-                  onClick={() => void navigator.clipboard.writeText(qrPayload)}
-                >
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-                <Typography variant="caption" color="text.secondary">
-                  {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
-                </Typography>
-              </>
+              qrUri && (
+                <>
+                  <IconButton
+                    size="small"
+                    onClick={() => void navigator.clipboard.writeText(qrUri)}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                  <Typography variant="caption" color="text.secondary">
+                    {intl.formatMessage({ id: "login.copyNostrconnectUri" })}
+                  </Typography>
+                </>
+              )
             )}
           </Box>
-          <Typography variant="caption" color="text.secondary">
-            {intl.formatMessage(
-              { id: "login.usingRelaysForCommunication" },
-              {
-                relays: Nip46Relays.map((relay) =>
-                  relay.replace("wss://", ""),
-                ).join(", "),
-              },
-            )}
-          </Typography>
         </Box>
       )}
     </Box>
   );
 };
+
+// ─── Nip55Section ─────────────────────────────────────────────────────────────
 
 function Nip55Section({
   onClose,
@@ -254,6 +286,8 @@ function Nip55Section({
   );
 }
 
+// ─── NsecSection (Android native only) ────────────────────────────────────────
+
 function NsecSection({
   onClose,
   onError,
@@ -307,26 +341,24 @@ function NsecSection({
           }}
           type={showNsec ? "text" : "password"}
           autoComplete="off"
-          inputProps={{
-            autoCapitalize: "none",
-            autoCorrect: "off",
-            spellCheck: false,
-          }}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  size="small"
-                  edge="end"
-                  onClick={() => setShowNsec((prev) => !prev)}
-                  aria-label={intl.formatMessage({
-                    id: showNsec ? "login.hideNsec" : "login.showNsec",
-                  })}
-                >
-                  {showNsec ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                </IconButton>
-              </InputAdornment>
-            ),
+          slotProps={{
+            htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false },
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    edge="end"
+                    onClick={() => setShowNsec((prev) => !prev)}
+                    aria-label={intl.formatMessage({
+                      id: showNsec ? "login.hideNsec" : "login.showNsec",
+                    })}
+                  >
+                    {showNsec ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <Button
@@ -340,6 +372,306 @@ function NsecSection({
     </Box>
   );
 }
+
+// ─── NcryptsecSection (all platforms) ─────────────────────────────────────────
+
+function NcryptsecSection({
+  onClose,
+  onError,
+}: {
+  onClose: () => void;
+  onError: (msg: string) => void;
+}) {
+  const [ncryptsec, setNcryptsec] = useState(
+    () => signerManager.getStoredNcryptsec() ?? "",
+  );
+  const [passphrase, setPassphrase] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    onError("");
+    try {
+      await signerManager.loginWithNcryptsec(ncryptsec.trim(), passphrase);
+      onClose();
+    } catch {
+      onError("Invalid ncryptsec or wrong passphrase.");
+    } finally {
+      setLoading(false);
+      setPassphrase("");
+    }
+  };
+
+  return (
+    <Box sx={{ px: 2, pb: 2, bgcolor: "action.hover" }}>
+      <Stack spacing={1.5}>
+        <TextField
+          size="small"
+          fullWidth
+          label="ncryptsec"
+          placeholder="ncryptsec1..."
+          value={ncryptsec}
+          onChange={(e) => setNcryptsec(e.target.value)}
+          multiline
+          minRows={2}
+          slotProps={{ htmlInput: { autoCapitalize: "none", spellCheck: false } }}
+        />
+        <TextField
+          size="small"
+          fullWidth
+          label="Passphrase"
+          type="password"
+          value={passphrase}
+          onChange={(e) => setPassphrase(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleLogin();
+          }}
+          autoComplete="current-password"
+          autoFocus={!!ncryptsec}
+        />
+        <Button
+          variant="contained"
+          onClick={() => void handleLogin()}
+          disabled={loading || !ncryptsec.trim() || !passphrase}
+        >
+          {loading ? (
+            <CircularProgress size={18} color="inherit" />
+          ) : (
+            "Sign in"
+          )}
+        </Button>
+      </Stack>
+    </Box>
+  );
+}
+
+// ─── CreateAccountDialog ───────────────────────────────────────────────────────
+
+function CreateAccountDialog({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [step, setStep] = useState<"form" | "backup">("form");
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [about, setAbout] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [confirmPassphrase, setConfirmPassphrase] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [ncryptsec, setNcryptsec] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setStep("form");
+      setName("");
+      setImageUrl("");
+      setAbout("");
+      setPassphrase("");
+      setConfirmPassphrase("");
+      setNcryptsec("");
+      setError("");
+      setCopied(false);
+    }
+  }, [open]);
+
+  const handleCreate = async () => {
+    if (!passphrase) {
+      setError("Passphrase is required.");
+      return;
+    }
+    if (passphrase !== confirmPassphrase) {
+      setError("Passphrases don't match.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const result = await signerManager.createAccount(passphrase, {
+        name: name.trim() || undefined,
+        picture: imageUrl.trim() || undefined,
+        about: about.trim() || undefined,
+      });
+      setNcryptsec(result.ncryptsec);
+      setPassphrase("");
+      setConfirmPassphrase("");
+      setStep("backup");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create account.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(ncryptsec);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAcknowledge = () => {
+    setNcryptsec("");
+    onSuccess();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={step === "backup" ? undefined : onClose}
+      maxWidth="xs"
+      fullWidth
+      slotProps={{ paper: { sx: { borderRadius: 3 } } }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {step === "form" ? "Create Account" : "Back up your key"}
+      </DialogTitle>
+
+      <DialogContent>
+        {step === "form" ? (
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <TextField
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              size="small"
+              autoComplete="name"
+            />
+            <TextField
+              label="Image URL"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              fullWidth
+              size="small"
+              placeholder="https://..."
+              slotProps={{ htmlInput: { autoCapitalize: "none" } }}
+            />
+            <TextField
+              label="About"
+              value={about}
+              onChange={(e) => setAbout(e.target.value)}
+              fullWidth
+              size="small"
+              multiline
+              minRows={2}
+            />
+            <TextField
+              label="Passphrase"
+              type={showPass ? "text" : "password"}
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              fullWidth
+              size="small"
+              helperText="Encrypts your key. Never stored."
+              autoComplete="new-password"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        onClick={() => setShowPass((v) => !v)}
+                      >
+                        {showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            <TextField
+              label="Confirm Passphrase"
+              type={showPass ? "text" : "password"}
+              value={confirmPassphrase}
+              onChange={(e) => setConfirmPassphrase(e.target.value)}
+              fullWidth
+              size="small"
+              autoComplete="new-password"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreate();
+              }}
+            />
+            {error && <Alert severity="error">{error}</Alert>}
+          </Stack>
+        ) : (
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <Alert severity="warning">
+              Save this encrypted key. Without it and your passphrase you
+              cannot sign in again. It is safe to store — it is already
+              encrypted with your passphrase.
+            </Alert>
+            <Box
+              sx={{
+                bgcolor: "action.hover",
+                borderRadius: 2,
+                p: 1.5,
+                wordBreak: "break-all",
+                fontFamily: "monospace",
+                fontSize: 12,
+                lineHeight: 1.6,
+                userSelect: "all",
+              }}
+            >
+              {ncryptsec}
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => void handleCopy()}
+              fullWidth
+            >
+              {copied ? "Copied!" : "Copy ncryptsec"}
+            </Button>
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        {step === "form" ? (
+          <>
+            <Button onClick={onClose} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleCreate()}
+              disabled={
+                loading ||
+                !passphrase ||
+                passphrase !== confirmPassphrase
+              }
+            >
+              {loading ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                "Create"
+              )}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            onClick={handleAcknowledge}
+            fullWidth
+            disabled={!copied}
+          >
+            I&apos;ve backed it up
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ─── OptionButton ──────────────────────────────────────────────────────────────
 
 function OptionButton({
   icon,
@@ -419,6 +751,8 @@ function OptionButton({
   );
 }
 
+// ─── LoginModal ────────────────────────────────────────────────────────────────
+
 interface LoginModalProps {
   open: boolean;
   onClose: () => void;
@@ -429,8 +763,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const theme = useTheme();
   const [showNip46, setShowNip46] = useState(false);
   const [showNsecLogin, setShowNsecLogin] = useState(false);
+  const [showNcryptsec, setShowNcryptsec] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"nip07" | "guest" | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && signerManager.getStoredNcryptsec() !== null) {
+      setShowNcryptsec(true);
+    }
+  }, [open]);
 
   const handleNip07 = async () => {
     if (!window.nostr) {
@@ -438,155 +780,179 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       return;
     }
     setError("");
-    setLoading("nip07");
+    setLoading(true);
     try {
       await signerManager.loginWithNip07();
       onClose();
     } catch {
       setError(intl.formatMessage({ id: "login.loginFailed" }));
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
 
-  const handleGuest = async () => {
+  const collapse = () => {
+    setShowNip46(false);
+    setShowNsecLogin(false);
+    setShowNcryptsec(false);
     setError("");
-    setLoading("guest");
-    try {
-      const key = bytesToHex(generateSecretKey());
-      await signerManager.createGuestAccount(key, {});
-      onClose();
-    } catch {
-      setError(intl.formatMessage({ id: "login.loginFailed" }));
-    } finally {
-      setLoading(null);
-    }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="xs"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
-    >
-      <Box
-        sx={{
-          px: 3,
-          pt: 4,
-          pb: 3,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 1.5,
-          borderBottom: `1px solid ${theme.palette.divider}`,
+    <>
+      <Dialog
+        open={open}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 3,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "90vh",
+            },
+          },
         }}
       >
-        <img
-          src="/formstr.png"
-          alt="Calendar by Form*"
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 14,
-            objectFit: "contain",
+        <Box
+          sx={{
+            px: 3,
+            pt: 2,
+            pb: 1.5,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 1,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           }}
-        />
-        <Box textAlign="center">
-          <Typography variant="h6" fontWeight={700}>
-            {intl.formatMessage({ id: "login.signInToFormstr" })}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {intl.formatMessage({ id: "login.chooseLoginMethod" })}
-          </Typography>
+        >
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: 3,
+              bgcolor: `${theme.palette.primary.main}18`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <img
+              src="/icon.svg"
+              alt="Calendar"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                objectFit: "contain",
+              }}
+            />
+          </Box>
+          <Box textAlign="center">
+            <Typography variant="h6" fontWeight={700}>
+              {intl.formatMessage({ id: "login.signInToFormstr" })}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mt={0.5}>
+              {intl.formatMessage({ id: "login.chooseLoginMethod" })}
+            </Typography>
+          </Box>
+          {error && (
+            <Alert severity="error" sx={{ width: "100%", borderRadius: 2 }}>
+              {error}
+            </Alert>
+          )}
         </Box>
-        {error && (
-          <Alert severity="error" sx={{ width: "100%", borderRadius: 2 }}>
-            {error}
-          </Alert>
-        )}
-      </Box>
 
-      <Stack divider={<Divider />}>
-        {!isNative && (
-          <OptionButton
-            icon={<VpnKeyOutlinedIcon />}
-            title={intl.formatMessage({ id: "login.signInWithExtension" })}
-            description="Alby, nos2x, Flamingo"
-            loading={loading === "nip07"}
-            disabled={loading !== null}
-            onClick={() => void handleNip07()}
-          />
-        )}
-
-        {isAndroidNative() && (
-          <Nip55Section onClose={onClose} onError={setError} />
-        )}
-
-        {isAndroidNative() && (
-          <Box>
+        <Stack divider={<Divider />} sx={{ overflowY: "auto", flex: 1 }}>
+          {!isNative && (
             <OptionButton
               icon={<VpnKeyOutlinedIcon />}
-              title={intl.formatMessage({ id: "login.signInWithNsec" })}
-              description={intl.formatMessage({ id: "login.keysNeverLeave" })}
+              title={intl.formatMessage({ id: "login.signInWithExtension" })}
+              description="Alby, nos2x, Flamingo"
+              loading={loading}
+              disabled={loading}
+              onClick={() => void handleNip07()}
+            />
+          )}
+
+          {isAndroidNative() && (
+            <Nip55Section onClose={onClose} onError={setError} />
+          )}
+
+          {isAndroidNative() && (
+            <Box>
+              <OptionButton
+                icon={<VpnKeyOutlinedIcon />}
+                title={intl.formatMessage({ id: "login.signInWithNsec" })}
+                description={intl.formatMessage({ id: "login.keysNeverLeave" })}
+                onClick={() => {
+                  collapse();
+                  setShowNsecLogin((prev) => !prev);
+                }}
+                showChevron
+                chevronRotated={showNsecLogin}
+              />
+              {showNsecLogin && (
+                <NsecSection onClose={onClose} onError={setError} />
+              )}
+            </Box>
+          )}
+
+          <Box>
+            <OptionButton
+              icon={<LockOutlinedIcon />}
+              title="Existing Key"
+              description="Sign in with an ncryptsec"
               onClick={() => {
-                setError("");
-                setShowNsecLogin((prev) => !prev);
-                setShowNip46(false);
+                collapse();
+                setShowNcryptsec((prev) => !prev);
               }}
               showChevron
-              chevronRotated={showNsecLogin}
+              chevronRotated={showNcryptsec}
             />
-            {showNsecLogin && (
-              <NsecSection onClose={onClose} onError={setError} />
+            {showNcryptsec && (
+              <NcryptsecSection onClose={onClose} onError={setError} />
             )}
           </Box>
-        )}
 
-        <Box>
           <OptionButton
-            icon={<HubOutlinedIcon />}
-            title={intl.formatMessage({ id: "login.connectRemoteSigner" })}
-            description="Connect via NIP-46"
-            onClick={() => {
-              setError("");
-              setShowNip46((prev) => !prev);
-              setShowNsecLogin(false);
-            }}
-            showChevron
-            chevronRotated={showNip46}
+            icon={<PersonAddOutlinedIcon />}
+            title="Create Account"
+            description="Generate a new key, encrypted at rest"
+            onClick={() => setShowCreateAccount(true)}
           />
-          {showNip46 && <Nip46Section onSuccess={onClose} onError={setError} />}
-        </Box>
 
-        <OptionButton
-          icon={<PersonOutlinedIcon />}
-          title="Temporary Account"
-          description="Quick access, no keys needed"
-          loading={loading === "guest"}
-          disabled={loading !== null}
-          onClick={() => void handleGuest()}
-        />
-      </Stack>
+          <Box>
+            <OptionButton
+              icon={<HubOutlinedIcon />}
+              title={intl.formatMessage({ id: "login.connectRemoteSigner" })}
+              description="Connect via NIP-46"
+              onClick={() => {
+                collapse();
+                setShowNip46((prev) => !prev);
+              }}
+              showChevron
+              chevronRotated={showNip46}
+            />
+            {showNip46 && (
+              <Nip46Section onSuccess={onClose} onError={setError} />
+            )}
+          </Box>
+        </Stack>
 
-      <Box
-        sx={{
-          px: 3,
-          py: 1.5,
-          borderTop: `1px solid ${theme.palette.divider}`,
+      </Dialog>
+
+      <CreateAccountDialog
+        open={showCreateAccount}
+        onClose={() => setShowCreateAccount(false)}
+        onSuccess={() => {
+          setShowCreateAccount(false);
+          onClose();
         }}
-      >
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          display="block"
-          textAlign="center"
-        >
-          {intl.formatMessage({ id: "login.keysNeverLeave" })}
-        </Typography>
-      </Box>
-    </Dialog>
+      />
+    </>
   );
 };
 
