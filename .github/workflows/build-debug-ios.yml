@@ -55,4 +55,3 @@ jobs:
       pr_sha: ${{ needs.resolve-pr.outputs.pr_sha }}
       package_manager: "pnpm"
       pnpm_version: "10.26.2"
-      sign_ios: ${{ secrets.IOS_P12_BASE64 != '' }}
