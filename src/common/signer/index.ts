@@ -17,6 +17,7 @@ import {
   removeNsec,
   saveNsec,
 } from "../../utils/secureKeyStorage";
+import { pool } from "../nostrRuntime";
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
 
@@ -90,14 +91,13 @@ class SignerManager {
             if (unlocked) await this.fetchAndCacheUser(active.pubkey);
             break;
           }
-          case "nip46":
-            if (active.nip46) {
-              await packageSigner.loginWithBunkerUri(active.nip46.uri, {
-                clientSecretKey: hexToBytes(active.nip46.clientSecretKey),
-              });
-              await this.fetchAndCacheUser(active.pubkey);
-            }
+          case "nip46": {
+            // unlock() reuses the stored clientSecretKey to reconnect without
+            // re-sending a connect request, so the bunker won't prompt again.
+            const unlocked = await packageSigner.unlock({ pool });
+            if (unlocked) await this.fetchAndCacheUser(active.pubkey);
             break;
+          }
           case "ncryptsec":
             // Requires a passphrase — user must log in manually
             break;
