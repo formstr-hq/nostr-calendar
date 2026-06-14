@@ -1,4 +1,4 @@
-name: Build Debug APK (PR + Manual)
+name: Build Debug iOS (PR + Manual)
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   resolve-pr:
-    if: github.event.label.name == 'build-apk' || github.event_name == 'workflow_dispatch'
+    if: github.event.label.name == 'build-ios' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       pr_number: ${{ steps.pr.outputs.number }}
@@ -48,7 +48,8 @@ jobs:
 
   build:
     needs: resolve-pr
-    uses: formstr-hq/common-packages/.github/workflows/reusable-build-debug-apk.yml@main
+    uses: formstr-hq/common-packages/.github/workflows/reusable-build-debug-ios.yml@main
+    secrets: inherit
     with:
       pr_number: ${{ needs.resolve-pr.outputs.pr_number }}
       pr_sha: ${{ needs.resolve-pr.outputs.pr_sha }}
