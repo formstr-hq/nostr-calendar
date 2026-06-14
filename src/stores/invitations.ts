@@ -63,7 +63,10 @@ interface InvitationsState {
   stopInvitations: () => void;
   acceptInvitation: (giftWrapId: string, calendarId: string) => Promise<void>;
   dismissInvitation: (giftWrapId: string) => void;
-  reportInvitation: (giftWrapId: string, reportType: ReportType) => Promise<void>;
+  reportInvitation: (
+    giftWrapId: string,
+    reportType: ReportType,
+  ) => Promise<void>;
   clearCachedInvitations: () => Promise<void>;
 }
 

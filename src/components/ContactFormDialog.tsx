@@ -166,7 +166,6 @@ export function ContactFormDialog({ open, onClose }: Props) {
     prevSubmittingRef.current = submitting;
   }, [submitting, submitError, applyPrefill]);
 
-
   return (
     <>
       <Dialog
@@ -225,7 +224,9 @@ export function ContactFormDialog({ open, onClose }: Props) {
               ref={containerRef}
               sx={{
                 ...buildFormSx(theme),
-                ...(submitting ? { visibility: "hidden", height: 0, overflow: "hidden" } : {}),
+                ...(submitting
+                  ? { visibility: "hidden", height: 0, overflow: "hidden" }
+                  : {}),
               }}
               dangerouslySetInnerHTML={{ __html: form.html?.form ?? "" }}
             />

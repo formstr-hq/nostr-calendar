@@ -1454,8 +1454,6 @@ export async function fetchUserReports(
     "#a": eventCoordinates,
   });
   return events.flatMap((event) =>
-    event.tags
-      .filter((t) => t[0] === "a" && t[1])
-      .map((t) => t[1]),
+    event.tags.filter((t) => t[0] === "a" && t[1]).map((t) => t[1]),
   );
 }

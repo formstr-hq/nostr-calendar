@@ -71,7 +71,9 @@ export function ReportEventDialog({
           {intl.formatMessage({ id: "report.description" })}
         </Typography>
         <FormControl fullWidth size="small">
-          <InputLabel>{intl.formatMessage({ id: "report.selectType" })}</InputLabel>
+          <InputLabel>
+            {intl.formatMessage({ id: "report.selectType" })}
+          </InputLabel>
           <Select
             value={reportType}
             label={intl.formatMessage({ id: "report.selectType" })}

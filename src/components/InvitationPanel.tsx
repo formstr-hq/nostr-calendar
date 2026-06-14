@@ -55,9 +55,7 @@ export function InvitationPanel() {
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
   const [addDialogDefaultCalendarId, setAddDialogDefaultCalendarId] =
     useState("");
-  const [reportGiftWrapId, setReportGiftWrapId] = useState<string | null>(
-    null,
-  );
+  const [reportGiftWrapId, setReportGiftWrapId] = useState<string | null>(null);
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
     .sort((a, b) => b.receivedAt - a.receivedAt);
@@ -225,7 +223,14 @@ export function InvitationPanel() {
             </Typography>
           )}
 
-          <Box display="flex" gap={1} mt={2} justifyContent="space-between" alignItems="center" flexWrap="wrap">
+          <Box
+            display="flex"
+            gap={1}
+            mt={2}
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+          >
             <Button
               size="small"
               color="warning"
