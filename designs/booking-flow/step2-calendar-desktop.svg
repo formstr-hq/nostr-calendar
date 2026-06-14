@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="system-ui, -apple-system, sans-serif">
+  <!-- Background -->
+  <rect width="1440" height="900" fill="#ffffff"/>
+
+  <!-- Top summary bar -->
+  <rect width="1440" height="56" fill="#f5f5f5"/>
+  <text x="720" y="34" text-anchor="middle" fill="#000" font-size="14" font-weight="600">Book 30 min with Alex Kim</text>
+
+  <!-- Back link -->
+  <text x="40" y="34" fill="#555" font-size="13">← Back</text>
+
+  <!-- Step indicator -->
+  <text x="1400" y="34" text-anchor="end" fill="#999" font-size="13">Step 2 of 4</text>
+
+  <!-- Calendar container -->
+  <rect x="400" y="96" width="640" height="680" rx="12" fill="#fff" stroke="#e8e8e8" stroke-width="1.5"/>
+
+  <!-- Calendar header -->
+  <text x="720" y="144" text-anchor="middle" fill="#000" font-size="20" font-weight="700">June 2026</text>
+  <!-- Prev / Next arrows -->
+  <text x="436" y="144" fill="#555" font-size="18" font-weight="300">‹</text>
+  <text x="1012" y="144" fill="#555" font-size="18" font-weight="300">›</text>
+
+  <line x1="420" y1="162" x2="1020" y2="162" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Day headers -->
+  <text x="456" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">SUN</text>
+  <text x="548" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">MON</text>
+  <text x="640" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">TUE</text>
+  <text x="732" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">WED</text>
+  <text x="824" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">THU</text>
+  <text x="916" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">FRI</text>
+  <text x="1008" y="188" text-anchor="middle" fill="#999" font-size="12" font-weight="600">SAT</text>
+
+  <!-- Week 1: June 1-7 (Mon=1) — unavailable days in gray/strikethrough, available in black -->
+  <!-- Row Y start: 228, row height: 76 -->
+
+  <!-- Jun 1 (Mon) - unavailable -->
+  <text x="548" y="252" text-anchor="middle" fill="#ccc" font-size="15">1</text>
+  <line x1="528" y1="252" x2="568" y2="252" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Jun 2 (Tue) - unavailable -->
+  <text x="640" y="252" text-anchor="middle" fill="#ccc" font-size="15">2</text>
+  <line x1="620" y1="252" x2="660" y2="252" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Jun 3 (Wed) - available -->
+  <circle cx="732" cy="246" r="20" fill="transparent"/>
+  <text x="732" y="252" text-anchor="middle" fill="#000" font-size="15" font-weight="500">3</text>
+
+  <!-- Jun 4 (Thu) - available -->
+  <circle cx="824" cy="246" r="20" fill="transparent"/>
+  <text x="824" y="252" text-anchor="middle" fill="#000" font-size="15" font-weight="500">4</text>
+
+  <!-- Jun 5 (Fri) - available -->
+  <circle cx="916" cy="246" r="20" fill="transparent"/>
+  <text x="916" y="252" text-anchor="middle" fill="#000" font-size="15" font-weight="500">5</text>
+
+  <!-- Jun 6 (Sat) - unavailable -->
+  <text x="1008" y="252" text-anchor="middle" fill="#ccc" font-size="15">6</text>
+  <line x1="988" y1="252" x2="1028" y2="252" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Week 2: Jun 7-13 -->
+  <!-- Jun 7 (Sun) - unavailable -->
+  <text x="456" y="328" text-anchor="middle" fill="#ccc" font-size="15">7</text>
+  <line x1="436" y1="328" x2="476" y2="328" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Jun 8 (Mon) - available -->
+  <text x="548" y="328" text-anchor="middle" fill="#000" font-size="15" font-weight="500">8</text>
+
+  <!-- Jun 9 (Tue) - available -->
+  <text x="640" y="328" text-anchor="middle" fill="#000" font-size="15" font-weight="500">9</text>
+
+  <!-- Jun 10 (Wed) - available -->
+  <text x="732" y="328" text-anchor="middle" fill="#000" font-size="15" font-weight="500">10</text>
+
+  <!-- Jun 11 (Thu) - available -->
+  <text x="824" y="328" text-anchor="middle" fill="#000" font-size="15" font-weight="500">11</text>
+
+  <!-- Jun 12 (Fri) - unavailable -->
+  <text x="916" y="328" text-anchor="middle" fill="#ccc" font-size="15">12</text>
+  <line x1="896" y1="328" x2="936" y2="328" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Jun 13 (Sat) - unavailable -->
+  <text x="1008" y="328" text-anchor="middle" fill="#ccc" font-size="15">13</text>
+  <line x1="988" y1="328" x2="1028" y2="328" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Week 3: Jun 14-20 -->
+  <!-- Jun 14 (Sun) - unavailable -->
+  <text x="456" y="404" text-anchor="middle" fill="#ccc" font-size="15">14</text>
+  <line x1="436" y1="404" x2="476" y2="404" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Jun 15 (Mon) - SELECTED/TODAY -->
+  <circle cx="548" cy="398" r="22" fill="#000"/>
+  <text x="548" y="404" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">15</text>
+
+  <!-- Jun 16 (Tue) - available -->
+  <text x="640" y="404" text-anchor="middle" fill="#000" font-size="15" font-weight="500">16</text>
+
+  <!-- Jun 17 (Wed) - available -->
+  <text x="732" y="404" text-anchor="middle" fill="#000" font-size="15" font-weight="500">17</text>
+
+  <!-- Jun 18 (Thu) - available -->
+  <text x="824" y="404" text-anchor="middle" fill="#000" font-size="15" font-weight="500">18</text>
+
+  <!-- Jun 19 (Fri) - available -->
+  <text x="916" y="404" text-anchor="middle" fill="#000" font-size="15" font-weight="500">19</text>
+
+  <!-- Jun 20 (Sat) - unavailable -->
+  <text x="1008" y="404" text-anchor="middle" fill="#ccc" font-size="15">20</text>
+  <line x1="988" y1="404" x2="1028" y2="404" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Week 4: Jun 21-27 -->
+  <text x="456" y="480" text-anchor="middle" fill="#ccc" font-size="15">21</text>
+  <line x1="436" y1="480" x2="476" y2="480" stroke="#ddd" stroke-width="1"/>
+  <text x="548" y="480" text-anchor="middle" fill="#000" font-size="15" font-weight="500">22</text>
+  <text x="640" y="480" text-anchor="middle" fill="#000" font-size="15" font-weight="500">23</text>
+  <text x="732" y="480" text-anchor="middle" fill="#000" font-size="15" font-weight="500">24</text>
+  <text x="824" y="480" text-anchor="middle" fill="#000" font-size="15" font-weight="500">25</text>
+  <text x="916" y="480" text-anchor="middle" fill="#ccc" font-size="15">26</text>
+  <line x1="896" y1="480" x2="936" y2="480" stroke="#ddd" stroke-width="1"/>
+  <text x="1008" y="480" text-anchor="middle" fill="#ccc" font-size="15">27</text>
+  <line x1="988" y1="480" x2="1028" y2="480" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Week 5: Jun 28-30 -->
+  <text x="456" y="556" text-anchor="middle" fill="#ccc" font-size="15">28</text>
+  <line x1="436" y1="556" x2="476" y2="556" stroke="#ddd" stroke-width="1"/>
+  <text x="548" y="556" text-anchor="middle" fill="#000" font-size="15" font-weight="500">29</text>
+  <text x="640" y="556" text-anchor="middle" fill="#000" font-size="15" font-weight="500">30</text>
+
+  <!-- Legend -->
+  <circle cx="440" cy="636" r="8" fill="#000"/>
+  <text x="456" y="641" fill="#555" font-size="12">Selected</text>
+  <text x="530" y="641" fill="#555" font-size="12">●</text>
+  <text x="545" y="641" fill="#555" font-size="12">Available</text>
+  <text x="628" y="641" fill="#ccc" font-size="12" text-decoration="line-through">✕</text>
+  <text x="644" y="641" fill="#999" font-size="12">Unavailable</text>
+
+  <!-- Timezone note -->
+  <text x="720" y="730" text-anchor="middle" fill="#aaa" font-size="12">All times shown in your local timezone (UTC+5:30)</text>
+
+  <!-- Footer -->
+  <text x="720" y="874" text-anchor="middle" fill="#bbb" font-size="12">Powered by Formstr</text>
+</svg>
