@@ -23,10 +23,13 @@ import {
 import {
   fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
+  fetchUserReports,
   getUserPublicKey,
   publishParticipantRemovalEvent,
+  publishReportEvent,
   viewPrivateEvent,
 } from "../common/nostr";
+import type { ReportType } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
@@ -60,6 +63,7 @@ interface InvitationsState {
   stopInvitations: () => void;
   acceptInvitation: (giftWrapId: string, calendarId: string) => Promise<void>;
   dismissInvitation: (giftWrapId: string) => void;
+  reportInvitation: (giftWrapId: string, reportType: ReportType) => Promise<void>;
   clearCachedInvitations: () => Promise<void>;
 }
 
@@ -166,7 +170,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           });
           invitation.event = { ...parsed, isInvitation: true };
         },
-        () => {
+        async () => {
           // After private events are fetched, update store with resolved events
           set((state) => {
             const resolvedIds = new Set(batch.map((i) => i.eventId));
@@ -180,6 +184,39 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
             saveInvitationsToStorage(updated);
             return { invitations: updated, unreadCount };
           });
+
+          // Lazily filter out any invitations the user has previously reported
+          try {
+            const userPubkey = await getUserPublicKey();
+            if (!userPubkey) return;
+
+            const coordinates = batch.map((inv) => {
+              const authorPubkey = inv.event?.user ?? inv.pubkey;
+              return `${inv.kind}:${authorPubkey}:${inv.eventId}`;
+            });
+
+            const reportedCoordinates = await fetchUserReports(
+              userPubkey,
+              coordinates,
+            );
+            if (reportedCoordinates.length === 0) return;
+
+            const reportedSet = new Set(reportedCoordinates);
+            set((state) => {
+              const updated = state.invitations.filter((inv) => {
+                const authorPubkey = inv.event?.user ?? inv.pubkey;
+                const coord = `${inv.kind}:${authorPubkey}:${inv.eventId}`;
+                return !reportedSet.has(coord);
+              });
+              const unreadCount = updated.filter(
+                (i) => i.status === "pending",
+              ).length;
+              saveInvitationsToStorage(updated);
+              return { invitations: updated, unreadCount };
+            });
+          } catch {
+            // Non-fatal: blocking filter is best-effort
+          }
         },
       );
     }
@@ -323,6 +360,36 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         });
       }
 
+      const unreadCount = updated.filter((i) => i.status === "pending").length;
+      saveInvitationsToStorage(updated);
+      return { invitations: updated, unreadCount };
+    });
+  },
+
+  /**
+   * Reports an invitation via NIP-56 (kind 1984) and removes it from the list.
+   * The event coordinate is built from the resolved event so the relay-side
+   * a-tag filter can match it on future loads.
+   */
+  reportInvitation: async (giftWrapId, reportType) => {
+    const { invitations } = get();
+    const invitation = invitations.find((i) => i.giftWrapId === giftWrapId);
+    if (!invitation) return;
+
+    const authorPubkey = invitation.event?.user ?? invitation.pubkey;
+    const eventCoordinate = `${invitation.kind}:${authorPubkey}:${invitation.eventId}`;
+
+    await publishReportEvent({
+      authorPubkey,
+      eventCoordinate,
+      relayHint: invitation.relayHint,
+      reportType,
+    });
+
+    set((state) => {
+      const updated = state.invitations.filter(
+        (i) => i.giftWrapId !== giftWrapId,
+      );
       const unreadCount = updated.filter((i) => i.status === "pending").length;
       saveInvitationsToStorage(updated);
       return { invitations: updated, unreadCount };

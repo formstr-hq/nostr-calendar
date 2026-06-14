@@ -327,6 +327,23 @@ const dictionary: NestedObject = {
       alreadyAdded: "Participant already added",
       invalid: "Enter a valid npub, NIP-05, or hex pubkey",
     },
+    report: {
+      reportEvent: "Report this event",
+      title: "Report Event",
+      description:
+        "You are about to report this event. Reports are published publicly and may be used for moderation purposes for other users. This event will be hidden from your invitations.",
+      selectType: "Select a reason",
+      nudity: "Nudity / Explicit content",
+      malware: "Malware",
+      profanity: "Profanity / Hateful speech",
+      illegal: "Illegal content",
+      spam: "Spam",
+      impersonation: "Impersonation",
+      other: "Other",
+      submit: "Submit Report",
+      cancel: "Cancel",
+      submitting: "Submitting...",
+    },
     scheduling: {
       featureDescription:
         "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
@@ -744,6 +761,23 @@ const dictionary: NestedObject = {
       author: "Organisator",
       alreadyAdded: "Teilnehmer bereits hinzugefügt",
       invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
+    },
+    report: {
+      reportEvent: "Dieses Ereignis melden",
+      title: "Ereignis melden",
+      description:
+        "Sie sind dabei, dieses Ereignis zu melden. Meldungen werden öffentlich veröffentlicht und können zu Moderationszwecken für andere Nutzer verwendet werden. Dieses Ereignis wird aus Ihren Einladungen ausgeblendet.",
+      selectType: "Grund auswählen",
+      nudity: "Nacktheit / Explizite Inhalte",
+      malware: "Schadsoftware",
+      profanity: "Obszönität / Hassrede",
+      illegal: "Illegale Inhalte",
+      spam: "Spam",
+      impersonation: "Identitätsbetrug",
+      other: "Sonstiges",
+      submit: "Meldung absenden",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet...",
     },
     scheduling: {
       featureDescription:
