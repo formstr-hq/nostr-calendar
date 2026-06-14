@@ -223,6 +223,8 @@ const dictionary: NestedObject = {
       createCalendar: "Create Calendar",
       about: "About",
       privacyPolicy: "Privacy Policy",
+      contactUs: "Contact Us",
+      thankYouMessage: "Thank you for contacting us!",
     },
     deviceCalendar: {
       title: "Device calendars",
@@ -635,6 +637,8 @@ const dictionary: NestedObject = {
       createCalendar: "Kalender erstellen",
       about: "Über uns",
       privacyPolicy: "Datenschutzrichtlinie",
+      contactUs: "Kontakt",
+      thankYouMessage: "Vielen Dank für Ihre Kontaktaufnahme!",
     },
     deviceCalendar: {
       title: "Gerätekalender",
