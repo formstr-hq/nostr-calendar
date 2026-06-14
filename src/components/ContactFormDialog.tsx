@@ -94,25 +94,27 @@ export function ContactFormDialog({ open, onClose }: Props) {
     }
   }, [open, fetchForm]);
 
-  // Prefill the contact field with user's npub after form renders
-  useEffect(() => {
+  // Extracted so it can be called on initial render and after submit error
+  // (the SDK resets the form DOM when collecting values for signing)
+  const applyPrefill = useCallback(() => {
     if (!form || !containerRef.current || !user?.pubkey) return;
-
     const fields = (form.fields ?? {}) as Record<string, SdkField>;
     const contactFieldId = Object.entries(fields).find(([, field]) =>
       plainText(field.labelHtml).toLowerCase().includes("email or npub"),
     )?.[0];
-
     if (!contactFieldId) return;
-
-    const npub = nip19.npubEncode(user.pubkey);
     const input = containerRef.current.querySelector<HTMLInputElement>(
       `[name="${contactFieldId}"], [id="${contactFieldId}"]`,
     );
     if (input) {
-      input.value = npub;
+      input.value = nip19.npubEncode(user.pubkey);
     }
   }, [form, user]);
+
+  // Prefill after initial form render
+  useEffect(() => {
+    applyPrefill();
+  }, [applyPrefill]);
 
   const submitForm = () => {
     if (!form || !sdkRef.current || !containerRef.current) return;
@@ -155,7 +157,15 @@ export function ContactFormDialog({ open, onClose }: Props) {
     });
   };
 
-  const showFormContent = form && !loading && !fetchError;
+  // Re-apply prefill after error — SDK reset the form DOM during signing
+  const prevSubmittingRef = useRef(false);
+  useEffect(() => {
+    if (prevSubmittingRef.current && !submitting && submitError) {
+      applyPrefill();
+    }
+    prevSubmittingRef.current = submitting;
+  }, [submitting, submitError, applyPrefill]);
+
 
   return (
     <>
@@ -181,7 +191,7 @@ export function ContactFormDialog({ open, onClose }: Props) {
         </DialogTitle>
 
         <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
-          {loading && (
+          {(loading || submitting) && (
             <Box display="flex" justifyContent="center" py={6}>
               <CircularProgress />
             </Box>
@@ -202,19 +212,23 @@ export function ContactFormDialog({ open, onClose }: Props) {
             </Stack>
           )}
 
-          {showFormContent && (
-            <>
-              {submitError && (
-                <Typography color="error" variant="body2" sx={{ mb: 2 }}>
-                  {submitError}
-                </Typography>
-              )}
-              <Box
-                ref={containerRef}
-                sx={buildFormSx(theme)}
-                dangerouslySetInnerHTML={{ __html: form.html?.form ?? "" }}
-              />
-            </>
+          {submitError && !submitting && (
+            <Typography color="error" variant="body2" sx={{ mb: 2 }}>
+              {submitError}
+            </Typography>
+          )}
+
+          {/* Keep the form in the DOM while submitting so the SDK can read values;
+              visibility:hidden hides it without unmounting */}
+          {form && !loading && !fetchError && (
+            <Box
+              ref={containerRef}
+              sx={{
+                ...buildFormSx(theme),
+                ...(submitting ? { visibility: "hidden", height: 0, overflow: "hidden" } : {}),
+              }}
+              dangerouslySetInnerHTML={{ __html: form.html?.form ?? "" }}
+            />
           )}
         </DialogContent>
 
@@ -222,7 +236,7 @@ export function ContactFormDialog({ open, onClose }: Props) {
           <Button onClick={onClose} disabled={submitting} color="inherit">
             {intl.formatMessage({ id: "form.cancel" })}
           </Button>
-          {showFormContent && (
+          {form && !loading && !fetchError && (
             <Button
               variant="contained"
               disabled={submitting}

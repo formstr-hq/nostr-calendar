@@ -236,9 +236,10 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
       <Box
         pt={2}
         pb={2}
+        padding={2}
         sx={{ borderTop: "1px solid", borderColor: "divider" }}
       >
-        <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
+        <Box display="flex" gap={2} justifyContent="space-between" flexWrap="wrap">
           <Typography
             variant="caption"
             component="a"
