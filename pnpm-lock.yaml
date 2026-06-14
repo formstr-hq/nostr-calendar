@@ -39,8 +39,8 @@ importers:
         specifier: ^0.2.7
         version: 0.2.7(@babel/core@7.28.0)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.28.0))(babel-plugin-macros@3.1.0)(jest-util@29.7.0)
       '@formstr/signer':
-        specifier: ^0.1.0
-        version: 0.1.0(nostr-signer-capacitor-plugin@0.0.5(@capacitor/core@8.0.0))(typescript@5.8.3)
+        specifier: ^0.2.2
+        version: 0.2.2(nostr-signer-capacitor-plugin@0.0.5(@capacitor/core@8.0.0))(typescript@5.8.3)
       '@khadarvsk/capacitor-secure-storage':
         specifier: 0.0.1
         version: 0.0.1(@capacitor/core@8.0.0)
@@ -697,8 +697,8 @@ packages:
   '@formstr/sdk@0.2.7':
     resolution: {integrity: sha512-juGV2EzN42Aiqvsj1mfFqNro3jIwlughatICfU+1pAyI33FedqNOueFQ8No8bN3Zyhp5F5WpIt2g2ykL4KYbHg==}
 
-  '@formstr/signer@0.1.0':
-    resolution: {integrity: sha512-RvLEuXCPVynMSuV7TCkxat2ihkMTyTEm8rLcoxuuqbxxRhRSLLr5h6BguBBAo1Y/xro5fbcfxfA4AoI1pa0DZQ==}
+  '@formstr/signer@0.2.2':
+    resolution: {integrity: sha512-25BCGIKZSKRrtVQwnxfWeiLH7KctEbxQrB26dxcjbkcnIIcfiV39s/Xt9yG//eZ+1zTHUpkIQkplfOhjTENtNw==}
     peerDependencies:
       nostr-signer-capacitor-plugin: ^0.0.5
     peerDependenciesMeta:
@@ -4020,7 +4020,7 @@ snapshots:
       - supports-color
       - ts-node
 
-  '@formstr/signer@0.1.0(nostr-signer-capacitor-plugin@0.0.5(@capacitor/core@8.0.0))(typescript@5.8.3)':
+  '@formstr/signer@0.2.2(nostr-signer-capacitor-plugin@0.0.5(@capacitor/core@8.0.0))(typescript@5.8.3)':
     dependencies:
       nostr-tools: 2.23.5(typescript@5.8.3)
       qrcode: 1.5.4
