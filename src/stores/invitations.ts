@@ -29,7 +29,8 @@ import {
 } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
-import { useTimeBasedEvents } from "./events";
+import { useTimeBasedEvents, resetProcessedEvent } from "./events";
+import { useInaccessibleEvents } from "./inaccessibleEvents";
 import { useBookingRequests } from "./bookingRequests";
 import { buildEventRef } from "../utils/calendarListTypes";
 import type { IInvitation } from "../utils/calendarListTypes";
@@ -59,6 +60,7 @@ interface InvitationsState {
   fetchInvitations: () => void;
   stopInvitations: () => void;
   acceptInvitation: (giftWrapId: string, calendarId: string) => Promise<void>;
+  applyAccessUpdate: (giftWrapId: string) => Promise<void>;
   dismissInvitation: (giftWrapId: string) => void;
   clearCachedInvitations: () => Promise<void>;
 }
@@ -158,7 +160,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           const invitation = batch.find((inv) => inv.eventId === eventId);
           if (!invitation) return;
           const decrypted = viewPrivateEvent(event, invitation.viewKey);
-          if (!decrypted) return;
+          if (!decrypted) {
+            // The key carried by this gift wrap no longer decrypts the event
+            // (e.g. the author rotated it again). Flag it so the panel shows an
+            // "ask the author for access" state instead of looping on loading.
+            invitation.inaccessible = true;
+            return;
+          }
+          invitation.inaccessible = false;
           const parsed = nostrEventToCalendar(decrypted, "", {
             viewKey: invitation.viewKey,
             isPrivateEvent: true,
@@ -199,11 +208,66 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           useCalendarLists.getState().getAllEventIds(),
         );
 
-        // If already in a calendar, the event was added when the booking was
-        // submitted (with the pre-generated view key). Auto-approve the matching
-        // outgoing booking so the UI updates without waiting for the separate
-        // booking-response gift wrap.
+        // If the event is already in a calendar, this gift wrap is either a
+        // booking confirmation, a duplicate, or a *key rotation* — the author
+        // re-shared the same event under a new view key. Compare the stored
+        // key against the incoming one to tell them apart.
         if (existingEventIds.has(rumor.eventId)) {
+          const coordinate = `${rumor.kind}:${rumor.authorPubkey}:${rumor.eventId}`;
+          const calendars = useCalendarLists.getState().calendars;
+          let existingViewKey = "";
+          let owningCalendarId = "";
+          for (const cal of calendars) {
+            const ref = cal.eventRefs.find((r) => r[0] === coordinate);
+            if (ref) {
+              existingViewKey = ref[2] ?? "";
+              owningCalendarId = cal.id;
+              break;
+            }
+          }
+
+          // New key for an event we already hold → surface an "update access"
+          // notification the user can act on. De-dupe per (event, new key).
+          if (
+            existingViewKey &&
+            rumor.viewKey &&
+            existingViewKey !== rumor.viewKey &&
+            owningCalendarId
+          ) {
+            const updateKey = `access-update:${rumor.eventId}:${rumor.viewKey}`;
+            if (processedIds.has(updateKey)) return;
+            processedIds.add(updateKey);
+
+            const { invitations: currentInvitations } = get();
+            if (
+              currentInvitations.some(
+                (inv) =>
+                  inv.isAccessUpdate &&
+                  inv.eventId === rumor.eventId &&
+                  inv.viewKey === rumor.viewKey,
+              )
+            ) {
+              return;
+            }
+
+            pendingBuffer.push({
+              originalInvitationId: rumor.originalInvitationId,
+              giftWrapId: rumor.originalInvitationId,
+              eventId: rumor.eventId,
+              viewKey: rumor.viewKey,
+              relayHint: rumor.relayHint,
+              receivedAt: rumor.createdAt,
+              status: "pending",
+              pubkey: rumor.authorPubkey,
+              kind: rumor.kind,
+              isAccessUpdate: true,
+              calendarId: owningCalendarId,
+            });
+            return;
+          }
+
+          // Same key (or no stored key to compare): keep the existing booking
+          // auto-approval behavior and ignore otherwise.
           useBookingRequests
             .getState()
             .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
@@ -295,6 +359,46 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     }
 
     // Remove from invitations
+    set((state) => {
+      const updated = state.invitations.filter(
+        (i) => i.giftWrapId !== giftWrapId,
+      );
+      const unreadCount = updated.filter((i) => i.status === "pending").length;
+      saveInvitationsToStorage(updated);
+      return { invitations: updated, unreadCount };
+    });
+  },
+
+  /**
+   * Applies a received access update: the author rotated this event's view key
+   * and re-shared it. Rewrites the stored key on the existing calendar
+   * reference, then forces a re-fetch so the event decrypts with the new key.
+   */
+  applyAccessUpdate: async (giftWrapId) => {
+    const { invitations } = get();
+    const invitation = invitations.find(
+      (i) => i.giftWrapId === giftWrapId && i.isAccessUpdate,
+    );
+    if (!invitation || !invitation.calendarId) return;
+
+    const coordinate = `${invitation.kind}:${invitation.pubkey}:${invitation.eventId}`;
+
+    // Swap in the new view key on the existing calendar reference.
+    await useCalendarLists
+      .getState()
+      .updateEventRefViewKey(
+        invitation.calendarId,
+        coordinate,
+        invitation.viewKey,
+        invitation.relayHint,
+      );
+
+    // Drop dedup + "no access" state, then re-fetch so the event decrypts
+    // with the rotated key.
+    resetProcessedEvent(invitation.eventId);
+    useInaccessibleEvents.getState().remove(coordinate);
+    useTimeBasedEvents.getState().fetchPrivateEvents();
+
     set((state) => {
       const updated = state.invitations.filter(
         (i) => i.giftWrapId !== giftWrapId,

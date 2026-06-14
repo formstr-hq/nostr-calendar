@@ -38,7 +38,12 @@ export function InvitationPanel() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
-  const { invitations, acceptInvitation, dismissInvitation } = useInvitations();
+  const {
+    invitations,
+    acceptInvitation,
+    applyAccessUpdate,
+    dismissInvitation,
+  } = useInvitations();
   const { fetchCalendars } = useCalendarLists();
 
   useEffect(() => {
@@ -150,7 +155,53 @@ export function InvitationPanel() {
             borderRadius: 2,
           }}
         >
-          {invitation.event ? (
+          {invitation.isAccessUpdate ? (
+            // The author rotated this event's view key and re-shared it.
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600}>
+                {invitation.event?.title || invitation.eventId}
+              </Typography>
+              {invitation.event && (
+                <TimeRenderer
+                  begin={invitation.event.begin}
+                  end={invitation.event.end}
+                  repeat={invitation.event.repeat}
+                  allDay={invitation.event.allDay}
+                />
+              )}
+              <Box
+                display="flex"
+                alignItems="center"
+                gap={0.5}
+                mt={1}
+                flexWrap="wrap"
+              >
+                <FormattedMessage
+                  id="invitation.accessUpdated"
+                  values={{
+                    participant: (
+                      <Participant
+                        pubKey={invitation.pubkey}
+                        isAuthor={false}
+                      />
+                    ),
+                  }}
+                />
+              </Box>
+            </Box>
+          ) : invitation.inaccessible ? (
+            // Could not decrypt with the key this gift wrap carried.
+            <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+              <FormattedMessage
+                id="invitation.noAccess"
+                values={{
+                  participant: (
+                    <Participant pubKey={invitation.pubkey} isAuthor={false} />
+                  ),
+                }}
+              />
+            </Box>
+          ) : invitation.event ? (
             <Box>
               <Typography variant="subtitle1" fontWeight={600}>
                 {invitation.event.title}
@@ -226,16 +277,28 @@ export function InvitationPanel() {
             >
               {intl.formatMessage({ id: "invitation.dismiss" })}
             </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={!invitation.event?.user}
-              onClick={() =>
-                handleAccept(invitation.giftWrapId, invitation.event)
-              }
-            >
-              {intl.formatMessage({ id: "addToCalendar.addToCalendar" })}
-            </Button>
+            {invitation.isAccessUpdate ? (
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => applyAccessUpdate(invitation.giftWrapId)}
+              >
+                {intl.formatMessage({ id: "invitation.updateMyCalendar" })}
+              </Button>
+            ) : (
+              !invitation.inaccessible && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={!invitation.event?.user}
+                  onClick={() =>
+                    handleAccept(invitation.giftWrapId, invitation.event)
+                  }
+                >
+                  {intl.formatMessage({ id: "addToCalendar.addToCalendar" })}
+                </Button>
+              )
+            )}
           </Box>
         </Paper>
       ))}

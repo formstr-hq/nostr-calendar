@@ -7,6 +7,7 @@ import { ROUTES } from "../utils/routingHelper";
 import { Index } from "./Index";
 import Calendar from "./Calendar";
 import { InvitationPanel } from "./InvitationPanel";
+import { EventsWithoutAccessPage } from "./EventsWithoutAccessPage";
 import { SchedulingPageEdit } from "./SchedulingPageEdit";
 import { BookingPage } from "./BookingPage";
 import { BookingNotifications } from "./BookingNotifications";
@@ -25,6 +26,10 @@ export const Routing = () => {
         element={<NotificationEventPage />}
       />
       <Route path={ROUTES.Notifications} element={<InvitationPanel />} />
+      <Route
+        path={ROUTES.EventsWithoutAccess}
+        element={<EventsWithoutAccessPage />}
+      />
       <Route
         path={ROUTES.SchedulingPageCreate}
         element={<SchedulingPageEdit />}

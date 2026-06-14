@@ -31,6 +31,7 @@ import Download from "@mui/icons-material/Download";
 import Edit from "@mui/icons-material/Edit";
 import FileCopy from "@mui/icons-material/FileCopy";
 import Delete from "@mui/icons-material/Delete";
+import VpnKey from "@mui/icons-material/VpnKey";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import dayjs from "dayjs";
@@ -55,6 +56,7 @@ import {
 import { useIntl, type IntlShape } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
+import { RotateKeyDialog } from "./RotateKeyDialog";
 import { EventBusyListToggle } from "./EventBusyListToggle";
 
 import {
@@ -353,8 +355,10 @@ function ActionButtons({
 }) {
   const intl = useIntl();
   const { user } = useUser();
+  const { calendars } = useCalendarLists();
   const navigate = useNavigate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
   const iconSize = isMobile ? "small" : "medium";
 
   // Device events have no Nostr coordinate; render a slim action bar that
@@ -405,6 +409,12 @@ function ActionButtons({
     navigator.clipboard.writeText(eventUrl);
   };
   const isEditable = event.user === user?.pubkey;
+  // Rotation needs the event in one of the author's calendars (we rewrite the
+  // stored view key there). Only private events have a key to rotate.
+  const rotateCalendar = event.isPrivateEvent
+    ? findCalendarForEvent(calendars, event)
+    : undefined;
+  const canRotateKey = isEditable && !!rotateCalendar;
 
   const editEvent = () => {
     const editLink = getEditEventPage(
@@ -485,6 +495,13 @@ function ActionButtons({
           </Tooltip>
         </IconButton>
       )}
+      {canRotateKey && (
+        <IconButton size={iconSize} onClick={() => setRotateDialogOpen(true)}>
+          <Tooltip title={intl.formatMessage({ id: "rotateKey.action" })}>
+            <VpnKey fontSize={iconSize} />
+          </Tooltip>
+        </IconButton>
+      )}
       <IconButton size={iconSize} onClick={() => setDeleteDialogOpen(true)}>
         <Tooltip title={intl.formatMessage({ id: "event.deleteEvent" })}>
           <Delete fontSize={iconSize} />
@@ -498,6 +515,14 @@ function ActionButtons({
         }}
         event={event}
       />
+      {canRotateKey && rotateCalendar && (
+        <RotateKeyDialog
+          open={rotateDialogOpen}
+          onClose={() => setRotateDialogOpen(false)}
+          event={event}
+          calendarId={rotateCalendar.id}
+        />
+      )}
       {showClose && (
         <IconButton
           size={iconSize}

@@ -2,8 +2,10 @@ import { MenuItem } from "@mui/material";
 import { useUser } from "../stores/user";
 import { useIntl } from "react-intl";
 import { useEffect } from "react";
+import { useNavigate } from "react-router";
 import { npubEncode } from "nostr-tools/nip19";
 import { useRelayStore } from "../stores/relays";
+import { ROUTES } from "../utils/routingHelper";
 
 export const Auth = () => {
   const { user, updateLoginModal, logout, initializeUser } = useUser(
@@ -11,6 +13,7 @@ export const Auth = () => {
   );
   const hasUserLoggedIn = !!user;
   const intl = useIntl();
+  const navigate = useNavigate();
 
   useEffect(() => {
     initializeUser();
@@ -45,10 +48,17 @@ export const Auth = () => {
     useRelayStore.getState().updateRelayModal(true);
   };
 
+  const handleOpenEventsWithoutAccess = () => {
+    navigate(ROUTES.EventsWithoutAccess);
+  };
+
   const logoutElem = (
     <>
       <MenuItem onClick={handleOpenRelays}>
         {intl.formatMessage({ id: "navigation.relays" })}
+      </MenuItem>
+      <MenuItem onClick={handleOpenEventsWithoutAccess}>
+        {intl.formatMessage({ id: "navigation.eventsWithoutAccess" })}
       </MenuItem>
       <MenuItem onClick={handleLogout}>
         {intl.formatMessage({ id: "navigation.logout" })}

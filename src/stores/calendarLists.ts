@@ -26,6 +26,7 @@ import {
   addEventToCalendarList as addEventToCalList,
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
+  updateEventRefViewKey as updateEventRefViewKeyOnList,
   createCalendar,
 } from "../common/calendarList";
 import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
@@ -95,6 +96,12 @@ interface CalendarListsState {
     targetCalendarId: string,
     eventCoordinate: string,
     eventRef: string[],
+  ) => Promise<void>;
+  updateEventRefViewKey: (
+    calendarId: string,
+    eventCoordinate: string,
+    newViewKey: string,
+    relayUrl?: string,
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
   getAllEventIds: () => string[];
@@ -377,6 +384,37 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
         return { calendars: updated };
       });
     }
+  },
+
+  /**
+   * Replaces the stored view key of an event reference in a calendar and
+   * republishes the list. Used by key rotation (author updating their own
+   * ref) and access updates (recipient applying a rotated key). No-op if the
+   * calendar or the ref is not found.
+   */
+  updateEventRefViewKey: async (
+    calendarId,
+    eventCoordinate,
+    newViewKey,
+    relayUrl,
+  ) => {
+    const calendar = get().calendars.find((c) => c.id === calendarId);
+    if (!calendar) return;
+
+    const updated = await updateEventRefViewKeyOnList(
+      calendar,
+      eventCoordinate,
+      newViewKey,
+      relayUrl,
+    );
+
+    set((state) => {
+      const calendars = state.calendars.map((c) =>
+        c.id === calendarId ? updated : c,
+      );
+      saveCalendarsToStorage(calendars);
+      return { calendars };
+    });
   },
 
   /**
