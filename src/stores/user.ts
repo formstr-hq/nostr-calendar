@@ -13,6 +13,7 @@ import { cancelAllNotifications } from "../utils/notifications";
 import { defaultRelays, fetchRelayList } from "../common/nostr";
 import { useRelayStore } from "./relays";
 import { useCalendarLists } from "./calendarLists";
+import { useInaccessibleEvents } from "./inaccessibleEvents";
 import { useInvitations } from "./invitations";
 import { useBookingRequests } from "./bookingRequests";
 import { useSchedulingPages } from "./schedulingPages";
@@ -75,6 +76,7 @@ export const useUser = create<{
     await useCalendarLists.getState().clearCachedCalendars();
     logger.log("logout: cached calendars cleared");
     await useInvitations.getState().clearCachedInvitations();
+    await useInaccessibleEvents.getState().clearCached();
     await useBookingRequests.getState().clearCached();
     await useSchedulingPages.getState().clearCachedPages();
     // Clear background worker keys
@@ -121,6 +123,7 @@ const onUserChange = async () => {
       logger.log("onUserChange: loading cached calendars and invitations");
       useCalendarLists.getState().loadCachedCalendars();
       useTimeBasedEvents.getState().loadCachedEvents();
+      useInaccessibleEvents.getState().loadCached();
       logger.log("onUserChange: fetching relay list");
       const relays = await fetchRelayList(cachedUser.pubkey);
       const userRelays = relays.length > 0 ? relays : defaultRelays;

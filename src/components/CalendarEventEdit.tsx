@@ -19,6 +19,7 @@ import {
   useTheme,
   Checkbox,
   FormControlLabel,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
@@ -61,6 +62,7 @@ import { useUser } from "../stores/user";
 import {
   findCalendarForEvent,
   parseEventRef,
+  getRemovedParticipants,
 } from "../utils/calendarListTypes";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
@@ -449,6 +451,16 @@ export function CalendarEventEdit({
     user?.pubkey,
   );
   const displayParticipants = uniqueParticipants(eventDetails.participants);
+  // Removing a participant from a private event rotates the view key on save
+  // (so the removed person loses access). Warn the author when that will happen.
+  const removedParticipants =
+    mode === "edit" && initialEvent && isPrivate
+      ? getRemovedParticipants(
+          initialEvent.participants,
+          eventDetails.participants,
+          user?.pubkey ?? "",
+        )
+      : [];
   const [formInput, setFormInput] = useState("");
   const [formInputError, setFormInputError] = useState<string | null>(null);
 
@@ -1412,6 +1424,12 @@ export function CalendarEventEdit({
                 </Box>
               ))}
             </Box>
+          )}
+
+          {removedParticipants.length > 0 && (
+            <Alert severity="warning">
+              {intl.formatMessage({ id: "event.removeParticipantWarning" })}
+            </Alert>
           )}
         </Box>
       </Box>

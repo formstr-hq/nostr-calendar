@@ -37,6 +37,7 @@ const dictionary: NestedObject = {
       privateEventCaption:
         "Private events are only visible to you and the invited participants",
       relays: "Relays",
+      eventsWithoutAccess: "Events without access",
       goToWeek: "go to week",
     },
     filters: {
@@ -135,6 +136,8 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
+      removeParticipantWarning:
+        "Removing a participant rotates this event's key. The removed person loses access, and the remaining participants are re-invited with the new key.",
     },
     form: {
       attachments: "Forms",
@@ -275,6 +278,34 @@ const dictionary: NestedObject = {
       addedToCalendar: "Event added to your calendar",
       viewInCalendar: "View in Calendar",
       stayHere: "Stay Here",
+      accessUpdated:
+        "{participant} updated your access to this event. Update your calendar to see the latest version.",
+      noAccess:
+        "Invited by {participant}. You don't have access yet — please ask them to provide you access.",
+      updateMyCalendar: "Update my calendar",
+    },
+    rotateKey: {
+      action: "Rotate access key",
+      title: "Rotate access key",
+      warning:
+        "Rotating generates a new key and re-encrypts this event. Anyone who has the old key — including people you shared a link with — will lose access to it.",
+      shareQuestion: "Who should receive the new key?",
+      invitedOnly: "Invited participants",
+      invitedOnlyCount:
+        "{count, plural, one {# participant} other {# participants}}",
+      invitedAndResponders: "Invited participants and people who RSVP'd",
+      invitedAndRespondersCount:
+        "{count, plural, one {# person} other {# people}}",
+      rotate: "Rotate key",
+      rotating: "Rotating…",
+      error: "Could not rotate the key. Please try again.",
+    },
+    eventsWithoutAccess: {
+      title: "Events Without Access",
+      empty: "No events are missing access.",
+      invitedBy:
+        "{dTag} invited by {participant}. Please ask them to provide you access.",
+      remove: "Remove from my calendar",
     },
     login: {
       signInToFormstr: "Sign in to Formstr",

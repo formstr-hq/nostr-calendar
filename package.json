@@ -17,6 +17,7 @@
     "simulate-ios": "pnpm cap run ios",
     "build-ios": "pnpm cap build ios",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
@@ -65,6 +66,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.30.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",

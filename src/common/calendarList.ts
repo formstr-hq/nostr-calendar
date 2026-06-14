@@ -34,6 +34,7 @@ import type { ICalendarList } from "../utils/calendarListTypes";
 import {
   DEFAULT_CALENDAR_COLOR,
   DEFAULT_CALENDAR_TITLE,
+  replaceEventRefViewKey,
 } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "./nostrRuntime";
 
@@ -305,6 +306,48 @@ export async function removeEventFromCalendarList(
   const updated: ICalendarList = {
     ...calendarList,
     eventRefs: calendarList.eventRefs.filter((ref) => ref[0] !== eventRef[0]),
+    createdAt: Math.floor(Date.now() / 1000),
+  };
+
+  await publishCalendarList(updated);
+  return updated;
+}
+
+/**
+ * Replaces the view key (and optionally relay hint) of an event reference
+ * inside a calendar list, then republishes the list.
+ *
+ * Unlike {@link addEventToCalendarList}, this targets a ref that already
+ * exists by coordinate — the add/move helpers dedupe by coordinate and would
+ * treat a same-coordinate/new-key ref as a no-op, so key rotation and access
+ * updates need this dedicated path. If no ref matches the coordinate, the list
+ * is returned unchanged and nothing is published.
+ *
+ * @param calendarList - The calendar list to update
+ * @param eventCoordinate - Coordinate "{kind}:{authorPubkey}:{eventDTag}"
+ * @param newViewKey - The nsec-encoded view key to store
+ * @param relayUrl - Optional relay hint to update alongside the key
+ * @returns The updated (and published) calendar list, or the original if unchanged
+ */
+export async function updateEventRefViewKey(
+  calendarList: ICalendarList,
+  eventCoordinate: string,
+  newViewKey: string,
+  relayUrl?: string,
+): Promise<ICalendarList> {
+  const hasRef = calendarList.eventRefs.some(
+    (ref) => ref[0] === eventCoordinate,
+  );
+  if (!hasRef) return calendarList;
+
+  const updated: ICalendarList = {
+    ...calendarList,
+    eventRefs: replaceEventRefViewKey(
+      calendarList.eventRefs,
+      eventCoordinate,
+      newViewKey,
+      relayUrl,
+    ),
     createdAt: Math.floor(Date.now() / 1000),
   };
 
