@@ -83,14 +83,13 @@ class SignerManager {
               await this.fetchAndCacheUser(active.pubkey);
             }
             break;
-          case "android":
-            if (active.androidPackageName) {
-              await packageSigner.loginWithAndroidSigner({
-                packageName: active.androidPackageName,
-              });
-              await this.fetchAndCacheUser(active.pubkey);
-            }
+          case "android": {
+            // unlock() reconstructs AndroidSigner from stored pubkey/npub/packageName
+            // without calling plugin.getPublicKey(), so the signer app is not opened.
+            const unlocked = await packageSigner.unlock();
+            if (unlocked) await this.fetchAndCacheUser(active.pubkey);
             break;
+          }
           case "nip46":
             if (active.nip46) {
               await packageSigner.loginWithBunkerUri(active.nip46.uri, {
