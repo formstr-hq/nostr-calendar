@@ -105,118 +105,166 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
 
   return (
     <Box
-      padding={theme.spacing(2)}
       sx={{
         width: "100%",
-        maxHeight: "100vh",
-        overflowY: "auto",
-        overflowX: "hidden",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
         boxSizing: "border-box",
       }}
     >
-      <Box width="100%" justifyContent="end" display="flex">
-        {isMobile && (
-          <IconButton onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
-        )}
-      </Box>
-
-      <DatePicker onSelect={onClose} />
-
-      {/* Calendar list section */}
-      <Box mt={3}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={1}
-        >
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Typography variant="subtitle2" fontWeight={600}>
-              {intl.formatMessage({ id: "sidebar.calendars" })}
-            </Typography>
-            <Tooltip
-              title={intl.formatMessage({
-                id: "calendarManage.notificationsAppOnly",
-              })}
-              arrow
-            >
-              <InfoOutlinedIcon
-                sx={{ fontSize: 16, color: "text.secondary", cursor: "help" }}
-              />
-            </Tooltip>
-          </Box>
-          <IconButton size="small" onClick={handleCreateCalendar}>
-            <AddIcon fontSize="small" />
-          </IconButton>
+      {/* Scrollable content */}
+      <Box
+        padding={theme.spacing(2)}
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          boxSizing: "border-box",
+        }}
+      >
+        <Box width="100%" justifyContent="end" display="flex">
+          {isMobile && (
+            <IconButton onClick={onClose}>
+              <CloseIcon />
+            </IconButton>
+          )}
         </Box>
 
-        {calendars.map((calendar) => (
+        <DatePicker onSelect={onClose} />
+
+        {/* Calendar list section */}
+        <Box mt={3}>
           <Box
-            key={calendar.id}
             display="flex"
+            justifyContent="space-between"
             alignItems="center"
-            sx={{
-              py: 0.5,
-              "&:hover": { backgroundColor: "action.hover" },
-              borderRadius: 1,
-            }}
+            mb={1}
           >
-            <Checkbox
-              checked={calendar.isVisible}
-              onChange={() => toggleVisibility(calendar.id)}
-              size="small"
-              sx={{
-                color: calendar.color,
-                "&.Mui-checked": { color: calendar.color },
-                p: 0.5,
-              }}
-            />
+            <Box display="flex" alignItems="center" gap={0.5}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                {intl.formatMessage({ id: "sidebar.calendars" })}
+              </Typography>
+              <Tooltip
+                title={intl.formatMessage({
+                  id: "calendarManage.notificationsAppOnly",
+                })}
+                arrow
+              >
+                <InfoOutlinedIcon
+                  sx={{ fontSize: 16, color: "text.secondary", cursor: "help" }}
+                />
+              </Tooltip>
+            </Box>
+            <IconButton size="small" onClick={handleCreateCalendar}>
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          {calendars.map((calendar) => (
             <Box
+              key={calendar.id}
               display="flex"
               alignItems="center"
-              gap={1}
-              flex={1}
-              minWidth={0}
-              sx={{ cursor: "pointer", ml: 0.5 }}
-              onClick={() => handleEditCalendar(calendar)}
+              sx={{
+                py: 0.5,
+                "&:hover": { backgroundColor: "action.hover" },
+                borderRadius: 1,
+              }}
             >
-              <CircleIcon sx={{ fontSize: 10, color: calendar.color }} />
-              <Typography
-                variant="body2"
-                sx={{ wordBreak: "break-word", whiteSpace: "normal" }}
+              <Checkbox
+                checked={calendar.isVisible}
+                onChange={() => toggleVisibility(calendar.id)}
+                size="small"
+                sx={{
+                  color: calendar.color,
+                  "&.Mui-checked": { color: calendar.color },
+                  p: 0.5,
+                }}
+              />
+              <Box
+                display="flex"
+                alignItems="center"
+                gap={1}
+                flex={1}
+                minWidth={0}
+                sx={{ cursor: "pointer", ml: 0.5 }}
+                onClick={() => handleEditCalendar(calendar)}
               >
-                {calendar.title}
-              </Typography>
+                <CircleIcon sx={{ fontSize: 10, color: calendar.color }} />
+                <Typography
+                  variant="body2"
+                  sx={{ wordBreak: "break-word", whiteSpace: "normal" }}
+                >
+                  {calendar.title}
+                </Typography>
+              </Box>
             </Box>
-          </Box>
-        ))}
+          ))}
 
-        {calendars.length === 0 && (
-          <Box py={2} textAlign="center">
-            <Typography variant="body2" color="text.secondary">
-              {intl.formatMessage({ id: "sidebar.noCalendarsYet" })}
-            </Typography>
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={handleCreateCalendar}
-              sx={{ mt: 1 }}
-            >
-              {intl.formatMessage({ id: "sidebar.createCalendar" })}
-            </Button>
+          {calendars.length === 0 && (
+            <Box py={2} textAlign="center">
+              <Typography variant="body2" color="text.secondary">
+                {intl.formatMessage({ id: "sidebar.noCalendarsYet" })}
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleCreateCalendar}
+                sx={{ mt: 1 }}
+              >
+                {intl.formatMessage({ id: "sidebar.createCalendar" })}
+              </Button>
+            </Box>
+          )}
+        </Box>
+        {/* Disabling device calendars for now */}
+        {/* <DeviceCalendarsSection /> */}
+        {/* Scheduling section — only visible to logged-in users */}
+        {isInitialized && (
+          <Box mt={3}>
+            <SchedulingPagesList onNavigate={onClose} />
           </Box>
         )}
       </Box>
-      {/* Disabling device calendars for now */}
-      {/* <DeviceCalendarsSection /> */}
-      {/* Scheduling section — only visible to logged-in users */}
-      {isInitialized && (
-        <Box mt={3}>
-          <SchedulingPagesList onNavigate={onClose} />
+
+      {/* Fixed footer */}
+      <Box
+        pt={2}
+        pb={2}
+        sx={{ borderTop: "1px solid", borderColor: "divider" }}
+      >
+        <Box display="flex" gap={2} justifyContent="center">
+          <Typography
+            variant="caption"
+            component="a"
+            href="https://about.formstr.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: "text.secondary",
+              textDecoration: "none",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            {intl.formatMessage({ id: "sidebar.about" })}
+          </Typography>
+          <Typography
+            variant="caption"
+            component="a"
+            href="https://about.formstr.app/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: "text.secondary",
+              textDecoration: "none",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            {intl.formatMessage({ id: "sidebar.privacyPolicy" })}
+          </Typography>
         </Box>
-      )}
+      </Box>
 
       {manageDialogOpen && (
         <CalendarManageDialog

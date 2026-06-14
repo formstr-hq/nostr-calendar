@@ -37,6 +37,7 @@ const PRESET_COLORS = [
   "#616161", // Grey
   "#e67c73", // Pink
   "#33b679", // Teal
+  "#000000", // Black
 ];
 
 interface CalendarManageDialogProps {

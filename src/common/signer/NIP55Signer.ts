@@ -30,7 +30,11 @@ export function createNIP55Signer(
 
       // Get public key from signer
       const { npub } = await NostrSignerPlugin.getPublicKey();
-      cachedPubkey = nip19.decode(npub as NPub).data as string;
+
+      // Amber may return a hex pubkey instead of an npub bech32 string
+      cachedPubkey = npub.startsWith("npub1")
+        ? (nip19.decode(npub as NPub).data as string)
+        : npub;
       return cachedPubkey;
     },
 
