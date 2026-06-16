@@ -31,7 +31,7 @@ function Calendar() {
     ...invitations.filter((inv) => inv.event).map((inv) => inv.event!),
     ...visibleDeviceEvents,
   ];
-  console.log("ALL_EVENTS", allEvents)
+  console.log("ALL_EVENTS", allEvents);
   return (
     <Box p={2}>
       <CalendarHeader />

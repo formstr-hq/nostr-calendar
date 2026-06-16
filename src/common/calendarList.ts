@@ -94,10 +94,8 @@ export async function decryptCalendarList(
     throw new Error("Calendar list event has empty content");
   }
 
-  const signer = await signerManager.getSigner();
-
   // Self-decrypt: the event was encrypted with our own pubkey
-  const decryptedContent = await nip44Decrypt(event) as unknown;
+  const decryptedContent = (await nip44Decrypt(event)) as unknown;
 
   if (!Array.isArray(decryptedContent)) {
     throw new Error(
