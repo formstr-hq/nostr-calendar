@@ -16,6 +16,8 @@ const OFFLINE_EVENT_KIND_BLACKLIST = new Set<number>();
 const pendingEventsByPubkey = new Map<string, Map<string, Event>>();
 const scheduledFlushesByPubkey = new Map<string, Promise<void>>();
 const activeFlushesByPubkey = new Map<string, Promise<void>>();
+// In-memory mirror of what's persisted — avoids a read-before-write on every flush.
+const persistedEventsByPubkey = new Map<string, Map<string, Event>>();
 
 const cache: OfflineEventCache = isNative
   ? new NativeOfflineEventCache()
@@ -34,7 +36,9 @@ export const hydrateOfflineEvents = async (
   pubkey: string,
 ): Promise<Event[]> => {
   const record = await readOfflineEventCache(pubkey);
-  return record?.events.filter(isOfflineCacheableEvent) ?? [];
+  const events = record?.events.filter(isOfflineCacheableEvent) ?? [];
+  persistedEventsByPubkey.set(pubkey, new Map(events.map((e) => [e.id, e])));
+  return events;
 };
 
 export const persistOfflineEvent = async (
@@ -99,11 +103,16 @@ const flushPendingEvents = async (pubkey: string): Promise<void> => {
   );
   if (eventsToPersist.length === 0) return;
 
-  const current = await readOfflineEventCache(pubkey);
-  const events = current?.events.filter(isOfflineCacheableEvent) ?? [];
-  const eventsById = new Map(events.map((event) => [event.id, event]));
+  // Use in-memory mirror — avoids a blocking Preferences.get + JSON.parse on every flush.
+  const eventsById =
+    persistedEventsByPubkey.get(pubkey) ?? new Map<string, Event>();
+  if (!persistedEventsByPubkey.has(pubkey)) {
+    persistedEventsByPubkey.set(pubkey, eventsById);
+  }
 
+  const newlyAdded: string[] = [];
   for (const event of eventsToPersist) {
+    if (!eventsById.has(event.id)) newlyAdded.push(event.id);
     eventsById.set(event.id, event);
   }
 
@@ -120,6 +129,10 @@ const flushPendingEvents = async (pubkey: string): Promise<void> => {
       restoredEvents.set(event.id, event);
     }
     pendingEventsByPubkey.set(pubkey, restoredEvents);
+    // Revert mirror to pre-flush state for newly added events.
+    for (const id of newlyAdded) {
+      eventsById.delete(id);
+    }
     throw error;
   }
 };
@@ -128,5 +141,6 @@ export const clearOfflineCache = async (pubkey: string): Promise<void> => {
   await scheduledFlushesByPubkey.get(pubkey)?.catch(() => undefined);
   await activeFlushesByPubkey.get(pubkey)?.catch(() => undefined);
   pendingEventsByPubkey.delete(pubkey);
+  persistedEventsByPubkey.delete(pubkey);
   await cache.deleteRecord(pubkey);
 };
