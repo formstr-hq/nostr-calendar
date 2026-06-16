@@ -163,7 +163,7 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
         list.notificationPreference =
           list.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE;
         fetchedCalendars.push(list);
-
+        console.log("CALENDAR_LIST_UPDATED")
         // Merge with existing: replace if newer, add if new
         set((state) => {
           const existingIndex = state.calendars.findIndex(
@@ -191,6 +191,7 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       // This handles the case where the user has no calendars at all.
       () => {
         set(() => {
+          console.log("CALENDAR_LIST_EOSE")
           return {
             isLoaded: true,
           };
