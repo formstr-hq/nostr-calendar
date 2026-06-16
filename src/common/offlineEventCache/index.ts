@@ -13,8 +13,10 @@ export type { OfflineEventCache, OfflineEventCacheRecord };
 export { getOfflineCacheKey };
 
 const OFFLINE_EVENT_KIND_BLACKLIST = new Set<number>();
+const FLUSH_DEBOUNCE_MS = 3000;
+
 const pendingEventsByPubkey = new Map<string, Map<string, Event>>();
-const scheduledFlushesByPubkey = new Map<string, Promise<void>>();
+const flushTimersByPubkey = new Map<string, ReturnType<typeof setTimeout>>();
 const activeFlushesByPubkey = new Map<string, Promise<void>>();
 // In-memory mirror of what's persisted — avoids a read-before-write on every flush.
 const persistedEventsByPubkey = new Map<string, Map<string, Event>>();
@@ -41,56 +43,37 @@ export const hydrateOfflineEvents = async (
   return events;
 };
 
-export const persistOfflineEvent = async (
-  pubkey: string,
-  event: Event,
-): Promise<void> => {
+export const persistOfflineEvent = (pubkey: string, event: Event): void => {
   if (!isOfflineCacheableEvent(event)) return;
 
   const pendingEvents = pendingEventsByPubkey.get(pubkey) ?? new Map();
   pendingEvents.set(event.id, event);
   pendingEventsByPubkey.set(pubkey, pendingEvents);
 
-  await scheduleFlush(pubkey);
+  scheduleFlush(pubkey);
 };
 
-const scheduleFlush = (pubkey: string): Promise<void> => {
-  const scheduledFlush = scheduledFlushesByPubkey.get(pubkey);
-  if (scheduledFlush) return scheduledFlush;
+const scheduleFlush = (pubkey: string): void => {
+  const existing = flushTimersByPubkey.get(pubkey);
+  if (existing) clearTimeout(existing);
 
-  const flush = new Promise<void>((resolve, reject) => {
-    scheduleIdleTask(() => {
-      scheduledFlushesByPubkey.delete(pubkey);
-      const previousFlush =
-        activeFlushesByPubkey.get(pubkey) ?? Promise.resolve();
-      const activeFlush = previousFlush.then(() => flushPendingEvents(pubkey));
-      activeFlushesByPubkey.set(pubkey, activeFlush);
-
-      activeFlush.then(resolve, reject).finally(() => {
-        if (activeFlushesByPubkey.get(pubkey) === activeFlush) {
+  flushTimersByPubkey.set(
+    pubkey,
+    setTimeout(() => {
+      flushTimersByPubkey.delete(pubkey);
+      const previous = activeFlushesByPubkey.get(pubkey) ?? Promise.resolve();
+      const active = previous.then(() => flushPendingEvents(pubkey));
+      activeFlushesByPubkey.set(pubkey, active);
+      active.finally(() => {
+        if (activeFlushesByPubkey.get(pubkey) === active) {
           activeFlushesByPubkey.delete(pubkey);
         }
         if ((pendingEventsByPubkey.get(pubkey)?.size ?? 0) > 0) {
-          void scheduleFlush(pubkey);
+          scheduleFlush(pubkey);
         }
       });
-    });
-  });
-
-  scheduledFlushesByPubkey.set(pubkey, flush);
-  return flush;
-};
-
-const scheduleIdleTask = (callback: () => void): void => {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.requestIdleCallback === "function"
-  ) {
-    window.requestIdleCallback(callback, { timeout: 1000 });
-    return;
-  }
-
-  setTimeout(callback, 100);
+    }, FLUSH_DEBOUNCE_MS),
+  );
 };
 
 const flushPendingEvents = async (pubkey: string): Promise<void> => {
@@ -138,7 +121,11 @@ const flushPendingEvents = async (pubkey: string): Promise<void> => {
 };
 
 export const clearOfflineCache = async (pubkey: string): Promise<void> => {
-  await scheduledFlushesByPubkey.get(pubkey)?.catch(() => undefined);
+  const timer = flushTimersByPubkey.get(pubkey);
+  if (timer) {
+    clearTimeout(timer);
+    flushTimersByPubkey.delete(pubkey);
+  }
   await activeFlushesByPubkey.get(pubkey)?.catch(() => undefined);
   pendingEventsByPubkey.delete(pubkey);
   persistedEventsByPubkey.delete(pubkey);
