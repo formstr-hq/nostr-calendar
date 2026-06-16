@@ -28,8 +28,7 @@ import { useCalendarLists } from "./stores/calendarLists";
 import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-import { useSchedulingPages } from "./stores/schedulingPages";
-import { useBookingRequests } from "./stores/bookingRequests";
+
 import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
@@ -56,7 +55,9 @@ function Application() {
     null,
   );
   const navigate = useNavigate();
-  const events = useTimeBasedEvents((state) => state);
+  const fetchPrivateEvents = useTimeBasedEvents(
+    (state) => state.fetchPrivateEvents,
+  );
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -84,10 +85,16 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      void events.fetchPrivateEvents();
+      void fetchPrivateEvents();
       fetchInvitations();
     }
-  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+  }, [
+    user,
+    calendarsLoaded,
+    fetchPrivateEvents,
+    fetchInvitations,
+    isInitialized,
+  ]);
 
   // Refetch the user's own public busy lists whenever the visible month
   // changes, so add/remove operations merge with the latest remote state
@@ -112,17 +119,6 @@ function Application() {
   useEffect(() => {
     return () => stopInvitations();
   }, []);
-
-  // Fetch calendar lists, scheduling pages, and bookings when user is available.
-  // This must live in App.tsx (not Calendar.tsx) so it fires on every route.
-  useEffect(() => {
-    if (user) {
-      fetchCalendars();
-      useSchedulingPages.getState().fetchPages();
-      useBookingRequests.getState().fetchIncomingRequests();
-      useBookingRequests.getState().fetchOutgoingBookings();
-    }
-  }, [user, fetchCalendars]);
 
   useEffect(() => {
     return addNotificationClickListener((eventId) => {

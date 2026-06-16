@@ -100,13 +100,8 @@ export async function getUserPublicKey() {
   return pubKey;
 }
 
-export const ensureRelay = async (
-  url: string,
-  params?: { connectionTimeout?: number },
-): Promise<AbstractRelay> => {
+export const ensureRelay = async (url: string): Promise<AbstractRelay> => {
   const relay = new Relay(url);
-  if (params?.connectionTimeout)
-    relay.connectionTimeout = params.connectionTimeout;
   await relay.connect();
   return relay;
 };
@@ -647,7 +642,7 @@ export const fetchCalendarGiftWraps = (
   };
 
   // Use nostrRuntime for subscription management and deduplication
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: async (event: Event) => {
       try {
         const unWrappedEvent = await getDetailsFromGiftWrap(event);
@@ -728,12 +723,10 @@ export const fetchPrivateEventRSVPs = (
   handles.push(
     nostrRuntime.subscribe(
       privateRelayList,
-      [
-        {
-          kinds: [EventKinds.PrivateRSVPEvent],
-          "#a": [params.eventCoord],
-        },
-      ],
+      {
+        kinds: [EventKinds.PrivateRSVPEvent],
+        "#a": [params.eventCoord],
+      },
       {
         onEvent: (event: Event) => {
           try {
@@ -774,7 +767,7 @@ export const fetchPublicEventRSVPs = (
     kinds: [EventKinds.PublicRSVPEvent],
     "#a": [params.eventCoord],
   };
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       const record = parseRSVPTags(
         event.pubkey,
@@ -842,7 +835,7 @@ export function fetchPrivateCalendarEvents(
     ...(until && { until }),
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       onEvent(event);
     },
@@ -866,7 +859,7 @@ export const publishToRelays = (
   const publishPromises = relayList.map(async (url) => {
     let relay: AbstractRelay | null = null;
     try {
-      relay = await ensureRelay(url, { connectionTimeout: 5000 });
+      relay = await ensureRelay(url);
       const reason = await Promise.race<string>([
         relay.publish(event).then((r) => {
           onAcceptedRelays(url);
@@ -935,7 +928,7 @@ export const fetchCalendarEvents = (
     ...(until && { until }),
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: (event: Event) => {
       onEvent(event);
     },
@@ -1398,3 +1391,69 @@ export const getAllResponsesForForm = async (
   });
   return events;
 };
+
+export type ReportType =
+  | "nudity"
+  | "malware"
+  | "profanity"
+  | "illegal"
+  | "spam"
+  | "impersonation"
+  | "other";
+
+/**
+ * Publishes a NIP-56 report event (kind 1984) for a calendar event.
+ * Tags the author's pubkey and the addressable coordinate of the event.
+ */
+export async function publishReportEvent(params: {
+  authorPubkey: string;
+  eventCoordinate: string;
+  relayHint?: string;
+  reportType: ReportType;
+  content?: string;
+}): Promise<Event> {
+  const userPublicKey = await getUserPublicKey();
+  const tags: string[][] = [
+    ["p", params.authorPubkey, params.reportType],
+    params.relayHint
+      ? ["a", params.eventCoordinate, params.relayHint, params.reportType]
+      : ["a", params.eventCoordinate, params.reportType],
+  ];
+
+  const unsigned: UnsignedEvent = {
+    pubkey: userPublicKey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: EventKinds.ReportEvent,
+    content: params.content ?? "",
+    tags,
+  };
+
+  const signer = await signerManager.getSigner();
+  const signed = await signer.signEvent(unsigned);
+  signed.id = getEventHash(unsigned);
+
+  await publishToRelays(signed);
+  nostrRuntime.addEvent(signed);
+
+  return signed;
+}
+
+/**
+ * Fetches the current user's NIP-56 report events (kind 1984) filtered
+ * by a list of calendar event coordinates. Used to suppress already-reported
+ * invitations on load.
+ */
+export async function fetchUserReports(
+  userPubkey: string,
+  eventCoordinates: string[],
+): Promise<string[]> {
+  if (eventCoordinates.length === 0) return [];
+  const events = await nostrRuntime.querySync(getRelays(), {
+    kinds: [EventKinds.ReportEvent],
+    authors: [userPubkey],
+    "#a": eventCoordinates,
+  });
+  return events.flatMap((event) =>
+    event.tags.filter((t) => t[0] === "a" && t[1]).map((t) => t[1]),
+  );
+}

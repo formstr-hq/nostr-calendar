@@ -205,7 +205,7 @@ export function fetchCalendarLists(
     authors: [userPubkey],
   };
 
-  return nostrRuntime.subscribe(relayList, [filter], {
+  return nostrRuntime.subscribe(relayList, filter, {
     onEvent: async (event: Event) => {
       // Guard: the subscription filter should ensure this, but relays or the
       // local event-store broadcast can occasionally deliver wrong-kind events

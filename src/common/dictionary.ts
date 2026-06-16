@@ -223,6 +223,8 @@ const dictionary: NestedObject = {
       createCalendar: "Create Calendar",
       about: "About",
       privacyPolicy: "Privacy Policy",
+      contactUs: "Contact Us",
+      thankYouMessage: "Thank you for contacting us!",
     },
     deviceCalendar: {
       title: "Device calendars",
@@ -277,7 +279,7 @@ const dictionary: NestedObject = {
       stayHere: "Stay Here",
     },
     login: {
-      signInToFormstr: "Sign in to Formstr",
+      signInToFormstr: "Sign in to Calendar",
       chooseLoginMethod: "Choose your preferred login method",
       signInWithExtension: "Sign in with Nostr Extension (NIP-07)",
       signInWithNsec: "Sign in with nsec",
@@ -324,6 +326,23 @@ const dictionary: NestedObject = {
       author: "Organiser",
       alreadyAdded: "Participant already added",
       invalid: "Enter a valid npub, NIP-05, or hex pubkey",
+    },
+    report: {
+      reportEvent: "Report this event",
+      title: "Report Event",
+      description:
+        "You are about to report this event. Reports are published publicly and may be used for moderation purposes for other users. This event will be hidden from your invitations.",
+      selectType: "Select a reason",
+      nudity: "Nudity / Explicit content",
+      malware: "Malware",
+      profanity: "Profanity / Hateful speech",
+      illegal: "Illegal content",
+      spam: "Spam",
+      impersonation: "Impersonation",
+      other: "Other",
+      submit: "Submit Report",
+      cancel: "Cancel",
+      submitting: "Submitting...",
     },
     scheduling: {
       featureDescription:
@@ -635,6 +654,8 @@ const dictionary: NestedObject = {
       createCalendar: "Kalender erstellen",
       about: "Über uns",
       privacyPolicy: "Datenschutzrichtlinie",
+      contactUs: "Kontakt",
+      thankYouMessage: "Vielen Dank für Ihre Kontaktaufnahme!",
     },
     deviceCalendar: {
       title: "Gerätekalender",
@@ -693,7 +714,7 @@ const dictionary: NestedObject = {
       stayHere: "Hier bleiben",
     },
     login: {
-      signInToFormstr: "Bei Formstr anmelden",
+      signInToFormstr: "Bei Calendar anmelden",
       chooseLoginMethod: "Wählen Sie Ihre bevorzugte Anmeldemethode",
       signInWithExtension: "Mit Nostr-Erweiterung anmelden (NIP-07)",
       signInWithNsec: "Mit nsec anmelden",
@@ -740,6 +761,23 @@ const dictionary: NestedObject = {
       author: "Organisator",
       alreadyAdded: "Teilnehmer bereits hinzugefügt",
       invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
+    },
+    report: {
+      reportEvent: "Dieses Ereignis melden",
+      title: "Ereignis melden",
+      description:
+        "Sie sind dabei, dieses Ereignis zu melden. Meldungen werden öffentlich veröffentlicht und können zu Moderationszwecken für andere Nutzer verwendet werden. Dieses Ereignis wird aus Ihren Einladungen ausgeblendet.",
+      selectType: "Grund auswählen",
+      nudity: "Nacktheit / Explizite Inhalte",
+      malware: "Schadsoftware",
+      profanity: "Obszönität / Hassrede",
+      illegal: "Illegale Inhalte",
+      spam: "Spam",
+      impersonation: "Identitätsbetrug",
+      other: "Sonstiges",
+      submit: "Meldung absenden",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet...",
     },
     scheduling: {
       featureDescription:

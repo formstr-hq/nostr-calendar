@@ -41,4 +41,7 @@ export enum EventKinds {
   // Formstr / NIP-101
   FormTemplate = 30168,
   FormResponse = 1069,
+
+  // NIP-56 Reporting
+  ReportEvent = 1984,
 }

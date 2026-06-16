@@ -36,6 +36,8 @@ import { useIntl } from "react-intl";
 import { useTimeBasedEvents } from "../stores/events";
 import { useUser } from "../stores/user";
 import { SchedulingPagesList } from "./SchedulingPagesList";
+import { useAppointmentData } from "../hooks/useAppointmentData";
+import { ContactFormDialog } from "./ContactFormDialog";
 
 interface CalendarSidebarProps {
   onClose: () => void;
@@ -46,6 +48,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { isInitialized } = useUser();
+  useAppointmentData();
   const {
     calendars,
     toggleVisibility,
@@ -58,6 +61,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
   const [editingCalendar, setEditingCalendar] = useState<
     ICalendarList | undefined
   >();
+  const [contactFormOpen, setContactFormOpen] = useState(false);
 
   const handleCreateCalendar = () => {
     setEditingCalendar(undefined);
@@ -232,9 +236,15 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
       <Box
         pt={2}
         pb={2}
+        padding={2}
         sx={{ borderTop: "1px solid", borderColor: "divider" }}
       >
-        <Box display="flex" gap={2} justifyContent="center">
+        <Box
+          display="flex"
+          gap={2}
+          justifyContent="space-between"
+          flexWrap="wrap"
+        >
           <Typography
             variant="caption"
             component="a"
@@ -263,6 +273,19 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           >
             {intl.formatMessage({ id: "sidebar.privacyPolicy" })}
           </Typography>
+          <Typography
+            variant="caption"
+            component="span"
+            onClick={() => setContactFormOpen(true)}
+            sx={{
+              color: "text.secondary",
+              textDecoration: "none",
+              cursor: "pointer",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            {intl.formatMessage({ id: "sidebar.contactUs" })}
+          </Typography>
         </Box>
       </Box>
 
@@ -275,6 +298,11 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           onDelete={editingCalendar ? handleDelete : undefined}
         />
       )}
+
+      <ContactFormDialog
+        open={contactFormOpen}
+        onClose={() => setContactFormOpen(false)}
+      />
     </Box>
   );
 }

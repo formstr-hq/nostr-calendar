@@ -29,7 +29,7 @@ import { EventKinds } from "../EventConfigs";
  * // Subscribe to events (network + cache)
  * const handle = nostrRuntime.subscribe(
  *   ['wss://relay.example.com'],
- *   [{ kinds: [1], limit: 100 }],
+ *   { kinds: [1], limit: 100 },
  *   {
  *     onEvent: (event) => console.log('New event:', event),
  *     onEose: () => console.log('Subscription ready'),
@@ -84,55 +84,45 @@ export class NostrRuntime {
    * - Automatically manages reference counting and cleanup
    *
    * @param relays - Array of relay URLs
-   * @param filters - Array of Nostr filters
+   * @param filter - Nostr filter
    * @param options - Subscription options
    * @returns SubscriptionHandle with unsubscribe function
    */
   subscribe(
     relays: string[],
-    filters: Filter[],
+    filter: Filter,
     options?: SubscribeOptions,
   ): SubscriptionHandle {
     const { onEvent, onEose, localOnly } = options || {};
 
-    // If localOnly, just query cache and return
     if (localOnly) {
       if (onEvent) {
-        // Query cache for each filter
-        for (const filter of filters) {
-          const events = this.eventStore.query(filter);
-          for (const event of events) {
-            onEvent(event);
-          }
+        const events = this.eventStore.query(filter);
+        for (const event of events) {
+          onEvent(event);
         }
       }
 
-      // Call onEose immediately
       if (onEose) {
         onEose();
       }
 
-      // Return dummy handle
       return {
         id: "local-only",
-        unsubscribe: () => {}, // No-op
+        unsubscribe: () => {},
       };
     }
 
-    // First, deliver cached events immediately
     if (onEvent) {
-      for (const filter of filters) {
-        const cachedEvents = this.eventStore.query(filter);
-        for (const event of cachedEvents) {
-          onEvent(event);
-        }
+      const cachedEvents = this.eventStore.query(filter);
+      for (const event of cachedEvents) {
+        onEvent(event);
       }
     }
 
-    // Then create network subscription
     const { id, unsubscribe } = this.subscriptionManager.subscribe(
       relays,
-      filters,
+      filter,
       onEvent,
       onEose,
     );
@@ -181,7 +171,7 @@ export class NostrRuntime {
     return new Promise((resolve) => {
       const handle = this.subscriptionManager.subscribe(
         relays,
-        [filter],
+        filter,
         (event) => {
           if (!seen.has(event.id)) {
             seen.add(event.id);
@@ -398,4 +388,5 @@ export * from "./types";
 export { EventStore } from "./EventStore";
 export { SubscriptionManager } from "./SubscriptionManager";
 
-export const nostrRuntime = createNostrRuntime(new SimplePool());
+export const pool = new SimplePool();
+export const nostrRuntime = createNostrRuntime(pool);

@@ -32,19 +32,15 @@ export function normalizeFilter(filter: Filter): Filter {
  * Generate a unique hash for a set of filters and relays
  * Used for subscription deduplication
  */
-export function generateFilterHash(
-  filters: Filter[],
-  relays: string[],
-): string {
-  // Normalize all filters
-  const normalizedFilters = filters.map(normalizeFilter);
+export function generateFilterHash(filter: Filter, relays: string[]): string {
+  const normalizedFilter = normalizeFilter(filter);
 
   // Sort relays
   const sortedRelays = [...relays].sort();
 
   // Create deterministic string representation
   const hashInput = JSON.stringify({
-    filters: normalizedFilters,
+    filter: normalizedFilter,
     relays: sortedRelays,
   });
 
