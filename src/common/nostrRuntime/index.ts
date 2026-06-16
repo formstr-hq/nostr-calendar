@@ -8,6 +8,11 @@ import {
   SubscriptionDebugInfo,
 } from "./types";
 import { EventKinds } from "../EventConfigs";
+import {
+  clearOfflineCache,
+  hydrateOfflineEvents,
+  persistOfflineEvent,
+} from "../offlineEventCache";
 
 /**
  * NostrRuntime - Centralized Nostr subscription and event storage
@@ -43,10 +48,20 @@ import { EventKinds } from "../EventConfigs";
 export class NostrRuntime {
   public eventStore: EventStore;
   private subscriptionManager: SubscriptionManager;
+  private offlineCachePubkey: string | null = null;
 
   constructor(pool: SimplePool) {
     this.eventStore = new EventStore();
-    this.subscriptionManager = new SubscriptionManager(pool, this.eventStore);
+    this.subscriptionManager = new SubscriptionManager(
+      pool,
+      this.eventStore,
+      (event) => this.persistAcceptedEvent(event),
+    );
+  }
+
+  private persistAcceptedEvent(event: Event): void {
+    if (!this.offlineCachePubkey) return;
+    void persistOfflineEvent(this.offlineCachePubkey, event);
   }
 
   /**
@@ -139,7 +154,24 @@ export class NostrRuntime {
    * @returns true if event was added, false if rejected/duplicate
    */
   addEvent(event: Event): boolean {
-    return this.eventStore.addEvent(event);
+    const added = this.eventStore.addEvent(event);
+    if (added) {
+      this.persistAcceptedEvent(event);
+    }
+    return added;
+  }
+
+  async hydrateOfflineEvents(pubkey: string): Promise<number> {
+    this.offlineCachePubkey = pubkey;
+    const cachedEvents = await hydrateOfflineEvents(pubkey);
+    return this.addEvents(cachedEvents, { persist: false });
+  }
+
+  async clearOfflineCache(pubkey: string): Promise<void> {
+    if (this.offlineCachePubkey === pubkey) {
+      this.offlineCachePubkey = null;
+    }
+    await clearOfflineCache(pubkey);
   }
 
   /**
@@ -266,11 +298,18 @@ export class NostrRuntime {
    * @param events - Events to add
    * @returns Number of events successfully added
    */
-  addEvents(events: Event[]): number {
+  addEvents(
+    events: Event[],
+    { persist = true }: { persist?: boolean } = {},
+  ): number {
     let addedCount = 0;
     for (const event of events) {
-      if (this.eventStore.addEvent(event)) {
+      const added = this.eventStore.addEvent(event);
+      if (added) {
         addedCount++;
+        if (persist) {
+          this.persistAcceptedEvent(event);
+        }
       }
     }
     return addedCount;
@@ -312,6 +351,10 @@ export class NostrRuntime {
      */
     getEventsByKind: (kind: number): Event[] => {
       return this.eventStore.getEventsByKind(kind);
+    },
+
+    getAllEvents: (): Event[] => {
+      return this.eventStore.getAllEvents();
     },
 
     /**

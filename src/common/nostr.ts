@@ -441,6 +441,8 @@ export async function publishPrivateCalendarEvent(
     { waitForAll, onRelayComplete },
   );
 
+  nostrRuntime.addEvent(signedEvent);
+
   // Gift-wrap the event keys to each participant (including the creator).
   // These serve as invitations — recipients will see them as notifications
   // and can accept them into their own calendars.
@@ -522,6 +524,10 @@ export async function editPrivateCalendarEvent(
     undefined,
     { waitForAll: true, onRelayComplete },
   );
+
+  // Add to local EventStore + offline cache immediately so the edited event
+  // is available offline without waiting for the relay echo.
+  nostrRuntime.addEvent(signedEvent);
 
   // Send gift wraps to participants that weren't in the previous version.
   const previousSet = new Set(previousParticipants);

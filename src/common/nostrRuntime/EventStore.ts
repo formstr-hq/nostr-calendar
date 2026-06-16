@@ -99,8 +99,8 @@ export class EventStore {
       if (existingEventId) {
         const existingEvent = this.eventsById.get(existingEventId);
         if (existingEvent && !shouldReplaceEvent(event, existingEvent)) {
-          // Existing event is newer, don't add but return true
-          return true;
+          // Existing event is newer, don't add or re-notify listeners.
+          return false;
         }
 
         // Remove old event
@@ -115,7 +115,7 @@ export class EventStore {
 
     // Check for exact duplicate
     if (this.eventsById.has(event.id)) {
-      return true;
+      return false;
     }
 
     // Add to primary store
@@ -259,6 +259,28 @@ export class EventStore {
    */
   getById(id: string): Event | undefined {
     return this.eventsById.get(id);
+  }
+
+  /**
+   * Return all currently retained raw events.
+   */
+  getAllEvents(): Event[] {
+    return Array.from(this.eventsById.values()).sort(
+      (a, b) => b.created_at - a.created_at,
+    );
+  }
+
+  /**
+   * Add many raw events without requiring callers to know store internals.
+   */
+  addEvents(events: Event[]): number {
+    let addedCount = 0;
+    for (const event of events) {
+      if (this.addEvent(event)) {
+        addedCount++;
+      }
+    }
+    return addedCount;
   }
 
   /**

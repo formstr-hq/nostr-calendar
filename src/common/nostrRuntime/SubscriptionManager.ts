@@ -21,10 +21,24 @@ export class SubscriptionManager {
   private subscriptions: Map<string, ManagedSubscription> = new Map();
   private pool: SimplePool;
   private eventStore: EventStore;
+  private onStoredEvent?: EventCallback;
 
-  constructor(pool: SimplePool, eventStore: EventStore) {
+  constructor(
+    pool: SimplePool,
+    eventStore: EventStore,
+    onStoredEvent?: EventCallback,
+  ) {
     this.pool = pool;
     this.eventStore = eventStore;
+    this.onStoredEvent = onStoredEvent;
+  }
+
+  private handleStoredEvent(event: Parameters<EventCallback>[0]): boolean {
+    const added = this.eventStore.addEvent(event);
+    if (added) {
+      this.onStoredEvent?.(event);
+    }
+    return added;
   }
 
   /**
@@ -81,7 +95,7 @@ export class SubscriptionManager {
       for (const chunk of chunks) {
         const closer = this.pool.subscribeMany(relays, chunk, {
           onevent: (event) => {
-            const added = this.eventStore.addEvent(event);
+            const added = this.handleStoredEvent(event);
             if (added) {
               for (const callback of Array.from(managedSub.callbacks)) {
                 callback(event);
@@ -104,7 +118,7 @@ export class SubscriptionManager {
     } else {
       managedSub.closer = this.pool.subscribeMany(relays, filter, {
         onevent: (event) => {
-          const added = this.eventStore.addEvent(event);
+          const added = this.handleStoredEvent(event);
           if (added) {
             for (const callback of Array.from(managedSub.callbacks)) {
               callback(event);
