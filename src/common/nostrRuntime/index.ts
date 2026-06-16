@@ -431,4 +431,5 @@ export * from "./types";
 export { EventStore } from "./EventStore";
 export { SubscriptionManager } from "./SubscriptionManager";
 
-export const nostrRuntime = createNostrRuntime(new SimplePool());
+export const pool = new SimplePool();
+export const nostrRuntime = createNostrRuntime(pool);

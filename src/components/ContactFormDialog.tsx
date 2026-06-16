@@ -132,10 +132,10 @@ export function ContactFormDialog({ open, onClose }: Props) {
 
     signerManager.getSigner().then((signer) => {
       const formsSigner: FormsSigner = {
-        signEvent: signer.signEvent,
-        getPublicKey: signer.getPublicKey,
-        nip44Decrypt: signer.nip44Decrypt!,
-        nip44Encrypt: signer.nip44Encrypt!,
+        signEvent: signer.signEvent.bind(signer),
+        getPublicKey: signer.getPublicKey.bind(signer),
+        nip44Decrypt: signer.nip44Decrypt!.bind(signer),
+        nip44Encrypt: signer.nip44Encrypt!.bind(signer),
       };
 
       sdk.attachSubmitListener(form as never, formsSigner, {
