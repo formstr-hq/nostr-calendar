@@ -9,7 +9,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import React from "react";
+import React, { useState } from "react";
 import { useIntl } from "react-intl";
 
 type ReminderUnit = "minutes" | "hours" | "days";
@@ -46,6 +46,12 @@ export function NotificationPreferenceEditor({
   onChange,
 }: NotificationPreferenceEditorProps) {
   const intl = useIntl();
+  const [unitOverrides, setUnitOverrides] = useState<
+    Record<number, ReminderUnit>
+  >({});
+
+  const getSelectedUnit = (index: number, offset: number): ReminderUnit =>
+    unitOverrides[index] ?? getDisplayUnit(offset);
 
   const updateOffset = (index: number, offsetMinutes: number) => {
     onChange(
@@ -74,7 +80,9 @@ export function NotificationPreferenceEditor({
   };
 
   const handleUnitChange = (index: number, unit: ReminderUnit) => {
-    const currentUnit = getDisplayUnit(offsets[index]);
+    setUnitOverrides((current) => ({ ...current, [index]: unit }));
+
+    const currentUnit = getSelectedUnit(index, offsets[index]);
     const displayValue = Number.parseInt(
       getDisplayValue(offsets[index], currentUnit),
       10,
@@ -88,10 +96,26 @@ export function NotificationPreferenceEditor({
 
   const addOffset = () => {
     onChange([...offsets, 0]);
+    setUnitOverrides((current) => ({
+      ...current,
+      [offsets.length]: "minutes",
+    }));
   };
 
   const removeOffset = (index: number) => {
     onChange(offsets.filter((_, currentIndex) => currentIndex !== index));
+    setUnitOverrides((current) => {
+      const next: Record<number, ReminderUnit> = {};
+      Object.entries(current).forEach(([key, unit]) => {
+        const currentIndex = Number.parseInt(key, 10);
+        if (currentIndex < index) {
+          next[currentIndex] = unit;
+        } else if (currentIndex > index) {
+          next[currentIndex - 1] = unit;
+        }
+      });
+      return next;
+    });
   };
 
   return (
@@ -109,7 +133,7 @@ export function NotificationPreferenceEditor({
         </Typography>
       ) : (
         offsets.map((offset, index) => {
-          const unit = getDisplayUnit(offset);
+          const unit = getSelectedUnit(index, offset);
 
           return (
             <Box

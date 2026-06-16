@@ -162,6 +162,7 @@ function Application() {
           setSecureItem(BG_KEY_LAST_INVITATION_FETCH_TIME, now);
           setSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME, now);
           setSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME, now);
+          useTimeBasedEvents.getState().refreshEventNotifications();
         }
       });
       cleanup = () => {
