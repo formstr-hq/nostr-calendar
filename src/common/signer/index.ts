@@ -77,25 +77,26 @@ class SignerManager {
 
     if (active) {
       try {
+        this.restoreCachedUser(active.pubkey);
         switch (active.method) {
           case "extension":
             if (await this.waitForWindowNostr()) {
               await packageSigner.loginWithExtension();
-              await this.fetchAndCacheUser(active.pubkey);
+              this.refreshUserProfile(active.pubkey);
             }
             break;
           case "android": {
             // unlock() reconstructs AndroidSigner from stored pubkey/npub/packageName
             // without calling plugin.getPublicKey(), so the signer app is not opened.
             const unlocked = await packageSigner.unlock();
-            if (unlocked) await this.fetchAndCacheUser(active.pubkey);
+            if (unlocked) this.refreshUserProfile(active.pubkey);
             break;
           }
           case "nip46": {
             // unlock() reuses the stored clientSecretKey to reconnect without
             // re-sending a connect request, so the bunker won't prompt again.
             const unlocked = await packageSigner.unlock({ pool });
-            if (unlocked) await this.fetchAndCacheUser(active.pubkey);
+            if (unlocked) this.refreshUserProfile(active.pubkey);
             break;
           }
           case "ncryptsec":
@@ -140,7 +141,10 @@ class SignerManager {
       const nsec = await getNsec();
       if (nsec) {
         try {
-          await this.loginWithNsec(nsec);
+          this.localSigner = new LocalSigner(this.decodeNsec(nsec));
+          const pubkey = await this.localSigner.getPublicKey();
+          this.restoreCachedUser(pubkey);
+          this.refreshUserProfile(pubkey);
           localStorage.removeItem(LEGACY_KEYS_KEY);
           return;
         } catch (e) {
@@ -216,6 +220,40 @@ class SignerManager {
       };
       this.user = userData;
       return userData;
+    }
+  }
+
+  private restoreCachedUser(pubkey: string): void {
+    const cachedData = localStorage.getItem(USER_CACHE_KEY);
+    if (cachedData) {
+      try {
+        const cachedUser = JSON.parse(cachedData) as IUser;
+        if (cachedUser.pubkey === pubkey) {
+          this.user = cachedUser;
+          return;
+        }
+        // eslint-disable-next-line no-empty
+      } catch {}
+    }
+
+    this.user = {
+      pubkey,
+      name: ANONYMOUS_USER_NAME,
+      picture: DEFAULT_IMAGE_URL,
+    };
+  }
+
+  private refreshUserProfile(pubkey: string): void {
+    void this.fetchAndCacheUser(pubkey).then(() => this.notify());
+  }
+
+  private decodeNsec(nsec: string): Uint8Array {
+    try {
+      const decoded = nip19.decode(nsec);
+      if (decoded.type !== "nsec") throw new Error("Invalid nsec");
+      return decoded.data as Uint8Array;
+    } catch {
+      throw new Error("Invalid nsec");
     }
   }
 
@@ -296,16 +334,7 @@ class SignerManager {
   async loginWithNsec(nsec: string): Promise<void> {
     if (!isNative) throw new Error("NSEC login only allowed on native");
 
-    let privkeyBytes: Uint8Array;
-    try {
-      const decoded = nip19.decode(nsec);
-      if (decoded.type !== "nsec") throw new Error("Invalid nsec");
-      privkeyBytes = decoded.data as Uint8Array;
-    } catch {
-      throw new Error("Invalid nsec");
-    }
-
-    this.localSigner = new LocalSigner(privkeyBytes);
+    this.localSigner = new LocalSigner(this.decodeNsec(nsec));
     const pubkey = await this.localSigner.getPublicKey();
     await this.fetchAndCacheUser(pubkey);
     await saveNsec(nsec);
