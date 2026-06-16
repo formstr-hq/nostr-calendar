@@ -95,6 +95,7 @@ function Application() {
     fetchPrivateEvents,
     fetchInvitations,
     isInitialized,
+    calendars.length
   ]);
 
   // Refetch the user's own public busy lists whenever the visible month
