@@ -36,6 +36,7 @@ import {
   DEFAULT_CALENDAR_TITLE,
 } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "./nostrRuntime";
+import { nip44Decrypt } from "./nip59";
 
 /**
  * Encrypts a calendar list's content tags using self-encryption (NIP-44).
@@ -93,21 +94,15 @@ export async function decryptCalendarList(
     throw new Error("Calendar list event has empty content");
   }
 
-  const signer = await signerManager.getSigner();
-
   // Self-decrypt: the event was encrypted with our own pubkey
-  const decryptedContent = await signer.nip44Decrypt!(
-    event.pubkey,
-    event.content,
-  );
+  const decryptedContent = (await nip44Decrypt(event)) as unknown;
 
-  const parsed = JSON.parse(decryptedContent) as unknown;
-  if (!Array.isArray(parsed)) {
+  if (!Array.isArray(decryptedContent)) {
     throw new Error(
-      `Calendar list payload is not a tags array (got ${typeof parsed})`,
+      `Calendar list payload is not a tags array (got ${typeof decryptedContent})`,
     );
   }
-  const tags = parsed as string[][];
+  const tags = decryptedContent as string[][];
 
   let title = DEFAULT_CALENDAR_TITLE;
   let description = "";

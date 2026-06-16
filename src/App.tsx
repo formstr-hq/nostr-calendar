@@ -85,6 +85,7 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
+      console.log("STARTING_FETCH", calendars);
       void fetchPrivateEvents();
       fetchInvitations();
     }
@@ -94,6 +95,7 @@ function Application() {
     fetchPrivateEvents,
     fetchInvitations,
     isInitialized,
+    calendars.length,
   ]);
 
   // Refetch the user's own public busy lists whenever the visible month
