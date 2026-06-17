@@ -53,7 +53,7 @@ function subscribeBookingRequests(
     "#p": [pubkey],
     limit: 50,
   };
-  return nostrRuntime.subscribe(relayList, [filter], { onEvent, onEose });
+  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
 }
 
 function subscribeBookingResponses(
@@ -67,7 +67,7 @@ function subscribeBookingResponses(
     "#p": [pubkey],
     limit: 50,
   };
-  return nostrRuntime.subscribe(relayList, [filter], { onEvent, onEose });
+  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
 }
 
 async function unwrapBookingRequest(giftWrap: Event): Promise<{
@@ -78,6 +78,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
   title: string;
   note: string;
   dTag: string;
+  viewKey?: string;
 }> {
   const rumor = await nip59.unwrapEvent(giftWrap);
   const getTag = (name: string) =>
@@ -90,6 +91,7 @@ async function unwrapBookingRequest(giftWrap: Event): Promise<{
     title: getTag("title"),
     note: getTag("note"),
     dTag: getTag("d"),
+    viewKey: getTag("viewKey") || undefined,
   };
 }
 
@@ -255,6 +257,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             title: details.title,
             note: details.note,
             dTag: details.dTag,
+            viewKey: details.viewKey,
             receivedAt: giftWrap.created_at * 1000,
             status: "pending",
           };
@@ -357,7 +360,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   approveRequest: async (requestId, calendarId) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
-
+    const pubkey = await getUserPublicKey();
     // Create a private calendar event for this appointment
     // using the booker's pre-generated d-tag so the event
     // auto-appears in the booker's calendar list.
@@ -369,7 +372,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       begin: request.start,
       end: request.end,
       kind: 0,
-      user: "",
+      calendarId,
+      user: pubkey,
       participants: [request.bookerPubkey],
       categories: [],
       reference: [],
@@ -383,26 +387,21 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       image: undefined,
     };
 
-    // Pass the booker's d-tag so the published event uses it.
-    // publishPrivateCalendarEvent already sends invitation gift wraps
-    // with viewKey to all participants (including booker), so the
-    // booker's calendar will pick it up automatically.
-    const { eventRef, authorPubkey, viewKey } = await publishPrivateCalendarEvent(
-      event,
-      {
+    // Use the booker's pre-generated d-tag and view key so the published
+    // event matches exactly what the booker already added to their calendar.
+    const { eventRef, authorPubkey, viewKey } =
+      await publishPrivateCalendarEvent(event, {
         existingDTag: request.dTag,
+        existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
-        waitForAll: false
-      }
-    );
+        waitForAll: false,
+      });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
     // approved booking shows up on the host's calendar without waiting
     // for a relay round-trip.
-    await useCalendarLists
-      .getState()
-      .addEventToCalendar(calendarId, eventRef);
+    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
     const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
@@ -456,11 +455,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       const incomingRequests = state.incomingRequests.map((r) =>
         r.id === requestId
           ? {
-            ...r,
-            status: "declined" as const,
-            respondedAt: Date.now(),
-            declineReason: reason,
-          }
+              ...r,
+              status: "declined" as const,
+              respondedAt: Date.now(),
+              declineReason: reason,
+            }
           : r,
       );
       const incomingUnreadCount = incomingRequests.filter(

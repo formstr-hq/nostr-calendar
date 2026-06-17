@@ -14,17 +14,26 @@ import { BookingNotifications } from "./BookingNotifications";
 export const Routing = () => {
   return (
     <Routes>
+      <Route path={ROUTES.EditEventPage} element={<EditEventPage />} />
+      <Route
+        path={ROUTES.DuplicateEventPage}
+        element={<DuplicateEventPage />}
+      />
       <Route path={ROUTES.EventPage} element={<ViewEventPage />} />
       <Route
-        path={ROUTES.SchedulingPagePublic}
-        element={<BookingPage />}
+        path="/notification-event/:eventId"
+        element={<NotificationEventPage />}
       />
-      <Route path={ROUTES.EditEventPage} element={<EditEventPage />} />
-      <Route path={ROUTES.DuplicateEventPage} element={<DuplicateEventPage />} />
-      <Route path="/notification-event/:eventId" element={<NotificationEventPage />} />
       <Route path={ROUTES.Notifications} element={<InvitationPanel />} />
-      <Route path={ROUTES.SchedulingPageEdit} element={<SchedulingPageEdit />} />
-      <Route path={ROUTES.SchedulingPageCreate} element={<SchedulingPageEdit />} />
+      <Route
+        path={ROUTES.SchedulingPageCreate}
+        element={<SchedulingPageEdit />}
+      />
+      <Route
+        path={ROUTES.SchedulingPageEdit}
+        element={<SchedulingPageEdit />}
+      />
+      <Route path={ROUTES.SchedulingPagePublic} element={<BookingPage />} />
       <Route path={ROUTES.Bookings} element={<BookingNotifications />} />
       <Route path={ROUTES.WeekCalendar} element={<Calendar />} />
       <Route path={ROUTES.MonthCalendar} element={<Calendar />} />

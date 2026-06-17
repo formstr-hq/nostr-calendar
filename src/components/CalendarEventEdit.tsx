@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -48,6 +48,8 @@ import LocationPinIcon from "@mui/icons-material/LocationPin";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import AssignmentIcon from "@mui/icons-material/Assignment";
 import { EventAttributeEditContainer } from "./StyledComponents";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
@@ -56,17 +58,38 @@ import { useRelayStore } from "../stores/relays";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
 import { useUser } from "../stores/user";
-import { parseEventRef } from "../utils/calendarListTypes";
+import {
+  findCalendarForEvent,
+  parseEventRef,
+} from "../utils/calendarListTypes";
 import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
 import { CalendarListSelect } from "./CalendarListSelect";
+import {
+  areNotificationOffsetsEqual,
+  clearNotificationPreference,
+  DEFAULT_NOTIFICATION_OFFSETS,
+  getNotificationPreference,
+  normalizeNotificationOffsets,
+  setNotificationPreference,
+  shouldScheduleNotifications,
+} from "../utils/notificationPreferences";
+import {
+  cancelEventNotifications,
+  scheduleEventNotifications,
+} from "../utils/notifications";
+import { useNotifications } from "../stores/notifications";
 import { RelayPublishDialog } from "./RelayPublishDialog";
 import { RelayDots } from "./RelayDots";
 import { useRelayPublishStatus } from "../hooks/useRelayPublishStatus";
+import { getRelayPublishCounts } from "../utils/relayPublishStatus";
 import {
   useBusyList,
   getBusyListDefaultOptIn,
   setBusyListDefaultOptIn,
 } from "../stores/busyList";
+import { parseFormInput } from "../utils/formLink";
+import type { IFormAttachment } from "../utils/types";
+import { NotificationPreferenceEditor } from "./NotificationPreferenceEditor";
 
 interface CalendarEventEditProps {
   open: boolean;
@@ -107,6 +130,11 @@ const WEEKDAY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: "FR", label: "F" },
   { code: "SA", label: "S" },
 ];
+
+const uniqueParticipants = (participants: string[]) =>
+  Array.from(
+    new Set(participants.map((participant) => participant.toLowerCase())),
+  );
 
 function toRRuleBody(rule: string): string {
   const trimmed = rule.trim();
@@ -325,12 +353,21 @@ export function CalendarEventEdit({
   const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars, addEventToCalendar } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
-    initialEvent?.calendarId || calendars[0]?.id || "",
+    (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
+      calendars[0]?.id ||
+      "",
   );
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
-      return { ...initialEvent };
+      const evt = {
+        ...initialEvent,
+        participants: uniqueParticipants(initialEvent.participants),
+      };
+      if (!evt.calendarId) {
+        evt.calendarId = selectedCalendarId;
+      }
+      return evt;
     }
 
     const begin = initialDateTime || Date.now();
@@ -345,6 +382,7 @@ export function CalendarEventEdit({
       title: "",
       createdAt: Date.now(),
       description: "",
+      calendarId: selectedCalendarId,
       location: [],
       categories: [],
       reference: [],
@@ -357,8 +395,13 @@ export function CalendarEventEdit({
       repeat: {
         rrule: null,
       },
-    } as ICalendarEvent;
+    };
   });
+  const [notificationOffsets, setNotificationOffsets] = useState<number[]>(
+    DEFAULT_NOTIFICATION_OFFSETS,
+  );
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] =
+    useState(!initialEvent?.id);
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RepeatingFrequency>(
       initialIsCustom
@@ -405,6 +448,9 @@ export function CalendarEventEdit({
     existingEvents,
     user?.pubkey,
   );
+  const displayParticipants = uniqueParticipants(eventDetails.participants);
+  const [formInput, setFormInput] = useState("");
+  const [formInputError, setFormInputError] = useState<string | null>(null);
 
   const handleClose = () => {
     resetRelayStatus();
@@ -420,6 +466,75 @@ export function CalendarEventEdit({
     value: ICalendarEvent[K],
   ) => {
     setEventDetails((prev) => ({ ...prev, [key]: value }));
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    if (!open) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!initialEvent?.id) {
+      setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+      setNotificationPreferencesLoaded(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setNotificationPreferencesLoaded(false);
+    getNotificationPreference(initialEvent.id)
+      .then((preference) => {
+        if (!active) {
+          return;
+        }
+
+        if (preference) {
+          setNotificationOffsets(preference.offsetsMinutes);
+        } else {
+          setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        }
+        setNotificationPreferencesLoaded(true);
+      })
+      .catch((error) => {
+        console.warn("Failed to load notification preferences", error);
+        if (!active) {
+          return;
+        }
+        setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+        setNotificationPreferencesLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialEvent?.id, open]);
+
+  const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
+
+  const handleAddForm = () => {
+    const parsed = parseFormInput(formInput);
+    if (!parsed) {
+      setFormInputError(intl.formatMessage({ id: "form.invalidInput" }));
+      return;
+    }
+    if (attachedForms.some((f) => f.naddr === parsed.naddr)) {
+      setFormInputError(intl.formatMessage({ id: "form.duplicateAttachment" }));
+      return;
+    }
+    updateField("forms", [...attachedForms, parsed]);
+    setFormInput("");
+    setFormInputError(null);
+  };
+
+  const handleRemoveForm = (naddr: string) => {
+    updateField(
+      "forms",
+      attachedForms.filter((f) => f.naddr !== naddr),
+    );
   };
 
   const openCustomDialog = () => {
@@ -455,45 +570,50 @@ export function CalendarEventEdit({
 
     setProcessing(true);
     try {
+      const normalizedNotificationOffsets =
+        normalizeNotificationOffsets(notificationOffsets);
       const rrule = draftRecurrenceRule;
       const eventToSave = {
         ...eventDetails,
         isPrivateEvent: isPrivate,
+        participants: uniqueParticipants(eventDetails.participants),
         repeat: { rrule },
       };
+      let savedEvent: ICalendarEvent = eventToSave;
 
       if (isPrivate) {
         if (mode === "edit") {
           const updates = await editPrivateCalendarEvent(
             eventToSave,
             selectedCalendarId,
+            initialEvent?.participants ?? [],
             undefined,
             onRelayComplete,
           );
           setSignedEventForRetry(updates.signedEvent);
 
-          useTimeBasedEvents
-            .getState()
-            .updateEvent({ ...updates.event, calendarId: updates.calendarId });
+          useTimeBasedEvents.getState().updateEvent(updates.event);
+          savedEvent = updates.event;
         } else {
           const { eventRef, authorPubkey, calendarEvent } =
-            await publishPrivateCalendarEvent(
-              eventToSave,
-              {
-                onRelayComplete,
-                waitForAll: true
-              }
-            );
+            await publishPrivateCalendarEvent(eventToSave, {
+              onRelayComplete,
+              waitForAll: false,
+            });
+
           setSignedEventForRetry(calendarEvent);
           await addEventToCalendar(selectedCalendarId, eventRef);
-          const { eventDTag, viewKey } = parseEventRef(eventRef);
-          useTimeBasedEvents.getState().addEvent({
+          const { eventDTag, relayUrl, viewKey, kind } =
+            parseEventRef(eventRef);
+          savedEvent = {
             ...eventToSave,
             id: eventDTag,
+            kind,
             viewKey,
+            relayHint: relayUrl,
             user: authorPubkey,
-            calendarId: selectedCalendarId,
-          });
+          };
+          useTimeBasedEvents.getState().addEvent(savedEvent);
         }
       } else {
         const {
@@ -506,13 +626,52 @@ export function CalendarEventEdit({
           onRelayComplete,
         );
         setSignedEventForRetry(signedEvent);
-        useTimeBasedEvents.getState().updateEvent({
+        savedEvent = {
           ...eventToSave,
           id: savedId,
           kind: EventKinds.PublicCalendarEvent,
           user: pubKey,
           isPrivateEvent: false,
-        });
+        };
+        useTimeBasedEvents.getState().updateEvent(savedEvent);
+      }
+
+      if (
+        areNotificationOffsetsEqual(
+          normalizedNotificationOffsets,
+          DEFAULT_NOTIFICATION_OFFSETS,
+        )
+      ) {
+        await clearNotificationPreference(savedEvent.id);
+      } else {
+        await setNotificationPreference(
+          savedEvent.id,
+          normalizedNotificationOffsets,
+        );
+      }
+
+      if (mode === "create" && isPrivate) {
+        await cancelEventNotifications(savedEvent.id);
+        useNotifications.getState().removeNotifications(savedEvent.id);
+
+        const calendarPreference = calendars.find(
+          (calendar) => calendar.id === selectedCalendarId,
+        )?.notificationPreference;
+
+        if (
+          shouldScheduleNotifications(
+            eventToSave.notificationPreference,
+            calendarPreference,
+          )
+        ) {
+          const notifications = await scheduleEventNotifications({
+            ...savedEvent,
+            calendarId: selectedCalendarId,
+          });
+          useNotifications
+            .getState()
+            .setNotifications(savedEvent.id, notifications);
+        }
       }
 
       // Public busy list maintenance:
@@ -525,8 +684,8 @@ export function CalendarEventEdit({
       const rangeChanged =
         mode === "edit" &&
         !!initialEvent &&
-        (initialEvent.begin !== eventToSave.begin ||
-          initialEvent.end !== eventToSave.end);
+        (initialEvent.begin !== savedEvent.begin ||
+          initialEvent.end !== savedEvent.end);
       if (rangeChanged && initialEvent) {
         void useBusyList.getState().removeBusyRange({
           start: initialEvent.begin,
@@ -540,21 +699,20 @@ export function CalendarEventEdit({
       ) {
         void useBusyList
           .getState()
-          .addBusyRange({ start: eventToSave.begin, end: eventToSave.end });
+          .addBusyRange({ start: savedEvent.begin, end: savedEvent.end });
       }
 
       // Persist preference so future events default to the user's last choice.
       setBusyListDefaultOptIn(publishBusy);
-
       if (onSave) {
-        onSave(eventToSave);
+        onSave(savedEvent);
       }
 
-      const allOk = getFailedRelays(relaysToPublish).length === 0;
-      setProcessing(false);
-      if (allOk) {
-        handleClose();
-      }
+      // const allOk = getFailedRelays(relaysToPublish).length === 0;
+      // setProcessing(false);
+      // if (allOk) {
+      handleClose();
+      // }
     } catch (e) {
       console.error(e instanceof Error ? e.message : "Unknown error");
       const failedRelays = getFailedRelays(relaysToPublish);
@@ -639,6 +797,12 @@ export function CalendarEventEdit({
     setRecurrenceFrequency(value as RepeatingFrequency);
   };
 
+  const notificationsValid =
+    notificationPreferencesLoaded &&
+    notificationOffsets.every(
+      (offset) =>
+        Number.isInteger(offset) && Number.isFinite(offset) && offset >= 0,
+    );
   const handleRecurrenceEndModeChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as RecurrenceEndMode;
     setRecurrenceEndMode(value);
@@ -690,20 +854,32 @@ export function CalendarEventEdit({
     eventDetails.begin &&
     eventDetails.end &&
     eventDetails.begin < eventDetails.end &&
-    recurrenceValid
+    recurrenceValid &&
+    notificationsValid
   );
 
   const showRelayDetailsButton =
     hasRelayErrors && !processing && publishingRelays.length > 0;
   /** Save succeeded for the network, but at least one relay failed (event is already on the calendar). */
-  const hasRelaySuccess = publishingRelays.some((relayUrl) => {
-    return relayStatus[relayUrl] === "ok";
-  });
+  const { acceptedCount, failedCount, totalCount } = getRelayPublishCounts(
+    publishingRelays,
+    relayStatus,
+  );
+  const hasRelaySuccess = acceptedCount > 0;
   const partialSaveRelayIssues =
     !processing &&
     publishingRelays.length > 0 &&
     hasRelayErrors &&
     hasRelaySuccess;
+  const relayDotsLabel = partialSaveRelayIssues
+    ? intl.formatMessage(
+        { id: "event.relaysPartialPublishSummary" },
+        { acceptedCount, totalCount },
+      )
+    : intl.formatMessage(
+        { id: "event.publishingToRelays" },
+        { count: getRelays().length },
+      );
 
   if (!open || !eventDetails) {
     return null;
@@ -1168,22 +1344,44 @@ export function CalendarEventEdit({
         </Box>
       </EventAttributeEditContainer>
       <Divider />
+      <EventAttributeEditContainer>
+        <NotificationsActiveIcon />
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Typography variant="subtitle2">
+            {intl.formatMessage({ id: "event.notifications" })}
+          </Typography>
+          <NotificationPreferenceEditor
+            offsets={notificationOffsets}
+            onChange={setNotificationOffsets}
+          />
+        </Box>
+      </EventAttributeEditContainer>
+      <Divider />
       {/* Participants */}
       <Box>
         <PeopleIcon />
         <Box style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <ParticipantAdd
+            participants={eventDetails.participants}
             onAdd={(pubKey) => {
-              const newParticipants = Array.from(
-                new Set([...eventDetails.participants, pubKey]),
-              );
+              const newParticipants = uniqueParticipants([
+                ...eventDetails.participants,
+                pubKey,
+              ]);
               updateField("participants", newParticipants);
             }}
           />
 
-          {eventDetails.participants.length > 0 && (
+          {displayParticipants.length > 0 && (
             <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {eventDetails.participants.map((participant) => (
+              {displayParticipants.map((participant) => (
                 <Box
                   key={participant}
                   style={{
@@ -1218,6 +1416,96 @@ export function CalendarEventEdit({
         </Box>
       </Box>
       <Divider />
+      {/* Attached Forms (private events only) */}
+      {isPrivate && (
+        <>
+          <Box>
+            <AssignmentIcon />
+            <Box style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Typography variant="body2" style={{ fontWeight: 500 }}>
+                {intl.formatMessage({ id: "form.attachments" })}
+              </Typography>
+
+              {attachedForms.length > 0 && (
+                <Box
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {attachedForms.map((form) => (
+                    <Box
+                      key={form.naddr}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "8px 12px",
+                        backgroundColor: "#f5f5f5",
+                        borderRadius: 4,
+                        gap: 8,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          flex: 1,
+                          fontFamily: "monospace",
+                        }}
+                        title={form.naddr}
+                      >
+                        {form.naddr}
+                      </Typography>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveForm(form.naddr)}
+                      >
+                        {intl.formatMessage({ id: "form.removeAttachment" })}
+                      </Button>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              <Box
+                style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder={intl.formatMessage({
+                    id: "form.inputPlaceholder",
+                  })}
+                  value={formInput}
+                  onChange={(e) => {
+                    setFormInput(e.target.value);
+                    if (formInputError) setFormInputError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddForm();
+                    }
+                  }}
+                  error={!!formInputError}
+                  helperText={formInputError ?? undefined}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleAddForm}
+                  disabled={!formInput.trim()}
+                  style={{ marginTop: 0 }}
+                >
+                  {intl.formatMessage({ id: "form.addAttachment" })}
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+          <Divider />
+        </>
+      )}
       {/* Description */}
       <Box>
         <DescriptionIcon />
@@ -1317,10 +1605,7 @@ export function CalendarEventEdit({
         <RelayDots
           relays={publishingRelays}
           relayStatus={relayStatus}
-          label={intl.formatMessage(
-            { id: "event.publishingToRelays" },
-            { count: getRelays().length },
-          )}
+          label={relayDotsLabel}
           onDetailsClick={
             showRelayDetailsButton && !partialSaveRelayIssues
               ? () => setRelayDetailsOpen(true)
@@ -1378,9 +1663,12 @@ export function CalendarEventEdit({
         sx={{ lineHeight: 1.5 }}
       >
         <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
-          {intl.formatMessage({ id: "event.note" })}:{" "}
+          {intl.formatMessage({ id: "event.eventSaved" })}:{" "}
         </Box>
-        {intl.formatMessage({ id: "event.partialPublishHint" })}
+        {intl.formatMessage(
+          { id: "event.partialPublishHint" },
+          { acceptedCount, failedCount, totalCount },
+        )}
       </Typography>
     </Box>
   ) : null;

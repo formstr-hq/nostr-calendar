@@ -6,9 +6,7 @@ import { nip19 } from "nostr-tools";
 import { NPub } from "nostr-tools/nip19";
 import { NIP05_REGEX } from "nostr-tools/nip05";
 
-const resolveNip05 = async (
-  nip05: string,
-): Promise<string | null> => {
+const resolveNip05 = async (nip05: string): Promise<string | null> => {
   const match = nip05.match(NIP05_REGEX);
   if (!match) return null;
 
@@ -18,9 +16,7 @@ const resolveNip05 = async (
     const url = `https://${domain}/.well-known/nostr.json?name=${name}`;
     const res = await (await fetch(url, { redirect: "error" })).json();
     const pubkey = res.names?.[name];
-    return typeof pubkey === "string" && pubkey.length === 64
-      ? pubkey
-      : null;
+    return typeof pubkey === "string" && pubkey.length === 64 ? pubkey : null;
   } catch {
     return null;
   }
@@ -28,54 +24,73 @@ const resolveNip05 = async (
 
 export const ParticipantAdd = ({
   onAdd,
+  participants = [],
 }: {
   onAdd: (pubKey: string) => void;
+  participants?: string[];
 }) => {
   const [pubKey, updatePubkey] = useState("");
-  const [error, updateError] = useState(false);
+  const [errorMessageId, updateErrorMessageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const canSubmit = !!pubKey && !loading;
   const intl = useIntl();
+  const existingParticipants = new Set(
+    participants.map((participant) => participant.toLowerCase()),
+  );
+
+  const addParticipant = (participant: string) => {
+    const normalizedParticipant = participant.trim().toLowerCase();
+    if (existingParticipants.has(normalizedParticipant)) {
+      updateErrorMessageId("participant.alreadyAdded");
+      return;
+    }
+
+    onAdd(normalizedParticipant);
+    updatePubkey("");
+  };
 
   const onSubmit = async () => {
     if (!canSubmit) {
       return;
     }
 
+    const trimmedPubKey = pubKey.trim();
+
     // npub
-    if (pubKey.startsWith("npub")) {
+    if (trimmedPubKey.startsWith("npub")) {
       try {
-        const decoded = nip19.decode(pubKey as NPub).data;
-        onAdd(decoded);
-        updatePubkey("");
+        const decoded = nip19.decode(trimmedPubKey as NPub).data;
+        if (typeof decoded !== "string") {
+          updateErrorMessageId("participant.invalid");
+          return;
+        }
+        addParticipant(decoded);
       } catch {
-        updateError(true);
+        updateErrorMessageId("participant.invalid");
       }
       return;
     }
 
     // NIP-05 (user@domain)
-    if (NIP05_REGEX.test(pubKey)) {
+    if (NIP05_REGEX.test(trimmedPubKey)) {
       setLoading(true);
-      const resolved = await resolveNip05(pubKey);
+      const resolved = await resolveNip05(trimmedPubKey);
       setLoading(false);
       if (resolved) {
-        onAdd(resolved);
-        updatePubkey("");
+        addParticipant(resolved);
       } else {
-        updateError(true);
+        updateErrorMessageId("participant.invalid");
       }
       return;
     }
 
     // Hex pubkey
-    if (pubKey.length === 64) {
-      onAdd(pubKey);
-      updatePubkey("");
+    if (/^[0-9a-fA-F]{64}$/.test(trimmedPubKey)) {
+      addParticipant(trimmedPubKey);
       return;
     }
 
-    updateError(true);
+    updateErrorMessageId("participant.invalid");
   };
 
   return (
@@ -88,7 +103,12 @@ export const ParticipantAdd = ({
       }}
     >
       <TextField
-        error={error}
+        error={!!errorMessageId}
+        helperText={
+          errorMessageId
+            ? intl.formatMessage({ id: errorMessageId })
+            : undefined
+        }
         style={{
           width: "100%",
         }}
@@ -100,7 +120,7 @@ export const ParticipantAdd = ({
           }
         }}
         onChange={(e) => {
-          updateError(false);
+          updateErrorMessageId(null);
           updatePubkey(e.target.value);
         }}
       />

@@ -1,6 +1,6 @@
 {
   "name": "nostr-calendar",
-  "version": "1.5.3",
+  "version": "1.6.2",
   "type": "module",
   "repository": {
     "url": "https://github.com/formstr-hq/nostr-calendar"
@@ -8,14 +8,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "prebuild": "pnpm lint && pnpm typecheck",
+    "lint": "eslint . --quiet",
     "preview": "vite preview",
     "simulate-android": "pnpm build && pnpm cap run android",
     "release-android": "./scripts/build-release.sh",
     "create-release": "./scripts/create-release.sh",
     "simulate-ios": "pnpm cap run ios",
     "build-ios": "pnpm cap build ios",
-    "test": "vitest"
+    "test": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -27,12 +29,15 @@
     "@dnd-kit/core": "^6.3.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@formstr/sdk": "^0.2.7",
+    "@formstr/signer": "^0.2.2",
     "@khadarvsk/capacitor-secure-storage": "0.0.2",
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
     "@mui/x-date-pickers": "^8.26.0",
     "@noble/hashes": "^2.0.0",
     "@voiceflow/normal-store": "^2.4.1",
+    "bech32": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",

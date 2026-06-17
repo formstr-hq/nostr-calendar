@@ -24,7 +24,10 @@ function makeEvent(
     title: "Multi-day Event",
     description: "",
     kind: 32678,
+    calendarId: "",
+    // @ts-expect-error its intentional
     begin: overrides.begin,
+    // @ts-expect-error its intentional
     end: overrides.end,
     createdAt: 1,
     categories: [],

@@ -10,6 +10,7 @@ const mockRequestPermissions = vi
   .fn()
   .mockResolvedValue({ display: "granted" });
 const mockAddListener = vi.fn().mockResolvedValue({ remove: vi.fn() });
+const mockGetNotificationOffsetsForEvent = vi.fn().mockResolvedValue([10, 0]);
 
 vi.mock("@capacitor/local-notifications", () => ({
   LocalNotifications: {
@@ -23,6 +24,15 @@ vi.mock("@capacitor/local-notifications", () => ({
 
 vi.mock("./platform", () => ({
   isNative: true,
+}));
+
+vi.mock("./notificationPreferences", () => ({
+  getNotificationOffsetsForEvent: (...args: unknown[]) =>
+    mockGetNotificationOffsetsForEvent(...args),
+  formatNotificationOffsetLabel: (offsetMinutes: number) =>
+    offsetMinutes === 0
+      ? "At event start"
+      : `${offsetMinutes} minute${offsetMinutes === 1 ? "" : "s"} before`,
 }));
 
 // Import AFTER mocks are set up
@@ -40,6 +50,7 @@ function makeEvent(
 ): ICalendarEvent {
   return {
     id: "test-id",
+    calendarId: "",
     eventId: overrides.eventId ?? "evt-123",
     title: "Test Event",
     description: "",
@@ -67,6 +78,7 @@ describe("scheduleEventNotifications", () => {
     vi.clearAllMocks();
     mockGetPending.mockResolvedValue({ notifications: [] });
     mockRequestPermissions.mockResolvedValue({ display: "granted" });
+    mockGetNotificationOffsetsForEvent.mockResolvedValue([10, 0]);
 
     // Cancel all to reset internal state
     await cancelAllNotifications();
@@ -184,7 +196,67 @@ describe("scheduleEventNotifications", () => {
 
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     expect(scheduled[0].extra.eventId).toBe("my-event-id");
-    expect(scheduled[0].extra.notificationKey).toBe("my-event-id");
+    expect(scheduled[0].extra.notificationKey).toMatch(
+      /^v1:my-event-id:\d+:m\d+$/,
+    );
+  });
+
+  it("cancels legacy unversioned pending notifications during startup", async () => {
+    const futureStart = Date.now() + HOUR;
+    const legacyNotification = {
+      id: 1,
+      extra: {
+        eventId: "legacy-event",
+        notificationKey: "legacy-event:1700000000000:10",
+      },
+    };
+    const currentNotification = {
+      id: 2,
+      extra: {
+        eventId: "current-event",
+        notificationKey: `v1:current-event:${futureStart}:m10`,
+      },
+    };
+
+    mockGetPending.mockResolvedValueOnce({
+      notifications: [legacyNotification, currentNotification],
+    });
+
+    await scheduleEventNotifications(
+      makeEvent({ begin: futureStart, id: "migration-event" }),
+    );
+
+    expect(mockCancel).toHaveBeenCalledWith({
+      notifications: [legacyNotification],
+    });
+  });
+
+  it("supports multiple custom reminder offsets", async () => {
+    mockGetNotificationOffsetsForEvent.mockResolvedValueOnce([60, 15, 0]);
+    const futureStart = Date.now() + 2 * HOUR;
+    const event = makeEvent({ begin: futureStart, id: "custom-reminders" });
+
+    const result = await scheduleEventNotifications(event);
+
+    expect(mockSchedule).toHaveBeenCalledTimes(1);
+    const scheduled = mockSchedule.mock.calls[0][0].notifications;
+    expect(scheduled).toHaveLength(3);
+    expect(result.map((notification) => notification.label)).toEqual([
+      "60 minutes before",
+      "15 minutes before",
+      "At event start",
+    ]);
+  });
+
+  it("skips scheduling when notifications are disabled for an event", async () => {
+    mockGetNotificationOffsetsForEvent.mockResolvedValueOnce([]);
+    const futureStart = Date.now() + HOUR;
+    const event = makeEvent({ begin: futureStart, id: "disabled-reminders" });
+
+    const result = await scheduleEventNotifications(event);
+
+    expect(result).toEqual([]);
+    expect(mockSchedule).not.toHaveBeenCalled();
   });
 });
 
@@ -193,6 +265,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     vi.clearAllMocks();
     mockGetPending.mockResolvedValue({ notifications: [] });
     mockRequestPermissions.mockResolvedValue({ display: "granted" });
+    mockGetNotificationOffsetsForEvent.mockResolvedValue([10, 0]);
     await cancelAllNotifications();
   });
 
@@ -213,7 +286,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     expect(scheduled.length).toBeGreaterThan(0);
     expect(scheduled[0].extra.eventId).toBe("daily-evt");
     // Notification key should include occurrence timestamp
-    expect(scheduled[0].extra.notificationKey).toContain("daily-evt:");
+    expect(scheduled[0].extra.notificationKey).toContain(":daily-evt:");
   });
 
   it("does not schedule for a weekly recurring event whose next occurrence is > 5 days away", async () => {
@@ -301,7 +374,7 @@ describe("scheduleEventNotifications – recurring events", () => {
 
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     const key = scheduled[0].extra.notificationKey;
-    expect(key).toMatch(/^recurring-key-test:\d+$/);
+    expect(key).toMatch(/^v1:recurring-key-test:\d+:m\d+$/);
   });
 });
 

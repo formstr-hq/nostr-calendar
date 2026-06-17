@@ -23,10 +23,13 @@ import {
 import {
   fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
+  fetchUserReports,
   getUserPublicKey,
   publishParticipantRemovalEvent,
+  publishReportEvent,
   viewPrivateEvent,
 } from "../common/nostr";
+import type { ReportType } from "../common/nostr";
 import { nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
@@ -60,6 +63,10 @@ interface InvitationsState {
   stopInvitations: () => void;
   acceptInvitation: (giftWrapId: string, calendarId: string) => Promise<void>;
   dismissInvitation: (giftWrapId: string) => void;
+  reportInvitation: (
+    giftWrapId: string,
+    reportType: ReportType,
+  ) => Promise<void>;
   clearCachedInvitations: () => Promise<void>;
 }
 
@@ -159,14 +166,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           if (!invitation) return;
           const decrypted = viewPrivateEvent(event, invitation.viewKey);
           if (!decrypted) return;
-          const parsed = nostrEventToCalendar(decrypted, {
+          const parsed = nostrEventToCalendar(decrypted, "", {
             viewKey: invitation.viewKey,
             isPrivateEvent: true,
             relayHint: invitation.relayHint,
           });
           invitation.event = { ...parsed, isInvitation: true };
         },
-        () => {
+        async () => {
           // After private events are fetched, update store with resolved events
           set((state) => {
             const resolvedIds = new Set(batch.map((i) => i.eventId));
@@ -180,6 +187,39 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
             saveInvitationsToStorage(updated);
             return { invitations: updated, unreadCount };
           });
+
+          // Lazily filter out any invitations the user has previously reported
+          try {
+            const userPubkey = await getUserPublicKey();
+            if (!userPubkey) return;
+
+            const coordinates = batch.map((inv) => {
+              const authorPubkey = inv.event?.user ?? inv.pubkey;
+              return `${inv.kind}:${authorPubkey}:${inv.eventId}`;
+            });
+
+            const reportedCoordinates = await fetchUserReports(
+              userPubkey,
+              coordinates,
+            );
+            if (reportedCoordinates.length === 0) return;
+
+            const reportedSet = new Set(reportedCoordinates);
+            set((state) => {
+              const updated = state.invitations.filter((inv) => {
+                const authorPubkey = inv.event?.user ?? inv.pubkey;
+                const coord = `${inv.kind}:${authorPubkey}:${inv.eventId}`;
+                return !reportedSet.has(coord);
+              });
+              const unreadCount = updated.filter(
+                (i) => i.status === "pending",
+              ).length;
+              saveInvitationsToStorage(updated);
+              return { invitations: updated, unreadCount };
+            });
+          } catch {
+            // Non-fatal: blocking filter is best-effort
+          }
         },
       );
     }
@@ -199,30 +239,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           useCalendarLists.getState().getAllEventIds(),
         );
 
-        // If already in a calendar, check if its viewKey needs updating
+        // If already in a calendar, the event was added when the booking was
+        // submitted (with the pre-generated view key). Auto-approve the matching
+        // outgoing booking so the UI updates without waiting for the separate
+        // booking-response gift wrap.
         if (existingEventIds.has(rumor.eventId)) {
-          // Find if the ref has an empty viewKey (placeholder from booking flow)
-          const calendars = useCalendarLists.getState().calendars;
-          const hasEmptyViewKey = calendars.some((cal) =>
-            cal.eventRefs.some(
-              (ref) =>
-                ref[0].split(":")[2] === rumor.eventId &&
-                (!ref[2] || ref[2] === ""),
-            ),
-          );
-          if (hasEmptyViewKey && rumor.viewKey) {
-            useCalendarLists
-              .getState()
-              .updateEventViewKey(rumor.eventId, rumor.viewKey);
-            // The placeholder ref was created by the booking flow when the
-            // user submitted a request. The host has now approved by
-            // publishing the calendar event with the booker's d-tag, so
-            // flip the matching outgoing booking to "approved" without
-            // requiring a separate booking-response gift wrap.
-            useBookingRequests
-              .getState()
-              .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
-          }
+          useBookingRequests
+            .getState()
+            .markOutgoingApprovedByDTag(rumor.eventId, rumor.viewKey);
           return;
         }
         // Skip if already processed
@@ -300,9 +324,8 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
     // Add to the selected calendar
     await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
 
-    // Update the event in the events store so it reflects the calendar assignment
-    // and is no longer treated as an invitation. This prevents duplication when
-    // fetchPrivateEvents picks up the same event from the calendar ref.
+    // Update the event in the events store so it is no longer treated as an
+    // invitation. Calendar membership is resolved from the calendar-list ref.
     if (invitation.event) {
       useTimeBasedEvents.getState().updateEvent({
         ...invitation.event,
@@ -340,6 +363,36 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         });
       }
 
+      const unreadCount = updated.filter((i) => i.status === "pending").length;
+      saveInvitationsToStorage(updated);
+      return { invitations: updated, unreadCount };
+    });
+  },
+
+  /**
+   * Reports an invitation via NIP-56 (kind 1984) and removes it from the list.
+   * The event coordinate is built from the resolved event so the relay-side
+   * a-tag filter can match it on future loads.
+   */
+  reportInvitation: async (giftWrapId, reportType) => {
+    const { invitations } = get();
+    const invitation = invitations.find((i) => i.giftWrapId === giftWrapId);
+    if (!invitation) return;
+
+    const authorPubkey = invitation.event?.user ?? invitation.pubkey;
+    const eventCoordinate = `${invitation.kind}:${authorPubkey}:${invitation.eventId}`;
+
+    await publishReportEvent({
+      authorPubkey,
+      eventCoordinate,
+      relayHint: invitation.relayHint,
+      reportType,
+    });
+
+    set((state) => {
+      const updated = state.invitations.filter(
+        (i) => i.giftWrapId !== giftWrapId,
+      );
       const unreadCount = updated.filter((i) => i.status === "pending").length;
       saveInvitationsToStorage(updated);
       return { invitations: updated, unreadCount };

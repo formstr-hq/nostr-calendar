@@ -92,7 +92,7 @@ export const SchedulingPagesList = ({
         }}
       >
         <Typography variant="subtitle2" fontWeight={600}>
-          {formatMessage({id: "scheduling.sidebarTitle"})}
+          {formatMessage({ id: "scheduling.sidebarTitle" })}
         </Typography>
         <IconButton size="small" onClick={handleCreate}>
           <AddIcon fontSize="small" />
@@ -199,7 +199,11 @@ export const SchedulingPagesList = ({
           <Button onClick={handleCancelDelete}>
             {formatMessage({ id: "navigation.cancel" })}
           </Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+          >
             {formatMessage({ id: "navigation.delete" })}
           </Button>
         </DialogActions>

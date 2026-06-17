@@ -86,6 +86,11 @@ export const useUser = create<{
     await removeSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME);
     await removeSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME);
     logger.log("logout: background worker keys cleared");
+    const pubkey = useUser.getState().user?.pubkey;
+    if (pubkey) {
+      logger.log("logout: clearing offline event cache for", pubkey);
+      await nostrRuntime.clearOfflineCache(pubkey);
+    }
     set({ user: null, isInitialized: false });
     localStorage.removeItem(USER_STORAGE_KEY);
     logger.log("logout: complete");
@@ -95,6 +100,18 @@ export const useUser = create<{
     if (!isInitializing) {
       logger.log("initializeUser: start");
       isInitializing = true;
+      signerManager.registerLoginModal(
+        () =>
+          new Promise<void>((resolve) => {
+            useUser.getState().updateLoginModal(true);
+            const unsubscribe = signerManager.onChange(() => {
+              if (signerManager.getUser()) {
+                unsubscribe();
+                resolve();
+              }
+            });
+          }),
+      );
       signerManager.onChange(onUserChange);
       signerManager.restoreFromStorage();
       logger.log("initializeUser: signer restored from storage");
@@ -114,39 +131,28 @@ const onUserChange = async () => {
     });
   if (cachedUser) {
     logger.log("onUserChange: cached user found", cachedUser.pubkey);
+    // Always hydrate — sets offlineCachePubkey so persistAcceptedEvent works.
+    // Must run on every app start, not just when the user changes.
+    logger.log("onUserChange: hydrating offline event cache");
+    await nostrRuntime.hydrateOfflineEvents(cachedUser.pubkey);
+
     if (currentUser?.pubkey !== cachedUser.pubkey) {
       logger.log("onUserChange: new user detected, resetting private events");
       const eventManager = useTimeBasedEvents.getState();
       eventManager.resetPrivateEvents();
       logger.log("onUserChange: loading cached calendars and invitations");
-      useCalendarLists.getState().loadCachedCalendars();
-      useTimeBasedEvents.getState().loadCachedEvents();
-      logger.log("onUserChange: fetching relay list");
-      const relays = await fetchRelayList(cachedUser.pubkey);
-      const userRelays = relays.length > 0 ? relays : defaultRelays;
-      logger.log("onUserChange: setting relays", userRelays.length, "relays");
-      useRelayStore.getState().setRelays(userRelays);
-      logger.log("onUserChange: persisting background worker keys");
-      logger.log("onUserChange: fetching deletion events");
-      await nostrRuntime.fetchDeletionEvents(userRelays, cachedUser.pubkey);
-      logger.log("onUserChange: fetching participant removal events");
-      await nostrRuntime.fetchParticipantRemovalEvents(
-        userRelays,
-        cachedUser.pubkey,
-      );
-      await setSecureItem(BG_KEY_USER_PUBKEY, cachedUser.pubkey);
-      await setSecureItem(BG_KEY_RELAYS, userRelays);
-      await setSecureItem(
-        BG_KEY_LAST_LOGIN_TIME,
-        Math.floor(Date.now() / 1000),
-      );
-      useUser.setState({
-        isInitialized: true,
-      });
+      await Promise.all([
+        useRelayStore.getState().loadCachedRelays(),
+        useCalendarLists.getState().loadCachedCalendars(),
+        useTimeBasedEvents.getState().loadCachedEvents(),
+      ]);
     } else {
       logger.log("onUserChange: same user, no re-initialization needed");
     }
-    logger.log("onUserChange: setting initialized state");
+
+    logger.log("onUserChange: setting initialized state from local cache");
+    useUser.setState({ isInitialized: true });
+    void syncUserNetworkState(cachedUser.pubkey);
   } else {
     logger.log("onUserChange: no cached user, clearing state");
     useUser.setState({
@@ -160,4 +166,29 @@ const onUserChange = async () => {
     }
   }
   logger.log("onUserChange: complete");
+};
+
+const syncUserNetworkState = async (pubkey: string) => {
+  try {
+    logger.log("syncUserNetworkState: fetching relay list");
+    const relays = await fetchRelayList(pubkey);
+    const userRelays = relays.length > 0 ? relays : defaultRelays;
+    logger.log(
+      "syncUserNetworkState: setting relays",
+      userRelays.length,
+      "relays",
+    );
+    useRelayStore.getState().setRelays(userRelays);
+
+    logger.log("syncUserNetworkState: fetching deletion events");
+    await nostrRuntime.fetchDeletionEvents(userRelays, pubkey);
+    logger.log("syncUserNetworkState: fetching participant removal events");
+    await nostrRuntime.fetchParticipantRemovalEvents(userRelays, pubkey);
+
+    await setSecureItem(BG_KEY_USER_PUBKEY, pubkey);
+    await setSecureItem(BG_KEY_RELAYS, userRelays);
+    await setSecureItem(BG_KEY_LAST_LOGIN_TIME, Math.floor(Date.now() / 1000));
+  } catch (error) {
+    logger.warn("syncUserNetworkState: background sync failed", error);
+  }
 };

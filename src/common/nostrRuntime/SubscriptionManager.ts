@@ -21,10 +21,24 @@ export class SubscriptionManager {
   private subscriptions: Map<string, ManagedSubscription> = new Map();
   private pool: SimplePool;
   private eventStore: EventStore;
+  private onStoredEvent?: EventCallback;
 
-  constructor(pool: SimplePool, eventStore: EventStore) {
+  constructor(
+    pool: SimplePool,
+    eventStore: EventStore,
+    onStoredEvent?: EventCallback,
+  ) {
     this.pool = pool;
     this.eventStore = eventStore;
+    this.onStoredEvent = onStoredEvent;
+  }
+
+  private handleStoredEvent(event: Parameters<EventCallback>[0]): boolean {
+    const added = this.eventStore.addEvent(event);
+    if (added) {
+      this.onStoredEvent?.(event);
+    }
+    return added;
   }
 
   /**
@@ -34,25 +48,20 @@ export class SubscriptionManager {
    */
   subscribe(
     relays: string[],
-    filters: Filter[],
+    filter: Filter,
     onEvent?: EventCallback,
     onEose?: EoseCallback,
   ): { id: string; unsubscribe: () => void } {
-    // Generate hash for deduplication
-    const subscriptionId = generateFilterHash(filters, relays);
+    const subscriptionId = generateFilterHash(filter, relays);
 
-    // Check if subscription already exists
     const existing = this.subscriptions.get(subscriptionId);
 
     if (existing) {
-      // Increment reference count
       existing.refCount++;
 
-      // Add callbacks
       if (onEvent) {
         existing.callbacks.add(onEvent);
 
-        // If subscription already received EOSE, immediately call onEose
         if (existing.eoseReceived && onEose) {
           onEose();
         } else if (onEose) {
@@ -60,17 +69,15 @@ export class SubscriptionManager {
         }
       }
 
-      // Return existing subscription
       return {
         id: subscriptionId,
         unsubscribe: () => this.unsubscribe(subscriptionId, onEvent, onEose),
       };
     }
 
-    // Create new subscription
     const managedSub: ManagedSubscription = {
       id: subscriptionId,
-      filters,
+      filter,
       relays,
       closer: null,
       refCount: 1,
@@ -79,63 +86,40 @@ export class SubscriptionManager {
       eoseReceived: false,
     };
 
-    // Check if we need to chunk (large author lists)
-    const needsChunking = filters.some(
-      (f) => f.authors && f.authors.length > 1000,
-    );
+    const chunks = chunkFilter(filter, 1000);
 
-    if (needsChunking) {
-      // Chunk filters and create multiple subscriptions
+    if (chunks.length > 1) {
       managedSub.chunks = [];
-      const totalChunks = filters.reduce((acc, f) => {
-        const chunks = chunkFilter(f, 1000);
-        return acc + chunks.length;
-      }, 0);
-
-      // Track EOSE count in a local variable to avoid closure issues
       const eoseState = { count: 0 };
 
-      for (const filter of filters) {
-        const chunks = chunkFilter(filter, 1000);
-
-        for (const chunkFilter of chunks) {
-          const closer = this.pool.subscribeMany(relays, [chunkFilter], {
-            onevent: (event) => {
-              // Add to event store
-              const added = this.eventStore.addEvent(event);
-              if (added) {
-                // Notify all callbacks
-                for (const callback of Array.from(managedSub.callbacks)) {
-                  callback(event);
-                }
+      for (const chunk of chunks) {
+        const closer = this.pool.subscribeMany(relays, chunk, {
+          onevent: (event) => {
+            const added = this.handleStoredEvent(event);
+            if (added) {
+              for (const callback of Array.from(managedSub.callbacks)) {
+                callback(event);
               }
-            },
-            oneose: () => {
-              eoseState.count++;
-              if (eoseState.count === totalChunks) {
-                // All chunks have reached EOSE
-                managedSub.eoseReceived = true;
-                for (const eoseCallback of Array.from(
-                  managedSub.eoseCallbacks,
-                )) {
-                  eoseCallback();
-                }
-                managedSub.eoseCallbacks.clear();
+            }
+          },
+          oneose: () => {
+            eoseState.count++;
+            if (eoseState.count === chunks.length) {
+              managedSub.eoseReceived = true;
+              for (const eoseCallback of Array.from(managedSub.eoseCallbacks)) {
+                eoseCallback();
               }
-            },
-          });
-
-          managedSub.chunks.push(closer);
-        }
+              managedSub.eoseCallbacks.clear();
+            }
+          },
+        });
+        managedSub.chunks.push(closer);
       }
     } else {
-      // Normal subscription (no chunking needed)
-      managedSub.closer = this.pool.subscribeMany(relays, filters, {
+      managedSub.closer = this.pool.subscribeMany(relays, filter, {
         onevent: (event) => {
-          // Add to event store
-          const added = this.eventStore.addEvent(event);
+          const added = this.handleStoredEvent(event);
           if (added) {
-            // Notify all callbacks
             for (const callback of Array.from(managedSub.callbacks)) {
               callback(event);
             }
@@ -143,8 +127,6 @@ export class SubscriptionManager {
         },
         oneose: () => {
           managedSub.eoseReceived = true;
-
-          // Notify all EOSE callbacks
           for (const eoseCallback of Array.from(managedSub.eoseCallbacks)) {
             eoseCallback();
           }
@@ -227,7 +209,7 @@ export class SubscriptionManager {
     for (const sub of Array.from(this.subscriptions.values())) {
       info.push({
         id: sub.id,
-        filters: sub.filters,
+        filter: sub.filter,
         relays: sub.relays,
         refCount: sub.refCount,
         callbackCount: sub.callbacks.size,

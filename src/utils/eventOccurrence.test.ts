@@ -10,6 +10,7 @@ import type { ICalendarEvent } from "./types";
 function makeEvent(overrides: Partial<ICalendarEvent> = {}): ICalendarEvent {
   return {
     id: "event-id",
+    calendarId: "",
     eventId: "event-hash",
     title: "Recurring Event",
     description: "",

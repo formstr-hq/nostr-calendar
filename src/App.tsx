@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { useUser } from "./stores/user";
 import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
-import dictionary from "./common/dictionary";
+import dictionary, { NestedObject } from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
 import RelayManager from "./components/RelayManager";
 import { BrowserRouter, useLocation, useNavigate } from "react-router";
@@ -59,7 +59,9 @@ function Application() {
   );
   const navigate = useNavigate();
   const location = useLocation();
-  const events = useTimeBasedEvents((state) => state);
+  const fetchPrivateEvents = useTimeBasedEvents(
+    (state) => state.fetchPrivateEvents,
+  );
   const {
     calendars,
     isLoaded: calendarsLoaded,
@@ -96,10 +98,10 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      void events.fetchPrivateEvents();
+      void fetchPrivateEvents();
       fetchInvitations();
     }
-  }, [user, calendarsLoaded, events, fetchInvitations, isInitialized]);
+  }, [user, calendarsLoaded, fetchPrivateEvents, fetchInvitations, isInitialized]);
 
   // Refetch the user's own public busy lists whenever the visible month
   // changes, so add/remove operations merge with the latest remote state
@@ -313,8 +315,8 @@ export default function App() {
   const i18nLocale = _locale;
   const dayjsLocale = useDayjsLocale();
   const locale_dictionary = {
-    ...flattenMessages(dictionary["en-US"]),
-    ...flattenMessages(dictionary[i18nLocale]),
+    ...flattenMessages(dictionary["en-US"] as NestedObject),
+    ...flattenMessages(dictionary[i18nLocale] as NestedObject),
   };
   return (
     <IntlProvider locale={i18nLocale} messages={locale_dictionary}>

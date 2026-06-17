@@ -23,14 +23,50 @@ const nip44Encrypt = (
   publicKey: string,
 ) => encrypt(JSON.stringify(data), nip44ConversationKey(privateKey, publicKey));
 
-const nip44Decrypt = async (data: NostrEvent) => {
+// Gate for the first concurrent nip44_decrypt call.
+// External signers (nos2x-fox, Amber) may show a permission popup on the
+// first call and reject immediately while that popup is pending. Keeping a
+// gate means all subsequent calls queue up behind the first request instead
+// of each firing their own signer round-trip concurrently.
+let decryptGate: Promise<void> | null = null;
+
+export const nip44Decrypt = async (
+  data: Pick<NostrEvent, "pubkey" | "content">,
+): Promise<NostrEvent> => {
   const signer = await signerManager.getSigner();
+  console.log("SIGNER-DECRYPT", "called");
   if (!signer?.nip44Decrypt) {
     throw new Error("CANNOT_DECRYPT_EVENT");
   }
-  return JSON.parse(
-    await signer.nip44Decrypt(data.pubkey, data.content),
-  ) as NostrEvent;
+
+  const runDecrypt = async () => {
+    console.log("SIGNER-DECRYPT", "calling decrypt");
+    return signer.nip44Decrypt!(data.pubkey, data.content).then((raw) => {
+      console.log("SIGNER-DECRYPT", raw);
+      return JSON.parse(raw) as NostrEvent;
+    });
+  };
+
+  if (decryptGate === null) {
+    // First concurrent call: send it immediately and hold the gate open until
+    // it settles so queued callers don't each open their own permission popup.
+    console.log("SIGNER-DECRYPT", "first call");
+    const result = runDecrypt();
+    decryptGate = result.then(
+      () => {},
+      () => {},
+    );
+    void decryptGate.then(() => {
+      decryptGate = null;
+    });
+    return result;
+  }
+  console.log("SIGNER-DECRYPT", "general call");
+  // Gate is active: wait for the in-flight call to settle, then run ours.
+  // Awaiting here regardless of success/failure so that if the user grants
+  // the permission in the popup, this call proceeds with it already cached.
+  await decryptGate;
+  return runDecrypt();
 };
 
 export async function getUserPublicKey() {
@@ -69,7 +105,8 @@ export async function createSeal(rumor: Rumor, recipientPublicKey: string) {
     content,
     created_at: now(),
     tags: [],
-  });
+    // manual typecasting as its a seal and seals do not contain pubkey
+  } as unknown as UnsignedEvent);
 }
 
 export function createWrap(

@@ -18,7 +18,7 @@ function makeNostrEvent(overrides: Partial<Event> = {}): Event {
 describe("nostrEventToCalendar", () => {
   it("maps basic event fields correctly", () => {
     const event = makeNostrEvent();
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
 
     expect(result.description).toBe("Event description");
     expect(result.user).toBe("pubkey-abc");
@@ -35,7 +35,7 @@ describe("nostrEventToCalendar", () => {
         ["end", "1700003600"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
 
     expect(result.begin).toBe(1700000000 * 1000);
     expect(result.end).toBe(1700003600 * 1000);
@@ -45,7 +45,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["d", "my-calendar-event"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.id).toBe("my-calendar-event");
   });
 
@@ -53,7 +53,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["title", "My Event"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.title).toBe("My Event");
   });
 
@@ -61,7 +61,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["name", "Named Event"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.title).toBe("Named Event");
   });
 
@@ -70,7 +70,7 @@ describe("nostrEventToCalendar", () => {
       content: "content description",
       tags: [["description", "tag description"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.description).toBe("tag description");
   });
 
@@ -81,7 +81,7 @@ describe("nostrEventToCalendar", () => {
         ["r", "https://other.com"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.reference).toEqual([
       "https://example.com",
       "https://other.com",
@@ -92,7 +92,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["image", "https://example.com/image.jpg"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.image).toBe("https://example.com/image.jpg");
   });
 
@@ -103,7 +103,7 @@ describe("nostrEventToCalendar", () => {
         ["t", "nostr"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.categories).toEqual(["meetup", "nostr"]);
   });
 
@@ -111,7 +111,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["location", "NYC"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.location).toEqual(["NYC"]);
   });
 
@@ -122,7 +122,7 @@ describe("nostrEventToCalendar", () => {
         ["p", "participant-2"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.participants).toEqual(["participant-1", "participant-2"]);
   });
 
@@ -130,7 +130,7 @@ describe("nostrEventToCalendar", () => {
     const event = makeNostrEvent({
       tags: [["g", "u4pruydqqvj"]],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.geoHash).toEqual(["u4pruydqqvj"]);
   });
 
@@ -141,7 +141,7 @@ describe("nostrEventToCalendar", () => {
         ["l", "FREQ=WEEKLY"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.repeat.rrule).toBe("FREQ=WEEKLY");
   });
 
@@ -152,31 +152,33 @@ describe("nostrEventToCalendar", () => {
         ["l", "FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z"],
       ],
     });
-    const result = nostrEventToCalendar(event);
-    expect(result.repeat.rrule).toBe("FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z");
+    const result = nostrEventToCalendar(event, "");
+    expect(result.repeat.rrule).toBe(
+      "FREQ=DAILY;COUNT=5;UNTIL=20250430T100000Z",
+    );
   });
 
   it("sets repeat.rrule to null for non-recurring events", () => {
     const event = makeNostrEvent({ tags: [] });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.repeat.rrule).toBeNull();
   });
 
   it("sets isPrivateEvent from options", () => {
     const event = makeNostrEvent();
-    const result = nostrEventToCalendar(event, { isPrivateEvent: true });
+    const result = nostrEventToCalendar(event, "", { isPrivateEvent: true });
     expect(result.isPrivateEvent).toBe(true);
   });
 
   it("sets viewKey from options", () => {
     const event = makeNostrEvent();
-    const result = nostrEventToCalendar(event, { viewKey: "secret-key" });
+    const result = nostrEventToCalendar(event, "", { viewKey: "secret-key" });
     expect(result.viewKey).toBe("secret-key");
   });
 
   it("defaults to empty arrays for missing collection fields", () => {
     const event = makeNostrEvent({ tags: [] });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
 
     expect(result.categories).toEqual([]);
     expect(result.reference).toEqual([]);
@@ -188,14 +190,14 @@ describe("nostrEventToCalendar", () => {
 
   it("defaults to 0 for begin and end when tags are missing", () => {
     const event = makeNostrEvent({ tags: [] });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.begin).toBe(0);
     expect(result.end).toBe(0);
   });
 
   it("defaults to empty string for title and website", () => {
     const event = makeNostrEvent({ tags: [] });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
     expect(result.title).toBe("");
     expect(result.website).toBe("");
   });
@@ -220,7 +222,7 @@ describe("nostrEventToCalendar", () => {
         ["l", "FREQ=DAILY"],
       ],
     });
-    const result = nostrEventToCalendar(event);
+    const result = nostrEventToCalendar(event, "");
 
     expect(result.id).toBe("full-event");
     expect(result.title).toBe("Full Event");
@@ -233,5 +235,52 @@ describe("nostrEventToCalendar", () => {
     expect(result.reference).toEqual(["https://nostr.com"]);
     expect(result.image).toBe("https://img.com/pic.png");
     expect(result.repeat.rrule).toBe("FREQ=DAILY");
+  });
+});
+
+describe("nostrEventToCalendar form tags", () => {
+  it("returns undefined forms when no form tag is present", () => {
+    const result = nostrEventToCalendar(makeNostrEvent(), "");
+    expect(result.forms).toBeUndefined();
+  });
+
+  it("parses a form tag with naddr only", () => {
+    const result = nostrEventToCalendar(
+      makeNostrEvent({ tags: [["form", "naddr1abc"]] }),
+      "",
+    );
+    expect(result.forms).toEqual([{ naddr: "naddr1abc" }]);
+  });
+
+  it("parses a form tag with naddr and viewKey", () => {
+    const result = nostrEventToCalendar(
+      makeNostrEvent({ tags: [["form", "naddr1abc", "key-1"]] }),
+      "",
+    );
+    expect(result.forms).toEqual([{ naddr: "naddr1abc", viewKey: "key-1" }]);
+  });
+
+  it("parses multiple form tags", () => {
+    const result = nostrEventToCalendar(
+      makeNostrEvent({
+        tags: [
+          ["form", "naddr1aaa"],
+          ["form", "naddr1bbb", "k2"],
+        ],
+      }),
+      "",
+    );
+    expect(result.forms).toEqual([
+      { naddr: "naddr1aaa" },
+      { naddr: "naddr1bbb", viewKey: "k2" },
+    ]);
+  });
+
+  it("ignores empty-value form tags", () => {
+    const result = nostrEventToCalendar(
+      makeNostrEvent({ tags: [["form", ""]] }),
+      "",
+    );
+    expect(result.forms).toBeUndefined();
   });
 });

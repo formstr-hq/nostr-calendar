@@ -8,6 +8,11 @@ import {
   SubscriptionDebugInfo,
 } from "./types";
 import { EventKinds } from "../EventConfigs";
+import {
+  clearOfflineCache,
+  hydrateOfflineEvents,
+  persistOfflineEvent,
+} from "../offlineEventCache";
 
 /**
  * NostrRuntime - Centralized Nostr subscription and event storage
@@ -29,7 +34,7 @@ import { EventKinds } from "../EventConfigs";
  * // Subscribe to events (network + cache)
  * const handle = nostrRuntime.subscribe(
  *   ['wss://relay.example.com'],
- *   [{ kinds: [1], limit: 100 }],
+ *   { kinds: [1], limit: 100 },
  *   {
  *     onEvent: (event) => console.log('New event:', event),
  *     onEose: () => console.log('Subscription ready'),
@@ -41,14 +46,22 @@ import { EventKinds } from "../EventConfigs";
  * ```
  */
 export class NostrRuntime {
-  private pool: SimplePool;
   public eventStore: EventStore;
   private subscriptionManager: SubscriptionManager;
+  private offlineCachePubkey: string | null = null;
 
   constructor(pool: SimplePool) {
-    this.pool = pool;
     this.eventStore = new EventStore();
-    this.subscriptionManager = new SubscriptionManager(pool, this.eventStore);
+    this.subscriptionManager = new SubscriptionManager(
+      pool,
+      this.eventStore,
+      (event) => this.persistAcceptedEvent(event),
+    );
+  }
+
+  private persistAcceptedEvent(event: Event): void {
+    if (!this.offlineCachePubkey) return;
+    void persistOfflineEvent(this.offlineCachePubkey, event);
   }
 
   /**
@@ -86,55 +99,45 @@ export class NostrRuntime {
    * - Automatically manages reference counting and cleanup
    *
    * @param relays - Array of relay URLs
-   * @param filters - Array of Nostr filters
+   * @param filter - Nostr filter
    * @param options - Subscription options
    * @returns SubscriptionHandle with unsubscribe function
    */
   subscribe(
     relays: string[],
-    filters: Filter[],
+    filter: Filter,
     options?: SubscribeOptions,
   ): SubscriptionHandle {
     const { onEvent, onEose, localOnly } = options || {};
 
-    // If localOnly, just query cache and return
     if (localOnly) {
       if (onEvent) {
-        // Query cache for each filter
-        for (const filter of filters) {
-          const events = this.eventStore.query(filter);
-          for (const event of events) {
-            onEvent(event);
-          }
+        const events = this.eventStore.query(filter);
+        for (const event of events) {
+          onEvent(event);
         }
       }
 
-      // Call onEose immediately
       if (onEose) {
         onEose();
       }
 
-      // Return dummy handle
       return {
         id: "local-only",
-        unsubscribe: () => {}, // No-op
+        unsubscribe: () => {},
       };
     }
 
-    // First, deliver cached events immediately
     if (onEvent) {
-      for (const filter of filters) {
-        const cachedEvents = this.eventStore.query(filter);
-        for (const event of cachedEvents) {
-          onEvent(event);
-        }
+      const cachedEvents = this.eventStore.query(filter);
+      for (const event of cachedEvents) {
+        onEvent(event);
       }
     }
 
-    // Then create network subscription
     const { id, unsubscribe } = this.subscriptionManager.subscribe(
       relays,
-      filters,
+      filter,
       onEvent,
       onEose,
     );
@@ -151,7 +154,24 @@ export class NostrRuntime {
    * @returns true if event was added, false if rejected/duplicate
    */
   addEvent(event: Event): boolean {
-    return this.eventStore.addEvent(event);
+    const added = this.eventStore.addEvent(event);
+    if (added) {
+      this.persistAcceptedEvent(event);
+    }
+    return added;
+  }
+
+  async hydrateOfflineEvents(pubkey: string): Promise<number> {
+    this.offlineCachePubkey = pubkey;
+    const cachedEvents = await hydrateOfflineEvents(pubkey);
+    return this.addEvents(cachedEvents, { persist: false });
+  }
+
+  async clearOfflineCache(pubkey: string): Promise<void> {
+    if (this.offlineCachePubkey === pubkey) {
+      this.offlineCachePubkey = null;
+    }
+    await clearOfflineCache(pubkey);
   }
 
   /**
@@ -183,7 +203,7 @@ export class NostrRuntime {
     return new Promise((resolve) => {
       const handle = this.subscriptionManager.subscribe(
         relays,
-        [filter],
+        filter,
         (event) => {
           if (!seen.has(event.id)) {
             seen.add(event.id);
@@ -263,7 +283,7 @@ export class NostrRuntime {
         const event = eventMap.get(id) || null;
         resolvers.forEach((resolve) => resolve(event));
       });
-    } catch (err) {
+    } catch (_err) {
       // Resolve all with null on error
       idToResolvers.forEach((resolvers) => {
         resolvers.forEach((resolve) => resolve(null));
@@ -278,11 +298,18 @@ export class NostrRuntime {
    * @param events - Events to add
    * @returns Number of events successfully added
    */
-  addEvents(events: Event[]): number {
+  addEvents(
+    events: Event[],
+    { persist = true }: { persist?: boolean } = {},
+  ): number {
     let addedCount = 0;
     for (const event of events) {
-      if (this.eventStore.addEvent(event)) {
+      const added = this.eventStore.addEvent(event);
+      if (added) {
         addedCount++;
+        if (persist) {
+          this.persistAcceptedEvent(event);
+        }
       }
     }
     return addedCount;
@@ -324,6 +351,10 @@ export class NostrRuntime {
      */
     getEventsByKind: (kind: number): Event[] => {
       return this.eventStore.getEventsByKind(kind);
+    },
+
+    getAllEvents: (): Event[] => {
+      return this.eventStore.getAllEvents();
     },
 
     /**
@@ -400,4 +431,5 @@ export * from "./types";
 export { EventStore } from "./EventStore";
 export { SubscriptionManager } from "./SubscriptionManager";
 
-export const nostrRuntime = createNostrRuntime(new SimplePool());
+export const pool = new SimplePool();
+export const nostrRuntime = createNostrRuntime(pool);

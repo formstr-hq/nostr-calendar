@@ -9,57 +9,115 @@
  * and dashed border styling. Users can accept (add to calendar) or dismiss.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
   Button,
   Paper,
   IconButton,
+  Stack,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useNavigate } from "react-router";
 import { useInvitations } from "../stores/invitations";
 import { AddToCalendarDialog } from "./AddToCalendarDialog";
+import { FormFillerDialog } from "./FormFillerDialog";
+import { ReportEventDialog } from "./ReportEventDialog";
 import { TimeRenderer } from "./TimeRenderer";
 import { Participant } from "./Participant";
 import type { ICalendarEvent } from "../utils/types";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
+import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
+import { FormAttachmentRow } from "./FormAttachmentRow";
+import type { ReportType } from "../common/nostr";
 
 export function InvitationPanel() {
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
-  const { invitations, acceptInvitation, dismissInvitation } = useInvitations();
+  const { invitations, acceptInvitation, dismissInvitation, reportInvitation } =
+    useInvitations();
   const { fetchCalendars } = useCalendarLists();
 
   useEffect(() => {
     fetchCalendars();
-  }, []);
+  }, [fetchCalendars]);
 
   const [addDialogEvent, setAddDialogEvent] = useState<ICalendarEvent | null>(
     null,
   );
   const [addDialogGiftWrapId, setAddDialogGiftWrapId] = useState<string>("");
+  const [addDialogDefaultCalendarId, setAddDialogDefaultCalendarId] =
+    useState("");
+  const [reportGiftWrapId, setReportGiftWrapId] = useState<string | null>(null);
   const pendingInvitations = invitations
     .filter((inv) => inv.status === "pending")
     .sort((a, b) => b.receivedAt - a.receivedAt);
-  console.log(pendingInvitations);
+
+  const finalizeAccept = useCallback(
+    async ({
+      calendarId,
+      giftWrapId,
+    }: {
+      calendarId: string;
+      giftWrapId?: string;
+    }) => {
+      if (!giftWrapId) {
+        throw new Error("Missing gift wrap id for invitation acceptance");
+      }
+
+      await acceptInvitation(giftWrapId, calendarId);
+    },
+    [acceptInvitation],
+  );
+
+  const {
+    pendingAccept,
+    pendingForm,
+    formCount,
+    startAccept,
+    advanceAccept,
+    cancelAccept,
+  } = useAcceptWithFormsFlow<ICalendarEvent>({
+    onFinalize: finalizeAccept,
+    onCancel: (currentPendingAccept) => {
+      setAddDialogDefaultCalendarId(currentPendingAccept.calendarId);
+      setAddDialogGiftWrapId(currentPendingAccept.giftWrapId ?? "");
+      setAddDialogEvent(currentPendingAccept.context);
+    },
+  });
 
   const handleAccept = (giftWrapId: string, event?: ICalendarEvent) => {
     if (event) {
+      setAddDialogDefaultCalendarId("");
       setAddDialogEvent(event);
       setAddDialogGiftWrapId(giftWrapId);
     }
   };
 
-  const handleAcceptConfirm = async (calendarId: string) => {
-    await acceptInvitation(addDialogGiftWrapId, calendarId);
+  const closeAddDialog = () => {
     setAddDialogEvent(null);
+    setAddDialogGiftWrapId("");
+    setAddDialogDefaultCalendarId("");
+  };
+
+  const handleAcceptConfirm = async (calendarId: string) => {
+    const event = addDialogEvent;
+    const giftWrapId = addDialogGiftWrapId;
+    closeAddDialog();
+    if (!event) return;
+    await startAccept({
+      calendarId,
+      giftWrapId,
+      attachments: event.forms ?? [],
+      context: event,
+    });
   };
 
   return (
@@ -137,6 +195,27 @@ export function InvitationPanel() {
                   }}
                 />
               </Box>
+              {invitation.event.forms && invitation.event.forms.length > 0 && (
+                <Box mt={1.5}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    mb={0.75}
+                  >
+                    {intl.formatMessage({ id: "form.attachments" })}
+                  </Typography>
+                  <Stack spacing={0.75}>
+                    {invitation.event.forms.map((attachment) => (
+                      <FormAttachmentRow
+                        key={attachment.naddr}
+                        attachment={attachment}
+                        showSubmissionStatus={false}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
@@ -144,24 +223,41 @@ export function InvitationPanel() {
             </Typography>
           )}
 
-          <Box display="flex" gap={1} mt={2} justifyContent="flex-end">
+          <Box
+            display="flex"
+            gap={1}
+            mt={2}
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+          >
             <Button
               size="small"
-              color="inherit"
-              onClick={() => dismissInvitation(invitation.giftWrapId)}
+              color="warning"
+              startIcon={<WarningAmberIcon fontSize="small" />}
+              onClick={() => setReportGiftWrapId(invitation.giftWrapId)}
             >
-              {intl.formatMessage({ id: "invitation.dismiss" })}
+              {intl.formatMessage({ id: "report.reportEvent" })}
             </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={!invitation.event?.user}
-              onClick={() =>
-                handleAccept(invitation.giftWrapId, invitation.event)
-              }
-            >
-              {intl.formatMessage({ id: "addToCalendar.addToCalendar" })}
-            </Button>
+            <Box display="flex" gap={1}>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => dismissInvitation(invitation.giftWrapId)}
+              >
+                {intl.formatMessage({ id: "invitation.dismiss" })}
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!invitation.event?.user}
+                onClick={() =>
+                  handleAccept(invitation.giftWrapId, invitation.event)
+                }
+              >
+                {intl.formatMessage({ id: "addToCalendar.addToCalendar" })}
+              </Button>
+            </Box>
           </Box>
         </Paper>
       ))}
@@ -170,11 +266,37 @@ export function InvitationPanel() {
       {addDialogEvent && (
         <AddToCalendarDialog
           open={!!addDialogEvent}
-          onClose={() => setAddDialogEvent(null)}
+          onClose={closeAddDialog}
           event={addDialogEvent}
           onAccept={handleAcceptConfirm}
+          defaultCalendarId={addDialogDefaultCalendarId || undefined}
         />
       )}
+
+      {/* Form filler — runs after calendar selection, before accept finalizes */}
+      {pendingForm && (
+        <FormFillerDialog
+          open
+          attachment={pendingForm}
+          index={pendingAccept ? pendingAccept.formIndex + 1 : undefined}
+          total={formCount}
+          onClose={cancelAccept}
+          onSubmitted={() => {
+            void advanceAccept();
+          }}
+        />
+      )}
+
+      {/* Report event dialog */}
+      <ReportEventDialog
+        open={reportGiftWrapId !== null}
+        onClose={() => setReportGiftWrapId(null)}
+        onReport={async (reportType: ReportType) => {
+          if (!reportGiftWrapId) return;
+          await reportInvitation(reportGiftWrapId, reportType);
+          setReportGiftWrapId(null);
+        }}
+      />
     </Box>
   );
 }

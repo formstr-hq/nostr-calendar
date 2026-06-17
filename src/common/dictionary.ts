@@ -4,12 +4,6 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
-    rsvp: {
-      accepted: "Accepted",
-      declined: "Declined",
-      maybe: "Maybe",
-      pending: "Pending",
-    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -65,6 +59,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Edit Event",
+      forms: "Attached forms",
       duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
@@ -79,6 +74,13 @@ const dictionary: NestedObject = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
+      notifications: "Notifications",
+      reminderValue: "Reminder",
+      reminderUnitMinutes: "minutes before",
+      reminderUnitHours: "hours before",
+      reminderUnitDays: "days before",
+      addReminder: "Add reminder",
+      noNotifications: "No notifications for this event",
       customRecurrence: "Custom Rule",
       customRecurrenceTitle: "Custom recurrence",
       repeatEvery: "Repeat every",
@@ -102,13 +104,16 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "No relays accepted the event. Please check your relay configuration and try again.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Some relays did not accept the event. You can try again for failed relays only.",
+      relayPartialSuccess: "Saved to {acceptedCount} of {totalCount} relay(s).",
+      relaysPartialPublishSummary:
+        "Saved to {acceptedCount}/{totalCount} relay(s)",
+      relayRetryHint:
+        "Retry failed relays to publish to relays that did not accept it.",
       retryFailedRelays: "Retry failed relays",
       closeEditor: "Close",
       note: "Note",
       partialPublishHint:
-        "The event is on your calendar. Retry to publish to relays that did not accept.",
+        "{acceptedCount} of {totalCount} relay(s) accepted it. You can retry the {failedCount} failed relay(s) only.",
       saving: "Saving...",
       saveEvent: "Save Event",
       copyLink: "Copy link to this event",
@@ -130,6 +135,52 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
+    },
+    form: {
+      attachments: "Forms",
+      inputPlaceholder: "Paste form naddr or Formstr URL",
+      addAttachment: "Add",
+      removeAttachment: "Remove form",
+      invalidInput: "Could not recognize a form naddr in that input.",
+      duplicateAttachment: "That form is already attached.",
+      privateOnly: "Forms can only be attached to private events.",
+      fillTitle: "Fill out form",
+      fillOut: "Fill out",
+      responsesLoading: "Checking your previous responses",
+      viewOrUpdate: "View / update response",
+      submit: "Submit",
+      cancel: "Cancel",
+      submitting: "Submitting…",
+      retry: "Retry",
+      openExternal: "Open in Formstr",
+      fetchError: "Could not load the form. Please try again.",
+      submitError: "Could not submit your response. Please try again.",
+      alreadySubmitted: "You've already responded to this form.",
+      yourResponse: "Your response",
+      responseUnavailable:
+        "We found your submission, and we're still collecting your answers.",
+      noAnswer: "No answer",
+      unknownQuestion: "Question",
+      submitAgain: "Submit again",
+    },
+    formResponses: {
+      viewButton: "View responses",
+    },
+    rsvp: {
+      yourResponse: "Will you be attending?",
+      yes: "Yes",
+      no: "No",
+      maybe: "Maybe",
+      toggleDetails: "Show RSVP details",
+      alternateTimeTitle: "Can't attend at this time? Suggest a new time",
+      suggestedStart: "Suggested start",
+      suggestedEnd: "Suggested end",
+      comment: "Comment",
+      detailsHint:
+        "Share another time that works, or leave a note for the host and participants.",
+      addNote: "Add a note",
+      suggestionsHeading: "Time suggestions from participants",
+      applySuggestion: "Move event to this time",
     },
     deleteEvent: {
       title: "Delete Event",
@@ -155,6 +206,7 @@ const dictionary: NestedObject = {
       notifications: "Notifications",
       notificationsOn: "Enabled for this calendar",
       notificationsOff: "Disabled for this calendar",
+      submit: "Absenden",
       notificationsAppOnly: "Notifications are only available in the app.",
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
@@ -163,7 +215,16 @@ const dictionary: NestedObject = {
     sidebar: {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Antwort gefunden, aber die Details synchronisieren noch von den Relays.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
       createCalendar: "Create Calendar",
+      about: "About",
+      privacyPolicy: "Privacy Policy",
+      contactUs: "Contact Us",
+      thankYouMessage: "Thank you for contacting us!",
     },
     deviceCalendar: {
       title: "Device calendars",
@@ -218,7 +279,7 @@ const dictionary: NestedObject = {
       stayHere: "Stay Here",
     },
     login: {
-      signInToFormstr: "Sign in to Formstr",
+      signInToFormstr: "Sign in to Calendar",
       chooseLoginMethod: "Choose your preferred login method",
       signInWithExtension: "Sign in with Nostr Extension (NIP-07)",
       signInWithNsec: "Sign in with nsec",
@@ -263,9 +324,29 @@ const dictionary: NestedObject = {
       clickToCopy: "Click to copy",
       copied: "Copied!",
       author: "Organiser",
+      alreadyAdded: "Participant already added",
+      invalid: "Enter a valid npub, NIP-05, or hex pubkey",
+    },
+    report: {
+      reportEvent: "Report this event",
+      title: "Report Event",
+      description:
+        "You are about to report this event. Reports are published publicly and may be used for moderation purposes for other users. This event will be hidden from your invitations.",
+      selectType: "Select a reason",
+      nudity: "Nudity / Explicit content",
+      malware: "Malware",
+      profanity: "Profanity / Hateful speech",
+      illegal: "Illegal content",
+      spam: "Spam",
+      impersonation: "Impersonation",
+      other: "Other",
+      submit: "Submit Report",
+      cancel: "Cancel",
+      submitting: "Submitting...",
     },
     scheduling: {
-      featureDescription: "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
+      featureDescription:
+        "Create a booking page that lets others schedule appointments with you. Your page is not listed anywhere publicly — it's only accessible to people you share the link with.",
       sidebarTitle: "Booking Links",
       createSchedulingPage: "Create a booking page",
       createSchedulingPageButton: "Create page",
@@ -304,7 +385,8 @@ const dictionary: NestedObject = {
       noSlotsThisWeek:
         "No available slots this week. Try navigating to a different week.",
       eventTitle: "Event Title",
-      eventTitleHelp: "Title for calendar events created from bookings. You will be able to update it later on",
+      eventTitleHelp:
+        "Title for calendar events created from bookings. You will be able to update it later on",
       eventTitlePlaceholder: "e.g., Meeting with {name}",
       basicInformation: "Basic Information",
       appointmentDuration: "Appointment Duration",
@@ -351,12 +433,6 @@ const dictionary: NestedObject = {
     },
   },
   "de-DE": {
-    rsvp: {
-      accepted: "Angenommen",
-      declined: "Abgelehnt",
-      maybe: "Vielleicht",
-      pending: "Ausstehend",
-    },
     navigation: {
       today: "Heute",
       previousDay: "Vortag",
@@ -416,6 +492,7 @@ const dictionary: NestedObject = {
     },
     event: {
       editEvent: "Termin bearbeiten",
+      forms: "Angehängte Formulare",
       duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
@@ -430,6 +507,13 @@ const dictionary: NestedObject = {
       monthly: "Monatlich",
       quarterly: "Vierteljährlich",
       yearly: "Jährlich",
+      notifications: "Benachrichtigungen",
+      reminderValue: "Erinnerung",
+      reminderUnitMinutes: "Minuten vorher",
+      reminderUnitHours: "Stunden vorher",
+      reminderUnitDays: "Tage vorher",
+      addReminder: "Erinnerung hinzufügen",
+      noNotifications: "Keine Benachrichtigungen für diesen Termin",
       customRecurrence: "Benutzerdefinierte Regel",
       customRecurrenceTitle: "Benutzerdefinierte Wiederholung",
       repeatEvery: "Wiederhole alle",
@@ -453,13 +537,17 @@ const dictionary: NestedObject = {
       noRelaysAccepted:
         "Kein Relay hat den Termin akzeptiert. Bitte überprüfen Sie Ihre Relay-Konfiguration und versuchen Sie es erneut.",
       relayDetails: "Details",
-      relayPartialFailure:
-        "Einige Relays haben den Termin nicht akzeptiert. Sie können nur fehlgeschlagene Relays erneut versuchen.",
+      relayPartialSuccess:
+        "Gespeichert auf {acceptedCount} von {totalCount} Relay(s).",
+      relaysPartialPublishSummary:
+        "Gespeichert auf {acceptedCount}/{totalCount} Relay(s)",
+      relayRetryHint:
+        "Fehlgeschlagene Relays erneut versuchen, um an Relays zu senden, die nicht angenommen haben.",
       retryFailedRelays: "Fehlgeschlagene Relays erneut senden",
       closeEditor: "Schließen",
       note: "Hinweis",
       partialPublishHint:
-        "Der Termin ist in Ihrem Kalender. Wiederholen, um an Relays zu senden, die nicht angenommen haben.",
+        "{acceptedCount} von {totalCount} Relay(s) haben ihn akzeptiert. Sie können nur die {failedCount} fehlgeschlagenen Relay(s) erneut versuchen.",
       saving: "Speichern...",
       saveEvent: "Termin speichern",
       copyLink: "Link zu diesem Termin kopieren",
@@ -482,6 +570,54 @@ const dictionary: NestedObject = {
       notInCalendar:
         "Dieser Termin ist in keinem Ihrer Kalender. Sie erhalten keine Benachrichtigungen für diesen Termin. Fügen Sie ihn zu Ihrem Kalender hinzu, um Benachrichtigungen zu erhalten.",
       scheduledNotifications: "Geplante Benachrichtigungen",
+    },
+    form: {
+      attachments: "Formulare",
+      inputPlaceholder: "Formular-naddr oder Formstr-URL einfügen",
+      addAttachment: "Hinzufügen",
+      removeAttachment: "Formular entfernen",
+      invalidInput: "In der Eingabe wurde keine Formular-naddr erkannt.",
+      duplicateAttachment: "Dieses Formular ist bereits angehängt.",
+      privateOnly: "Formulare können nur an private Termine angehängt werden.",
+      fillTitle: "Formular ausfüllen",
+      fillOut: "Ausfüllen",
+      viewOrUpdate: "Antwort ansehen / aktualisieren",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet…",
+      retry: "Erneut versuchen",
+      openExternal: "In Formstr öffnen",
+      fetchError:
+        "Das Formular konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+      submitError:
+        "Ihre Antwort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      alreadySubmitted: "Sie haben dieses Formular bereits beantwortet.",
+      yourResponse: "Ihre Antwort",
+      responseUnavailable:
+        "Wir haben Ihre Einreichung gefunden und sammeln noch Ihre Antworten.",
+      noAnswer: "Keine Antwort",
+      unknownQuestion: "Frage",
+      submitAgain: "Erneut absenden",
+      continue: "Weiter",
+    },
+    formResponses: {
+      viewButton: "Antworten in Formstr ansehen",
+    },
+    rsvp: {
+      yourResponse: "Nimmst du teil?",
+      yes: "Ja",
+      no: "Nein",
+      maybe: "Vielleicht",
+      toggleDetails: "RSVP-Details anzeigen",
+      alternateTimeTitle:
+        "Kannst du zu dieser Zeit nicht? Schlage eine neue Zeit vor",
+      suggestedStart: "Vorgeschlagener Beginn",
+      suggestedEnd: "Vorgeschlagenes Ende",
+      comment: "Kommentar",
+      detailsHint:
+        "Teile eine andere passende Zeit oder hinterlasse eine Notiz für Gastgeber und Teilnehmer.",
+      addNote: "Eine Notiz hinzufügen",
+      suggestionsHeading: "Zeitvorschläge von Teilnehmern",
+      applySuggestion: "Termin auf diese Zeit verschieben",
     },
     deleteEvent: {
       title: "Termin löschen",
@@ -516,6 +652,10 @@ const dictionary: NestedObject = {
       calendars: "Kalender",
       noCalendarsYet: "Noch keine Kalender",
       createCalendar: "Kalender erstellen",
+      about: "Über uns",
+      privacyPolicy: "Datenschutzrichtlinie",
+      contactUs: "Kontakt",
+      thankYouMessage: "Vielen Dank für Ihre Kontaktaufnahme!",
     },
     deviceCalendar: {
       title: "Gerätekalender",
@@ -574,7 +714,7 @@ const dictionary: NestedObject = {
       stayHere: "Hier bleiben",
     },
     login: {
-      signInToFormstr: "Bei Formstr anmelden",
+      signInToFormstr: "Bei Calendar anmelden",
       chooseLoginMethod: "Wählen Sie Ihre bevorzugte Anmeldemethode",
       signInWithExtension: "Mit Nostr-Erweiterung anmelden (NIP-07)",
       signInWithNsec: "Mit nsec anmelden",
@@ -619,9 +759,29 @@ const dictionary: NestedObject = {
       clickToCopy: "Klicken zum Kopieren",
       copied: "Kopiert!",
       author: "Organisator",
+      alreadyAdded: "Teilnehmer bereits hinzugefügt",
+      invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
+    },
+    report: {
+      reportEvent: "Dieses Ereignis melden",
+      title: "Ereignis melden",
+      description:
+        "Sie sind dabei, dieses Ereignis zu melden. Meldungen werden öffentlich veröffentlicht und können zu Moderationszwecken für andere Nutzer verwendet werden. Dieses Ereignis wird aus Ihren Einladungen ausgeblendet.",
+      selectType: "Grund auswählen",
+      nudity: "Nacktheit / Explizite Inhalte",
+      malware: "Schadsoftware",
+      profanity: "Obszönität / Hassrede",
+      illegal: "Illegale Inhalte",
+      spam: "Spam",
+      impersonation: "Identitätsbetrug",
+      other: "Sonstiges",
+      submit: "Meldung absenden",
+      cancel: "Abbrechen",
+      submitting: "Wird gesendet...",
     },
     scheduling: {
-      featureDescription: "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
+      featureDescription:
+        "Erstellen Sie eine Buchungsseite, über die andere Personen Termine mit Ihnen vereinbaren können. Ihre Seite ist nirgendwo öffentlich aufgeführt — sie ist nur für Personen zugänglich, mit denen Sie den Link teilen.",
       createSchedulingPage: "Terminseite erstellen",
       editSchedulingPage: "Terminseite bearbeiten",
       schedulingPages: "Terminplanung",

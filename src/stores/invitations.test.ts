@@ -82,6 +82,7 @@ describe("useInvitations store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "My Calendar",
           description: "",
           color: "#4285f4",
@@ -105,6 +106,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -127,6 +131,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-123",
           viewKey: "nsec1testkey",
@@ -135,6 +142,7 @@ describe("useInvitations store", () => {
           event: {
             id: "event-123",
             eventId: "event-123",
+            calendarId: "",
             title: "Meeting",
             description: "",
             begin: 1700000000000,
@@ -179,16 +187,11 @@ describe("useInvitations store", () => {
       calendars: [
         {
           id: "cal-1",
+          eventId: "",
           title: "My Calendar",
           description: "",
           color: "#4285f4",
-          eventRefs: [
-            [
-              "32678:testpubkey:existing-event",
-              "",
-              "nsec1key:1700000000::1700003600:false",
-            ],
-          ],
+          eventRefs: [["32678:testpubkey:existing-event", "", "nsec1key"]],
           createdAt: 1700000000,
           isVisible: true,
         },
@@ -205,6 +208,9 @@ describe("useInvitations store", () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-1",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-1",
           eventId: "event-1",
           viewKey: "nsec1test",
@@ -224,11 +230,13 @@ describe("useInvitations store", () => {
     expect(state.isLoaded).toBe(false);
   });
 
-  it("correctly builds event ref with isRecurring flag on accept", async () => {
-    // Invitation with a recurring event
+  it("correctly builds event ref for a recurring event on accept", async () => {
     useInvitations.setState({
       invitations: [
         {
+          originalInvitationId: "wrap-recurring",
+          kind: 32678,
+          pubkey: "test-pubkey",
           giftWrapId: "wrap-recurring",
           eventId: "recurring-event",
           viewKey: "nsec1recur",
@@ -236,12 +244,13 @@ describe("useInvitations store", () => {
           status: "pending",
           event: {
             id: "recurring-event",
+            calendarId: "",
             eventId: "recurring-event",
             title: "Weekly Standup",
             description: "",
             begin: 1700000000000,
             end: 1700003600000,
-            kind: 32679,
+            kind: 32678,
             createdAt: 1700000000,
             categories: [],
             participants: [],
@@ -267,11 +276,9 @@ describe("useInvitations store", () => {
     );
     expect(ref).toBeDefined();
     // Coordinate should contain kind:authorPubkey:eventDTag
-    expect(ref![0]).toContain("32679");
+    expect(ref![0]).toContain("32678");
     expect(ref![0]).toContain("recurring-event");
-    // Metadata (third element) should end with :true for recurring
-    expect(ref![2].endsWith(":true")).toBe(true);
-    // Metadata should contain the viewKey
-    expect(ref![2]).toContain("nsec1recur");
+    // viewKey should be in the third element
+    expect(ref![2]).toBe("nsec1recur");
   });
 });
