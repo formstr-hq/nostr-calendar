@@ -1,7 +1,4 @@
-const PUBLIC_ROUTE_PATTERNS = [
-  /^\/event\/[^/]+$/,
-  /^\/schedule\/[^/]+$/,
-];
+const PUBLIC_ROUTE_PATTERNS = [/^\/event\/[^/]+$/, /^\/schedule\/[^/]+$/];
 
 const STANDALONE_HEADER_PATTERNS = [
   ...PUBLIC_ROUTE_PATTERNS,

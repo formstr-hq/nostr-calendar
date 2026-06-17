@@ -128,7 +128,9 @@ export const ViewEventPage = () => {
         component={"main"}
         style={{ width: "100%", minHeight: `max(100vh, 100%)` }}
       >
-        <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
+        <Box
+          sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }}
+        />
         {calendarEventLoadState.fetchState === "loading" ? (
           <LoaderRenderer />
         ) : null}
