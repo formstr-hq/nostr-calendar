@@ -119,6 +119,7 @@ export class SubscriptionManager {
       managedSub.closer = this.pool.subscribeMany(relays, filter, {
         onevent: (event) => {
           const added = this.handleStoredEvent(event);
+          console.log(event.kind, added, "subman");
           if (added) {
             for (const callback of Array.from(managedSub.callbacks)) {
               callback(event);

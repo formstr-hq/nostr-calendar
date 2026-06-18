@@ -25,7 +25,6 @@ import {
 import { ICSListener } from "./components/ICSListener";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
-import { CalendarManageDialog } from "./components/CalendarManageDialog";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
 
@@ -58,13 +57,7 @@ function Application() {
   const fetchPrivateEvents = useTimeBasedEvents(
     (state) => state.fetchPrivateEvents,
   );
-  const {
-    calendars,
-    isLoaded: calendarsLoaded,
-    createCalendar,
-    fetchCalendars,
-  } = useCalendarLists();
-  const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
+  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
 
   useEffect(() => {
     initializeUser();
@@ -195,30 +188,6 @@ function Application() {
     }
   }, [user, isInitialized, updateLoginModal]);
 
-  // Show onboarding dialog when user is logged in but has no calendars
-  useEffect(() => {
-    if (isInitialized && calendarsLoaded && calendars.length === 0) {
-      setShowOnboardingDialog(true);
-    } else {
-      setShowOnboardingDialog(false);
-    }
-  }, [user, calendarsLoaded, calendars.length, isInitialized]);
-
-  const handleOnboardingSave = async (data: {
-    title: string;
-    description: string;
-    color: string;
-    notificationPreference: "enabled" | "disabled";
-  }) => {
-    await createCalendar(
-      data.title,
-      data.description,
-      data.color,
-      data.notificationPreference,
-    );
-    setShowOnboardingDialog(false);
-  };
-
   return (
     <>
       <Header onImportEvent={setImportedEvent} />
@@ -232,16 +201,6 @@ function Application() {
         open={showLoginModal}
         onClose={() => updateLoginModal(false)}
       />
-
-      {showOnboardingDialog && (
-        <CalendarManageDialog
-          open={showOnboardingDialog}
-          onClose={() => setShowOnboardingDialog(false)}
-          onSave={handleOnboardingSave}
-          onRefetch={fetchCalendars}
-          blocking
-        />
-      )}
 
       <RelayManager />
       <Toolbar />

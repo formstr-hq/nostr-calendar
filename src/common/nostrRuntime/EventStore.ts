@@ -111,10 +111,12 @@ export class EventStore {
 
       // Track new replaceable event
       this.replaceableKeys.set(replaceableKey, event.id);
+      return true;
     }
 
     // Check for exact duplicate
     if (this.eventsById.has(event.id)) {
+      console.log("Not adding duplicate event", event.kind);
       return false;
     }
 

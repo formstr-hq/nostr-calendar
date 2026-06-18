@@ -16,7 +16,6 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
 import {
@@ -51,10 +50,6 @@ interface CalendarManageDialogProps {
     notificationPreference: NotificationPreference;
   }) => void;
   onDelete?: () => void;
-  /** When true, the dialog cannot be dismissed — used for onboarding when no calendars exist. */
-  blocking?: boolean;
-  /** Called when the user wants to retry fetching calendars (shown in blocking/onboarding mode). */
-  onRefetch?: () => void;
 }
 
 export function CalendarManageDialog({
@@ -63,8 +58,6 @@ export function CalendarManageDialog({
   calendar,
   onSave,
   onDelete,
-  blocking = false,
-  onRefetch,
 }: CalendarManageDialogProps) {
   const [title, setTitle] = useState(calendar?.title || "");
   const [description, setDescription] = useState(calendar?.description || "");
@@ -88,13 +81,15 @@ export function CalendarManageDialog({
     onClose();
   };
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
   const isEdit = !!calendar;
 
   return (
     <Dialog
       fullScreen={isMobile}
       open={open}
-      onClose={blocking ? undefined : onClose}
+      onClose={onClose}
       maxWidth="sm"
       fullWidth
     >
@@ -105,38 +100,14 @@ export function CalendarManageDialog({
               ? intl.formatMessage({ id: "calendarManage.editCalendar" })
               : intl.formatMessage({ id: "calendarManage.newCalendar" })}
           </Typography>
-          {!blocking && (
-            <IconButton onClick={onClose} size="small">
-              <CloseIcon />
-            </IconButton>
-          )}
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
         </Box>
       </DialogTitle>
 
       <DialogContent dividers>
         <Box display="flex" flexDirection="column" gap={3}>
-          {blocking && (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                {intl.formatMessage({
-                  id: "calendarManage.onboardingExplanation",
-                })}
-              </Typography>
-              {onRefetch && (
-                <Button
-                  startIcon={<RefreshIcon />}
-                  onClick={onRefetch}
-                  variant="outlined"
-                  size="small"
-                  sx={{ alignSelf: "flex-start" }}
-                >
-                  {intl.formatMessage({
-                    id: "calendarManage.refetchCalendars",
-                  })}
-                </Button>
-              )}
-            </>
-          )}
           <TextField
             fullWidth
             label={intl.formatMessage({ id: "calendarManage.calendarName" })}
@@ -211,26 +182,53 @@ export function CalendarManageDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ padding: 2 }}>
-        {isEdit && onDelete && (
-          <Button color="error" onClick={onDelete} sx={{ mr: "auto" }}>
-            {intl.formatMessage({ id: "navigation.delete" })}
-          </Button>
+      <DialogActions sx={{ padding: 2, flexWrap: "wrap", gap: 1 }}>
+        {deleteConfirm ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 1,
+              width: "100%",
+            }}
+          >
+            <Typography variant="body2" color="error">
+              {intl.formatMessage({ id: "calendarManage.deleteWarning" })}
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+              <Button onClick={() => setDeleteConfirm(false)} color="inherit">
+                {intl.formatMessage({ id: "navigation.cancel" })}
+              </Button>
+              <Button color="error" variant="contained" onClick={onDelete}>
+                {intl.formatMessage({ id: "calendarManage.reallyDelete" })}
+              </Button>
+            </Box>
+          </Box>
+        ) : (
+          <>
+            {isEdit && onDelete && (
+              <Button
+                color="error"
+                onClick={() => setDeleteConfirm(true)}
+                sx={{ mr: "auto" }}
+              >
+                {intl.formatMessage({ id: "navigation.delete" })}
+              </Button>
+            )}
+            <Button onClick={onClose} color="inherit">
+              {intl.formatMessage({ id: "navigation.cancel" })}
+            </Button>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              disabled={!title.trim()}
+            >
+              {isEdit
+                ? intl.formatMessage({ id: "navigation.save" })
+                : intl.formatMessage({ id: "navigation.create" })}
+            </Button>
+          </>
         )}
-        {!blocking && (
-          <Button onClick={onClose} color="inherit">
-            {intl.formatMessage({ id: "navigation.cancel" })}
-          </Button>
-        )}
-        <Button
-          onClick={handleSave}
-          variant="contained"
-          disabled={!title.trim()}
-        >
-          {isEdit
-            ? intl.formatMessage({ id: "navigation.save" })
-            : intl.formatMessage({ id: "navigation.create" })}
-        </Button>
       </DialogActions>
     </Dialog>
   );
