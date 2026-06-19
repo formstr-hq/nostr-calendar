@@ -38,6 +38,8 @@ const dictionary: NestedObject = {
         "Private events are only visible to you and the invited participants",
       relays: "Relays",
       goToWeek: "go to week",
+      copyNpub: "Copy Identity (NPUB)",
+      copied: "Copied!",
     },
     filters: {
       showPublicEvents: "Show Public Events",
@@ -473,6 +475,8 @@ const dictionary: NestedObject = {
         "Private Termine sind nur für Sie und die eingeladenen Teilnehmer sichtbar",
       relays: "Relays",
       goToWeek: "Zur Woche gehen",
+      copyNpub: "Identität kopieren (NPUB)",
+      copied: "Kopiert!",
     },
     filters: {
       showPublicEvents: "Öffentliche Termine anzeigen",
