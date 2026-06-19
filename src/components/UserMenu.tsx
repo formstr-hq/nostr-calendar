@@ -33,7 +33,11 @@ export const UserMenu = () => {
         onClose={() => setCopied(false)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={() => setCopied(false)} severity="success" sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => setCopied(false)}
+          severity="success"
+          sx={{ width: "100%" }}
+        >
           {intl.formatMessage({ id: "navigation.copied" })}
         </Alert>
       </Snackbar>
