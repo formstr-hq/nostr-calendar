@@ -651,11 +651,22 @@ export const BookingPage = () => {
                 rows={2}
                 size="small"
               />
-              <CalendarListSelect
-                value={selectedCalendarId}
-                onChange={setSelectedCalendarId}
-                label={intl.formatMessage({ id: "scheduling.addToCalendar" })}
-              />
+              <Box>
+                <CalendarListSelect
+                  value={selectedCalendarId}
+                  onChange={setSelectedCalendarId}
+                  label={intl.formatMessage({ id: "scheduling.addToCalendar" })}
+                />
+                {calendars.length === 0 && (
+                  <Typography
+                    variant="caption"
+                    color="warning.main"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {intl.formatMessage({ id: "event.calendarRequired" })}
+                  </Typography>
+                )}
+              </Box>
             </Box>
           )}
         </DialogContent>
