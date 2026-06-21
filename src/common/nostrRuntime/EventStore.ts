@@ -97,7 +97,11 @@ export class EventStore {
       if (existingEventId) {
         const existingEvent = this.eventsById.get(existingEventId);
         if (existingEvent && !shouldReplaceEvent(event, existingEvent)) {
-          // Existing event is newer, don't add or re-notify listeners.
+          if(existingEvent.id === event.id) {
+            // If existing event is same, then dont add but renotify
+            return true
+          }
+          // Existing event is newer, don't add and re-notify listeners.
           return false;
         }
 

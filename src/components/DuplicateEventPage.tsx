@@ -10,6 +10,8 @@ import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildDuplicatedEventDraft } from "../utils/duplicateEvent";
+import { CalendarEventState } from "../common/types";
+import { useTypedLocationState } from "../hooks/useTypedLocationState";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -20,6 +22,7 @@ export const DuplicateEventPage = () => {
   const { naddr } = useParams<{ naddr: string }>();
   const [queryParams] = useSearchParams();
   const viewKey = queryParams.get("viewKey");
+  const defaultCalendarEvent = useTypedLocationState<CalendarEventState>();
   const navigate = useNavigate();
   const intl = useIntl();
   const { user } = useUser();
@@ -31,6 +34,10 @@ export const DuplicateEventPage = () => {
   });
 
   React.useEffect(() => {
+    if (defaultCalendarEvent) {
+      setLoadState({ event: defaultCalendarEvent.calendarEvent, fetchState: "fetched" });
+      return
+    }
     if (!naddr) return;
     setLoadState({ event: null, fetchState: "loading" });
     fetchCalendarEvent(naddr as NAddr)

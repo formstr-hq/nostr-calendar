@@ -10,6 +10,7 @@ import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTypedLocationState } from "../hooks/useTypedLocationState";
+import { CalendarEventState } from "../common/types";
 
 interface ILoadState {
   event: ICalendarEvent | null;
@@ -18,7 +19,7 @@ interface ILoadState {
 
 export const EditEventPage = () => {
   const { naddr } = useParams<{ naddr: string }>();
-  const defaultCalendarEvent = useTypedLocationState<ICalendarEvent>();
+  const defaultCalendarEvent = useTypedLocationState<CalendarEventState>();
   const [queryParams] = useSearchParams();
   const viewKey = queryParams.get("viewKey");
   const navigate = useNavigate();
@@ -32,7 +33,8 @@ export const EditEventPage = () => {
   });
   React.useEffect(() => {
     if (defaultCalendarEvent) {
-      setLoadState({ event: defaultCalendarEvent, fetchState: "fetched" });
+      setLoadState({ event: defaultCalendarEvent.calendarEvent, fetchState: "fetched" });
+      return
     }
     if (!naddr) return;
     setLoadState({ event: null, fetchState: "loading" });
