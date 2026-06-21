@@ -72,13 +72,11 @@ export class EventStore {
     // Handle deletion events (NIP-09, kind 5)
     if (isDeletionEvent(event.kind)) {
       this.processDeletionEvent(event);
-      return true;
     }
 
     // Handle participant removal events (kind 84)
     if (isParticipantRemovalEvent(event.kind)) {
       this.processParticipantRemovalEvent(event);
-      return true;
     }
 
     // Reject events that have been deleted
@@ -111,7 +109,6 @@ export class EventStore {
 
       // Track new replaceable event
       this.replaceableKeys.set(replaceableKey, event.id);
-      return true;
     }
 
     // Check for exact duplicate
