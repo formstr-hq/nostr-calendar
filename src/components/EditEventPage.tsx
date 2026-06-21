@@ -33,8 +33,11 @@ export const EditEventPage = () => {
   });
   React.useEffect(() => {
     if (defaultCalendarEvent) {
-      setLoadState({ event: defaultCalendarEvent.calendarEvent, fetchState: "fetched" });
-      return
+      setLoadState({
+        event: defaultCalendarEvent.calendarEvent,
+        fetchState: "fetched",
+      });
+      return;
     }
     if (!naddr) return;
     setLoadState({ event: null, fetchState: "loading" });
