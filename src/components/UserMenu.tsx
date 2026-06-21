@@ -21,7 +21,7 @@ export const UserMenu = () => {
 
   return (
     <>
-      <IconButton onClick={handleClick}>
+      <IconButton onClick={handleClick} data-testid="user-avatar">
         <NostrAvatar user={user} />
       </IconButton>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>

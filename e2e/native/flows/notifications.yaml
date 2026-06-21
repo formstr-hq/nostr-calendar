@@ -1,0 +1,89 @@
+# Notification smoke test — one-time event fires a notification on Android.
+#
+# What this tests:
+#   - Maestro can drive the Capacitor/WebView app end-to-end
+#   - Creating an event schedules a LocalNotification via @capacitor/local-notifications
+#   - The notification appears in the Android notification shade at the scheduled time
+#
+# Prerequisites:
+#   - App installed: adb install <apk>
+#   - App notification permission granted (grant via adb or on first run)
+#   - A test relay running: E2E_TEST_RELAY env var or ws://localhost:7777
+#   - Alice's nsec ready (from e2e/relay/seed/keys.ts)
+#
+# Duration: ~2 minutes (event fires 90 s after creation)
+
+appId: app.formstr.calendar
+---
+# ── 1. Compute event start time (90 s from now) ────────────────────────────
+- runScript:
+    file: ../scripts/compute-event-time.js
+
+# ── 2. Launch / bring app to foreground ────────────────────────────────────
+- launchApp:
+    clearState: false   # keep auth state from a prior login flow
+
+# ── 3. Login — skip if already authenticated (user-avatar visible) ──────────
+# If the user-avatar button is NOT visible, tap the menu and log in with nsec.
+# On Android native the LoginModal shows the "Sign in with nsec" option.
+- runFlow:
+    when:
+      visible: "Log In"   # Auth menu item shown when not logged in
+    file: ./login-nsec.yaml
+
+# ── 4. Navigate to today's day view ─────────────────────────────────────────
+# The app opens on the calendar. Tap on today's date in whatever view is visible
+# to enter the day view. Works from week or month view.
+- tapOn:
+    text: "${now.getDate()}"   # Today's day number (e.g., "15")
+    # NOTE: if multiple elements match, use `index: 0` to pick the first.
+
+# ── 5. Open the event creation dialog by tapping a time slot ────────────────
+# The DayView renders 24 hour cells. Swipe to make the current hour visible,
+# then tap on it. The dialog opens with the tapped time pre-filled.
+- tapOn:
+    id: "div[data-date]"   # any hour cell on the day grid (WebView element)
+    index: 0
+
+# ── 6. Fill in the event title ───────────────────────────────────────────────
+- tapOn:
+    placeholder: "Enter event title"
+- inputText: "Notification Test Event"
+
+# ── 7. Set start time to 90 seconds from now ────────────────────────────────
+# MUI DateTimePicker renders two text fields in the form (start / end).
+# Tap the first one, triple-tap to select-all, then type the computed time.
+# Format: "M/D/YYYY h:mm AM" — set by compute-event-time.js
+- tapOn:
+    index: 0             # first DateTimePicker text field in the dialog
+- repeat:
+    times: 3
+    commands:
+      - pressKey: Backspace
+- inputText: "${output.startTime}"
+
+# ── 8. Ensure the "At event start" notification offset is active ─────────────
+# The default notification preference includes a 0-minute offset ("At event
+# start"). If the NotificationPreferenceEditor shows it enabled, nothing to do.
+# If it's off, this section would toggle it — left as a TODO for the first run.
+# TODO: add a tapOn step here if default notifications are disabled.
+
+# ── 9. Save the event ────────────────────────────────────────────────────────
+- tapOn:
+    text: "Save Event"
+
+# ── 10. Wait for the notification to fire ───────────────────────────────────
+- pause:
+    ms: "${output.waitMs}"   # 100 000 ms = 100 s (compute-event-time.js sets 90s + buffer)
+
+# ── 11. Pull down the Android notification shade ─────────────────────────────
+- swipe:
+    direction: DOWN
+    startX: 540
+    startY: 0
+    endX: 540
+    endY: 700
+
+# ── 12. Assert the notification is visible ───────────────────────────────────
+- assertVisible:
+    text: "Notification Test Event"

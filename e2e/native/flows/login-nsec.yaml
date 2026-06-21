@@ -1,0 +1,29 @@
+# Sub-flow: log in with Alice's nsec on Android native.
+# Called from other flows when the app is not yet authenticated.
+#
+# Requires env var ALICE_NSEC to be set. Run Maestro with:
+#   maestro test --env ALICE_NSEC=<nsec> flows/notifications.yaml
+
+appId: app.formstr.calendar
+---
+# Open the user menu (shows "Log In" when not authenticated)
+- tapOn:
+    text: "Log In"
+
+# In the LoginModal, tap "Sign in with nsec" (Android native option)
+- tapOn:
+    text: "Sign in with nsec"
+
+# Type Alice's nsec into the nsec input field
+- tapOn:
+    placeholder: "Enter nsec"
+- inputText: "${ALICE_NSEC}"
+
+# Submit
+- tapOn:
+    text: "Log In"
+
+# Wait for the avatar to appear (auth complete)
+- assertVisible:
+    id: "user-avatar"
+    timeout: 10000
