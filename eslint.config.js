@@ -8,7 +8,7 @@ import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended"
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config([
-  globalIgnores(["dist", "android", "ios", "src/test_scripts"]),
+  globalIgnores(["dist", "android", "ios", "src/test_scripts", "dev-dist"]),
   {
     files: ["src/**/*.{ts,tsx}"],
     extends: [
