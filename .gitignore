@@ -151,7 +151,6 @@ keystore.properties
 .vscode/*
 
 # E2E test artifacts
-e2e/.auth/
 playwright-report/
 test-results/
 .e2e-tsbuild/

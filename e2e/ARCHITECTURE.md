@@ -17,11 +17,11 @@ e2e/
 ├── ARCHITECTURE.md         ← this file
 ├── web/
 │   ├── playwright.config.ts
-│   ├── global-setup.ts     ← start relay, seed events, create auth storageState
+│   ├── global-setup.ts     ← start relay, seed events
 │   ├── global-teardown.ts  ← stop relay
 │   ├── fixtures/
 │   │   ├── index.ts        ← exports the extended `test` with custom fixtures
-│   │   ├── auth.fixture.ts ← authedPage fixture using storageState
+│   │   ├── auth.fixture.ts ← authedPage fixture (logs in via ncryptsec UI)
 │   │   └── relay.fixture.ts← testRelay fixture (already started by globalSetup)
 │   └── tests/
 │       ├── onboarding.spec.ts       ← first-time user: login → events load
@@ -506,6 +506,40 @@ jobs:
 ```
 
 Note: the Playwright Docker image includes Chromium. The relay runs as a Docker service in the same job. No separate service container declaration needed when using `docker compose` directly.
+
+---
+
+## Playwright vs Unified Maestro
+
+The architecture uses two tools (Playwright for web, Maestro for native). The alternative — using Maestro alone for all platforms — is a valid choice and worth understanding as the app evolves.
+
+### Pros of unified Maestro
+
+**True write-once cross-platform.** The same YAML flow runs on web, Android, and iOS. With the shared `data-testid` / accessibility ID contract, a flow written once covers all three surfaces.
+
+**Single toolchain.** One thing to learn, one thing to maintain, one thing to debug. Contributors don't need to know both Playwright's API and Maestro's YAML.
+
+**Simpler auth handling across platforms.** Playwright's `storageState` only works on web. For native you already need a different auth strategy. Maestro handles both in the same flow, avoiding the impedance mismatch.
+
+**Maestro Cloud as a unified CI target.** Web, Android, and iOS all run on Maestro Cloud without managing Linux runners, Android emulators, and macOS runners separately.
+
+**The WebSocket interception argument for Playwright has weakened.** Once the relay pool moves to a WebWorker, `page.routeWebSocket` stops working for failure injection (see [WebWorker Usage](#webworker-usage)). The main technical differentiator Playwright had for this app is already eroding.
+
+### Cons of unified Maestro
+
+**No `storageState` — every flow pays the login cost.** Playwright's `storageState` restores saved browser storage so every test starts already authenticated. Maestro has no equivalent — you either re-run login steps at the top of every flow (slow) or inject localStorage via `runScript` before each flow (fragile and verbose).
+
+**YAML expressiveness ceiling.** Playwright tests are TypeScript — full language power for setup, data seeding, assertions, and complex conditions. Maestro YAML has basic conditionals and `repeat` but no real loops, no data manipulation, and no ability to compute values like `naddr` and compare them against selectors. Any logic beyond "tap this, assert that" requires `runScript` (inline JavaScript), which partially defeats the simplicity argument.
+
+**No `globalSetup` equivalent.** Playwright's `globalSetup` hook is where the relay starts, events are seeded, and `storageState` is created — all in one TypeScript file with full async control. In Maestro this becomes shell scripts run before the flows, with no built-in way to share computed values (like seeded event naddrs) back into the flows.
+
+**Maestro web is less mature.** Maestro's native support is excellent. Its web support uses Chrome DevTools Protocol under the hood but exposes a much smaller surface — no service worker control, no network request interception, no multi-context support. For PWA offline behaviour and service worker caching, this is a gap.
+
+**Worse debugging on web.** Playwright's trace viewer gives step-by-step replay with DOM snapshots, network log, console output, and timing in one file. Maestro gives per-step screenshots and a video. For diagnosing a failed web test, the trace viewer is significantly more useful.
+
+### When to switch to unified Maestro
+
+Switch if the app goes **fully native** — Playwright becomes irrelevant for native and unified Maestro pays off clearly. If a web version is maintained alongside native apps, keep the split: Playwright's debugging and `storageState` justify the two-toolchain cost.
 
 ---
 

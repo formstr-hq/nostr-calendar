@@ -1,4 +1,5 @@
-import { test, expect } from "../fixtures/index.js";
+import { TEST_PASSPHRASE } from "../../relay/seed/keys.js";
+import { test, expect, navigate } from "../fixtures/index.js";
 
 // Navigate to a fixed future date so the test is date-independent.
 const TEST_DATE = "2027-01-15";
@@ -6,7 +7,7 @@ const [year, month, day] = TEST_DATE.split("-");
 
 test("user opens the app and creates a calendar event", async ({ authedPage: page }) => {
   // Navigate to the day view for the test date
-  await page.goto(`/d/${year}/${month}/${day}`);
+  await navigate(page, `/d/${year}/${month}/${day}`);
 
   // Click a time slot on the grid to open the create-event dialog.
   // The DayView renders 24 hour-cells, each with data-date. We click the

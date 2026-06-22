@@ -1,5 +1,8 @@
 import { getPublicKey } from "nostr-tools";
 import { nsecEncode, npubEncode } from "nostr-tools/nip19";
+import { encrypt as nip49Encrypt } from "nostr-tools/nip49";
+
+export const TEST_PASSPHRASE = "e2e-test-passphrase";
 
 const SEEDS: Record<string, string> = {
   alice: "aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0001",
@@ -13,6 +16,7 @@ export type TestKey = {
   pubkey: string;
   nsec: string;
   npub: string;
+  ncryptsec: string;
 };
 
 function deriveKey(hexSeed: string): TestKey {
@@ -24,6 +28,7 @@ function deriveKey(hexSeed: string): TestKey {
     pubkey,
     nsec: nsecEncode(secretBytes),
     npub: npubEncode(pubkey),
+    ncryptsec: nip49Encrypt(secretBytes, TEST_PASSPHRASE),
   };
 }
 
