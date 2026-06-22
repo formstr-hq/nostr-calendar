@@ -49,7 +49,7 @@ jobs:
 
   build:
     needs: resolve-pr
-    uses: formstr-hq/common-packages/.github/workflows/reusable-build-debug-ios.yml@main
+    uses: formstr-hq/common-packages/.github/workflows/reusable-build-debug-ios.yml@claude/ios-build-cocoapods-pr159-jggjtm
     secrets: inherit
     with:
       pr_number: ${{ needs.resolve-pr.outputs.pr_number }}
