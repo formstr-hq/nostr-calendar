@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getEventSegmentForDay, layoutDayEvents } from "./calendarEngine";
+import {
+  getEventSegmentForDay,
+  getTimeFromCell,
+  layoutDayEvents,
+} from "./calendarEngine";
 import type { ICalendarEvent } from "../utils/types";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -207,5 +211,26 @@ describe("layoutDayEvents", () => {
 
     expect(positioned.top).toBe(0);
     expect(positioned.height).toBe(9 * 60);
+  });
+});
+
+describe("getTimeFromCell", () => {
+  it("treats YYYY-MM-DD cell dates as local calendar dates", () => {
+    const event = {
+      clientY: 15 * 60,
+      currentTarget: {
+        dataset: { date: "2026-06-22" },
+      },
+    } as unknown as React.MouseEvent<HTMLDivElement>;
+    const containerRef = {
+      current: {
+        getBoundingClientRect: () => ({ top: 0 }),
+      },
+    } as React.RefObject<HTMLDivElement>;
+
+    const timestamp = getTimeFromCell(event, containerRef);
+
+    expect(timestamp).toBe(atLocal(2026, 5, 22, 15));
+    expect(new Date(timestamp!).getDay()).toBe(1);
   });
 });

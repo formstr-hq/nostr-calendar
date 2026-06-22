@@ -167,12 +167,15 @@ export const getTimeFromCell = (
     const hour = Math.floor(clickY / 60) - offsetHours;
     const minute = Math.floor((clickY % 60) / 30) * 30; // Round to nearest 30 min
 
-    // Get date from the cell's data
-    const cellDate = new Date(event.currentTarget.dataset.date!);
+    // `YYYY-MM-DD` strings parse as UTC in JavaScript; split the parts so the
+    // clicked calendar date is interpreted in the user's local timezone.
+    const [year, month, day] = event.currentTarget.dataset.date!
+      .split("-")
+      .map(Number);
     const clickedDate = new Date(
-      cellDate.getFullYear(),
-      cellDate.getMonth(),
-      cellDate.getDate(),
+      year,
+      month - 1,
+      day,
       hour,
       minute,
     );
