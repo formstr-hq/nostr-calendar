@@ -276,11 +276,16 @@ export function CalendarEventView({
       sx={{
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: { xs: "flex-start", sm: "center" },
+        gap: 1,
         width: "100%",
       }}
     >
-      <Typography component={"p"} variant="h5">
+      <Typography
+        component={"p"}
+        variant="h5"
+        sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}
+      >
         {title}
       </Typography>
       <ActionButtons
@@ -329,6 +334,7 @@ export function CalendarEventView({
         sx={{
           display: "flex",
           justifyContent: "space-between",
+          pt: fullScreen ? "calc(16px + var(--safe-area-top))" : 2,
         }}
       >
         {titleBar}
