@@ -169,16 +169,10 @@ export const getTimeFromCell = (
 
     // `YYYY-MM-DD` strings parse as UTC in JavaScript; split the parts so the
     // clicked calendar date is interpreted in the user's local timezone.
-    const [year, month, day] = event.currentTarget.dataset.date!
-      .split("-")
+    const [year, month, day] = event.currentTarget.dataset
+      .date!.split("-")
       .map(Number);
-    const clickedDate = new Date(
-      year,
-      month - 1,
-      day,
-      hour,
-      minute,
-    );
+    const clickedDate = new Date(year, month - 1, day, hour, minute);
 
     return clickedDate.getTime();
   }
