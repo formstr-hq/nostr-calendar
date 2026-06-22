@@ -40,7 +40,7 @@ import { alpha } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import { FormsSigner, FormstrSDK, NormalizedForm } from "@formstr/sdk";
+import { FormstrSDK, NormalizedForm } from "@formstr/sdk";
 import dayjs from "dayjs";
 import type { Event as NostrEvent } from "nostr-tools";
 import { useIntl } from "react-intl";
@@ -53,6 +53,7 @@ import {
 import { useUser } from "../stores/user";
 import { fetchAttachedFormCached } from "../utils/formAttachment";
 import { buildFormstrUrl } from "../utils/formLink";
+import { toFormsSigner } from "../utils/toFormsSigner";
 
 type SdkOption = {
   id: string;
@@ -325,12 +326,7 @@ export function FormFillerDialog({
     };
     formEl.addEventListener("submit", onSubmitDom);
     signerManager.getSigner().then((signer) => {
-      const formsSigner: FormsSigner = {
-        signEvent: signer.signEvent,
-        getPublicKey: signer.getPublicKey,
-        nip44Decrypt: signer.nip44Decrypt!,
-        nip44Encrypt: signer.nip44Encrypt!,
-      };
+      const formsSigner = toFormsSigner(signer);
 
       sdk.attachSubmitListener(form as never, formsSigner, {
         onSuccess: ({ event }) => {

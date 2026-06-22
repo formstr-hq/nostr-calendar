@@ -17,12 +17,13 @@ import {
 import { alpha } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
-import { FormsSigner, FormstrSDK, NormalizedForm } from "@formstr/sdk";
+import { FormstrSDK, NormalizedForm } from "@formstr/sdk";
 import { nip19 } from "nostr-tools";
 import { useIntl } from "react-intl";
 import { useUser } from "../stores/user";
 import { signerManager } from "../common/signer";
 import { fetchAttachedFormCached } from "../utils/formAttachment";
+import { toFormsSigner } from "../utils/toFormsSigner";
 import type { IFormAttachment } from "../utils/types";
 
 const CONTACT_FORM: IFormAttachment = {
@@ -131,12 +132,7 @@ export function ContactFormDialog({ open, onClose }: Props) {
     formEl.addEventListener("submit", onSubmitDom);
 
     signerManager.getSigner().then((signer) => {
-      const formsSigner: FormsSigner = {
-        signEvent: signer.signEvent.bind(signer),
-        getPublicKey: signer.getPublicKey.bind(signer),
-        nip44Decrypt: signer.nip44Decrypt!.bind(signer),
-        nip44Encrypt: signer.nip44Encrypt!.bind(signer),
-      };
+      const formsSigner = toFormsSigner(signer);
 
       sdk.attachSubmitListener(form as never, formsSigner, {
         onSuccess: () => {
