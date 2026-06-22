@@ -91,10 +91,21 @@ export function AddToCalendarDialog({
           </Box>
 
           {/* Calendar selector */}
-          <CalendarListSelect
-            value={selectedCalendarId}
-            onChange={setSelectedCalendarId}
-          />
+          <Box>
+            <CalendarListSelect
+              value={selectedCalendarId}
+              onChange={setSelectedCalendarId}
+            />
+            {calendars.length === 0 && (
+              <Typography
+                variant="caption"
+                color="warning.main"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {intl.formatMessage({ id: "event.calendarRequired" })}
+              </Typography>
+            )}
+          </Box>
         </Box>
       </DialogContent>
 

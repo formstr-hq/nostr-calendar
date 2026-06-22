@@ -2,44 +2,35 @@
   <rect fill="#ffffff" width="2732" height="2732"/>
   <g transform="translate(866,866)">
     <svg viewBox="0 0 512 512" width="1000" height="1000">
-  <defs>
-    <clipPath id="calendarClip">
-      <rect x="80" y="80" width="352" height="352" rx="77"/>
-    </clipPath>
-  </defs>
+  <!-- Dark calendar background - full bleed -->
+  <rect width="512" height="512" fill="#111111"/>
 
-  <!-- Outer background: white (light mode) -->
-  <rect width="512" height="512" rx="112" fill="#FFFFFF"/>
-
-  <!-- Calendar widget background -->
-  <rect x="80" y="80" width="352" height="352" rx="77" fill="#111111"/>
-
-  <!-- Red header strip -->
-  <rect x="80" y="80" width="352" height="110" fill="#E24B4A" clip-path="url(#calendarClip)"/>
+  <!-- Red header strip - edge to edge, including top -->
+  <rect x="0" y="0" width="512" height="145" fill="#E24B4A"/>
 
   <!-- Month label -->
-  <text x="256" y="135"
+  <text x="256" y="72"
         font-family="system-ui, sans-serif"
         font-weight="bold"
-        font-size="55"
+        font-size="60"
         fill="rgba(255,255,255,0.85)"
         text-anchor="middle"
         dominant-baseline="middle">JAN</text>
 
   <!-- Date number -->
-  <text x="256" y="262"
+  <text x="256" y="290"
         font-family="system-ui, sans-serif"
         font-weight="bold"
-        font-size="128"
+        font-size="155"
         fill="#ffffff"
         text-anchor="middle"
         dominant-baseline="middle">3</text>
 
   <!-- Year -->
-  <text x="256" y="376"
+  <text x="256" y="415"
         font-family="system-ui, sans-serif"
         font-weight="bold"
-        font-size="48"
+        font-size="50"
         fill="rgba(255,255,255,0.6)"
         text-anchor="middle"
         dominant-baseline="middle">2009</text>

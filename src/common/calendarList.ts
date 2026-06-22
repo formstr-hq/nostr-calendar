@@ -199,7 +199,7 @@ export function fetchCalendarLists(
     kinds: [EventKinds.PrivateCalendarList],
     authors: [userPubkey],
   };
-
+  console.log("HERE!!!!!!!", EventKinds.PrivateCalendarList);
   return nostrRuntime.subscribe(relayList, filter, {
     onEvent: async (event: Event) => {
       // Guard: the subscription filter should ensure this, but relays or the
@@ -213,6 +213,7 @@ export function fetchCalendarLists(
         return;
       }
       try {
+        console.log("HERE!!!!!!!");
         const list = await decryptCalendarList(event);
         onList(list);
       } catch (error) {

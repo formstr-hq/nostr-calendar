@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="system-ui, -apple-system, sans-serif">
+  <rect width="1440" height="900" fill="#ffffff"/>
+
+  <!-- Top summary bar -->
+  <rect width="1440" height="56" fill="#f5f5f5"/>
+  <text x="40" y="34" fill="#555" font-size="13">← Back</text>
+  <text x="720" y="34" text-anchor="middle" fill="#000" font-size="14" font-weight="600">Confirm Your Booking</text>
+  <text x="1400" y="34" text-anchor="end" fill="#999" font-size="13">Step 4 of 4</text>
+
+  <!-- Two-column layout: left=booking summary, right=message + confirm -->
+  <!-- Left panel x=340, right panel x=760 -->
+
+  <!-- Left panel — booking summary card -->
+  <rect x="340" y="96" width="360" height="460" rx="12" fill="#f9f9f9" stroke="#e8e8e8" stroke-width="1.5"/>
+
+  <text x="520" y="136" text-anchor="middle" fill="#999" font-size="11" font-weight="600" letter-spacing="1">BOOKING SUMMARY</text>
+  <line x1="356" y1="148" x2="684" y2="148" stroke="#e8e8e8" stroke-width="1"/>
+
+  <!-- Avatar -->
+  <circle cx="520" cy="196" r="32" fill="#e0e0e0"/>
+  <text x="520" y="204" text-anchor="middle" fill="#555" font-size="14" font-weight="600">AK</text>
+
+  <text x="520" y="248" text-anchor="middle" fill="#000" font-size="17" font-weight="700">Alex Kim</text>
+  <text x="520" y="270" text-anchor="middle" fill="#888" font-size="13">Product Designer</text>
+
+  <line x1="356" y1="288" x2="684" y2="288" stroke="#e8e8e8" stroke-width="1"/>
+
+  <!-- Detail rows -->
+  <!-- Duration -->
+  <text x="372" y="316" fill="#999" font-size="12">DURATION</text>
+  <text x="668" y="316" text-anchor="end" fill="#000" font-size="14" font-weight="500">30 min</text>
+
+  <line x1="356" y1="330" x2="684" y2="330" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Date -->
+  <text x="372" y="356" fill="#999" font-size="12">DATE</text>
+  <text x="668" y="356" text-anchor="end" fill="#000" font-size="14" font-weight="500">Tue, Jun 15, 2026</text>
+
+  <line x1="356" y1="370" x2="684" y2="370" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Time -->
+  <text x="372" y="396" fill="#999" font-size="12">TIME</text>
+  <text x="668" y="396" text-anchor="end" fill="#000" font-size="14" font-weight="500">2:00 PM – 2:30 PM</text>
+
+  <line x1="356" y1="410" x2="684" y2="410" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Timezone -->
+  <text x="372" y="436" fill="#999" font-size="12">TIMEZONE</text>
+  <text x="668" y="436" text-anchor="end" fill="#000" font-size="14" font-weight="500">UTC+5:30 (IST)</text>
+
+  <line x1="356" y1="450" x2="684" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Price -->
+  <text x="372" y="476" fill="#999" font-size="12">PRICE</text>
+  <text x="668" y="476" text-anchor="end" fill="#000" font-size="16" font-weight="700">$25</text>
+
+  <!-- Confirmation note -->
+  <text x="372" y="520" fill="#aaa" font-size="11">A calendar invite will be sent to your email</text>
+  <text x="372" y="538" fill="#aaa" font-size="11">upon confirmation.</text>
+
+  <!-- Right panel — message + confirm -->
+  <rect x="740" y="96" width="360" height="460" rx="12" fill="#fff" stroke="#e8e8e8" stroke-width="1.5"/>
+
+  <text x="920" y="136" text-anchor="middle" fill="#999" font-size="11" font-weight="600" letter-spacing="1">YOUR DETAILS</text>
+  <line x1="756" y1="148" x2="1084" y2="148" stroke="#e8e8e8" stroke-width="1"/>
+
+  <!-- Name field -->
+  <text x="760" y="178" fill="#555" font-size="12" font-weight="500">Your name</text>
+  <rect x="756" y="186" width="328" height="44" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="772" y="213" fill="#000" font-size="14">Rahul Mehta</text>
+
+  <!-- Email field -->
+  <text x="760" y="254" fill="#555" font-size="12" font-weight="500">Email address</text>
+  <rect x="756" y="262" width="328" height="44" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="772" y="289" fill="#000" font-size="14">rahul@example.com</text>
+
+  <!-- Message field -->
+  <text x="760" y="330" fill="#555" font-size="12" font-weight="500">Message <tspan fill="#aaa">(optional)</tspan></text>
+  <rect x="756" y="338" width="328" height="112" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="772" y="362" fill="#aaa" font-size="13">Add a note for Alex (e.g. topics to cover, context...)</text>
+
+  <!-- Confirm button -->
+  <rect x="756" y="468" width="328" height="52" rx="6" fill="#000"/>
+  <text x="920" y="500" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">Confirm Booking</text>
+
+  <!-- Cancel link -->
+  <text x="920" y="540" text-anchor="middle" fill="#aaa" font-size="13" text-decoration="underline">Cancel</text>
+
+  <!-- Terms note -->
+  <text x="920" y="580" text-anchor="middle" fill="#ccc" font-size="11">By confirming you agree to the cancellation policy.</text>
+
+  <!-- Footer -->
+  <text x="720" y="874" text-anchor="middle" fill="#bbb" font-size="12">Powered by Formstr</text>
+</svg>

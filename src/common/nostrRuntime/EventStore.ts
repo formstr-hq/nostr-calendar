@@ -72,13 +72,11 @@ export class EventStore {
     // Handle deletion events (NIP-09, kind 5)
     if (isDeletionEvent(event.kind)) {
       this.processDeletionEvent(event);
-      return true;
     }
 
     // Handle participant removal events (kind 84)
     if (isParticipantRemovalEvent(event.kind)) {
       this.processParticipantRemovalEvent(event);
-      return true;
     }
 
     // Reject events that have been deleted
@@ -99,7 +97,11 @@ export class EventStore {
       if (existingEventId) {
         const existingEvent = this.eventsById.get(existingEventId);
         if (existingEvent && !shouldReplaceEvent(event, existingEvent)) {
-          // Existing event is newer, don't add or re-notify listeners.
+          if (existingEvent.id === event.id) {
+            // If existing event is same, then dont add but renotify
+            return true;
+          }
+          // Existing event is newer, don't add and re-notify listeners.
           return false;
         }
 
@@ -115,6 +117,7 @@ export class EventStore {
 
     // Check for exact duplicate
     if (this.eventsById.has(event.id)) {
+      console.log("Not adding duplicate event", event.kind);
       return false;
     }
 

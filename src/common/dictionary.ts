@@ -38,6 +38,8 @@ const dictionary: NestedObject = {
         "Private events are only visible to you and the invited participants",
       relays: "Relays",
       goToWeek: "go to week",
+      copyNpub: "Copy Identity (NPUB)",
+      copied: "Copied!",
     },
     filters: {
       showPublicEvents: "Show Public Events",
@@ -94,6 +96,8 @@ const dictionary: NestedObject = {
       addDescription: "Add event description...",
       calendar: "Calendar",
       selectCalendar: "Select calendar",
+      calendarRequired:
+        "You need to create a calendar before you can create an event.",
       eventType: "Event Type",
       private: "Private",
       public: "Public",
@@ -211,6 +215,9 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Create a calendar to get started. Events are organized into calendars — you need at least one to add and manage your events.",
       refetchCalendars: "Refetch Calendars",
+      deleteWarning:
+        "Deleting this calendar will remove all your events from it and they may be lost forever. Are you sure?",
+      reallyDelete: "Really Delete?",
     },
     sidebar: {
       calendars: "Calendars",
@@ -468,6 +475,8 @@ const dictionary: NestedObject = {
         "Private Termine sind nur für Sie und die eingeladenen Teilnehmer sichtbar",
       relays: "Relays",
       goToWeek: "Zur Woche gehen",
+      copyNpub: "Identität kopieren (NPUB)",
+      copied: "Kopiert!",
     },
     filters: {
       showPublicEvents: "Öffentliche Termine anzeigen",
@@ -527,6 +536,8 @@ const dictionary: NestedObject = {
       addDescription: "Beschreibung hinzufügen...",
       calendar: "Kalender",
       selectCalendar: "Kalender auswählen",
+      calendarRequired:
+        "Sie müssen zuerst einen Kalender erstellen, um einen Termin anlegen zu können.",
       eventType: "Termintyp",
       private: "Privat",
       public: "Öffentlich",
@@ -647,6 +658,9 @@ const dictionary: NestedObject = {
       onboardingExplanation:
         "Erstellen Sie einen Kalender, um loszulegen. Termine werden in Kalendern organisiert — Sie benötigen mindestens einen, um Termine hinzuzufügen und zu verwalten.",
       refetchCalendars: "Kalender neu laden",
+      deleteWarning:
+        "Das Löschen dieses Kalenders entfernt alle Ihre Termine daraus und sie könnten für immer verloren gehen. Sind Sie sicher?",
+      reallyDelete: "Wirklich löschen?",
     },
     sidebar: {
       calendars: "Kalender",

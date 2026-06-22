@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" font-family="system-ui, -apple-system, sans-serif">
+  <rect width="390" height="844" fill="#ffffff"/>
+
+  <!-- Status bar -->
+  <text x="20" y="22" fill="#000" font-size="13" font-weight="600">9:41</text>
+  <text x="350" y="22" fill="#000" font-size="11">●●●</text>
+
+  <!-- Header -->
+  <rect y="32" width="390" height="52" fill="#f5f5f5"/>
+  <text x="36" y="63" fill="#555" font-size="13">← Back</text>
+  <text x="195" y="63" text-anchor="middle" fill="#000" font-size="13" font-weight="600">Book 30 min with Alex Kim</text>
+
+  <!-- Date strip label -->
+  <text x="195" y="112" text-anchor="middle" fill="#999" font-size="11" font-weight="600" letter-spacing="1">SELECT A DATE</text>
+
+  <!-- 5-date strip — card w=60, gap=8, total=5×60+4×8=332, start x=(390-332)/2=29 -->
+
+  <!-- Jun 13 -->
+  <rect x="29" y="124" width="60" height="70" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="59" y="144" text-anchor="middle" fill="#999" font-size="10">SUN</text>
+  <text x="59" y="168" text-anchor="middle" fill="#555" font-size="18" font-weight="500">13</text>
+
+  <!-- Jun 14 -->
+  <rect x="97" y="124" width="60" height="70" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="127" y="144" text-anchor="middle" fill="#999" font-size="10">MON</text>
+  <text x="127" y="168" text-anchor="middle" fill="#555" font-size="18" font-weight="500">14</text>
+
+  <!-- Jun 15 SELECTED -->
+  <rect x="165" y="116" width="60" height="86" rx="6" fill="#000"/>
+  <text x="195" y="138" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="10">TUE</text>
+  <text x="195" y="165" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">15</text>
+  <text x="195" y="184" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">Jun</text>
+
+  <!-- Jun 16 -->
+  <rect x="233" y="124" width="60" height="70" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="263" y="144" text-anchor="middle" fill="#999" font-size="10">WED</text>
+  <text x="263" y="168" text-anchor="middle" fill="#555" font-size="18" font-weight="500">16</text>
+
+  <!-- Jun 17 -->
+  <rect x="301" y="124" width="60" height="70" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="331" y="144" text-anchor="middle" fill="#999" font-size="10">THU</text>
+  <text x="331" y="168" text-anchor="middle" fill="#555" font-size="18" font-weight="500">17</text>
+
+  <!-- Time slots label -->
+  <text x="195" y="230" text-anchor="middle" fill="#999" font-size="11" font-weight="600" letter-spacing="1">AVAILABLE TIMES</text>
+  <line x1="16" y1="244" x2="374" y2="244" stroke="#f0f0f0" stroke-width="1"/>
+
+  <!-- Time slots — single column, full width -->
+  <!-- Slot height 52, gap 10 -->
+
+  <rect x="16" y="256" width="358" height="52" rx="6" fill="#000"/>
+  <text x="195" y="288" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">9:00 AM</text>
+
+  <rect x="16" y="318" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="350" text-anchor="middle" fill="#000" font-size="15" font-weight="500">9:30 AM</text>
+
+  <rect x="16" y="380" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="412" text-anchor="middle" fill="#000" font-size="15" font-weight="500">10:00 AM</text>
+
+  <rect x="16" y="442" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="474" text-anchor="middle" fill="#000" font-size="15" font-weight="500">2:00 PM</text>
+
+  <rect x="16" y="504" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="536" text-anchor="middle" fill="#000" font-size="15" font-weight="500">2:30 PM</text>
+
+  <rect x="16" y="566" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="598" text-anchor="middle" fill="#000" font-size="15" font-weight="500">3:00 PM</text>
+
+  <rect x="16" y="628" width="358" height="52" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="195" y="660" text-anchor="middle" fill="#000" font-size="15" font-weight="500">4:00 PM</text>
+
+  <!-- Timezone -->
+  <text x="195" y="714" text-anchor="middle" fill="#bbb" font-size="11">Timezone: UTC+5:30</text>
+
+  <!-- Footer -->
+  <text x="195" y="820" text-anchor="middle" fill="#bbb" font-size="11">Powered by Formstr</text>
+</svg>

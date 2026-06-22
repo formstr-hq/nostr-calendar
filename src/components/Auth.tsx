@@ -5,7 +5,13 @@ import { useEffect } from "react";
 import { npubEncode } from "nostr-tools/nip19";
 import { useRelayStore } from "../stores/relays";
 
-export const Auth = () => {
+export const Auth = ({
+  onClose,
+  onCopied,
+}: {
+  onClose?: () => void;
+  onCopied?: () => void;
+}) => {
   const { user, updateLoginModal, logout, initializeUser } = useUser(
     (state) => state,
   );
@@ -45,10 +51,21 @@ export const Auth = () => {
     useRelayStore.getState().updateRelayModal(true);
   };
 
+  const handleCopyNpub = () => {
+    if (user?.pubkey) {
+      navigator.clipboard.writeText(npubEncode(user.pubkey));
+      onClose?.();
+      onCopied?.();
+    }
+  };
+
   const logoutElem = (
     <>
       <MenuItem onClick={handleOpenRelays}>
         {intl.formatMessage({ id: "navigation.relays" })}
+      </MenuItem>
+      <MenuItem onClick={handleCopyNpub}>
+        {intl.formatMessage({ id: "navigation.copyNpub" })}
       </MenuItem>
       <MenuItem onClick={handleLogout}>
         {intl.formatMessage({ id: "navigation.logout" })}
@@ -63,7 +80,5 @@ export const Auth = () => {
     </MenuItem>
   );
 
-  const toDisplay = hasUserLoggedIn ? logoutElem : loginElem;
-
-  return toDisplay;
+  return hasUserLoggedIn ? logoutElem : loginElem;
 };

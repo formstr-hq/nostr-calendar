@@ -439,7 +439,11 @@ function ActionButtons({
       event.viewKey,
     );
     closeModal();
-    navigate(duplicateLink);
+    navigate(duplicateLink, {
+      state: {
+        calendarEvent: event,
+      } satisfies CalendarEventState,
+    });
   };
 
   return (

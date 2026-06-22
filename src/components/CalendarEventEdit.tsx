@@ -358,15 +358,18 @@ export function CalendarEventEdit({
       "",
   );
 
+  useEffect(() => {
+    if (!selectedCalendarId && calendars.length > 0) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars.length, selectedCalendarId]);
+
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
       const evt = {
         ...initialEvent,
         participants: uniqueParticipants(initialEvent.participants),
       };
-      if (!evt.calendarId) {
-        evt.calendarId = selectedCalendarId;
-      }
       return evt;
     }
 
@@ -575,6 +578,7 @@ export function CalendarEventEdit({
       const rrule = draftRecurrenceRule;
       const eventToSave = {
         ...eventDetails,
+        calendarId: selectedCalendarId,
         isPrivateEvent: isPrivate,
         participants: uniqueParticipants(eventDetails.participants),
         repeat: { rrule },
@@ -851,6 +855,7 @@ export function CalendarEventEdit({
   const buttonDisabled = !(
     !processing &&
     eventDetails.title &&
+    selectedCalendarId &&
     eventDetails.begin &&
     eventDetails.end &&
     eventDetails.begin < eventDetails.end &&
@@ -1529,6 +1534,15 @@ export function CalendarEventEdit({
           onChange={setSelectedCalendarId}
           label={intl.formatMessage({ id: "event.calendar" })}
         />
+        {calendars.length === 0 && (
+          <Typography
+            variant="caption"
+            color="warning.main"
+            sx={{ mt: 0.5, display: "block" }}
+          >
+            {intl.formatMessage({ id: "event.calendarRequired" })}
+          </Typography>
+        )}
       </Box>
       <Divider />
 

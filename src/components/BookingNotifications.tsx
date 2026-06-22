@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useIntl } from "react-intl";
 import { useNavigate } from "react-router";
 import {
   Box,
@@ -202,6 +203,7 @@ function IncomingRequestCard({
   calendars: IncomingTabProps["calendars"];
   calendarsLoaded: boolean;
 }) {
+  const intl = useIntl();
   const { participant, loading } = useGetParticipant({
     pubKey: request.bookerPubkey,
   });
@@ -213,6 +215,13 @@ function IncomingRequestCard({
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     calendars[0]?.id || "",
   );
+
+  useEffect(() => {
+    if (!selectedCalendarId && calendars[0]?.id) {
+      setSelectedCalendarId(calendars[0].id);
+    }
+  }, [calendars, selectedCalendarId]);
+
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -369,18 +378,22 @@ function IncomingRequestCard({
           <Typography variant="body2" sx={{ mb: 2 }}>
             This will create a private calendar event and notify the booker.
           </Typography>
-          {calendarsLoaded && calendars.length > 0 ? (
+          <Box>
             <CalendarListSelect
               value={selectedCalendarId}
               onChange={setSelectedCalendarId}
               label="Add to calendar"
             />
-          ) : (
-            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-              No calendars found. Please create a calendar first from the
-              sidebar.
-            </Typography>
-          )}
+            {calendarsLoaded && calendars.length === 0 && (
+              <Typography
+                variant="caption"
+                color="warning.main"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {intl.formatMessage({ id: "event.calendarRequired" })}
+              </Typography>
+            )}
+          </Box>
           {errorMsg && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
               {errorMsg}
