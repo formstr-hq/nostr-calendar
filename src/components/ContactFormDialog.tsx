@@ -175,7 +175,13 @@ export function ContactFormDialog({ open, onClose }: Props) {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle sx={{ pr: 6 }}>
+        <DialogTitle
+          sx={{
+            pr: 6,
+            pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2,
+            position: "relative",
+          }}
+        >
           <Typography variant="h6">
             {intl.formatMessage({ id: "sidebar.contactUs" })}
           </Typography>
@@ -183,7 +189,11 @@ export function ContactFormDialog({ open, onClose }: Props) {
             aria-label="close"
             onClick={onClose}
             disabled={submitting}
-            sx={{ position: "absolute", right: 8, top: 8 }}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: isMobile ? "calc(8px + var(--safe-area-top))" : 8,
+            }}
           >
             <CloseIcon />
           </IconButton>

@@ -64,7 +64,9 @@ export function AddToCalendarDialog({
       maxWidth="sm"
       fullWidth
     >
-      <DialogTitle>
+      <DialogTitle
+        sx={{ pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2 }}
+      >
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" fontWeight={600}>
             {intl.formatMessage({ id: "addToCalendar.addToCalendar" })}
