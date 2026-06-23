@@ -1,3 +1,2 @@
 patchedDependencies:
-  '@khadarvsk/capacitor-secure-storage@0.0.2': patches/@khadarvsk__capacitor-secure-storage@0.0.2.patch
   nostr-signer-capacitor-plugin@0.0.5: patches/nostr-signer-capacitor-plugin@0.0.5.patch
