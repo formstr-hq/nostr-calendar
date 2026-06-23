@@ -210,7 +210,6 @@ export const useTimeBasedEvents = create<{
     daysBefore?: number;
     daysAfter?: number;
   }) => void;
-  refreshEventNotifications: () => void;
   refreshNotificationPreferencesForCalendar: (calendarId: string) => void;
 }>((set) => ({
   addEvent: (newEvent) => {
@@ -293,19 +292,6 @@ export const useTimeBasedEvents = create<{
   getTimeRangeConfig,
   updateTimeRangeConfig: (newConfig) => {
     Object.assign(getTimeRangeConfig(), newConfig);
-  },
-  refreshEventNotifications: () => {
-    const { events } = useTimeBasedEvents.getState();
-
-    void (async () => {
-      const batchSize = 5;
-      for (let i = 0; i < events.length; i += batchSize) {
-        const batch = events.slice(i, i + batchSize);
-        await Promise.allSettled(
-          batch.map((event) => syncEventNotifications(event)),
-        );
-      }
-    })();
   },
   refreshNotificationPreferencesForCalendar: (calendarId) => {
     const { events } = useTimeBasedEvents.getState();

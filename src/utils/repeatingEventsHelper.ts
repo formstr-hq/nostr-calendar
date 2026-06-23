@@ -349,24 +349,3 @@ export function getNextOccurrenceInRange(
 
   return null;
 }
-
-export function getOccurrencesInRange(
-  event: ICalendarEvent,
-  rangeStart: number,
-  rangeEnd: number,
-): number[] {
-  const { begin, repeat } = event;
-
-  if (!repeat?.rrule) {
-    return begin >= rangeStart && begin <= rangeEnd ? [begin] : [];
-  }
-
-  const dtstart = new Date(begin);
-  const rule = parseRRule(repeat.rrule, dtstart);
-  const searchStart = new Date(Math.max(begin, rangeStart));
-  const searchEnd = new Date(rangeEnd);
-
-  return rule
-    .between(searchStart, searchEnd, true)
-    .map((date) => date.getTime());
-}

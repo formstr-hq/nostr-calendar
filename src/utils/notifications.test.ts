@@ -377,7 +377,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     expect(key).toMatch(/^v1:recurring-key-test:\d+:m\d+$/);
   });
 
-  it("applies custom reminder offsets to every recurring occurrence in the scheduling window", async () => {
+  it("applies custom reminder offsets to the next recurring occurrence", async () => {
     mockGetNotificationOffsetsForEvent.mockResolvedValueOnce([60, 15, 0]);
     const startTime = Date.now() + 2 * HOUR - 10 * DAY;
     const event = makeEvent({
@@ -390,24 +390,20 @@ describe("scheduleEventNotifications – recurring events", () => {
 
     expect(mockSchedule).toHaveBeenCalledTimes(1);
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
-    expect(scheduled.length).toBeGreaterThanOrEqual(6);
-    expect(
-      result.slice(0, 3).map((notification) => notification.label),
-    ).toEqual(["60 minutes before", "15 minutes before", "At event start"]);
+    expect(scheduled).toHaveLength(3);
+    expect(result.map((notification) => notification.label)).toEqual([
+      "60 minutes before",
+      "15 minutes before",
+      "At event start",
+    ]);
 
-    const occurrencesByTimestamp = new Map<string, Set<string>>();
-    for (const notification of scheduled) {
-      const [, , occurrenceStart, offset] =
-        notification.extra.notificationKey.split(":");
-      const offsets = occurrencesByTimestamp.get(occurrenceStart) ?? new Set();
-      offsets.add(offset);
-      occurrencesByTimestamp.set(occurrenceStart, offsets);
-    }
-
-    expect(occurrencesByTimestamp.size).toBeGreaterThanOrEqual(2);
-    for (const offsets of occurrencesByTimestamp.values()) {
-      expect(offsets).toEqual(new Set(["m60", "m15", "m0"]));
-    }
+    const occurrenceStarts = new Set(
+      scheduled.map(
+        (notification: { extra: { notificationKey: string } }) =>
+          notification.extra.notificationKey.split(":")[2],
+      ),
+    );
+    expect(occurrenceStarts.size).toBe(1);
   });
 });
 

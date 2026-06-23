@@ -1,7 +1,7 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
-import { getOccurrencesInRange } from "./repeatingEventsHelper";
+import { getNextOccurrenceInRange } from "./repeatingEventsHelper";
 import {
   formatNotificationOffsetLabel,
   getNotificationOffsetsForEvent,
@@ -119,18 +119,16 @@ export async function scheduleEventNotifications(
     return [];
   }
 
-  let occurrenceStarts: number[];
+  let occurrenceStart: number;
 
   if (isRepeating) {
-    occurrenceStarts = getOccurrencesInRange(event, now, nDaysFromNow);
+    const nextOccurrence = getNextOccurrenceInRange(event, now, nDaysFromNow);
+    if (nextOccurrence === null) return [];
+    occurrenceStart = nextOccurrence;
   } else {
     if (event.begin <= now) return [];
     if (event.begin > nDaysFromNow) return [];
-    occurrenceStarts = [event.begin];
-  }
-
-  if (occurrenceStarts.length === 0) {
-    return [];
+    occurrenceStart = event.begin;
   }
 
   const notifications: Array<{
@@ -142,37 +140,35 @@ export async function scheduleEventNotifications(
   }> = [];
   const scheduledInfo: IScheduledNotification[] = [];
 
-  for (const occurrenceStart of occurrenceStarts) {
-    for (const offsetMinutes of reminderOffsets) {
-      const scheduledAt = occurrenceStart - offsetMinutes * 60 * 1000;
-      if (scheduledAt <= now) {
-        continue;
-      }
-
-      const notificationKey = buildNotificationKey(
-        event.id,
-        occurrenceStart,
-        offsetMinutes,
-      );
-
-      scheduledInfo.push({
-        label: formatNotificationOffsetLabel(offsetMinutes),
-        scheduledAt,
-      });
-
-      if (scheduledNotificationKeys.has(notificationKey)) {
-        continue;
-      }
-
-      const { title, body } = buildNotificationContent(event, offsetMinutes);
-      notifications.push({
-        id: hashToNumber(notificationKey),
-        title,
-        body,
-        schedule: { at: new Date(scheduledAt), allowWhileIdle: true },
-        extra: { eventId: event.id, notificationKey },
-      });
+  for (const offsetMinutes of reminderOffsets) {
+    const scheduledAt = occurrenceStart - offsetMinutes * 60 * 1000;
+    if (scheduledAt <= now) {
+      continue;
     }
+
+    const notificationKey = buildNotificationKey(
+      event.id,
+      occurrenceStart,
+      offsetMinutes,
+    );
+
+    scheduledInfo.push({
+      label: formatNotificationOffsetLabel(offsetMinutes),
+      scheduledAt,
+    });
+
+    if (scheduledNotificationKeys.has(notificationKey)) {
+      continue;
+    }
+
+    const { title, body } = buildNotificationContent(event, offsetMinutes);
+    notifications.push({
+      id: hashToNumber(notificationKey),
+      title,
+      body,
+      schedule: { at: new Date(scheduledAt), allowWhileIdle: true },
+      extra: { eventId: event.id, notificationKey },
+    });
   }
 
   if (scheduledInfo.length === 0) {
@@ -193,7 +189,7 @@ export async function scheduleEventNotifications(
     });
 
     console.log(
-      `Scheduled ${notifications.length} notifications for ${event.id}`,
+      `Scheduled notifications for ${event.id} (occurrence: ${new Date(occurrenceStart).toISOString()})`,
     );
     return sortNotifications(scheduledInfo);
   } catch (err) {
