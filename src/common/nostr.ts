@@ -39,15 +39,17 @@ import {
 import type { IBusyList } from "../utils/types";
 import { createLogger } from "../utils/logger";
 
-export const defaultRelays = [
-  "wss://relay.damus.io/",
-  "wss://relay.primal.net/",
-  "wss://nos.lol",
-  "wss://relay.nostr.wirednet.jp/",
-  "wss://nostr-01.yakihonne.com",
-  "wss://relay.snort.social",
-  "wss://nostr21.com",
-];
+export const defaultRelays = import.meta.env.VITE_TEST_RELAY
+  ? [import.meta.env.VITE_TEST_RELAY as string]
+  : [
+      "wss://relay.damus.io/",
+      "wss://relay.primal.net/",
+      "wss://nos.lol",
+      "wss://relay.nostr.wirednet.jp/",
+      "wss://nostr-01.yakihonne.com",
+      "wss://relay.snort.social",
+      "wss://nostr21.com",
+    ];
 
 const logger = createLogger("NOSTR_CORE");
 
@@ -872,7 +874,7 @@ export const publishToRelays = (
           return r;
         }),
         new Promise<string>((_, reject) =>
-          setTimeout(() => reject("timeout"), 5000),
+          setTimeout(() => reject("timeout"), 15000),
         ),
       ]);
       onRelayComplete?.(url, true);

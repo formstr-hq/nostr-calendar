@@ -19,6 +19,8 @@ import {
   useTheme,
   Checkbox,
   FormControlLabel,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
@@ -340,6 +342,7 @@ export function CalendarEventEdit({
     null,
   );
   const [retryingRelays, setRetryingRelays] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
@@ -718,7 +721,13 @@ export function CalendarEventEdit({
       handleClose();
       // }
     } catch (e) {
-      console.error(e instanceof Error ? e.message : "Unknown error");
+      let msg = e instanceof Error ? e.message : String(e);
+      if (e instanceof AggregateError && e.errors.length > 0) {
+        const details = e.errors.map((err) => String(err)).join("; ");
+        msg = `${msg} — ${details}`;
+      }
+      console.error(msg);
+      setSaveError(msg);
       const failedRelays = getFailedRelays(relaysToPublish);
       for (const relayUrl of failedRelays) {
         onRelayComplete(relayUrl, false);
@@ -916,6 +925,7 @@ export function CalendarEventEdit({
       <Box>
         <TextField
           fullWidth
+          label={intl.formatMessage({ id: "event.title" })}
           placeholder={intl.formatMessage({ id: "event.enterTitle" })}
           value={eventDetails.title}
           onChange={(e) => {
@@ -923,6 +933,12 @@ export function CalendarEventEdit({
           }}
           required
           size="small"
+          slotProps={{
+            htmlInput: {
+              "data-testid": "event-title",
+              "aria-label": "event title",
+            },
+          }}
         />
       </Box>
 
@@ -946,11 +962,20 @@ export function CalendarEventEdit({
       <EventAttributeEditContainer>
         <ScheduleIcon />
         <DateTimePicker
+          label="Start time"
           sx={{
             width: "100%",
           }}
           value={dayjs(eventDetails.begin)}
           onChange={onChangeBeginDate}
+          slotProps={{
+            textField: {
+              inputProps: {
+                "data-testid": "event-start-time",
+                "aria-label": "event start time",
+              },
+            },
+          }}
         />
         {!isMobile && "-"}
         <DateTimePicker
@@ -1701,6 +1726,22 @@ export function CalendarEventEdit({
     />
   );
 
+  const errorSnackbar = (
+    <Snackbar
+      open={!!saveError}
+      onClose={() => setSaveError(null)}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+    >
+      <Alert
+        severity="error"
+        onClose={() => setSaveError(null)}
+        sx={{ maxWidth: 600, wordBreak: "break-word" }}
+      >
+        {saveError}
+      </Alert>
+    </Snackbar>
+  );
+
   if (display === "page") {
     return (
       <>
@@ -1727,6 +1768,8 @@ export function CalendarEventEdit({
           </Box>
         </Box>
         {relayPublishDialog}
+        {/* eslint-disable-next-line no-constant-binary-expression */}
+        {false && errorSnackbar}
       </>
     );
   }
@@ -1748,6 +1791,7 @@ export function CalendarEventEdit({
         <DialogActions style={{ padding: 16 }}>{actions}</DialogActions>
       </Dialog>
       {relayPublishDialog}
+      {errorSnackbar}
     </>
   );
 }

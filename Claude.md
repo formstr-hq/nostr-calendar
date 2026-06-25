@@ -166,3 +166,7 @@ Events are fetched from and published to:
 - wss://nostr-pub.wellorder.net
 - wss://nostr.mom
 - wss://nos.lol
+
+## E2E Testing
+- Run the script defined in package json to start the tests
+- Always look at the test files and not the architecture documents. They might be outdated
