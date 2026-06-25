@@ -1,0 +1,28 @@
+name: Cleanup Playwright Report
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Remove report directory
+        run: |
+          REPORT_DIR="reports/pr-${{ github.event.pull_request.number }}"
+          if [ -d "$REPORT_DIR" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git rm -rf "$REPORT_DIR"
+            git commit -m "remove playwright report for closed PR ${{ github.event.pull_request.number }}"
+            git push origin gh-pages
+          fi
