@@ -874,7 +874,7 @@ export const publishToRelays = (
           return r;
         }),
         new Promise<string>((_, reject) =>
-          setTimeout(() => reject("timeout"), 5000),
+          setTimeout(() => reject("timeout"), 15000),
         ),
       ]);
       onRelayComplete?.(url, true);

@@ -34,7 +34,7 @@ export function DayView({ events, date }: ViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clickedDateTime, setClickedDateTime] = useState<number | undefined>();
-  const handleCellClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleCellClick = (event: React.MouseEvent<HTMLElement>) => {
     const time = getTimeFromCell(event, containerRef);
     if (time) {
       setClickedDateTime(time);
@@ -85,13 +85,22 @@ export function DayView({ events, date }: ViewProps) {
             <Box display={"flex"} flexDirection={"column"}>
               {Array.from({ length: 24 }).map((_, h) => (
                 <Box
+                  component="button"
                   data-date={date.format("YYYY-MM-DD")}
+                  data-testid="day-hour-cell"
                   onClick={handleCellClick}
                   key={h}
-                  height={60}
-                  px={0.5}
+                  aria-label="time slot"
                   sx={{
+                    height: 60,
+                    px: 0.5,
                     cursor: "pointer",
+                    border: "none",
+                    background: "transparent",
+                    display: "block",
+                    width: "100%",
+                    p: 0,
+                    textAlign: "left",
                   }}
                 >
                   <Divider />

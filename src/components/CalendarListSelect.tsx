@@ -71,7 +71,11 @@ export function CalendarListSelect({
           value={value}
           label={displayLabel}
           onChange={(e) => handleChange(e.target.value)}
-          SelectDisplayProps={{ "data-testid": "calendar-list-select" } as React.HTMLAttributes<HTMLDivElement>}
+          SelectDisplayProps={
+            {
+              "data-testid": "calendar-list-select",
+            } as React.HTMLAttributes<HTMLDivElement>
+          }
           renderValue={(selected) => {
             const cal = calendars.find((c) => c.id === selected);
             return (

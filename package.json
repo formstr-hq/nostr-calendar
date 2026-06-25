@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test:e2e": "playwright test --config e2e/web/playwright.config.ts",
     "test:e2e:ui": "playwright test --config e2e/web/playwright.config.ts --ui",
-    "test:e2e:report": "playwright show-report playwright-report"
+    "test:e2e:report": "playwright show-report playwright-report",
+    "test:e2e:native": "bash e2e/native/run.sh",
+    "test:e2e:native:quick": "bash e2e/native/run.sh --skip-build"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -59,6 +61,7 @@
     "react-select": "^5.10.2",
     "remark-gfm": "^4.0.1",
     "rrule": "^2.8.1",
+    "tsx": "^4.22.4",
     "uuid": "^11.1.0",
     "vitest": "^4.0.18",
     "workbox-window": "^7.4.1",

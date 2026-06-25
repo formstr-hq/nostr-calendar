@@ -1,29 +1,39 @@
 # Sub-flow: log in with Alice's nsec on Android native.
 # Called from other flows when the app is not yet authenticated.
 #
+# The LoginModal is already visible — the app auto-shows it when not authenticated
+# (App.tsx: `if (!user && isInitialized) updateLoginModal(true)`).
+#
 # Requires env var ALICE_NSEC to be set. Run Maestro with:
 #   maestro test --env ALICE_NSEC=<nsec> flows/notifications.yaml
+#
+# Selectors use text/accessibilityText matching because WebView elements in the
+# Android accessibility tree do not expose resource-id (data-testid is not
+# surfaced there). aria-label on each element sets the accessibilityText field,
+# giving Maestro an exact, stable selector without relying on visible text.
 
 appId: app.formstr.calendar
 ---
-# Open the user menu (shows "Log In" when not authenticated)
-- tapOn:
-    text: "Log In"
-
-# In the LoginModal, tap "Sign in with nsec" (Android native option)
+# Tap "Sign in with nsec" to expand the nsec section (Android native only option).
+# aria-label="Sign in with nsec" on the ButtonBase sets accessibilityText exactly.
 - tapOn:
     text: "Sign in with nsec"
 
-# Type Alice's nsec into the nsec input field
+# Tap the nsec input field.
+# aria-label="nsec input" on the htmlInput sets accessibilityText.
 - tapOn:
-    placeholder: "Enter nsec"
+    text: "nsec input"
+
+# Type Alice's nsec
 - inputText: "${ALICE_NSEC}"
 
-# Submit
+# Submit — aria-label="Log In" on the button sets accessibilityText.
 - tapOn:
     text: "Log In"
 
-# Wait for the avatar to appear (auth complete)
-- assertVisible:
-    id: "user-avatar"
+# Wait for the User menu button to appear (auth complete, modal closed).
+# aria-label="User menu" on the IconButton sets accessibilityText.
+- extendedWaitUntil:
+    visible:
+      text: "User menu"
     timeout: 10000

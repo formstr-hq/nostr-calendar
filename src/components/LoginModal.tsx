@@ -343,6 +343,8 @@ function NsecSection({
           autoComplete="off"
           slotProps={{
             htmlInput: {
+              "data-testid": "login-input-nsec",
+              "aria-label": "nsec input",
               autoCapitalize: "none",
               autoCorrect: "off",
               spellCheck: false,
@@ -369,6 +371,8 @@ function NsecSection({
           variant="contained"
           onClick={() => void handleNsecLogin()}
           disabled={loading || !nsec.trim()}
+          data-testid="login-submit-nsec"
+          aria-label="Log In"
         >
           {intl.formatMessage({ id: "navigation.login" })}
         </Button>
@@ -682,6 +686,7 @@ function OptionButton({
   chevronRotated = false,
   loading = false,
   disabled = false,
+  testId,
 }: {
   icon: ReactNode;
   title: string;
@@ -691,6 +696,7 @@ function OptionButton({
   chevronRotated?: boolean;
   loading?: boolean;
   disabled?: boolean;
+  testId?: string;
 }) {
   const theme = useTheme();
   const accent = theme.palette.primary.main;
@@ -700,6 +706,8 @@ function OptionButton({
     <ButtonBase
       onClick={onClick}
       disabled={disabled || loading}
+      aria-label={title}
+      data-testid={testId}
       sx={{
         width: "100%",
         display: "flex",
@@ -893,6 +901,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
                 }}
                 showChevron
                 chevronRotated={showNsecLogin}
+                testId="login-btn-nsec"
               />
               {showNsecLogin && (
                 <NsecSection onClose={onClose} onError={setError} />

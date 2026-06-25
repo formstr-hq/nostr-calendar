@@ -26,6 +26,13 @@ var emins  = pad(endTarget.getMinutes());
 var eampm  = endTarget.getHours() >= 12 ? "PM" : "AM";
 output.endTime   = month + "/" + day + "/" + year + " " + eh12 + ":" + emins + " " + eampm;
 
+// Today's day number (e.g. "22") — used to tap the correct cell in the calendar.
+output.todayDay = String(now.getDate());
+
+// Current hour (0-23) — used as the index into the DayView's "time slot" cells.
+// The DayView auto-scrolls to show the current time, so this cell is always visible.
+output.currentHour = String(now.getHours());
+
 // How long (ms) to wait after saving before checking for the notification.
 // 90s + 10s buffer.
 output.waitMs = String((OFFSET_SECONDS + 10) * 1000);

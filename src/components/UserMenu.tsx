@@ -21,7 +21,11 @@ export const UserMenu = () => {
 
   return (
     <>
-      <IconButton onClick={handleClick} data-testid="user-avatar">
+      <IconButton
+        onClick={handleClick}
+        data-testid="user-avatar"
+        aria-label="User menu"
+      >
         <NostrAvatar user={user} />
       </IconButton>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
