@@ -1,6 +1,8 @@
-name: Playwright E2E Tests (PR + Manual)
+name: Playwright E2E Tests (PR + Manual + Main)
 
 on:
+  push:
+    branches: [main]
   pull_request_target:
     types: [labeled]
   workflow_dispatch:
@@ -48,12 +50,13 @@ jobs:
 
   test:
     needs: resolve-pr
+    if: always() && (needs.resolve-pr.result == 'success' || needs.resolve-pr.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-pr.outputs.pr_sha }}
+          ref: ${{ needs.resolve-pr.outputs.pr_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -95,17 +98,22 @@ jobs:
 
           git fetch origin gh-pages 2>/dev/null && git checkout gh-pages || git checkout --orphan gh-pages
 
-          REPORT_DIR="reports/pr-${{ needs.resolve-pr.outputs.pr_number }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REPORT_DIR="reports/main"
+          else
+            REPORT_DIR="reports/pr-${{ needs.resolve-pr.outputs.pr_number }}"
+          fi
+
           rm -rf "$REPORT_DIR"
           mkdir -p "$REPORT_DIR"
           cp -r /tmp/playwright-report-tmp/. "$REPORT_DIR/"
 
           git add "$REPORT_DIR"
-          git diff --cached --quiet || git commit -m "playwright report for PR ${{ needs.resolve-pr.outputs.pr_number }}"
+          git diff --cached --quiet || git commit -m "playwright report for $REPORT_DIR"
           git push origin gh-pages
 
       - name: Post report link to PR
-        if: always()
+        if: always() && github.event_name != 'push'
         uses: actions/github-script@v7
         with:
           script: |
@@ -122,8 +130,8 @@ jobs:
               body: `## ${icon} Playwright E2E Tests ${status}\n\n[View full report](${pagesUrl})\n\n> Run triggered by \`run-tests\` label on commit \`${{ needs.resolve-pr.outputs.pr_sha }}\`.`
             });
 
-      - name: Remove tests label
-        if: always()
+      - name: Remove run-tests label
+        if: always() && github.event_name != 'push'
         uses: actions/github-script@v7
         with:
           script: |
