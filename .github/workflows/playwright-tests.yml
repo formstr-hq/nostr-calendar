@@ -1,0 +1,125 @@
+name: Playwright E2E Tests (PR + Manual)
+
+on:
+  pull_request_target:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  resolve-pr:
+    if: github.event.label.name == 'run-tests' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+      pr_sha: ${{ steps.pr.outputs.sha }}
+    steps:
+      - name: Resolve PR info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let pr;
+
+            if (context.eventName === "pull_request" || context.eventName === "pull_request_target") {
+              pr = context.payload.pull_request;
+            }
+
+            if (context.eventName === "workflow_dispatch") {
+              const prNumber = Number('${{ inputs.pr_number }}');
+              pr = (await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              })).data;
+            }
+
+            core.setOutput('number', String(pr.number));
+            core.setOutput('sha', pr.head.sha);
+
+  test:
+    needs: resolve-pr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-pr.outputs.pr_sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10.26.2"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        id: run-tests
+        run: pnpm test:e2e
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Post report link to PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const outcome = '${{ steps.run-tests.outcome }}';
+            const passed = outcome === 'success';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const icon = passed ? '✅' : '❌';
+            const status = passed ? 'passed' : 'failed';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ needs.resolve-pr.outputs.pr_number }},
+              body: `## ${icon} Playwright E2E Tests ${status}\n\nThe full HTML report is attached to the [workflow run](${runUrl}) as the \`playwright-report\` artifact.\n\n> Run triggered by \`tests\` label on commit \`${{ needs.resolve-pr.outputs.pr_sha }}\`.`
+            });
+
+      - name: Remove tests label
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: ${{ needs.resolve-pr.outputs.pr_number }},
+                name: 'run-tests'
+              });
+            } catch (e) {
+              // Label already removed or never existed — not a failure
+              console.log('Could not remove label:', e.message);
+            }
+
+      - name: Fail if tests failed
+        if: steps.run-tests.outcome == 'failure'
+        run: exit 1
