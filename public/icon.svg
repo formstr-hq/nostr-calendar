@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dark calendar background - full bleed -->
+  <rect width="512" height="512" fill="#111111"/>
+
+  <!-- Red header strip - edge to edge, including top -->
+  <rect x="0" y="0" width="512" height="145" fill="#E24B4A"/>
+
+  <!-- Month label -->
+  <text x="256" y="72"
+        font-family="system-ui, sans-serif"
+        font-weight="bold"
+        font-size="60"
+        fill="rgba(255,255,255,0.85)"
+        text-anchor="middle"
+        dominant-baseline="middle">JAN</text>
+
+  <!-- Date number -->
+  <text x="256" y="290"
+        font-family="system-ui, sans-serif"
+        font-weight="bold"
+        font-size="155"
+        fill="#ffffff"
+        text-anchor="middle"
+        dominant-baseline="middle">3</text>
+
+  <!-- Year -->
+  <text x="256" y="415"
+        font-family="system-ui, sans-serif"
+        font-weight="bold"
+        font-size="50"
+        fill="rgba(255,255,255,0.6)"
+        text-anchor="middle"
+        dominant-baseline="middle">2009</text>
+</svg>

@@ -1,0 +1,147 @@
+import { NAddr } from "nostr-tools/nip19";
+import React from "react";
+import { useParams, useSearchParams } from "react-router";
+import type { ICalendarEvent } from "../utils/types";
+import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
+import { nostrEventToCalendar } from "../utils/parser";
+import { Header } from "./Header";
+import { Alert, Box, CircularProgress, Toolbar } from "@mui/material";
+import { CalendarEventView } from "./CalendarEvent";
+import { useIntl } from "react-intl";
+import {
+  applyEventOccurrenceRange,
+  getEventOccurrenceRangeFromQuery,
+  OCCURRENCE_END_PARAM,
+  OCCURRENCE_START_PARAM,
+} from "../utils/eventOccurrence";
+
+interface ILoadState {
+  event: ICalendarEvent | null;
+  fetchState: "loading" | "fetched" | "error";
+  error: Error | null;
+}
+
+const getInitialLoadState = (): ILoadState => ({
+  event: null,
+  fetchState: "loading",
+  error: null,
+});
+
+const ErrorRenderer = ({ error }: { error: Error }) => {
+  const intl = useIntl();
+  return (
+    <Box
+      style={{
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <Alert severity="error">
+        {intl.formatMessage({ id: "event.loadError" })}
+        {error.message && (
+          <>
+            <br />
+            <small>{error.message}</small>
+          </>
+        )}
+      </Alert>
+    </Box>
+  );
+};
+
+const LoaderRenderer = () => {
+  return (
+    <Box
+      style={{
+        width: "100%",
+        minHeight: `max(100vh, 100%)`,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <CircularProgress />
+    </Box>
+  );
+};
+
+export const ViewEventPage = () => {
+  const { naddr } = useParams<{ naddr: string }>();
+  const [queryParams] = useSearchParams();
+  const viewKey = queryParams.get("viewKey");
+  const occurrenceStartParam = queryParams.get(OCCURRENCE_START_PARAM);
+  const occurrenceEndParam = queryParams.get(OCCURRENCE_END_PARAM);
+  const [calendarEventLoadState, updateCalendarEventLoadState] =
+    React.useState<ILoadState>(getInitialLoadState);
+
+  React.useEffect(() => {
+    updateCalendarEventLoadState(getInitialLoadState);
+    fetchCalendarEvent(naddr as NAddr)
+      .then(({ event, relayHint }) => {
+        let parsedEvent: ICalendarEvent;
+        if (viewKey) {
+          const privateEvent = viewPrivateEvent(event, viewKey);
+          if (!privateEvent) throw new Error("Failed to decrypt event");
+          parsedEvent = nostrEventToCalendar(privateEvent, "", {
+            viewKey,
+            isPrivateEvent: true,
+            relayHint,
+          });
+        } else {
+          parsedEvent = nostrEventToCalendar(event, "", { relayHint });
+        }
+        const occurrenceRange = getEventOccurrenceRangeFromQuery(
+          occurrenceStartParam,
+          occurrenceEndParam,
+          parsedEvent,
+        );
+        updateCalendarEventLoadState((state) => ({
+          ...state,
+          event: applyEventOccurrenceRange(parsedEvent, occurrenceRange),
+          fetchState: "fetched",
+        }));
+      })
+      .catch((e) => {
+        updateCalendarEventLoadState((state) => ({
+          ...state,
+          error: e instanceof Error ? e : new Error(String(e)),
+          fetchState: "error",
+        }));
+        console.error(e);
+      });
+  }, [
+    naddr,
+    viewKey,
+    occurrenceStartParam,
+    occurrenceEndParam,
+    updateCalendarEventLoadState,
+  ]);
+  if (!naddr) {
+    return null;
+  }
+  return (
+    <>
+      <Header />
+      <Box
+        component={"main"}
+        style={{ width: "100%", minHeight: `max(100vh, 100%)` }}
+      >
+        <Toolbar />
+        {calendarEventLoadState.fetchState === "loading" ? (
+          <LoaderRenderer />
+        ) : null}
+        {calendarEventLoadState.error !== null ? (
+          <ErrorRenderer error={calendarEventLoadState.error} />
+        ) : null}
+        {calendarEventLoadState.event !== null ? (
+          <CalendarEventView
+            event={calendarEventLoadState.event}
+            display="page"
+          />
+        ) : null}
+      </Box>
+    </>
+  );
+};

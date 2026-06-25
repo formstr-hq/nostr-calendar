@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" font-family="system-ui, -apple-system, sans-serif">
+  <rect width="390" height="844" fill="#ffffff"/>
+
+  <!-- Status bar -->
+  <text x="20" y="22" fill="#000" font-size="13" font-weight="600">9:41</text>
+  <text x="350" y="22" fill="#000" font-size="11">●●●</text>
+
+  <!-- Header -->
+  <rect y="32" width="390" height="52" fill="#f5f5f5"/>
+  <text x="36" y="63" fill="#555" font-size="13">← Back</text>
+  <text x="195" y="63" text-anchor="middle" fill="#000" font-size="13" font-weight="600">Confirm Booking</text>
+
+  <!-- Summary card -->
+  <rect x="16" y="100" width="358" height="196" rx="10" fill="#f9f9f9" stroke="#e8e8e8" stroke-width="1.5"/>
+
+  <!-- Avatar + name row -->
+  <circle cx="52" cy="132" r="22" fill="#e0e0e0"/>
+  <text x="52" y="139" text-anchor="middle" fill="#555" font-size="11" font-weight="600">AK</text>
+  <text x="86" y="126" fill="#000" font-size="15" font-weight="700">Alex Kim</text>
+  <text x="86" y="144" fill="#888" font-size="12">Product Designer</text>
+
+  <line x1="32" y1="162" x2="358" y2="162" stroke="#e8e8e8" stroke-width="1"/>
+
+  <!-- Detail rows -->
+  <text x="32" y="184" fill="#999" font-size="11">DURATION</text>
+  <text x="358" y="184" text-anchor="end" fill="#000" font-size="13" font-weight="500">30 min</text>
+
+  <text x="32" y="208" fill="#999" font-size="11">DATE</text>
+  <text x="358" y="208" text-anchor="end" fill="#000" font-size="13" font-weight="500">Tue, Jun 15, 2026</text>
+
+  <text x="32" y="232" fill="#999" font-size="11">TIME</text>
+  <text x="358" y="232" text-anchor="end" fill="#000" font-size="13" font-weight="500">2:00 PM – 2:30 PM (IST)</text>
+
+  <text x="32" y="274" fill="#999" font-size="11">PRICE</text>
+  <text x="358" y="274" text-anchor="end" fill="#000" font-size="16" font-weight="700">$25</text>
+
+  <!-- Name field -->
+  <text x="20" y="322" fill="#555" font-size="12" font-weight="500">Your name</text>
+  <rect x="16" y="330" width="358" height="46" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="32" y="358" fill="#000" font-size="14">Rahul Mehta</text>
+
+  <!-- Email field -->
+  <text x="20" y="396" fill="#555" font-size="12" font-weight="500">Email address</text>
+  <rect x="16" y="404" width="358" height="46" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="32" y="432" fill="#000" font-size="14">rahul@example.com</text>
+
+  <!-- Message field -->
+  <text x="20" y="470" fill="#555" font-size="12" font-weight="500">Message <tspan fill="#aaa">(optional)</tspan></text>
+  <rect x="16" y="478" width="358" height="100" rx="6" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+  <text x="32" y="502" fill="#aaa" font-size="13">Add a note for Alex...</text>
+
+  <!-- Confirm button -->
+  <rect x="16" y="596" width="358" height="52" rx="6" fill="#000"/>
+  <text x="195" y="628" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">Confirm Booking</text>
+
+  <!-- Cancel -->
+  <text x="195" y="668" text-anchor="middle" fill="#aaa" font-size="13">Cancel</text>
+
+  <!-- Terms -->
+  <text x="195" y="700" text-anchor="middle" fill="#ccc" font-size="11">By confirming you agree to the cancellation policy.</text>
+
+  <!-- Footer -->
+  <text x="195" y="820" text-anchor="middle" fill="#bbb" font-size="11">Powered by Formstr</text>
+</svg>

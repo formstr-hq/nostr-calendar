@@ -1,0 +1,31 @@
+repository: https://github.com/formstr-hq/nostr-calendar
+description: Your calendar is one of the most personal things you own — it knows where you'll be, who you'll meet, and what you're doing every hour of every day. Why hand that to a corporation? Calendar by Form* is a fully decentralized calendar app built on the Nostr protocol. You sign in with your Nostr keys, and your events are stored privately(encrypted) across relays that you choose.
+summary: A private, decentralized calendar powered by Nostr. Your schedule, your keys.
+website: https://calendar.formstr.app
+images:
+  - assets/event-view.png
+  - assets/booking-request.png
+  - assets/booking-create-1.png
+  - assets/booking-create-2.png
+  - assets/booking-notifications.png
+  - assets/login.png
+  - assets/month-view.png
+  - assets/week-view.png
+  - assets/day-view.png
+  - assets/setup.png
+  - assets/calendar-list.png
+  - assets/calendar-management.png
+  - assets/invitation-event.png
+  - assets/invitations.png
+  - assets/event-view-2.png
+  - assets/event-create.png
+blossom_servers:
+  - https://cdn.zapstore.dev
+  - https://blossom.band
+tags:
+  - calendar
+  - schedule
+  - event
+  - nostr
+metadata_sources:
+  - github

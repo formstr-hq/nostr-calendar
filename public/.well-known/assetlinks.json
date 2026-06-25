@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.formstr.calendar",
+      "sha256_cert_fingerprints": [
+        "F9:6B:42:12:D8:C1:39:97:E2:1B:FB:11:A2:89:9F:6F:24:DA:A6:F8:AE:89:F6:6E:FF:87:A7:DA:90:36:83:0F"
+      ]
+    }
+  }
+]

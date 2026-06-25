@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Calendar header fill (rounded top corners) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,5 L19,5 Q20,5 20,6 L20,11 L4,11 L4,6 Q4,5 5,5 Z"/>
+
+    <!-- Calendar body outline -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M5,5 L19,5 Q20,5 20,6 L20,21 Q20,22 19,22 L5,22 Q4,22 4,21 L4,6 Q4,5 5,5 Z"/>
+
+    <!-- Spiral ring left -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M8,5 Q8,3 9.5,3 Q11,3 11,5"/>
+
+    <!-- Spiral ring right -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M13,5 Q13,3 14.5,3 Q16,3 16,5"/>
+
+    <!-- Date dots: 3 cols x 2 rows -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 Z M12,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 Z M16.5,14.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 Z M7.5,18.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 Z M12,18.5 m-1,0 a1,1 0 1 0 2,0 a1,1 0 1 0 -2,0 Z"/>
+
+</vector>

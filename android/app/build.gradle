@@ -1,0 +1,99 @@
+apply plugin: 'com.android.application'
+
+def keystorePropertiesPath = project.hasProperty('keystorePropertiesFile')
+    ? project.property('keystorePropertiesFile')
+    : null
+def keystoreProperties = new Properties()
+if (keystorePropertiesPath) {
+    def f = new File(keystorePropertiesPath)
+    if (f.exists()) {
+        keystoreProperties.load(new FileInputStream(f))
+    }
+}
+
+def envNames = [
+    storePassword: 'ANDROID_STORE_PASSWORD',
+    keyPassword:   'ANDROID_KEY_PASSWORD',
+]
+
+def prop = { String name ->
+    if (envNames[name]) {
+        def value = System.getenv(envNames[name])
+        if (value) return value
+    }
+    return keystoreProperties[name] ?: ''
+}
+
+android {
+    namespace = "app.formstr.calendar"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    if (keystorePropertiesPath) {
+        signingConfigs {
+            release {
+                storeFile = file(prop('storeFile'))
+                storePassword = prop('storePassword')
+                keyAlias = prop('keyAlias')
+                keyPassword = prop('keyPassword')
+            }
+        }
+    }
+
+    defaultConfig {
+        def ciSuffix = project.hasProperty('ciSuffix') ? ".${project.property('ciSuffix')}" : ""
+        applicationId "app.formstr.calendar${ciSuffix}"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+
+        def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+        def (major, minor, patch) = packageJson.version.tokenize('.').collect { it.toInteger() }
+        versionCode = major * 10000 + minor * 100 + patch
+        versionName = packageJson.version
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            if (keystorePropertiesPath) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.work:work-runtime:2.9.1"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

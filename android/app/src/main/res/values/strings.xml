@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Calendar by Form*</string>
+    <string name="title_activity_main">Calendar by Form*</string>
+    <string name="package_name">app.formstr.calendar</string>
+    <string name="custom_url_scheme">app.formstr.calendar</string>
+    <string name="widget_description">Shows your upcoming Nostr calendar events</string>
+</resources>
