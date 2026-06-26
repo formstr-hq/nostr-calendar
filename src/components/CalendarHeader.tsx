@@ -18,7 +18,6 @@ import dayjs from "dayjs";
 import { getRouteFromDate } from "../utils/dateBasedRouting";
 import { useNavigate } from "react-router";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
-import { StyledSecondaryHeader } from "./StyledComponents";
 import { WeekHeader } from "./WeekView";
 import { useIntl } from "react-intl";
 
@@ -41,12 +40,17 @@ export function CalendarHeader() {
 
   return (
     <>
-      <StyledSecondaryHeader
+      <Box
         display="flex"
         justifyContent="space-between"
         alignItems="center"
-        position={"sticky"}
         paddingBottom={2}
+        sx={{
+          bgcolor: "white",
+          flexShrink: 0,
+          position: "relative",
+          zIndex: 1,
+        }}
       >
         <Box display="flex" alignItems="center">
           {!isMobile && (
@@ -121,7 +125,7 @@ export function CalendarHeader() {
             </MenuItem>
           </Menu>
         </Box>
-      </StyledSecondaryHeader>
+      </Box>
       {layout === "week" && <WeekHeader date={date} />}
     </>
   );

@@ -94,17 +94,25 @@ export const Participant = ({
     return (
       <div
         style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           gap: "12px",
+          minWidth: 0,
+          maxWidth: "100%",
         }}
       >
-        <Skeleton variant="circular" width={"24px"} height={"24px"} />
+        <Skeleton
+          variant="circular"
+          width={"24px"}
+          height={"24px"}
+          sx={{ flexShrink: 0 }}
+        />
         <div
           style={{
             overflow: "hidden",
             textOverflow: "ellipsis",
-            maxWidth: "100%",
+            minWidth: 0,
+            flex: 1,
             display: "flex",
             alignItems: "center",
             gap: "8px",
@@ -120,9 +128,11 @@ export const Participant = ({
   return (
     <div
       style={{
-        display: "inline-flex",
+        display: "flex",
         alignItems: "center",
         gap: "12px",
+        minWidth: 0,
+        maxWidth: "100%",
       }}
     >
       {rsvpResponse && getRSVPIcon(rsvpResponse, theme)}
@@ -131,6 +141,7 @@ export const Participant = ({
           width: "24px",
           height: "24px",
           borderRadius: "100%",
+          flexShrink: 0,
         }}
         data={participant.picture}
       >
@@ -143,8 +154,8 @@ export const Participant = ({
       <div
         style={{
           overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "100%",
+          minWidth: 0,
+          flex: 1,
           display: "flex",
           alignItems: "center",
           gap: "4px",
@@ -153,26 +164,29 @@ export const Participant = ({
         <div
           style={{
             overflow: "hidden",
-            textOverflow: "ellipsis",
-            maxWidth: "100%",
+            minWidth: 0,
+            flex: 1,
             display: "flex",
             alignItems: "center",
             gap: "4px",
           }}
         >
-          <span style={{ textDecoration: "underline" }}>
+          <span
+            style={{
+              textDecoration: "underline",
+              fontWeight: isAuthor ? 700 : undefined,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {truncateText(displayName)}
           </span>
-          {isAuthor && (
-            <span style={{ color: theme.palette.text.secondary }}>
-              ({intl.formatMessage({ id: "participant.author" })})
-            </span>
-          )}
           <Tooltip title={copyTooltip} arrow>
             <IconButton
               size="small"
               onClick={handleCopy}
-              style={{ padding: "2px" }}
+              style={{ padding: "2px", flexShrink: 0 }}
             >
               <ContentCopyIcon style={{ fontSize: "14px" }} />
             </IconButton>

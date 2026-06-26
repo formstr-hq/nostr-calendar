@@ -217,7 +217,15 @@ function Application() {
   useNativeDeepLinks();
 
   return (
-    <>
+    <Box
+      className="App"
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
       {!standaloneHeaderRoute && <Header onImportEvent={setImportedEvent} />}
 
       <ICSListener
@@ -242,8 +250,19 @@ function Application() {
 
       <AppLoadingBar />
 
-      <Box>{shouldRenderRouting ? <Routing /> : null}</Box>
-    </>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {shouldRenderRouting ? <Routing /> : null}
+      </Box>
+    </Box>
   );
 }
 

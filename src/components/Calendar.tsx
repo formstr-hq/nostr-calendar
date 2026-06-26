@@ -33,15 +33,37 @@ function Calendar() {
   ];
   console.log("ALL_EVENTS", allEvents);
   return (
-    <Box p={2}>
+    <Box
+      p={2}
+      sx={{
+        height: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <CalendarHeader />
-      {layout === "day" && <SwipeableView View={DayView} events={allEvents} />}
-      {layout === "week" && (
-        <SwipeableView View={WeekView} events={allEvents} />
-      )}
-      {layout === "month" && (
-        <SwipeableView View={MonthView} events={allEvents} />
-      )}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {layout === "day" && (
+          <SwipeableView View={DayView} events={allEvents} />
+        )}
+        {layout === "week" && (
+          <SwipeableView View={WeekView} events={allEvents} />
+        )}
+        {layout === "month" && (
+          <SwipeableView View={MonthView} events={allEvents} />
+        )}
+      </Box>
     </Box>
   );
 }

@@ -20,6 +20,7 @@ import {
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 import { ICalendarEvent, RepeatingFrequency } from "../utils/types";
 import {
@@ -896,13 +897,31 @@ export function CalendarEventEdit({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 8,
       }}
     >
-      <Typography variant="h6" style={{ fontWeight: 600 }}>
-        {mode === "edit"
-          ? intl.formatMessage({ id: "event.editEvent" })
-          : intl.formatMessage({ id: "event.createNewEvent" })}
-      </Typography>
+      <Box
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          minWidth: 0,
+        }}
+      >
+        {display === "page" && (
+          <IconButton onClick={handleClose} size="small">
+            <ArrowBackIcon />
+          </IconButton>
+        )}
+        <Typography
+          variant="h6"
+          style={{ fontWeight: 600, overflowWrap: "anywhere" }}
+        >
+          {mode === "edit"
+            ? intl.formatMessage({ id: "event.editEvent" })
+            : intl.formatMessage({ id: "event.createNewEvent" })}
+        </Typography>
+      </Box>
       {display === "modal" && (
         <IconButton onClick={handleClose} size="small">
           <CloseIcon />
@@ -1708,8 +1727,8 @@ export function CalendarEventEdit({
           style={{
             maxWidth: 900,
             margin: "0 auto",
-            padding: 24,
-            paddingTop: "calc(24px + var(--safe-area-top))",
+            padding: isMobile ? 16 : 24,
+            boxSizing: "border-box",
           }}
         >
           <Box style={{ marginBottom: 24 }}>{titleBar}</Box>

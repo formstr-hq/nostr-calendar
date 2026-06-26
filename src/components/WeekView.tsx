@@ -12,7 +12,6 @@ import {
 import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
-import { StyledSecondaryHeader } from "./StyledComponents";
 import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
@@ -28,9 +27,8 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   const theme = useTheme();
   return (
-    <StyledSecondaryHeader
+    <Box
       zIndex={1}
-      topOffset={40 + 8}
       textAlign="center"
       display="grid"
       gridTemplateColumns="repeat(7, 1fr)"
@@ -39,6 +37,10 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
       paddingY={theme.spacing(1)}
       bgcolor={"white"}
       paddingLeft={"60px"}
+      sx={{
+        flexShrink: 0,
+        position: "relative",
+      }}
     >
       {days.map((day) => (
         <Box
@@ -53,7 +55,7 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
           <DateLabel day={day}></DateLabel>
         </Box>
       ))}
-    </StyledSecondaryHeader>
+    </Box>
   );
 };
 

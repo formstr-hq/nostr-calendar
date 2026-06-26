@@ -36,6 +36,48 @@ export const theme = createTheme({
         },
       ],
     },
+    MuiDialog: {
+      styleOverrides: {
+        // Make ALL dialogs full-screen on mobile, regardless of the
+        // `fullScreen` prop being passed. Done once here in the theme so
+        // we never have to touch each individual dialog component.
+        paper: {
+          "@media (max-width:599.95px)": {
+            margin: 0,
+            width: "100%",
+            maxWidth: "100%",
+            height: "100dvh",
+            maxHeight: "100dvh",
+            borderRadius: 0,
+            overflow: "hidden",
+          },
+        },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          "@media (max-width:599.95px)": {
+            overflowY: "auto",
+            overflowX: "hidden",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+          },
+        },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        // On mobile, keep the title clear of the iOS status bar / notch.
+        // Dialogs that already set this explicitly via `sx` win (higher
+        // specificity), so this only fills in for those that don't.
+        root: {
+          "@media (max-width:599.95px)": {
+            paddingTop: "calc(16px + var(--safe-area-top))",
+          },
+        },
+      },
+    },
   },
   palette: {
     primary: {
