@@ -10,7 +10,7 @@ import LoginModal from "./components/LoginModal";
 import RelayManager from "./components/RelayManager";
 import { BrowserRouter, useLocation, useNavigate } from "react-router";
 import { Routing } from "./components/Routing";
-import { Header } from "./components/Header";
+import { Header, HeaderSpacer } from "./components/Header";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
@@ -27,8 +27,6 @@ import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-import { useSchedulingPages } from "./stores/schedulingPages";
-import { useBookingRequests } from "./stores/bookingRequests";
 import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
@@ -61,7 +59,7 @@ function Application() {
   const fetchPrivateEvents = useTimeBasedEvents(
     (state) => state.fetchPrivateEvents,
   );
-  const { isLoaded: calendarsLoaded, fetchCalendars } = useCalendarLists();
+  const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
   const publicRoute = isPublicAppPath(location.pathname);
   const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
   const shouldRenderRouting = isInitialized && (Boolean(user) || publicRoute);
@@ -71,9 +69,7 @@ function Application() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.platform = isIOSNative()
-      ? "ios-native"
-      : "";
+    document.documentElement.classList.toggle("ios-native", isIOSNative());
   }, []);
 
   const { fetchInvitations, stopInvitations } = useInvitations();
@@ -100,6 +96,7 @@ function Application() {
     fetchPrivateEvents,
     fetchInvitations,
     isInitialized,
+    calendars.length,
   ]);
 
   // Refetch the user's own public busy lists whenever the visible month
@@ -125,17 +122,6 @@ function Application() {
   useEffect(() => {
     return () => stopInvitations();
   }, []);
-
-  // Fetch calendar lists, scheduling pages, and bookings when user is available.
-  // This must live in App.tsx (not Calendar.tsx) so it fires on every route.
-  useEffect(() => {
-    if (user) {
-      fetchCalendars();
-      useSchedulingPages.getState().fetchPages();
-      useBookingRequests.getState().fetchIncomingRequests();
-      useBookingRequests.getState().fetchOutgoingBookings();
-    }
-  }, [user, fetchCalendars]);
 
   useEffect(() => {
     return addNotificationClickListener((eventId) => {
@@ -239,14 +225,7 @@ function Application() {
       />
 
       <RelayManager />
-      {!standaloneHeaderRoute && (
-        <Box
-          sx={{
-            height: `calc(${56}px + var(--safe-area-top))`,
-            flexShrink: 0,
-          }}
-        />
-      )}
+      {!standaloneHeaderRoute && <HeaderSpacer />}
 
       <AppLoadingBar />
 

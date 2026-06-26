@@ -186,15 +186,7 @@ export function CalendarManageDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions
-        sx={{
-          px: 2,
-          pt: 2,
-          pb: isMobile ? "calc(16px + var(--safe-area-bottom))" : 2,
-          flexWrap: "wrap",
-          gap: 1,
-        }}
-      >
+      <DialogActions>
         {deleteConfirm ? (
           <Box
             sx={{

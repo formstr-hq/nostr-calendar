@@ -334,7 +334,6 @@ export function CalendarEventView({
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          pt: fullScreen ? "calc(16px + var(--safe-area-top))" : 2,
         }}
       >
         {titleBar}

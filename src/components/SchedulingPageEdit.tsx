@@ -33,7 +33,7 @@ import dayjs, { Dayjs } from "dayjs";
 import localeData from "dayjs/plugin/localeData";
 dayjs.extend(localeData);
 import { useSchedulingPages } from "../stores/schedulingPages";
-import { Header, HEADER_HEIGHT } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import type { ISchedulingPage, IAvailabilityWindow } from "../utils/types";
 import { ROUTES } from "../utils/routingHelper";
 import { useIntl } from "react-intl";
@@ -431,9 +431,7 @@ export const SchedulingPageEdit = () => {
     return (
       <>
         <Header />
-        <Box
-          sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }}
-        />
+        <HeaderSpacer />
         <Box
           sx={{
             display: "flex",
@@ -452,9 +450,7 @@ export const SchedulingPageEdit = () => {
     return (
       <>
         <Header />
-        <Box
-          sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }}
-        />
+        <HeaderSpacer />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
             {intl.formatMessage({ id: "scheduling.pageNotFound" })}
@@ -467,7 +463,7 @@ export const SchedulingPageEdit = () => {
   return (
     <>
       <Header />
-      <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
+      <HeaderSpacer />
       <Box sx={{ maxWidth: 800, mx: "auto", p: isMobile ? 2 : 3 }}>
         {/* Top bar */}
         <Box

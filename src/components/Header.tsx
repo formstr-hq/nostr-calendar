@@ -6,6 +6,7 @@ import {
   Badge,
   Stack,
   Box,
+  styled,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -21,6 +22,11 @@ import { useInvitations } from "../stores/invitations";
 import { isIOSNative } from "../utils/platform";
 
 export const HEADER_HEIGHT = 56;
+
+export const HeaderSpacer = styled(Box)({
+  height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))`,
+  flexShrink: 0,
+});
 
 interface HeaderProps {
   onImportEvent?: (event: ICalendarEvent) => void;

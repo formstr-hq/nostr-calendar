@@ -68,14 +68,30 @@ export const theme = createTheme({
     },
     MuiDialogTitle: {
       styleOverrides: {
-        // On mobile, keep the title clear of the iOS status bar / notch.
-        // Dialogs that already set this explicitly via `sx` win (higher
-        // specificity), so this only fills in for those that don't.
         root: {
-          "@media (max-width:599.95px)": {
-            paddingTop: "calc(16px + var(--safe-area-top))",
+          "html.ios-native &": {
+            "@media (max-width:599.95px)": {
+              paddingTop: "var(--iphone-safe-area)",
+            },
           },
         },
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          paddingLeft: theme.spacing(2),
+          paddingRight: theme.spacing(2),
+          paddingTop: theme.spacing(2),
+          paddingBottom: theme.spacing(2),
+          flexWrap: "wrap",
+          gap: theme.spacing(1),
+          "html.ios-native &": {
+            "@media (max-width:599.95px)": {
+              paddingBottom: "var(--iphone-safe-area-bottom)",
+            },
+          },
+        }),
       },
     },
   },

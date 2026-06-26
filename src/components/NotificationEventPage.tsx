@@ -3,7 +3,7 @@ import { useTimeBasedEvents } from "../stores/events";
 import { CalendarEvent } from "./CalendarEvent";
 import { Box, IconButton, Typography } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
-import { Header, HEADER_HEIGHT } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import { useIntl } from "react-intl";
 
 export const NotificationEventPage = () => {
@@ -16,7 +16,7 @@ export const NotificationEventPage = () => {
   return (
     <>
       <Header />
-      <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
+      <HeaderSpacer />
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <IconButton onClick={() => navigate(-1)}>

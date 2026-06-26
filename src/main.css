@@ -3,10 +3,14 @@ html {
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
+  --iphone-safe-area: 16px;
+  --iphone-safe-area-bottom: 16px;
 }
 
-html[data-platform="ios-native"] {
+html.ios-native {
   --safe-area-top: max(env(safe-area-inset-top, 0px), 44px);
+  --iphone-safe-area: calc(16px + var(--safe-area-top));
+  --iphone-safe-area-bottom: calc(16px + var(--safe-area-bottom));
 }
 
 @font-face {

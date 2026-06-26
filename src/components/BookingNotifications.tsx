@@ -29,7 +29,7 @@ import { useBookingRequests } from "../stores/bookingRequests";
 import { useSchedulingPages } from "../stores/schedulingPages";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useGetParticipant } from "../stores/participants";
-import { Header, HEADER_HEIGHT } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { ROUTES } from "../utils/routingHelper";
 import type { IBookingRequest, IOutgoingBooking } from "../utils/types";
@@ -75,7 +75,7 @@ export const BookingNotifications = () => {
   return (
     <>
       <Header />
-      <Box sx={{ height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))` }} />
+      <HeaderSpacer />
       <Box sx={{ maxWidth: 900, mx: "auto", p: isMobile ? 2 : 3 }}>
         <Box
           sx={{
