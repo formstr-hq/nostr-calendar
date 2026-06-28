@@ -1,6 +1,6 @@
 import { ThemeProvider, CssBaseline, Box } from "@mui/material";
 import { theme } from "./theme";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
 import { IntlProvider } from "react-intl";
@@ -54,6 +54,7 @@ function Application() {
   const [importedEvent, setImportedEvent] = useState<ICalendarEvent | null>(
     null,
   );
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const fetchPrivateEvents = useTimeBasedEvents(
@@ -63,14 +64,20 @@ function Application() {
   const publicRoute = isPublicAppPath(location.pathname);
   const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
   const shouldRenderRouting = isInitialized && (Boolean(user) || publicRoute);
+  const iosNative = isIOSNative();
 
   useEffect(() => {
     initializeUser();
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("ios-native", isIOSNative());
-  }, []);
+    document.documentElement.classList.toggle("ios-native", iosNative);
+  }, [iosNative]);
+
+  useEffect(() => {
+    if (!iosNative) return;
+    contentRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [iosNative, location.pathname, location.search]);
 
   const { fetchInvitations, stopInvitations } = useInvitations();
 
@@ -206,10 +213,12 @@ function Application() {
     <Box
       className="App"
       sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
+        ...(iosNative && {
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          overflow: "hidden",
+        }),
       }}
     >
       {!standaloneHeaderRoute && <Header onImportEvent={setImportedEvent} />}
@@ -230,13 +239,16 @@ function Application() {
       <AppLoadingBar />
 
       <Box
+        ref={contentRef}
         sx={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-          overscrollBehavior: "contain",
-          WebkitOverflowScrolling: "touch",
+          ...(iosNative && {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+          }),
         }}
       >
         {shouldRenderRouting ? <Routing /> : null}

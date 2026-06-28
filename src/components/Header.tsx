@@ -21,12 +21,16 @@ import { ICalendarEvent } from "../utils/types";
 import { useInvitations } from "../stores/invitations";
 import { isIOSNative } from "../utils/platform";
 
-export const HEADER_HEIGHT = 56;
-
-export const HeaderSpacer = styled(Box)({
-  height: `calc(${HEADER_HEIGHT}px + var(--safe-area-top))`,
+export const HeaderSpacer = styled(Box)(({ theme }) => ({
+  height: "calc(56px + var(--safe-area-top))",
   flexShrink: 0,
-});
+  "@media (min-width:0px) and (orientation: landscape)": {
+    height: "calc(48px + var(--safe-area-top))",
+  },
+  [theme.breakpoints.up("sm")]: {
+    height: "calc(64px + var(--safe-area-top))",
+  },
+}));
 
 interface HeaderProps {
   onImportEvent?: (event: ICalendarEvent) => void;
@@ -56,7 +60,6 @@ export const Header = ({ onImportEvent }: HeaderProps) => {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            minHeight: `${HEADER_HEIGHT}px`,
             gap: 8,
           }}
         >

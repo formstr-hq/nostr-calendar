@@ -18,8 +18,10 @@ import dayjs from "dayjs";
 import { getRouteFromDate } from "../utils/dateBasedRouting";
 import { useNavigate } from "react-router";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
+import { StyledSecondaryHeader } from "./StyledComponents";
 import { WeekHeader } from "./WeekView";
 import { useIntl } from "react-intl";
+import { isIOSNative } from "../utils/platform";
 
 export function CalendarHeader() {
   const intl = useIntl();
@@ -36,96 +38,114 @@ export function CalendarHeader() {
     setAnchorEl(null);
   };
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const iosNative = isIOSNative();
   const move = (dir: number) => setDate(date.add(dir, layout), layout);
+
+  const headerContent = (
+    <>
+      <Box display="flex" alignItems="center">
+        {!isMobile && (
+          <>
+            <IconButton onClick={() => move(-1)}>
+              <ChevronLeft />
+            </IconButton>
+            <IconButton onClick={() => move(1)}>
+              <ChevronRight />
+            </IconButton>
+          </>
+        )}
+        <Typography ml={2} fontWeight={600}>
+          {layout === "month" && date.format("MMMM YYYY")}
+          {layout === "week" && (
+            <>
+              {date.startOf("week").format("DD")}-
+              {date.endOf("week").format("DD")} {date.format("MMM YY")}
+            </>
+          )}
+          {layout === "day" && date.format("MMM D, YYYY")}
+        </Typography>
+      </Box>
+      <Box display="flex" gap={theme.spacing(2)} alignItems="center">
+        <IconButton
+          onClick={() => {
+            const route = getRouteFromDate(dayjs(), layout);
+            if (route !== location.pathname) {
+              navigate(route);
+            }
+          }}
+        >
+          <TodayIcon />
+        </IconButton>
+        <Button
+          onClick={handleClick}
+          variant="outlined"
+          startIcon={<KeyboardArrowDown />}
+        >
+          {intl.formatMessage({ id: `navigation.${layout}` })}
+        </Button>
+        <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+          <MenuItem
+            selected={layout === "day"}
+            disabled={layout === "day"}
+            onClick={() => {
+              updateLayout("day");
+              handleClose();
+            }}
+          >
+            {intl.formatMessage({ id: "navigation.day" })}
+          </MenuItem>
+          <MenuItem
+            selected={layout === "week"}
+            disabled={layout === "week"}
+            onClick={() => {
+              updateLayout("week");
+              handleClose();
+            }}
+          >
+            {intl.formatMessage({ id: "navigation.week" })}
+          </MenuItem>
+          <MenuItem
+            selected={layout === "month"}
+            disabled={layout === "month"}
+            onClick={() => {
+              updateLayout("month");
+              handleClose();
+            }}
+          >
+            {intl.formatMessage({ id: "navigation.month" })}
+          </MenuItem>
+        </Menu>
+      </Box>
+    </>
+  );
 
   return (
     <>
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        paddingBottom={2}
-        sx={{
-          bgcolor: "white",
-          flexShrink: 0,
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Box display="flex" alignItems="center">
-          {!isMobile && (
-            <>
-              <IconButton onClick={() => move(-1)}>
-                <ChevronLeft />
-              </IconButton>
-              <IconButton onClick={() => move(1)}>
-                <ChevronRight />
-              </IconButton>
-            </>
-          )}
-          <Typography ml={2} fontWeight={600}>
-            {layout === "month" && date.format("MMMM YYYY")}
-            {layout === "week" && (
-              <>
-                {date.startOf("week").format("DD")}-
-                {date.endOf("week").format("DD")} {date.format("MMM YY")}
-              </>
-            )}
-            {layout === "day" && date.format("MMM D, YYYY")}
-          </Typography>
+      {iosNative ? (
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          paddingBottom={2}
+          sx={{
+            bgcolor: "white",
+            flexShrink: 0,
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {headerContent}
         </Box>
-        <Box display="flex" gap={theme.spacing(2)} alignItems="center">
-          <IconButton
-            onClick={() => {
-              const route = getRouteFromDate(dayjs(), layout);
-              if (route !== location.pathname) {
-                navigate(route);
-              }
-            }}
-          >
-            <TodayIcon />
-          </IconButton>
-          <Button
-            onClick={handleClick}
-            variant="outlined"
-            startIcon={<KeyboardArrowDown />}
-          >
-            {intl.formatMessage({ id: `navigation.${layout}` })}
-          </Button>
-          <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-            <MenuItem
-              selected={layout === "day"}
-              disabled={layout === "day"}
-              onClick={() => {
-                updateLayout("day");
-                handleClose();
-              }}
-            >
-              {intl.formatMessage({ id: "navigation.day" })}
-            </MenuItem>
-            <MenuItem
-              selected={layout === "week"}
-              disabled={layout === "week"}
-              onClick={() => {
-                updateLayout("week");
-                handleClose();
-              }}
-            >
-              {intl.formatMessage({ id: "navigation.week" })}
-            </MenuItem>
-            <MenuItem
-              selected={layout === "month"}
-              disabled={layout === "month"}
-              onClick={() => {
-                updateLayout("month");
-                handleClose();
-              }}
-            >
-              {intl.formatMessage({ id: "navigation.month" })}
-            </MenuItem>
-          </Menu>
-        </Box>
-      </Box>
+      ) : (
+        <StyledSecondaryHeader
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          paddingBottom={2}
+        >
+          {headerContent}
+        </StyledSecondaryHeader>
+      )}
       {layout === "week" && <WeekHeader date={date} />}
     </>
   );

@@ -12,11 +12,13 @@ import {
 import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
+import { StyledSecondaryHeader } from "./StyledComponents";
 import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
+import { isIOSNative } from "../utils/platform";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -26,6 +28,43 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
   const start = date.startOf("week");
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   const theme = useTheme();
+  const headerContent = (
+    <>
+      {days.map((day) => (
+        <Box
+          display={"flex"}
+          key={day.format("YYYY-MMM-ddd")}
+          flexDirection={"column"}
+          alignItems={"center"}
+        >
+          <Typography variant="body1" fontWeight={600}>
+            {day.format("ddd")}
+          </Typography>
+          <DateLabel day={day}></DateLabel>
+        </Box>
+      ))}
+    </>
+  );
+
+  if (!isIOSNative()) {
+    return (
+      <StyledSecondaryHeader
+        zIndex={1}
+        topOffset={40 + 8}
+        textAlign="center"
+        display="grid"
+        gridTemplateColumns="repeat(7, 1fr)"
+        flexDirection={"row"}
+        alignItems={"center"}
+        paddingY={theme.spacing(1)}
+        bgcolor={"white"}
+        paddingLeft={"60px"}
+      >
+        {headerContent}
+      </StyledSecondaryHeader>
+    );
+  }
+
   return (
     <Box
       zIndex={1}
@@ -42,19 +81,7 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
         position: "relative",
       }}
     >
-      {days.map((day) => (
-        <Box
-          display={"flex"}
-          key={day.format("YYYY-MMM-ddd")}
-          flexDirection={"column"}
-          alignItems={"center"}
-        >
-          <Typography variant="body1" fontWeight={600}>
-            {day.format("ddd")}
-          </Typography>
-          <DateLabel day={day}></DateLabel>
-        </Box>
-      ))}
+      {headerContent}
     </Box>
   );
 };

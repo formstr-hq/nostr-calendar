@@ -10,6 +10,7 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { useVisibleDeviceEvents } from "../hooks/useVisibleDeviceEvents";
+import { isIOSNative } from "../utils/platform";
 
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
@@ -31,7 +32,28 @@ function Calendar() {
     ...invitations.filter((inv) => inv.event).map((inv) => inv.event!),
     ...visibleDeviceEvents,
   ];
-  console.log("ALL_EVENTS", allEvents);
+
+  const calendarViews = (
+    <>
+      {layout === "day" && <SwipeableView View={DayView} events={allEvents} />}
+      {layout === "week" && (
+        <SwipeableView View={WeekView} events={allEvents} />
+      )}
+      {layout === "month" && (
+        <SwipeableView View={MonthView} events={allEvents} />
+      )}
+    </>
+  );
+
+  if (!isIOSNative()) {
+    return (
+      <Box p={2}>
+        <CalendarHeader />
+        {calendarViews}
+      </Box>
+    );
+  }
+
   return (
     <Box
       p={2}
@@ -54,15 +76,7 @@ function Calendar() {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        {layout === "day" && (
-          <SwipeableView View={DayView} events={allEvents} />
-        )}
-        {layout === "week" && (
-          <SwipeableView View={WeekView} events={allEvents} />
-        )}
-        {layout === "month" && (
-          <SwipeableView View={MonthView} events={allEvents} />
-        )}
+        {calendarViews}
       </Box>
     </Box>
   );
