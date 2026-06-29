@@ -21,7 +21,6 @@ import {
   CircularProgress,
   useMediaQuery,
   useTheme,
-  Toolbar,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -34,7 +33,7 @@ import dayjs, { Dayjs } from "dayjs";
 import localeData from "dayjs/plugin/localeData";
 dayjs.extend(localeData);
 import { useSchedulingPages } from "../stores/schedulingPages";
-import { Header } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import type { ISchedulingPage, IAvailabilityWindow } from "../utils/types";
 import { ROUTES } from "../utils/routingHelper";
 import { useIntl } from "react-intl";
@@ -432,7 +431,7 @@ export const SchedulingPageEdit = () => {
     return (
       <>
         <Header />
-        <Toolbar />
+        <HeaderSpacer />
         <Box
           sx={{
             display: "flex",
@@ -451,7 +450,7 @@ export const SchedulingPageEdit = () => {
     return (
       <>
         <Header />
-        <Toolbar />
+        <HeaderSpacer />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
             {intl.formatMessage({ id: "scheduling.pageNotFound" })}
@@ -464,7 +463,7 @@ export const SchedulingPageEdit = () => {
   return (
     <>
       <Header />
-      <Toolbar />
+      <HeaderSpacer />
       <Box sx={{ maxWidth: 800, mx: "auto", p: isMobile ? 2 : 3 }}>
         {/* Top bar */}
         <Box

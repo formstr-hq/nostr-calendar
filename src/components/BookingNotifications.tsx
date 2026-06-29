@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Toolbar,
   CircularProgress,
   useMediaQuery,
   useTheme,
@@ -30,7 +29,7 @@ import { useBookingRequests } from "../stores/bookingRequests";
 import { useSchedulingPages } from "../stores/schedulingPages";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useGetParticipant } from "../stores/participants";
-import { Header } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { ROUTES } from "../utils/routingHelper";
 import type { IBookingRequest, IOutgoingBooking } from "../utils/types";
@@ -76,7 +75,7 @@ export const BookingNotifications = () => {
   return (
     <>
       <Header />
-      <Toolbar />
+      <HeaderSpacer />
       <Box sx={{ maxWidth: 900, mx: "auto", p: isMobile ? 2 : 3 }}>
         <Box
           sx={{

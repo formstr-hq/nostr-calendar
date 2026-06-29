@@ -31,7 +31,7 @@
     "@emotion/styled": "^11.14.1",
     "@formstr/sdk": "^0.2.7",
     "@formstr/signer": "^0.2.2",
-    "@khadarvsk/capacitor-secure-storage": "0.0.1",
+    "@khadarvsk/capacitor-secure-storage": "0.0.3",
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
     "@mui/x-date-pickers": "^8.26.0",

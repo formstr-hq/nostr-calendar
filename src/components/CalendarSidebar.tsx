@@ -119,8 +119,9 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
     >
       {/* Scrollable content */}
       <Box
-        padding={theme.spacing(2)}
         sx={{
+          p: 2,
+          pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2,
           flex: 1,
           overflowY: "auto",
           overflowX: "hidden",
@@ -234,10 +235,12 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
 
       {/* Fixed footer */}
       <Box
-        pt={2}
-        pb={2}
-        padding={2}
-        sx={{ borderTop: "1px solid", borderColor: "divider" }}
+        sx={{
+          p: 2,
+          pb: isMobile ? "calc(16px + var(--safe-area-bottom))" : 2,
+          borderTop: "1px solid",
+          borderColor: "divider",
+        }}
       >
         <Box
           display="flex"

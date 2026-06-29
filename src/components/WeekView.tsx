@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
+import { isIOSNative } from "../utils/platform";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -27,19 +28,8 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
   const start = date.startOf("week");
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   const theme = useTheme();
-  return (
-    <StyledSecondaryHeader
-      zIndex={1}
-      topOffset={40 + 8}
-      textAlign="center"
-      display="grid"
-      gridTemplateColumns="repeat(7, 1fr)"
-      flexDirection={"row"}
-      alignItems={"center"}
-      paddingY={theme.spacing(1)}
-      bgcolor={"white"}
-      paddingLeft={"60px"}
-    >
+  const headerContent = (
+    <>
       {days.map((day) => (
         <Box
           display={"flex"}
@@ -53,7 +43,46 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
           <DateLabel day={day}></DateLabel>
         </Box>
       ))}
-    </StyledSecondaryHeader>
+    </>
+  );
+
+  if (!isIOSNative()) {
+    return (
+      <StyledSecondaryHeader
+        zIndex={1}
+        topOffset={40 + 8}
+        textAlign="center"
+        display="grid"
+        gridTemplateColumns="repeat(7, 1fr)"
+        flexDirection={"row"}
+        alignItems={"center"}
+        paddingY={theme.spacing(1)}
+        bgcolor={"white"}
+        paddingLeft={"60px"}
+      >
+        {headerContent}
+      </StyledSecondaryHeader>
+    );
+  }
+
+  return (
+    <Box
+      zIndex={1}
+      textAlign="center"
+      display="grid"
+      gridTemplateColumns="repeat(7, 1fr)"
+      flexDirection={"row"}
+      alignItems={"center"}
+      paddingY={theme.spacing(1)}
+      bgcolor={"white"}
+      paddingLeft={"60px"}
+      sx={{
+        flexShrink: 0,
+        position: "relative",
+      }}
+    >
+      {headerContent}
+    </Box>
   );
 };
 

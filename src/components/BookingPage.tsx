@@ -48,7 +48,7 @@ import { useUser } from "../stores/user";
 import { useBookingRequests } from "../stores/bookingRequests";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
-import { Header, HEADER_HEIGHT } from "./Header";
+import { Header, HeaderSpacer } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
@@ -384,7 +384,7 @@ export const BookingPage = () => {
     return (
       <>
         <Header />
-        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+        <HeaderSpacer />
         <Box
           sx={{
             display: "flex",
@@ -403,7 +403,7 @@ export const BookingPage = () => {
     return (
       <>
         <Header />
-        <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+        <HeaderSpacer />
         <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
           <Alert severity="error">
             {!viewKey
@@ -418,7 +418,7 @@ export const BookingPage = () => {
   return (
     <>
       <Header />
-      <Box sx={{ height: `${HEADER_HEIGHT}px` }} />
+      <HeaderSpacer />
       <Box
         sx={{
           maxWidth: 900,

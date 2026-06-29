@@ -1,0 +1,2 @@
+patchedDependencies:
+  nostr-signer-capacitor-plugin@0.0.5: patches/nostr-signer-capacitor-plugin@0.0.5.patch

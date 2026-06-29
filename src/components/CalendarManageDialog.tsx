@@ -93,7 +93,11 @@ export function CalendarManageDialog({
       maxWidth="sm"
       fullWidth
     >
-      <DialogTitle>
+      <DialogTitle
+        sx={{
+          pt: isMobile ? "calc(16px + var(--safe-area-top))" : 2,
+        }}
+      >
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" fontWeight={600}>
             {isEdit
@@ -182,7 +186,7 @@ export function CalendarManageDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ padding: 2, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions>
         {deleteConfirm ? (
           <Box
             sx={{

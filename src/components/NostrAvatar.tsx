@@ -1,4 +1,4 @@
-import { type FC, memo } from "react";
+import { type FC, memo, useState } from "react";
 import Avatar from "@mui/material/Avatar";
 import UserIcon from "@mui/icons-material/Person";
 import { IUser } from "../stores/user";
@@ -8,11 +8,21 @@ interface NostrAvatarProps {
 }
 
 export const NostrAvatar: FC<NostrAvatarProps> = memo(({ user }) => {
-  return user?.picture ? (
-    <Avatar src={user.picture} alt={user?.name} />
-  ) : (
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (user?.picture && !imgFailed) {
+    return (
+      <Avatar
+        src={user.picture}
+        alt={user?.name}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  return (
     <Avatar sx={{ bgcolor: "transparent" }}>
-      <UserIcon sx={{ color: "grey.500" }} />
+      <UserIcon sx={{ color: "grey.700" }} />
     </Avatar>
   );
 });

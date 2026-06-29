@@ -21,10 +21,17 @@ export const UserMenu = () => {
 
   return (
     <>
-      <IconButton onClick={handleClick}>
+      <IconButton onClick={handleClick} sx={{ color: "grey.700" }}>
         <NostrAvatar user={user} />
       </IconButton>
-      <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
+      <Menu
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        disableScrollLock
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
         <Auth onClose={handleClose} onCopied={() => setCopied(true)} />
       </Menu>
       <Snackbar

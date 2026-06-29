@@ -286,7 +286,7 @@ function Nip55Section({
   );
 }
 
-// ─── NsecSection (Android native only) ────────────────────────────────────────
+// ─── NsecSection (native only) ────────────────────────────────────────────────
 
 function NsecSection({
   onClose,
@@ -881,7 +881,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
             <Nip55Section onClose={onClose} onError={setError} />
           )}
 
-          {isAndroidNative() && (
+          {isNative && (
             <Box>
               <OptionButton
                 icon={<VpnKeyOutlinedIcon />}

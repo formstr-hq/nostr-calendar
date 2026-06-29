@@ -79,7 +79,14 @@ export function RSVPParticipantList({
 
         return (
           <Box key={pubkey} width="100%">
-            <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+            <Box
+              display="flex"
+              alignItems="center"
+              gap={0.5}
+              flexWrap="wrap"
+              minWidth={0}
+              maxWidth="100%"
+            >
               <Participant
                 pubKey={pubkey}
                 isAuthor={pubkey === event.user}

@@ -1,6 +1,6 @@
-import { ThemeProvider, CssBaseline, Box, Toolbar } from "@mui/material";
+import { ThemeProvider, CssBaseline, Box } from "@mui/material";
 import { theme } from "./theme";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
 import { IntlProvider } from "react-intl";
@@ -8,14 +8,14 @@ import { flattenMessages } from "./common/utils";
 import dictionary, { NestedObject } from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
 import RelayManager from "./components/RelayManager";
-import { BrowserRouter, useNavigate } from "react-router";
+import { BrowserRouter, useLocation, useNavigate } from "react-router";
 import { Routing } from "./components/Routing";
-import { Header } from "./components/Header";
+import { Header, HeaderSpacer } from "./components/Header";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { addNotificationClickListener } from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
-import { isNative } from "./utils/platform";
+import { isIOSNative, isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
 import {
   BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
@@ -27,11 +27,12 @@ import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
-
 import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
 import { useDateWithRouting } from "./hooks/useDateWithRouting";
+import { isPublicAppPath, usesStandaloneHeader } from "./utils/deepLinks";
+import { useNativeDeepLinks } from "./hooks/useNativeDeepLinks";
 
 const browserLocale =
   (navigator.languages && navigator.languages[0]) ||
@@ -53,15 +54,30 @@ function Application() {
   const [importedEvent, setImportedEvent] = useState<ICalendarEvent | null>(
     null,
   );
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const fetchPrivateEvents = useTimeBasedEvents(
     (state) => state.fetchPrivateEvents,
   );
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
+  const publicRoute = isPublicAppPath(location.pathname);
+  const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
+  const shouldRenderRouting = isInitialized && (Boolean(user) || publicRoute);
+  const iosNative = isIOSNative();
 
   useEffect(() => {
     initializeUser();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("ios-native", iosNative);
+  }, [iosNative]);
+
+  useEffect(() => {
+    if (!iosNative) return;
+    contentRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [iosNative, location.pathname, location.search]);
 
   const { fetchInvitations, stopInvitations } = useInvitations();
 
@@ -78,7 +94,6 @@ function Application() {
   // or when the user toggles calendar visibility.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
-      console.log("STARTING_FETCH", calendars);
       void fetchPrivateEvents();
       fetchInvitations();
     }
@@ -183,14 +198,30 @@ function Application() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!user && isInitialized) {
-      updateLoginModal(true);
+    if (!isInitialized || user) return;
+
+    if (publicRoute) {
+      updateLoginModal(false);
+      return;
     }
-  }, [user, isInitialized, updateLoginModal]);
+
+    updateLoginModal(true);
+  }, [user, isInitialized, updateLoginModal, publicRoute]);
+  useNativeDeepLinks();
 
   return (
-    <>
-      <Header onImportEvent={setImportedEvent} />
+    <Box
+      className="App"
+      sx={{
+        ...(iosNative && {
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          overflow: "hidden",
+        }),
+      }}
+    >
+      {!standaloneHeaderRoute && <Header onImportEvent={setImportedEvent} />}
 
       <ICSListener
         importedEvent={importedEvent}
@@ -203,12 +234,26 @@ function Application() {
       />
 
       <RelayManager />
-      <Toolbar />
+      {!standaloneHeaderRoute && <HeaderSpacer />}
 
       <AppLoadingBar />
 
-      <Box>{user && <Routing />}</Box>
-    </>
+      <Box
+        ref={contentRef}
+        sx={{
+          ...(iosNative && {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+          }),
+        }}
+      >
+        {shouldRenderRouting ? <Routing /> : null}
+      </Box>
+    </Box>
   );
 }
 
