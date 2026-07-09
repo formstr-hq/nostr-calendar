@@ -168,6 +168,9 @@ importers:
       globals:
         specifier: ^16.3.0
         version: 16.3.0
+      nostr-mock-relay:
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.8.3)
       prettier:
         specifier: 3.6.2
         version: 3.6.2
@@ -3864,6 +3867,10 @@ packages:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
 
+  nostr-mock-relay@0.1.1:
+    resolution: {integrity: sha512-FF5xqnKQQRJorfbxkacunur+wMPUAYJKdiVppNLQEWSZAFYvuMvmtt3FUYyMHYpVobqsm0gKL54tRTG5A8P4RA==}
+    engines: {node: '>=24'}
+
   nostr-signer-capacitor-plugin@0.0.5:
     resolution: {integrity: sha512-/EvqWz71HZ5cWmzvfXWTm48AWZtbeZDbOg3vLwXyXPjnIp1DR7Wurww/Mo41ORNu1DNPlqH20l7kIXKO6vR5og==}
     peerDependencies:
@@ -3871,6 +3878,14 @@ packages:
 
   nostr-tools@2.23.5:
     resolution: {integrity: sha512-Fa7ZlUdjfUW1P4E7H3yBexhOHYi18XNyvd2n7eNHkYR085xADX6Y8V8Vm7nT/XQajaFOBrptXmVIGkJ2E4vfVw==}
+    peerDependencies:
+      typescript: '>=5.0.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  nostr-tools@2.23.9:
+    resolution: {integrity: sha512-PBN3TpGh+EszlTZWpQdvcqEMqhcKcY1vTw0Xkkccg+TyP7y/icu9/iXJw72aFZ/ETm35ehU0hneGTXLaTSkImw==}
     peerDependencies:
       typescript: '>=5.0.0'
     peerDependenciesMeta:
@@ -4956,6 +4971,18 @@ packages:
   write-file-atomic@4.0.2:
     resolution: {integrity: sha512-7KxauUdBmSdWnmpaGFg+ppNjKF8uNLry8LyzjauQDOVONfFLNKrKvQOxZ/VuTIcS/gge/YNahf5RIIQWTSarlg==}
     engines: {node: ^12.13.0 || ^14.15.0 || >=16.0.0}
+
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   xml2js@0.6.2:
     resolution: {integrity: sha512-T4rieHaC1EXcES0Kxxj4JWgaUQHDk+qwHcYOCFHfiwKz7tOVPLq7Hjq9dM1WCMhylqMEfP7hMcOIChvotiZegA==}
@@ -9395,11 +9422,32 @@ snapshots:
 
   normalize-path@3.0.0: {}
 
+  nostr-mock-relay@0.1.1(typescript@5.8.3):
+    dependencies:
+      nostr-tools: 2.23.9(typescript@5.8.3)
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
   nostr-signer-capacitor-plugin@0.0.5(@capacitor/core@8.0.0):
     dependencies:
       '@capacitor/core': 8.0.0
 
   nostr-tools@2.23.5(typescript@5.8.3):
+    dependencies:
+      '@noble/ciphers': 2.1.1
+      '@noble/curves': 2.0.1
+      '@noble/hashes': 2.0.1
+      '@scure/base': 2.0.0
+      '@scure/bip32': 2.0.1
+      '@scure/bip39': 2.0.1
+      nostr-wasm: 0.1.0
+    optionalDependencies:
+      typescript: 5.8.3
+
+  nostr-tools@2.23.9(typescript@5.8.3):
     dependencies:
       '@noble/ciphers': 2.1.1
       '@noble/curves': 2.0.1
@@ -10671,6 +10719,8 @@ snapshots:
     dependencies:
       imurmurhash: 0.1.4
       signal-exit: 3.0.7
+
+  ws@8.21.0: {}
 
   xml2js@0.6.2:
     dependencies:

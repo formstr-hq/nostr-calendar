@@ -25,7 +25,6 @@ export default defineConfig({
   ],
 
   globalSetup: "./global-setup.ts",
-  globalTeardown: "./global-teardown.ts",
 
   webServer: {
     command: `cd ${rootDir} && vite build --mode test && vite preview --port 5173`,
