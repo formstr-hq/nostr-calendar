@@ -133,7 +133,6 @@ export const DuplicateEventPage = () => {
             open={true}
             event={duplicatedEvent}
             onClose={() => navigate(-1)}
-            onSave={() => navigate(-1)}
             mode="create"
             display="page"
           />

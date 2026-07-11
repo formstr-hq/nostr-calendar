@@ -1,4 +1,3 @@
-import { TEMP_CALENDAR_ID } from "../stores/eventDetails";
 import type { ICalendarEvent } from "./types";
 
 export function buildDuplicatedEventDraft(
@@ -6,7 +5,7 @@ export function buildDuplicatedEventDraft(
 ): ICalendarEvent {
   return {
     ...event,
-    id: TEMP_CALENDAR_ID,
+    id: "",
     eventId: "",
     createdAt: Date.now(),
     user: "",
