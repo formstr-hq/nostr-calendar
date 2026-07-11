@@ -1,0 +1,161 @@
+import { expect, type Locator, type Page } from "@playwright/test";
+import { TEST_KEYS } from "../relay/seed/keys.js";
+import { navigate } from "./fixtures/index.js";
+
+/**
+ * Opens the calendar selector inside `scope` (an event / booking dialog or a
+ * page) and creates a brand-new calendar with the given name. Creating a
+ * fresh calendar per test keeps parallel tests from racing on a shared one.
+ */
+export async function createCalendarViaSelect(
+  page: Page,
+  scope: Locator | Page,
+  calendarName: string,
+): Promise<void> {
+  const select = scope.getByTestId("calendar-list-select");
+  await select.scrollIntoViewIfNeeded();
+  await select.click();
+  await page.getByRole("option", { name: "Add new calendar" }).click();
+
+  const calendarDialog = page.getByRole("dialog", { name: "New Calendar" });
+  await calendarDialog.waitFor({ state: "visible" });
+  await calendarDialog.getByLabel("Calendar Name").fill(calendarName);
+  await calendarDialog.getByRole("button", { name: "Create" }).click();
+  await calendarDialog.waitFor({ state: "hidden" });
+}
+
+/**
+ * Creates a private event through the day-view click-to-create dialog and
+ * waits until it shows up on the grid. `date` is YYYY-MM-DD; `slotIndex` is
+ * the hour cell to click (10 = 10am).
+ */
+export async function createEventViaDialog(
+  page: Page,
+  {
+    date,
+    title,
+    calendarName,
+    slotIndex = 10,
+  }: { date: string; title: string; calendarName: string; slotIndex?: number },
+): Promise<void> {
+  const [year, month, day] = date.split("-");
+  await navigate(page, `/d/${year}/${month}/${day}`);
+
+  await page.locator(`[data-date="${date}"]`).nth(slotIndex).click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor({ state: "visible" });
+  await dialog.getByPlaceholder("Enter event title").fill(title);
+  await createCalendarViaSelect(page, dialog, calendarName);
+  await dialog.getByRole("button", { name: "Save Event" }).click();
+
+  await expect(dialog).not.toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(title)).toBeVisible();
+}
+
+/**
+ * Opens an event's view modal from the calendar grid and clicks through to
+ * the edit page, waiting for the form to be loaded with the event's title.
+ */
+export async function openEventEditor(page: Page, title: string): Promise<void> {
+  await page.getByText(title).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor({ state: "visible" });
+  await dialog.getByRole("button", { name: "Edit Event" }).click();
+  await expect(page.getByTestId("event-title")).toHaveValue(title);
+}
+
+/**
+ * Types a full date-time into one of the MUI picker fields on the event form.
+ * `fieldLabel` is the picker label ("Start time" / "End time") and `value`
+ * must be formatted as "MM/DD/YYYY hh:mm AM|PM".
+ */
+export async function fillDateTimeField(
+  page: Page,
+  fieldLabel: string,
+  value: string,
+): Promise<void> {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}) (AM|PM)$/);
+  if (!match) {
+    throw new Error(`Expected "MM/DD/YYYY hh:mm AM|PM", got "${value}"`);
+  }
+  const [, month, day, year, hours, minutes, meridiem] = match;
+
+  const field = page.getByRole("group", { name: fieldLabel });
+  await field.getByRole("spinbutton", { name: "Month" }).click();
+  // Each completed section auto-advances the focus to the next one.
+  await page.keyboard.type(`${month}${day}${year}${hours}${minutes}`, {
+    delay: 40,
+  });
+  await page.keyboard.press(meridiem === "AM" ? "a" : "p");
+}
+
+/**
+ * Opens the sidebar drawer and navigates to the bookings page. Mounting the
+ * sidebar is what starts the booking-request relay subscriptions, so this is
+ * the realistic path to a live /bookings view.
+ */
+export async function openBookingsViaSidebar(page: Page): Promise<void> {
+  // Booking-related pages render their own <Header/> in addition to the
+  // app-level one; both AppBars are position:fixed so only the last one in
+  // the DOM is actually clickable.
+  await page.getByRole("button", { name: "open menu" }).last().click();
+  await page.getByRole("button", { name: "View Bookings" }).click();
+  await page.waitForURL("**/bookings");
+}
+
+/**
+ * Creates a booking (scheduling) page with default availability and returns
+ * its public share URL (includes the viewKey query parameter).
+ */
+export async function createBookingPage(
+  page: Page,
+  title: string,
+): Promise<string> {
+  await navigate(page, "/bookings");
+  await page.getByRole("button", { name: "New Page" }).click();
+  await page.waitForURL("**/schedule/create");
+
+  // The label text is "Title *" (required marker), so match the accessible
+  // name via role instead of getByLabel.
+  await page.getByRole("textbox", { name: "Title", exact: true }).fill(title);
+  await page.getByRole("button", { name: "Create page" }).click();
+  await expect(page.getByText("Scheduling page created!")).toBeVisible({
+    timeout: 20_000,
+  });
+
+  const pageUrl = await page.getByLabel("booking page link").inputValue();
+  expect(pageUrl).toContain("/schedule/naddr");
+  return pageUrl;
+}
+
+/**
+ * As Bob, opens a booking link, picks the first available slot of next week
+ * (always fully in the future) and submits a booking request.
+ */
+export async function bookFirstSlot(
+  page: Page,
+  pageUrl: string,
+  meetingTitle: string,
+  calendarName: string,
+): Promise<void> {
+  await navigate(page, pageUrl, TEST_KEYS.bob);
+  await page.getByRole("button", { name: "next week" }).click();
+
+  // Slot buttons are labelled with their start time, e.g. "09:00 AM".
+  const slots = page
+    .getByRole("button", { name: /\d{1,2}:\d{2}/ })
+    .and(page.locator(":enabled"));
+  await expect(slots.first()).toBeVisible({ timeout: 15_000 });
+  await slots.first().click();
+
+  const dialog = page.getByRole("dialog", { name: "Confirm Booking" });
+  await dialog.waitFor({ state: "visible" });
+  await dialog.getByLabel("Meeting title").fill(meetingTitle);
+  await createCalendarViaSelect(page, dialog, calendarName);
+  await dialog.getByRole("button", { name: "Request Booking" }).click();
+
+  await expect(page.getByText("Booking request sent!")).toBeVisible({
+    timeout: 20_000,
+  });
+}

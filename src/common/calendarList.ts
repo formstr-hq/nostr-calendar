@@ -163,7 +163,14 @@ export async function publishCalendarList(
 
   const unsignedEvent: UnsignedEvent = {
     pubkey: userPubkey,
-    created_at: Math.floor(Date.now() / 1000),
+    // Replaceable events with equal created_at are tie-broken by lowest id
+    // (NIP-01), so an update published in the same second as the previous
+    // version could silently lose. Stay strictly after the version we
+    // replace (calendarList.createdAt holds its timestamp).
+    created_at: Math.max(
+      Math.floor(Date.now() / 1000),
+      (calendarList.createdAt ?? 0) + 1,
+    ),
     kind: EventKinds.PrivateCalendarList,
     content: encryptedContent,
     tags: [["d", calendarList.id]],
@@ -233,11 +240,12 @@ export async function createCalendar(
     ...calendarData,
     id,
     eventId: "",
-    createdAt: Math.floor(Date.now() / 1000),
+    createdAt: 0,
   };
 
   const publishedEvent = await publishCalendarList(calendar);
   calendar.eventId = publishedEvent.id;
+  calendar.createdAt = publishedEvent.created_at;
 
   return calendar;
 }
@@ -280,11 +288,10 @@ export async function addEventToCalendarList(
   const updated: ICalendarList = {
     ...calendarList,
     eventRefs: [...calendarList.eventRefs, eventRef],
-    createdAt: Math.floor(Date.now() / 1000),
   };
 
-  await publishCalendarList(updated);
-  return updated;
+  const publishedEvent = await publishCalendarList(updated);
+  return { ...updated, createdAt: publishedEvent.created_at };
 }
 
 /**
@@ -301,11 +308,10 @@ export async function removeEventFromCalendarList(
   const updated: ICalendarList = {
     ...calendarList,
     eventRefs: calendarList.eventRefs.filter((ref) => ref[0] !== eventRef[0]),
-    createdAt: Math.floor(Date.now() / 1000),
   };
 
-  await publishCalendarList(updated);
-  return updated;
+  const publishedEvent = await publishCalendarList(updated);
+  return { ...updated, createdAt: publishedEvent.created_at };
 }
 
 /**

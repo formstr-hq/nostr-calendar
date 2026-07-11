@@ -249,12 +249,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       notificationPreference: normalizePreferenceForPublish(
         calendar.notificationPreference,
       ),
-      createdAt: Math.floor(Date.now() / 1000),
     };
     const publishedEvent = await publishCalendarList(updatedForPublish);
     const updatedForState = withNotificationPreference({
       ...updatedForPublish,
       eventId: publishedEvent.id,
+      createdAt: publishedEvent.created_at,
     });
 
     set((state) => {

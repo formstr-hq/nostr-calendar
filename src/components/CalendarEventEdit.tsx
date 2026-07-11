@@ -979,6 +979,7 @@ export function CalendarEventEdit({
         />
         {!isMobile && "-"}
         <DateTimePicker
+          label="End time"
           sx={{
             width: "100%",
           }}
@@ -1410,9 +1411,20 @@ export function CalendarEventEdit({
           />
 
           {displayParticipants.length > 0 && (
-            <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Box
+              component="ul"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+              }}
+            >
               {displayParticipants.map((participant) => (
                 <Box
+                  component="li"
                   key={participant}
                   style={{
                     display: "flex",

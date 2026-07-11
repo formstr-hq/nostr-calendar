@@ -484,14 +484,22 @@ export const BookingPage = () => {
             mb: 2,
           }}
         >
-          <IconButton onClick={() => navigateWeek(-1)} size="small">
+          <IconButton
+            onClick={() => navigateWeek(-1)}
+            size="small"
+            aria-label="previous week"
+          >
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="subtitle1">
             {weekStart.format("MMM D")} –{" "}
             {weekEnd.subtract(1, "day").format("MMM D, YYYY")}
           </Typography>
-          <IconButton onClick={() => navigateWeek(1)} size="small">
+          <IconButton
+            onClick={() => navigateWeek(1)}
+            size="small"
+            aria-label="next week"
+          >
             <ArrowForwardIcon />
           </IconButton>
         </Box>

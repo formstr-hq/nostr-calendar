@@ -158,15 +158,17 @@ function IncomingTab({
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
             Pending ({pending.length})
           </Typography>
-          {pending.map((req) => (
-            <IncomingRequestCard
-              key={req.id}
-              request={req}
-              pages={pages}
-              calendars={calendars}
-              calendarsLoaded={calendarsLoaded}
-            />
-          ))}
+          <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            {pending.map((req) => (
+              <IncomingRequestCard
+                key={req.id}
+                request={req}
+                pages={pages}
+                calendars={calendars}
+                calendarsLoaded={calendarsLoaded}
+              />
+            ))}
+          </Box>
         </>
       )}
 
@@ -176,15 +178,17 @@ function IncomingTab({
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
             History
           </Typography>
-          {resolved.map((req) => (
-            <IncomingRequestCard
-              key={req.id}
-              request={req}
-              pages={pages}
-              calendars={calendars}
-              calendarsLoaded={calendarsLoaded}
-            />
-          ))}
+          <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            {resolved.map((req) => (
+              <IncomingRequestCard
+                key={req.id}
+                request={req}
+                pages={pages}
+                calendars={calendars}
+                calendarsLoaded={calendarsLoaded}
+              />
+            ))}
+          </Box>
         </>
       )}
     </Box>
@@ -275,7 +279,12 @@ function IncomingRequestCard({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 1.5 }}>
+    <Paper
+      component="li"
+      variant="outlined"
+      sx={{ p: 2, mb: 1.5 }}
+      data-testid="booking-request-card"
+    >
       <Box
         sx={{
           display: "flex",
@@ -469,7 +478,7 @@ function OutgoingTab({ bookings }: { bookings: IOutgoingBooking[] }) {
   }
 
   return (
-    <Box>
+    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
       {bookings.map((booking) => (
         <OutgoingBookingCard key={booking.id} booking={booking} />
       ))}
@@ -483,7 +492,7 @@ function OutgoingBookingCard({ booking }: { booking: IOutgoingBooking }) {
   });
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 1.5 }}>
+    <Paper component="li" variant="outlined" sx={{ p: 2, mb: 1.5 }}>
       <Box
         sx={{
           display: "flex",

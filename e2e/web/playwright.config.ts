@@ -13,6 +13,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : undefined,
 
+  // E2E flows involve full page reloads plus relay round-trips (login,
+  // calendar + private event fetches), so allow more headroom than the
+  // Playwright defaults (30s test / 5s expect).
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
+
   use: {
     baseURL: "http://localhost:5173",
     screenshot: "only-on-failure",

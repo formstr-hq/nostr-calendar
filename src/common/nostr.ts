@@ -330,6 +330,7 @@ async function preparePrivateCalendarEvent(
   event: ICalendarEvent,
   dTag: string,
   viewSecretKey: Uint8Array,
+  previousCreatedAtSecs = 0,
 ) {
   const eventKind = EventKinds.PrivateCalendarEvent;
   const eventData: (string | number)[][] = [
@@ -378,7 +379,13 @@ async function preparePrivateCalendarEvent(
 
   const unsignedCalendarEvent: UnsignedEvent = {
     pubkey: userPublicKey,
-    created_at: Math.floor(Date.now() / 1000),
+    // Replaceable events with equal created_at are tie-broken by lowest id
+    // (NIP-01), so an edit published in the same second as the version it
+    // replaces could silently lose. Stay strictly after the previous version.
+    created_at: Math.max(
+      Math.floor(Date.now() / 1000),
+      previousCreatedAtSecs + 1,
+    ),
     kind: eventKind,
     content: eventContent,
     tags: [["d", dTag]],
@@ -513,8 +520,18 @@ export async function editPrivateCalendarEvent(
 ) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
+  // ICalendarEvent.createdAt is seconds when parsed from a relay event but
+  // milliseconds for locally constructed drafts — only trust second-scale
+  // values as the previous version's timestamp.
+  const previousCreatedAtSecs =
+    event.createdAt && event.createdAt < 1e12 ? event.createdAt : 0;
   const { signedEvent, eventKind, userPublicKey } =
-    await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
+    await preparePrivateCalendarEvent(
+      event,
+      dTag,
+      viewSecretKey,
+      previousCreatedAtSecs,
+    );
 
   let publishedRelayHint = "";
   await publishToRelays(
@@ -585,7 +602,9 @@ export async function editPrivateCalendarEvent(
     .moveEventToCalendar(calendarId, eventCoordinate, eventRef);
 
   return {
-    event,
+    // Carry the published timestamp forward so a follow-up edit of this
+    // in-memory event keeps the monotonic created_at chain.
+    event: { ...event, createdAt: signedEvent.created_at },
     calendarId,
     signedEvent,
   };

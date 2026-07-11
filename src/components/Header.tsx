@@ -39,7 +39,11 @@ export const Header = ({ onImportEvent }: HeaderProps) => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <IconButton onClick={() => setDrawerOpen(true)} edge="start">
+            <IconButton
+              onClick={() => setDrawerOpen(true)}
+              edge="start"
+              aria-label="open menu"
+            >
               <MenuIcon />
             </IconButton>
             <Link

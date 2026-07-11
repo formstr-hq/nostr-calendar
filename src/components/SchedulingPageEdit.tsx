@@ -961,7 +961,10 @@ export const SchedulingPageEdit = () => {
               <TextField
                 value={savedPageUrl}
                 size="small"
-                slotProps={{ input: { readOnly: true } }}
+                slotProps={{
+                  input: { readOnly: true },
+                  htmlInput: { "aria-label": "booking page link" },
+                }}
                 sx={{
                   flex: 1,
                   "& .MuiInputBase-input": { fontSize: "0.75rem" },

@@ -476,14 +476,22 @@ function ActionButtons({
         </IconButton>
       )}
       {isEditable && (
-        <IconButton size={iconSize} onClick={duplicateEvent}>
+        <IconButton
+          size={iconSize}
+          onClick={duplicateEvent}
+          aria-label={intl.formatMessage({ id: "event.duplicateEvent" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.duplicateEvent" })}>
             <FileCopy fontSize={iconSize} />
           </Tooltip>
         </IconButton>
       )}
       {isEditable && (
-        <IconButton size={iconSize} onClick={editEvent}>
+        <IconButton
+          size={iconSize}
+          onClick={editEvent}
+          aria-label={intl.formatMessage({ id: "event.editEvent" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.editEvent" })}>
             <Edit fontSize={iconSize} />
           </Tooltip>

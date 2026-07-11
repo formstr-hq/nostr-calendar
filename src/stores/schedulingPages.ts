@@ -114,7 +114,13 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
     pubkey: pubKey,
     tags: publishTags,
     content,
-    created_at: Math.floor(Date.now() / 1000),
+    // Replaceable events with equal created_at are tie-broken by lowest id
+    // (NIP-01), so an update published in the same second as the previous
+    // version could silently lose. Stay strictly after the version we replace.
+    created_at: Math.max(
+      Math.floor(Date.now() / 1000),
+      (page.createdAt ?? 0) + 1,
+    ),
   };
 
   const signer = await signerManager.getSigner();
@@ -293,12 +299,13 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
       id,
       eventId: "",
       user: userPubkey,
-      createdAt: Math.floor(Date.now() / 1000),
+      createdAt: 0,
     };
 
     const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
     page.eventId = signedEvent.id;
     page.viewKey = viewKey;
+    page.createdAt = signedEvent.created_at;
 
     set((state) => {
       const pages = [...state.pages, page];
@@ -315,7 +322,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
       ...page,
       eventId: signedEvent.id,
       viewKey,
-      createdAt: Math.floor(Date.now() / 1000),
+      createdAt: signedEvent.created_at,
     };
 
     set((state) => {
