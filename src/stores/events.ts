@@ -50,11 +50,13 @@ import {
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { getDTag } from "../common/nostrRuntime/utils/helpers";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
+import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
-const saveEventsToStorage = (events: ICalendarEvent[]) => {
-  setSecureItem(EVENTS_STORAGE_KEY, events);
+const saveEventsToStorage = async (events: ICalendarEvent[]) => {
+  await setSecureItem(EVENTS_STORAGE_KEY, events);
+  await reconcileNotificationSchedule();
 };
 
 const getCalendarNotificationPreference = (

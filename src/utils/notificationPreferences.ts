@@ -5,6 +5,7 @@ import {
 } from "../common/localStorage";
 import { DEFAULT_NOTIFICATION_PREFERENCE } from "./calendarListTypes";
 import type { NotificationPreference } from "./types";
+import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
 export interface EventNotificationPreference {
   offsetsMinutes: number[];
@@ -84,10 +85,12 @@ async function savePreferenceMap(
 
   if (Object.keys(preferences).length === 0) {
     await removeDeviceItem(NOTIFICATION_PREFERENCES_STORAGE_KEY);
+    await reconcileNotificationSchedule();
     return;
   }
 
   await setDeviceItem(NOTIFICATION_PREFERENCES_STORAGE_KEY, preferences);
+  await reconcileNotificationSchedule();
 }
 
 export async function getNotificationPreference(

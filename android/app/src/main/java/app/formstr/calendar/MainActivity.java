@@ -33,6 +33,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppReadyPlugin.class);
         registerPlugin(DeviceCalendarPlugin.class);
+        registerPlugin(NotificationSchedulerPlugin.class);
         super.onCreate(savedInstanceState);
 
         View contentView = findViewById(android.R.id.content);
@@ -43,6 +44,7 @@ public class MainActivity extends BridgeActivity {
         });
 
         scheduleNotificationWorker();
+        NotificationWorker.enqueueImmediate(this);
         scheduleInvitationWorker();
         scheduleBookingWorker();
         handleIncomingIntent(getIntent());

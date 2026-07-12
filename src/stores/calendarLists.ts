@@ -36,6 +36,7 @@ import {
 } from "../utils/calendarListTypes";
 import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { isNative } from "../utils/platform";
+import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
 const CALENDAR_LISTS_STORAGE_KEY = "cal:calendar_lists";
 const CALENDAR_VISIBILITY_KEY = "cal:calendar_visibility";
@@ -43,8 +44,9 @@ const CALENDAR_VISIBILITY_KEY = "cal:calendar_visibility";
 /**
  * Saves calendars to secure storage for offline access.
  */
-const saveCalendarsToStorage = (calendars: ICalendarList[]) => {
-  setSecureItem(CALENDAR_LISTS_STORAGE_KEY, calendars);
+const saveCalendarsToStorage = async (calendars: ICalendarList[]) => {
+  await setSecureItem(CALENDAR_LISTS_STORAGE_KEY, calendars);
+  await reconcileNotificationSchedule();
 };
 
 /**
