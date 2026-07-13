@@ -116,7 +116,6 @@ export const EditEventPage = () => {
             open={true}
             event={loadState.event}
             onClose={() => navigate(-1)}
-            onSave={() => navigate(-1)}
             mode="edit"
             display="page"
           />
