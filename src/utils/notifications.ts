@@ -152,7 +152,7 @@ export async function getEventNotificationSchedule(
   }));
 }
 
-/** Must run in the foreground; the Android worker never prompts the user. */
+/** Must run in the foreground; native background schedulers never prompt. */
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!isNative) return false;
 
