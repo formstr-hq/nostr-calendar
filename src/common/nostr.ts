@@ -12,7 +12,6 @@ import {
 import { normalizeURL } from "nostr-tools/utils";
 import { v4 as uuid } from "uuid";
 import { ICalendarEvent } from "../stores/events";
-import { TEMP_CALENDAR_ID } from "../stores/eventDetails";
 import { AbstractRelay } from "nostr-tools/abstract-relay";
 import * as nip59 from "./nip59";
 import {
@@ -38,6 +37,7 @@ import {
 } from "../utils/parser";
 import type { IBusyList } from "../utils/types";
 import { createLogger } from "../utils/logger";
+import { getPersistedCalendarEventId } from "../utils/calendarEventIdentity";
 
 export const defaultRelays = [
   "wss://relay.damus.io/",
@@ -421,7 +421,7 @@ export async function publishPrivateCalendarEvent(
     : generateSecretKey();
   const dTag =
     existingDTag ||
-    event.id ||
+    getPersistedCalendarEventId(event.id) ||
     bytesToHex(
       sha256(utf8ToBytes(`${JSON.stringify(event)}-${Date.now()}`)),
     ).substring(0, 30);
@@ -947,7 +947,7 @@ export const publishPublicCalendarEvent = async (
   onRelayComplete?: (url: string, success: boolean) => void,
 ) => {
   const pubKey = await getUserPublicKey();
-  const id = event.id && event.id !== TEMP_CALENDAR_ID ? event.id : uuid();
+  const id = getPersistedCalendarEventId(event.id) ?? uuid();
   const tags = [
     ["name", event.title],
     ["d", id],

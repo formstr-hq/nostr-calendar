@@ -1,6 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { buildDuplicatedEventDraft } from "./duplicateEvent";
-import { TEMP_CALENDAR_ID } from "../stores/eventDetails";
 import { RSVPStatus, type ICalendarEvent } from "./types";
 
 function makeEvent(overrides: Partial<ICalendarEvent> = {}): ICalendarEvent {
@@ -56,7 +55,7 @@ describe("buildDuplicatedEventDraft", () => {
     expect(duplicated.participants).toEqual(["npub1participant"]);
     expect(duplicated.repeat.rrule).toBe("FREQ=WEEKLY");
 
-    expect(duplicated.id).toBe(TEMP_CALENDAR_ID);
+    expect(duplicated.id).toBe("");
     expect(duplicated.eventId).toBe("");
     expect(duplicated.createdAt).toBe(
       new Date("2026-04-28T12:30:00Z").valueOf(),
@@ -66,5 +65,15 @@ describe("buildDuplicatedEventDraft", () => {
     expect(duplicated.isInvitation).toBe(false);
     expect(duplicated.relayHint).toBeUndefined();
     expect(duplicated.rsvpResponses).toEqual([]);
+  });
+
+  it("does not reuse the source or temporary identity for a new event", () => {
+    const firstDraft = buildDuplicatedEventDraft(makeEvent());
+    const secondDraft = buildDuplicatedEventDraft(
+      makeEvent({ id: "Temp calendar id" }),
+    );
+
+    expect(firstDraft.id).toBe("");
+    expect(secondDraft.id).toBe("");
   });
 });

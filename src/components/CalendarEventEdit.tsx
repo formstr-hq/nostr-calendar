@@ -97,7 +97,6 @@ interface CalendarEventEditProps {
   event: ICalendarEvent | null;
   initialDateTime?: number;
   onClose: () => void;
-  onSave?: (event: ICalendarEvent) => void;
   mode?: "create" | "edit";
   display?: "modal" | "page";
 }
@@ -317,7 +316,6 @@ export function CalendarEventEdit({
   event: initialEvent,
   initialDateTime,
   onClose,
-  onSave,
   mode = "create",
   display = "modal",
 }: CalendarEventEditProps) {
@@ -709,15 +707,7 @@ export function CalendarEventEdit({
 
       // Persist preference so future events default to the user's last choice.
       setBusyListDefaultOptIn(publishBusy);
-      if (onSave) {
-        onSave(savedEvent);
-      }
-
-      // const allOk = getFailedRelays(relaysToPublish).length === 0;
-      // setProcessing(false);
-      // if (allOk) {
       handleClose();
-      // }
     } catch (e) {
       console.error(e instanceof Error ? e.message : "Unknown error");
       const failedRelays = getFailedRelays(relaysToPublish);
