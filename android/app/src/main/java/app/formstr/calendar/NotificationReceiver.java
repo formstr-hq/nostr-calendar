@@ -19,6 +19,7 @@ public class NotificationReceiver extends BroadcastReceiver {
     private static final String TAG = "NotificationReceiver";
     static final String CHANNEL_ID = "calendar_events";
     static final String EXTRA_NOTIFICATION_ID = "notification_id";
+    static final String EXTRA_NOTIFICATION_KEY = "notification_key";
     static final String EXTRA_TITLE = "title";
     static final String EXTRA_BODY = "body";
     static final String EXTRA_EVENT_ID = "event_id";
@@ -26,11 +27,21 @@ public class NotificationReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         int notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
+        String notificationKey = intent.getStringExtra(EXTRA_NOTIFICATION_KEY);
         String title = intent.getStringExtra(EXTRA_TITLE);
         String body = intent.getStringExtra(EXTRA_BODY);
+        String eventId = intent.getStringExtra(EXTRA_EVENT_ID);
 
-        if (title == null || body == null) {
-            Log.w(TAG, "Missing title or body in notification intent");
+        // The registry is the source of truth. This also suppresses stale,
+        // untracked alarms left by older app versions after an event changes.
+        if (!NotificationWorker.isNotificationRegistered(
+                context, notificationKey, notificationId)) {
+            Log.d(TAG, "Ignoring stale notification alarm: " + notificationId);
+            return;
+        }
+
+        if (title == null || body == null || eventId == null) {
+            Log.w(TAG, "Missing calendar notification data");
             return;
         }
 
@@ -46,6 +57,7 @@ public class NotificationReceiver extends BroadcastReceiver {
                 .getLaunchIntentForPackage(context.getPackageName());
         if (launchIntent != null) {
             launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            launchIntent.putExtra("openRoute", "/notification-event/" + eventId);
         }
 
         android.app.PendingIntent pendingIntent = null;

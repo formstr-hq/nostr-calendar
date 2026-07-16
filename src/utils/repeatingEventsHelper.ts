@@ -349,3 +349,21 @@ export function getNextOccurrenceInRange(
 
   return null;
 }
+
+/** Get every occurrence start within [rangeStart, rangeEnd]. */
+export function getOccurrencesInRange(
+  event: ICalendarEvent,
+  rangeStart: number,
+  rangeEnd: number,
+): number[] {
+  const { begin, repeat } = event;
+
+  if (!repeat?.rrule) {
+    return begin >= rangeStart && begin <= rangeEnd ? [begin] : [];
+  }
+
+  const rule = parseRRule(repeat.rrule, new Date(begin));
+  return rule
+    .between(new Date(Math.max(begin, rangeStart)), new Date(rangeEnd), true)
+    .map((occurrence) => occurrence.getTime());
+}

@@ -1,37 +1,45 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { isNative } from "./platform";
+import { isAndroidNative, isNative } from "./platform";
 import type { ICalendarEvent, IScheduledNotification } from "./types";
-import { getNextOccurrenceInRange } from "./repeatingEventsHelper";
+import { getOccurrencesInRange } from "./repeatingEventsHelper";
 import {
   formatNotificationOffsetLabel,
   getNotificationOffsetsForEvent,
 } from "./notificationPreferences";
+import {
+  cancelBackgroundEventNotifications,
+  clearBackgroundNotificationSchedule,
+  reconcileNotificationSchedule,
+} from "../plugins/notificationScheduler";
+
+export const NOTIFICATION_SCHEDULE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 const scheduledNotificationKeys = new Set<string>();
 let initialized = false;
-const NOTIFICATION_KEY_VERSION = "v1";
+const NOTIFICATION_KEY_VERSION = "v2";
 const NOTIFICATION_KEY_PREFIX = `${NOTIFICATION_KEY_VERSION}:`;
 
-/**
- * Load already-pending notification IDs so we don't re-schedule
- * after an app restart.
- */
+/** Load iOS pending IDs and remove notifications from older schedulers. */
 async function initScheduledIds(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
   try {
     const { notifications } = await LocalNotifications.getPending();
-    const legacyNotifications = [];
 
+    // Android event reminders are now owned exclusively by NotificationWorker.
+    if (isAndroidNative()) {
+      if (notifications.length > 0) {
+        await LocalNotifications.cancel({ notifications });
+      }
+      return;
+    }
+
+    const legacyNotifications = [];
     for (const notification of notifications) {
       const key = (notification.extra as Record<string, string> | undefined)
         ?.notificationKey;
-      if (!key) {
-        continue;
-      }
-
-      if (key.startsWith(NOTIFICATION_KEY_PREFIX)) {
+      if (key?.startsWith(NOTIFICATION_KEY_PREFIX)) {
         scheduledNotificationKeys.add(key);
       } else {
         legacyNotifications.push(notification);
@@ -41,8 +49,8 @@ async function initScheduledIds(): Promise<void> {
     if (legacyNotifications.length > 0) {
       await LocalNotifications.cancel({ notifications: legacyNotifications });
     }
-  } catch (err) {
-    console.warn("Failed to load pending notifications", err);
+  } catch (error) {
+    console.warn("Failed to load pending notifications", error);
   }
 }
 
@@ -64,11 +72,7 @@ function buildNotificationKey(
 }
 
 function notificationKeyMatchesEvent(key: string, eventId: string): boolean {
-  return (
-    key === eventId ||
-    key.startsWith(`${eventId}:`) ||
-    key.startsWith(`${NOTIFICATION_KEY_PREFIX}${eventId}:`)
-  );
+  return key.startsWith(`${NOTIFICATION_KEY_PREFIX}${eventId}:`);
 }
 
 function getLocationSuffix(event: ICalendarEvent): string {
@@ -103,34 +107,95 @@ function sortNotifications(
   );
 }
 
+type NotificationCandidate = {
+  occurrenceStart: number;
+  offsetMinutes: number;
+  scheduledAt: number;
+};
+
+function buildCandidates(
+  event: ICalendarEvent,
+  reminderOffsets: number[],
+  now: number,
+): NotificationCandidate[] {
+  if (reminderOffsets.length === 0) return [];
+
+  const scheduleEnd = now + NOTIFICATION_SCHEDULE_WINDOW_MS;
+  const maxOffsetMs = Math.max(...reminderOffsets) * 60 * 1000;
+  const occurrences = getOccurrencesInRange(
+    event,
+    now,
+    scheduleEnd + maxOffsetMs,
+  );
+  const candidates: NotificationCandidate[] = [];
+
+  for (const occurrenceStart of occurrences) {
+    for (const offsetMinutes of reminderOffsets) {
+      const scheduledAt = occurrenceStart - offsetMinutes * 60 * 1000;
+      if (scheduledAt > now && scheduledAt <= scheduleEnd) {
+        candidates.push({ occurrenceStart, offsetMinutes, scheduledAt });
+      }
+    }
+  }
+
+  return candidates.sort((left, right) => left.scheduledAt - right.scheduledAt);
+}
+
+export async function getEventNotificationSchedule(
+  event: ICalendarEvent,
+  now = Date.now(),
+): Promise<IScheduledNotification[]> {
+  const reminderOffsets = await getNotificationOffsetsForEvent(event.id);
+  return buildCandidates(event, reminderOffsets, now).map((candidate) => ({
+    label: formatNotificationOffsetLabel(candidate.offsetMinutes),
+    scheduledAt: candidate.scheduledAt,
+  }));
+}
+
+/** Must run in the foreground; the Android worker never prompts the user. */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!isNative) return false;
+
+  try {
+    await initScheduledIds();
+    const current = await LocalNotifications.checkPermissions();
+    if (current.display === "granted") {
+      await reconcileNotificationSchedule();
+      return true;
+    }
+    const requested = await LocalNotifications.requestPermissions();
+    if (requested.display === "granted") {
+      await reconcileNotificationSchedule();
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn("Failed to request notification permission", error);
+    return false;
+  }
+}
+
 export async function scheduleEventNotifications(
   event: ICalendarEvent,
 ): Promise<IScheduledNotification[]> {
   if (!isNative) return [];
 
-  await initScheduledIds();
+  const permissionGranted = await requestNotificationPermission();
+  if (!permissionGranted) return [];
 
-  const now = Date.now();
-  const nDaysFromNow = now + 5 * 24 * 60 * 60 * 1000;
-  const isRepeating = !!event.repeat?.rrule;
   const reminderOffsets = await getNotificationOffsetsForEvent(event.id);
+  const candidates = buildCandidates(event, reminderOffsets, Date.now());
+  const scheduledInfo = candidates.map((candidate) => ({
+    label: formatNotificationOffsetLabel(candidate.offsetMinutes),
+    scheduledAt: candidate.scheduledAt,
+  }));
 
-  if (reminderOffsets.length === 0) {
-    return [];
+  if (isAndroidNative()) {
+    await reconcileNotificationSchedule();
+    return scheduledInfo;
   }
 
-  let occurrenceStart: number;
-
-  if (isRepeating) {
-    const nextOccurrence = getNextOccurrenceInRange(event, now, nDaysFromNow);
-    if (nextOccurrence === null) return [];
-    occurrenceStart = nextOccurrence;
-  } else {
-    if (event.begin <= now) return [];
-    if (event.begin > nDaysFromNow) return [];
-    occurrenceStart = event.begin;
-  }
-
+  await initScheduledIds();
   const notifications: Array<{
     id: number;
     title: string;
@@ -138,62 +203,41 @@ export async function scheduleEventNotifications(
     schedule: { at: Date; allowWhileIdle: boolean };
     extra: { eventId: string; notificationKey: string };
   }> = [];
-  const scheduledInfo: IScheduledNotification[] = [];
 
-  for (const offsetMinutes of reminderOffsets) {
-    const scheduledAt = occurrenceStart - offsetMinutes * 60 * 1000;
-    if (scheduledAt <= now) {
-      continue;
-    }
-
+  for (const candidate of candidates) {
     const notificationKey = buildNotificationKey(
       event.id,
-      occurrenceStart,
-      offsetMinutes,
+      candidate.occurrenceStart,
+      candidate.offsetMinutes,
     );
+    if (scheduledNotificationKeys.has(notificationKey)) continue;
 
-    scheduledInfo.push({
-      label: formatNotificationOffsetLabel(offsetMinutes),
-      scheduledAt,
-    });
-
-    if (scheduledNotificationKeys.has(notificationKey)) {
-      continue;
-    }
-
-    const { title, body } = buildNotificationContent(event, offsetMinutes);
+    const { title, body } = buildNotificationContent(
+      event,
+      candidate.offsetMinutes,
+    );
     notifications.push({
       id: hashToNumber(notificationKey),
       title,
       body,
-      schedule: { at: new Date(scheduledAt), allowWhileIdle: true },
+      schedule: {
+        at: new Date(candidate.scheduledAt),
+        allowWhileIdle: true,
+      },
       extra: { eventId: event.id, notificationKey },
     });
   }
 
-  if (scheduledInfo.length === 0) {
-    return [];
-  }
-
-  if (notifications.length === 0) {
-    return sortNotifications(scheduledInfo);
-  }
+  if (notifications.length === 0) return sortNotifications(scheduledInfo);
 
   try {
-    const permResult = await LocalNotifications.requestPermissions();
-    if (permResult.display !== "granted") return [];
-
     await LocalNotifications.schedule({ notifications });
     notifications.forEach((notification) => {
       scheduledNotificationKeys.add(notification.extra.notificationKey);
     });
-
-    console.log(
-      `Scheduled notifications for ${event.id} (occurrence: ${new Date(occurrenceStart).toISOString()})`,
-    );
     return sortNotifications(scheduledInfo);
-  } catch (err) {
-    console.warn("Failed to schedule notification", err);
+  } catch (error) {
+    console.warn("Failed to schedule notification", error);
     return [];
   }
 }
@@ -209,14 +253,12 @@ export function addNotificationClickListener(
       const eventId = (
         action.notification.extra as Record<string, string> | undefined
       )?.eventId;
-      if (eventId) {
-        onEventClick(eventId);
-      }
+      if (eventId) onEventClick(eventId);
     },
   );
 
   return () => {
-    listener.then((l) => l.remove());
+    listener.then((registeredListener) => registeredListener.remove());
   };
 }
 
@@ -228,15 +270,24 @@ export async function cancelAllNotifications(): Promise<void> {
     if (notifications.length > 0) {
       await LocalNotifications.cancel({ notifications });
     }
+    await clearBackgroundNotificationSchedule();
     scheduledNotificationKeys.clear();
     initialized = false;
-  } catch (err) {
-    console.warn("Failed to cancel all notifications", err);
+  } catch (error) {
+    console.warn("Failed to cancel all notifications", error);
   }
 }
 
 export async function cancelEventNotifications(eventId: string): Promise<void> {
   if (!isNative) return;
+
+  if (isAndroidNative()) {
+    // Cancel synchronously so a deleted/edited event cannot fire while Android
+    // is waiting to run the follow-up WorkManager reconciliation.
+    await cancelBackgroundEventNotifications(eventId);
+    await reconcileNotificationSchedule();
+    return;
+  }
 
   try {
     const { notifications } = await LocalNotifications.getPending();
@@ -254,7 +305,7 @@ export async function cancelEventNotifications(eventId: string): Promise<void> {
         scheduledNotificationKeys.delete(key);
       }
     }
-  } catch (err) {
-    console.warn("Failed to cancel notification", err);
+  } catch (error) {
+    console.warn("Failed to cancel notification", error);
   }
 }

@@ -9,14 +9,24 @@ const mockGetPending = vi.fn().mockResolvedValue({ notifications: [] });
 const mockRequestPermissions = vi
   .fn()
   .mockResolvedValue({ display: "granted" });
+const mockCheckPermissions = vi.fn().mockResolvedValue({ display: "granted" });
 const mockAddListener = vi.fn().mockResolvedValue({ remove: vi.fn() });
 const mockGetNotificationOffsetsForEvent = vi.fn().mockResolvedValue([10, 0]);
+const mockIsAndroidNative = vi.fn(() => false);
+const mockReconcileNotificationSchedule = vi.fn().mockResolvedValue(undefined);
+const mockCancelBackgroundEventNotifications = vi
+  .fn()
+  .mockResolvedValue(undefined);
+const mockClearBackgroundNotificationSchedule = vi
+  .fn()
+  .mockResolvedValue(undefined);
 
 vi.mock("@capacitor/local-notifications", () => ({
   LocalNotifications: {
     schedule: (...args: unknown[]) => mockSchedule(...args),
     cancel: (...args: unknown[]) => mockCancel(...args),
     getPending: (...args: unknown[]) => mockGetPending(...args),
+    checkPermissions: (...args: unknown[]) => mockCheckPermissions(...args),
     requestPermissions: (...args: unknown[]) => mockRequestPermissions(...args),
     addListener: (...args: unknown[]) => mockAddListener(...args),
   },
@@ -24,6 +34,16 @@ vi.mock("@capacitor/local-notifications", () => ({
 
 vi.mock("./platform", () => ({
   isNative: true,
+  isAndroidNative: () => mockIsAndroidNative(),
+}));
+
+vi.mock("../plugins/notificationScheduler", () => ({
+  reconcileNotificationSchedule: (...args: unknown[]) =>
+    mockReconcileNotificationSchedule(...args),
+  cancelBackgroundEventNotifications: (...args: unknown[]) =>
+    mockCancelBackgroundEventNotifications(...args),
+  clearBackgroundNotificationSchedule: (...args: unknown[]) =>
+    mockClearBackgroundNotificationSchedule(...args),
 }));
 
 vi.mock("./notificationPreferences", () => ({
@@ -76,8 +96,10 @@ function makeEvent(
 describe("scheduleEventNotifications", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockIsAndroidNative.mockReturnValue(false);
     mockGetPending.mockResolvedValue({ notifications: [] });
     mockRequestPermissions.mockResolvedValue({ display: "granted" });
+    mockCheckPermissions.mockResolvedValue({ display: "granted" });
     mockGetNotificationOffsetsForEvent.mockResolvedValue([10, 0]);
 
     // Cancel all to reset internal state
@@ -159,8 +181,8 @@ describe("scheduleEventNotifications", () => {
     expect(mockSchedule).not.toHaveBeenCalled();
   });
 
-  it("skips non-repeating events more than 5 days away", async () => {
-    const farFuture = Date.now() + 6 * DAY;
+  it("skips non-repeating events whose reminders are beyond 48 hours", async () => {
+    const farFuture = Date.now() + 3 * DAY;
     const event = makeEvent({ begin: farFuture });
 
     await scheduleEventNotifications(event);
@@ -179,6 +201,7 @@ describe("scheduleEventNotifications", () => {
   });
 
   it("does not schedule when permissions are denied", async () => {
+    mockCheckPermissions.mockResolvedValueOnce({ display: "prompt" });
     mockRequestPermissions.mockResolvedValueOnce({ display: "denied" });
     const futureStart = Date.now() + HOUR;
     const event = makeEvent({ begin: futureStart });
@@ -197,7 +220,7 @@ describe("scheduleEventNotifications", () => {
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     expect(scheduled[0].extra.eventId).toBe("my-event-id");
     expect(scheduled[0].extra.notificationKey).toMatch(
-      /^v1:my-event-id:\d+:m\d+$/,
+      /^v2:my-event-id:\d+:m\d+$/,
     );
   });
 
@@ -214,7 +237,7 @@ describe("scheduleEventNotifications", () => {
       id: 2,
       extra: {
         eventId: "current-event",
-        notificationKey: `v1:current-event:${futureStart}:m10`,
+        notificationKey: `v2:current-event:${futureStart}:m10`,
       },
     };
 
@@ -263,8 +286,10 @@ describe("scheduleEventNotifications", () => {
 describe("scheduleEventNotifications – recurring events", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockIsAndroidNative.mockReturnValue(false);
     mockGetPending.mockResolvedValue({ notifications: [] });
     mockRequestPermissions.mockResolvedValue({ display: "granted" });
+    mockCheckPermissions.mockResolvedValue({ display: "granted" });
     mockGetNotificationOffsetsForEvent.mockResolvedValue([10, 0]);
     await cancelAllNotifications();
   });
@@ -289,9 +314,30 @@ describe("scheduleEventNotifications – recurring events", () => {
     expect(scheduled[0].extra.notificationKey).toContain(":daily-evt:");
   });
 
-  it("does not schedule for a weekly recurring event whose next occurrence is > 5 days away", async () => {
+  it("schedules every daily occurrence whose reminders fall in the next 48 hours", async () => {
+    const startTime = Date.now() + HOUR - 10 * DAY;
+    const event = makeEvent({
+      begin: startTime,
+      id: "daily-window",
+      repeat: { rrule: "FREQ=DAILY" },
+    });
+
+    await scheduleEventNotifications(event);
+
+    const scheduled = mockSchedule.mock.calls[0][0].notifications;
+    const occurrenceStarts = new Set(
+      scheduled.map(
+        (notification: { extra: { notificationKey: string } }) =>
+          notification.extra.notificationKey.split(":")[2],
+      ),
+    );
+    expect(occurrenceStarts.size).toBe(2);
+    expect(scheduled).toHaveLength(4);
+  });
+
+  it("does not schedule a weekly recurrence outside the 48-hour window", async () => {
     const now = Date.now();
-    // Event started 1 day ago weekly, next occurrence is 6 days from now → out of 5-day window
+    // Event started 1 day ago weekly, so the next occurrence is 6 days away.
     const startDate = now - 1 * DAY;
     const event = makeEvent({
       begin: startDate,
@@ -304,7 +350,7 @@ describe("scheduleEventNotifications – recurring events", () => {
     expect(mockSchedule).not.toHaveBeenCalled();
   });
 
-  it("schedules for a weekly recurring event with occurrence within 5 days", async () => {
+  it("schedules a weekly recurring event with an occurrence within 48 hours", async () => {
     // Event started exactly 7 days ago → next occurrence is now (today)
     const oneWeekAgo = Date.now() - 7 * DAY + HOUR; // +1h so it's in the future
     const event = makeEvent({
@@ -374,7 +420,7 @@ describe("scheduleEventNotifications – recurring events", () => {
 
     const scheduled = mockSchedule.mock.calls[0][0].notifications;
     const key = scheduled[0].extra.notificationKey;
-    expect(key).toMatch(/^v1:recurring-key-test:\d+:m\d+$/);
+    expect(key).toMatch(/^v2:recurring-key-test:\d+:m\d+$/);
   });
 });
 
@@ -407,8 +453,10 @@ describe("cancelAllNotifications", () => {
 describe("cancelEventNotifications", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockIsAndroidNative.mockReturnValue(false);
     mockGetPending.mockResolvedValue({ notifications: [] });
     mockRequestPermissions.mockResolvedValue({ display: "granted" });
+    mockCheckPermissions.mockResolvedValue({ display: "granted" });
     await cancelAllNotifications();
   });
 
@@ -445,5 +493,16 @@ describe("cancelEventNotifications", () => {
     // Should be able to schedule again
     await scheduleEventNotifications(event);
     expect(mockSchedule).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels Android alarms synchronously before reconciliation", async () => {
+    mockIsAndroidNative.mockReturnValue(true);
+
+    await cancelEventNotifications("deleted-event");
+
+    expect(mockCancelBackgroundEventNotifications).toHaveBeenCalledWith(
+      "deleted-event",
+    );
+    expect(mockReconcileNotificationSchedule).toHaveBeenCalledTimes(1);
   });
 });

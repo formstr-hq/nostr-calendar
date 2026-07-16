@@ -13,7 +13,10 @@ import { Routing } from "./components/Routing";
 import { Header, HeaderSpacer } from "./components/Header";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { addNotificationClickListener } from "./utils/notifications";
+import {
+  addNotificationClickListener,
+  requestNotificationPermission,
+} from "./utils/notifications";
 import { useTimeBasedEvents } from "./stores/events";
 import { isIOSNative, isNative } from "./utils/platform";
 import { setSecureItem } from "./common/localStorage";
@@ -135,6 +138,13 @@ function Application() {
       navigate(`/notification-event/${eventId}`);
     });
   }, [navigate]);
+
+  // Android's worker owns scheduling, but notification permission can only be
+  // requested while the foreground app is active.
+  useEffect(() => {
+    if (!isNative || !user || !isInitialized) return;
+    void requestNotificationPermission();
+  }, [isInitialized, user]);
 
   // Handle Android back button: navigate back instead of closing the app.
   // Only exit the app if there's no browser history to go back to.
