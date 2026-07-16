@@ -95,6 +95,7 @@ export function RSVPParticipantList({
                     >
                       <IconButton
                         size="small"
+                        aria-label="view suggested time"
                         onClick={() =>
                           setExpandedPubkey(expanded ? null : pubkey)
                         }
@@ -108,6 +109,7 @@ export function RSVPParticipantList({
                     <Tooltip title={intl.formatMessage({ id: "rsvp.comment" })}>
                       <IconButton
                         size="small"
+                        aria-label="view comment"
                         onClick={() =>
                           setExpandedPubkey(expanded ? null : pubkey)
                         }

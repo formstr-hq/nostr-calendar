@@ -147,6 +147,7 @@ export function InvitationPanel() {
       {pendingInvitations.map((invitation) => (
         <Paper
           key={invitation.giftWrapId}
+          data-testid="invitation-card"
           sx={{
             mb: 2,
             p: 2,

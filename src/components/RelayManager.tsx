@@ -183,6 +183,7 @@ export function RelayManager() {
                   secondaryAction={
                     <IconButton
                       edge="end"
+                      aria-label="remove relay"
                       onClick={() => handleRemove(relay)}
                       size="small"
                     >

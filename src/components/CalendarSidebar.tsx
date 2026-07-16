@@ -160,7 +160,11 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
                 />
               </Tooltip>
             </Box>
-            <IconButton size="small" onClick={handleCreateCalendar}>
+            <IconButton
+              size="small"
+              aria-label="create calendar"
+              onClick={handleCreateCalendar}
+            >
               <AddIcon fontSize="small" />
             </IconButton>
           </Box>
@@ -168,6 +172,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
           {calendars.map((calendar) => (
             <Box
               key={calendar.id}
+              data-testid="calendar-row"
               display="flex"
               alignItems="center"
               sx={{
@@ -178,6 +183,7 @@ export function CalendarSidebar({ onClose }: CalendarSidebarProps) {
             >
               <Checkbox
                 checked={calendar.isVisible}
+                data-testid="calendar-visibility-checkbox"
                 onChange={() => toggleVisibility(calendar.id)}
                 size="small"
                 sx={{

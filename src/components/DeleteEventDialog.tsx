@@ -190,6 +190,7 @@ export function DeleteEventDialog({
             {isAuthor && (
               <FormControlLabel
                 value="deleteForEveryone"
+                data-testid="delete-option-everyone"
                 control={<Radio color="error" />}
                 label={
                   <Box>
@@ -211,6 +212,7 @@ export function DeleteEventDialog({
             {isInCalendar && (
               <FormControlLabel
                 value="removeFromCalendar"
+                data-testid="delete-option-remove"
                 control={<Radio />}
                 label={
                   <Box>
@@ -231,6 +233,7 @@ export function DeleteEventDialog({
 
             <FormControlLabel
               value="ignore"
+              data-testid="delete-option-ignore"
               control={<Radio />}
               label={
                 <Box>

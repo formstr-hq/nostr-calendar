@@ -82,14 +82,16 @@ test("booker requests a slot and the host approves it", async ({
     .getByRole("button", { name: "Approve", exact: true })
     .click();
   await expect(approveDialog).not.toBeVisible({ timeout: 30_000 });
-  await expect(requestCard.getByText("approved")).toBeVisible();
+  await expect(
+    requestCard.getByText("approved", { exact: true }),
+  ).toBeVisible();
 
   // Booker sees the approval in their Sent tab.
   await openBookingsViaSidebar(bob);
   await bob.getByRole("tab", { name: "Sent" }).click();
   const sentCard = bob.getByRole("listitem").filter({ hasText: meetingTitle });
   await expect(sentCard).toBeVisible();
-  await expect(sentCard.getByText("approved")).toBeVisible({
+  await expect(sentCard.getByText("approved", { exact: true })).toBeVisible({
     timeout: 30_000,
   });
 });
@@ -120,7 +122,9 @@ test("booker requests a slot and the host declines it with a reason", async ({
     .getByRole("button", { name: "Decline", exact: true })
     .click();
   await expect(declineDialog).not.toBeVisible({ timeout: 30_000 });
-  await expect(requestCard.getByText("declined")).toBeVisible();
+  await expect(
+    requestCard.getByText("declined", { exact: true }),
+  ).toBeVisible();
   await expect(requestCard.getByText(`Reason: ${declineReason}`)).toBeVisible();
 
   // Booker sees the decline (and the reason) in their Sent tab.
@@ -128,7 +132,7 @@ test("booker requests a slot and the host declines it with a reason", async ({
   await bob.getByRole("tab", { name: "Sent" }).click();
   const sentCard = bob.getByRole("listitem").filter({ hasText: meetingTitle });
   await expect(sentCard).toBeVisible();
-  await expect(sentCard.getByText("declined")).toBeVisible({
+  await expect(sentCard.getByText("declined", { exact: true })).toBeVisible({
     timeout: 30_000,
   });
   await expect(sentCard.getByText(`Reason: ${declineReason}`)).toBeVisible();

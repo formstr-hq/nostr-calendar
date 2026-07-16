@@ -51,10 +51,10 @@ export function CalendarHeader() {
         <Box display="flex" alignItems="center">
           {!isMobile && (
             <>
-              <IconButton onClick={() => move(-1)}>
+              <IconButton aria-label="previous period" onClick={() => move(-1)}>
                 <ChevronLeft />
               </IconButton>
-              <IconButton onClick={() => move(1)}>
+              <IconButton aria-label="next period" onClick={() => move(1)}>
                 <ChevronRight />
               </IconButton>
             </>
@@ -72,6 +72,7 @@ export function CalendarHeader() {
         </Box>
         <Box display="flex" gap={theme.spacing(2)} alignItems="center">
           <IconButton
+            aria-label="go to today"
             onClick={() => {
               const route = getRouteFromDate(dayjs(), layout);
               if (route !== location.pathname) {

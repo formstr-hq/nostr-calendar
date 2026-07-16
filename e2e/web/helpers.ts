@@ -36,7 +36,16 @@ export async function createEventViaDialog(
     title,
     calendarName,
     slotIndex = 10,
-  }: { date: string; title: string; calendarName: string; slotIndex?: number },
+    configure,
+  }: {
+    date: string;
+    title: string;
+    calendarName: string;
+    slotIndex?: number;
+    // Extra editor interactions (recurrence, participants, …) run after the
+    // title/calendar are filled and before Save is clicked.
+    configure?: (dialog: Locator) => Promise<void>;
+  },
 ): Promise<void> {
   const [year, month, day] = date.split("-");
   await navigate(page, `/d/${year}/${month}/${day}`);
@@ -47,10 +56,112 @@ export async function createEventViaDialog(
   await dialog.waitFor({ state: "visible" });
   await dialog.getByPlaceholder("Enter event title").fill(title);
   await createCalendarViaSelect(page, dialog, calendarName);
+  if (configure) {
+    await configure(dialog);
+  }
   await dialog.getByRole("button", { name: "Save Event" }).click();
 
   await expect(dialog).not.toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(title)).toBeVisible();
+}
+
+/**
+ * Opens the event-view modal for an event visible on the calendar grid.
+ * Returns the dialog locator.
+ */
+export async function openEventModal(page: Page, title: string): Promise<Locator> {
+  await page.getByText(title).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor({ state: "visible" });
+  return dialog;
+}
+
+/** Opens the sidebar drawer (calendar list, date picker, scheduling links). */
+export async function openSidebar(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "open menu" }).last().click();
+  await expect(page.getByText("Calendars", { exact: true })).toBeVisible();
+}
+
+/** A unique-enough suffix so parallel tests never share entity names. */
+export function uniqueName(prefix: string): string {
+  return `${prefix} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Returns YYYY-MM-DD for `daysFromNow` days in the future (local time). */
+export function futureDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Navigates to the day view for a YYYY-MM-DD date. */
+export async function gotoDay(page: Page, date: string): Promise<void> {
+  const [year, month, day] = date.split("-");
+  await navigate(page, `/d/${year}/${month}/${day}`);
+}
+
+/**
+ * Creates a calendar through the sidebar's add button. Use this when the
+ * user needs a calendar but no calendar-select is on screen (e.g. the
+ * respond panel renders only a spinner for users with zero calendars).
+ */
+export async function createCalendarViaSidebar(
+  page: Page,
+  calendarName: string,
+): Promise<void> {
+  await openSidebar(page);
+  await page
+    .getByRole("button", { name: "create calendar", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "New Calendar" });
+  await dialog.getByLabel("Calendar Name").fill(calendarName);
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.keyboard.press("Escape"); // close the drawer
+}
+
+/**
+ * As `authorPage`'s user, creates a private event with a participant (sends
+ * them a gift-wrap invitation) and returns the shareable event URL (includes
+ * the viewKey for private events).
+ */
+export async function createInviteEvent(
+  authorPage: Page,
+  {
+    date,
+    title,
+    calendarName,
+    participantNpub,
+  }: {
+    date: string;
+    title: string;
+    calendarName: string;
+    participantNpub: string;
+  },
+): Promise<string> {
+  await createEventViaDialog(authorPage, {
+    date,
+    title,
+    calendarName,
+    configure: async (dialog) => {
+      const participantInput = dialog.getByPlaceholder("Enter participant nPub");
+      await participantInput.fill(participantNpub);
+      await participantInput.press("Enter");
+      // Wait for the participant chip to resolve before saving.
+      await expect(dialog.getByRole("listitem")).toBeVisible();
+    },
+  });
+
+  const modal = await openEventModal(authorPage, title);
+  const href = await modal
+    .locator('a[href*="/event/"]')
+    .first()
+    .getAttribute("href");
+  if (!href) throw new Error("Event link not found in event modal");
+  await authorPage.keyboard.press("Escape");
+  await expect(modal).not.toBeVisible();
+  return href;
 }
 
 /**
@@ -82,12 +193,22 @@ export async function fillDateTimeField(
   const [, month, day, year, hours, minutes, meridiem] = match;
 
   const field = page.getByRole("group", { name: fieldLabel });
-  await field.getByRole("spinbutton", { name: "Month" }).click();
-  // Each completed section auto-advances the focus to the next one.
-  await page.keyboard.type(`${month}${day}${year}${hours}${minutes}`, {
-    delay: 40,
-  });
-  await page.keyboard.press(meridiem === "AM" ? "a" : "p");
+  // A re-render mid-typing (relay events arriving) can steal focus and eat
+  // keystrokes — verify what actually landed in the field and retype if off.
+  await expect(async () => {
+    await field.getByRole("spinbutton", { name: "Month" }).click();
+    // Each completed section auto-advances the focus to the next one.
+    await page.keyboard.type(`${month}${day}${year}${hours}${minutes}`, {
+      delay: 40,
+    });
+    await page.keyboard.press(meridiem === "AM" ? "a" : "p");
+
+    const text = ((await field.textContent()) ?? "").replace(/[^0-9APM:/]/g, "");
+    const expected = `${month}/${day}/${year}${hours}:${minutes}${meridiem}`;
+    if (text !== expected) {
+      throw new Error(`field shows "${text}", expected "${expected}"`);
+    }
+  }).toPass({ timeout: 30_000 });
 }
 
 /**

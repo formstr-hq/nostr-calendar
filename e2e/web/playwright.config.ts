@@ -4,7 +4,8 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(import.meta.dirname, "../.env.test") });
 
-const relayUrl = process.env.VITE_TEST_RELAY ?? "ws://localhost:7777";
+// Must match the mock relay started in global-setup.ts (port 7780).
+const relayUrl = process.env.VITE_TEST_RELAY ?? "ws://localhost:7780";
 const rootDir = path.resolve(import.meta.dirname, "../..");
 
 export default defineConfig({
@@ -27,7 +28,16 @@ export default defineConfig({
   },
 
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      name: "mobile",
+      use: { ...devices["Pixel 7"] },
+      testMatch: /mobile\.spec\.ts/,
+    },
   ],
 
   globalSetup: "./global-setup.ts",

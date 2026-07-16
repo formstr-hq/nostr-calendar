@@ -219,6 +219,7 @@ export function CalendarEventCard({
         // ref={setNodeRef}
         // {...listeners}
         // {...attributes}
+        data-testid="event-card"
         onClick={() => setOpen(true)}
         sx={{
           position: "absolute",
@@ -469,7 +470,11 @@ function ActionButtons({
       )}
 
       {!isNative && (
-        <IconButton size={iconSize} onClick={() => exportICS(event)}>
+        <IconButton
+          size={iconSize}
+          onClick={() => exportICS(event)}
+          aria-label={intl.formatMessage({ id: "event.downloadDetails" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.downloadDetails" })}>
             <Download fontSize={iconSize} />
           </Tooltip>
@@ -497,7 +502,11 @@ function ActionButtons({
           </Tooltip>
         </IconButton>
       )}
-      <IconButton size={iconSize} onClick={() => setDeleteDialogOpen(true)}>
+      <IconButton
+        size={iconSize}
+        onClick={() => setDeleteDialogOpen(true)}
+        aria-label={intl.formatMessage({ id: "event.deleteEvent" })}
+      >
         <Tooltip title={intl.formatMessage({ id: "event.deleteEvent" })}>
           <Delete fontSize={iconSize} />
         </Tooltip>
@@ -930,6 +939,7 @@ export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
   return (
     <>
       <Box
+        data-testid="event-card"
         onClick={() => setOpen(true)}
         sx={{
           bgcolor: colorScheme.backgroundColor,

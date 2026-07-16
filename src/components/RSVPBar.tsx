@@ -115,6 +115,7 @@ export function RSVPBar({
                 activeStatus === RSVPStatus.accepted ? "contained" : "outlined"
               }
               color="success"
+              data-testid="rsvp-yes"
               onClick={() => handleStatus(RSVPStatus.accepted)}
             >
               {buttonLabel[RSVPStatus.accepted]}
@@ -124,6 +125,7 @@ export function RSVPBar({
                 activeStatus === RSVPStatus.tentative ? "contained" : "outlined"
               }
               color="warning"
+              data-testid="rsvp-maybe"
               onClick={() => handleStatus(RSVPStatus.tentative)}
             >
               {buttonLabel[RSVPStatus.tentative]}
@@ -133,6 +135,7 @@ export function RSVPBar({
                 activeStatus === RSVPStatus.declined ? "contained" : "outlined"
               }
               color="error"
+              data-testid="rsvp-no"
               onClick={() => handleStatus(RSVPStatus.declined)}
             >
               {buttonLabel[RSVPStatus.declined]}

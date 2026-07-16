@@ -1230,6 +1230,7 @@ export function CalendarEventEdit({
             <Select
               value={recurrenceSelectValue}
               label={intl.formatMessage({ id: "event.selectRecurrence" })}
+              data-testid="recurrence-select"
               onChange={handleFrequencyChange}
               renderValue={(selected) => {
                 if (selected === CUSTOM_RECURRENCE_VALUE) {
@@ -1325,6 +1326,7 @@ export function CalendarEventEdit({
                 <Select
                   value={recurrenceEndMode}
                   label={intl.formatMessage({ id: "event.recurrenceEnds" })}
+                  data-testid="recurrence-end-mode"
                   onChange={handleRecurrenceEndModeChange}
                 >
                   <MenuItem value="never">
