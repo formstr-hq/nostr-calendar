@@ -139,8 +139,8 @@ function Application() {
     });
   }, [navigate]);
 
-  // Native background schedulers never prompt; permission must be requested
-  // while the foreground app is active.
+  // Native background schedulers do not prompt; notification permission must
+  // be requested while the foreground app is active.
   useEffect(() => {
     if (!isNative || !user || !isInitialized) return;
     void requestNotificationPermission();
