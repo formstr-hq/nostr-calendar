@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { NAddr } from "nostr-tools/nip19";
 import { Alert, Box, CircularProgress } from "@mui/material";
-import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
+import { fetchCalendarEvent, viewPrivateEvent } from "../nostr/events";
 import { nostrEventToCalendar } from "../utils/parser";
 import type { ICalendarEvent } from "../utils/types";
 import CalendarEventEdit from "./CalendarEventEdit";

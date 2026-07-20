@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useIntl } from "react-intl";
-import type { ReportType } from "../common/nostr";
+import type { ReportType } from "../nostr/reports";
 
 interface ReportEventDialogProps {
   open: boolean;

@@ -19,6 +19,8 @@ import {
   useTheme,
   Checkbox,
   FormControlLabel,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
@@ -35,12 +37,12 @@ import { Participant } from "./Participant";
 import type { Event } from "nostr-tools";
 import {
   editPrivateCalendarEvent,
-  getRelays,
   publishPrivateCalendarEvent,
   publishPublicCalendarEvent,
-  republishEventToRelays,
-} from "../common/nostr";
-import { EventKinds } from "../common/EventConfigs";
+} from "../nostr/events";
+import { publishSignedEvent } from "../nostr/core";
+import { getRelays } from "../common/relayConfig";
+import { EventKinds } from "../nostr/kinds";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
@@ -339,6 +341,7 @@ export function CalendarEventEdit({
     null,
   );
   const [retryingRelays, setRetryingRelays] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(
     initialEvent?.isPrivateEvent ?? true,
   );
@@ -601,7 +604,6 @@ export function CalendarEventEdit({
           const { eventRef, authorPubkey, calendarEvent } =
             await publishPrivateCalendarEvent(eventToSave, {
               onRelayComplete,
-              waitForAll: false,
             });
 
           setSignedEventForRetry(calendarEvent);
@@ -709,7 +711,13 @@ export function CalendarEventEdit({
       setBusyListDefaultOptIn(publishBusy);
       handleClose();
     } catch (e) {
-      console.error(e instanceof Error ? e.message : "Unknown error");
+      let msg = e instanceof Error ? e.message : String(e);
+      if (e instanceof AggregateError && e.errors.length > 0) {
+        const details = e.errors.map((err) => String(err)).join("; ");
+        msg = `${msg} — ${details}`;
+      }
+      console.error(msg);
+      setSaveError(msg);
       const failedRelays = getFailedRelays(relaysToPublish);
       for (const relayUrl of failedRelays) {
         onRelayComplete(relayUrl, false);
@@ -729,12 +737,8 @@ export function CalendarEventEdit({
     setRetryingRelays(true);
     setRelaysPending(failed);
     try {
-      await republishEventToRelays(
-        signedEventForRetry,
-        failed,
-        undefined,
-        onRelayComplete,
-      );
+      // Retry is just another publish — the worker owns reaching dead relays.
+      await publishSignedEvent(signedEventForRetry, { onRelayComplete });
     } catch {
       // per-relay outcomes already set via onRelayComplete where applicable
     } finally {
@@ -925,6 +929,7 @@ export function CalendarEventEdit({
       <Box>
         <TextField
           fullWidth
+          label={intl.formatMessage({ id: "event.title" })}
           placeholder={intl.formatMessage({ id: "event.enterTitle" })}
           value={eventDetails.title}
           onChange={(e) => {
@@ -932,6 +937,12 @@ export function CalendarEventEdit({
           }}
           required
           size="small"
+          slotProps={{
+            htmlInput: {
+              "data-testid": "event-title",
+              "aria-label": "event title",
+            },
+          }}
         />
       </Box>
 
@@ -955,14 +966,24 @@ export function CalendarEventEdit({
       <EventAttributeEditContainer>
         <ScheduleIcon />
         <DateTimePicker
+          label="Start time"
           sx={{
             width: "100%",
           }}
           value={dayjs(eventDetails.begin)}
           onChange={onChangeBeginDate}
+          slotProps={{
+            textField: {
+              inputProps: {
+                "data-testid": "event-start-time",
+                "aria-label": "event start time",
+              },
+            },
+          }}
         />
         {!isMobile && "-"}
         <DateTimePicker
+          label="End time"
           sx={{
             width: "100%",
           }}
@@ -1213,6 +1234,7 @@ export function CalendarEventEdit({
             <Select
               value={recurrenceSelectValue}
               label={intl.formatMessage({ id: "event.selectRecurrence" })}
+              data-testid="recurrence-select"
               onChange={handleFrequencyChange}
               renderValue={(selected) => {
                 if (selected === CUSTOM_RECURRENCE_VALUE) {
@@ -1308,6 +1330,7 @@ export function CalendarEventEdit({
                 <Select
                   value={recurrenceEndMode}
                   label={intl.formatMessage({ id: "event.recurrenceEnds" })}
+                  data-testid="recurrence-end-mode"
                   onChange={handleRecurrenceEndModeChange}
                 >
                   <MenuItem value="never">
@@ -1394,9 +1417,20 @@ export function CalendarEventEdit({
           />
 
           {displayParticipants.length > 0 && (
-            <Box style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Box
+              component="ul"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+              }}
+            >
               {displayParticipants.map((participant) => (
                 <Box
+                  component="li"
                   key={participant}
                   style={{
                     display: "flex",
@@ -1710,6 +1744,22 @@ export function CalendarEventEdit({
     />
   );
 
+  const errorSnackbar = (
+    <Snackbar
+      open={!!saveError}
+      onClose={() => setSaveError(null)}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+    >
+      <Alert
+        severity="error"
+        onClose={() => setSaveError(null)}
+        sx={{ maxWidth: 600, wordBreak: "break-word" }}
+      >
+        {saveError}
+      </Alert>
+    </Snackbar>
+  );
+
   if (display === "page") {
     return (
       <>
@@ -1737,6 +1787,8 @@ export function CalendarEventEdit({
           </Box>
         </Box>
         {relayPublishDialog}
+        {/* eslint-disable-next-line no-constant-binary-expression */}
+        {false && errorSnackbar}
       </>
     );
   }
@@ -1766,6 +1818,7 @@ export function CalendarEventEdit({
         <DialogActions style={{ padding: 16 }}>{actions}</DialogActions>
       </Dialog>
       {relayPublishDialog}
+      {errorSnackbar}
     </>
   );
 }

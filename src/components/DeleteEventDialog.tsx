@@ -22,11 +22,11 @@ import { useUser } from "../stores/user";
 import {
   publishDeletionEvent,
   publishParticipantRemovalEvent,
-} from "../common/nostr";
+} from "../nostr/events";
 import { useInvitations } from "../stores/invitations";
 import { useBusyList } from "../stores/busyList";
 import type { ICalendarEvent } from "../utils/types";
-import { EventKinds } from "../common/EventConfigs";
+import { EventKinds } from "../nostr/kinds";
 import { TimeRenderer } from "./TimeRenderer";
 import { getEventDisplayRange } from "../utils/eventOccurrence";
 import { useIntl } from "react-intl";
@@ -192,6 +192,7 @@ export function DeleteEventDialog({
             {isAuthor && (
               <FormControlLabel
                 value="deleteForEveryone"
+                data-testid="delete-option-everyone"
                 control={<Radio color="error" />}
                 label={
                   <Box>
@@ -213,6 +214,7 @@ export function DeleteEventDialog({
             {isInCalendar && (
               <FormControlLabel
                 value="removeFromCalendar"
+                data-testid="delete-option-remove"
                 control={<Radio />}
                 label={
                   <Box>
@@ -233,6 +235,7 @@ export function DeleteEventDialog({
 
             <FormControlLabel
               value="ignore"
+              data-testid="delete-option-ignore"
               control={<Radio />}
               label={
                 <Box>

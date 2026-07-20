@@ -137,6 +137,7 @@ export function EventCalendarListManagement({
       >
         <IconButton
           size="small"
+          aria-label="change calendar"
           onClick={() => {
             setSelectedCalendarId(calendarId);
             setIsEditingCalendar(true);

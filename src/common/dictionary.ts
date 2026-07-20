@@ -40,6 +40,8 @@ const dictionary: NestedObject = {
       goToWeek: "go to week",
       copyNpub: "Copy Identity (NPUB)",
       copied: "Copied!",
+      openDayView: "Open day view",
+      more: "more",
     },
     filters: {
       showPublicEvents: "Show Public Events",
@@ -65,6 +67,7 @@ const dictionary: NestedObject = {
       duplicateEvent: "Duplicate Event",
       deleteEvent: "Delete Event",
       createNewEvent: "Create New Event",
+      title: "Title",
       enterTitle: "Enter event title",
       imageUrlPlaceholder: "Image URL eg. https://example.com/image.jpg",
       enterLocation: "Enter location",
@@ -129,6 +132,10 @@ const dictionary: NestedObject = {
       allDayDateRange: "{start} – {end} ⋅ {label}",
       deviceReadOnly: "From your device calendar — read-only.",
       repeats: "Repeats {label}",
+      repeatsBadge: "Repeats",
+      eventsCount: "events",
+      open: "Open",
+      going: "going",
       event: "Event",
       eventNotFound: "Event not found. It may not have loaded yet.",
       loadError:
@@ -222,6 +229,7 @@ const dictionary: NestedObject = {
     sidebar: {
       calendars: "Calendars",
       noCalendarsYet: "No calendars yet",
+      settingsLink: "Settings",
       yourResponse: "Ihre Antwort",
       responseUnavailable:
         "Wir haben Ihre Antwort gefunden, aber die Details synchronisieren noch von den Relays.",
@@ -505,6 +513,7 @@ const dictionary: NestedObject = {
       duplicateEvent: "Termin duplizieren",
       deleteEvent: "Termin löschen",
       createNewEvent: "Neuen Termin erstellen",
+      title: "Titel",
       enterTitle: "Titel eingeben",
       imageUrlPlaceholder: "Bild-URL z.B. https://example.com/image.jpg",
       enterLocation: "Ort eingeben",

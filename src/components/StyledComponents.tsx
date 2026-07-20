@@ -4,25 +4,15 @@ interface SecondaryHeaderProps extends BoxProps {
   topOffset?: number;
 }
 
+// TOPBAR_HEIGHT (src/components/ui/TopBar.tsx) is constant across breakpoints,
+// so secondary headers stick at the same offset on mobile and desktop.
 export const StyledSecondaryHeader = styled(Box, {
   shouldForwardProp: (prop) => prop !== "topOffset",
-})<SecondaryHeaderProps>(({ topOffset = 0 }) => ({
+})<SecondaryHeaderProps>(({ theme, topOffset = 0 }) => ({
   position: "sticky",
-  // mobile portrait
-  top: `calc(var(--safe-area-top) + ${56 + topOffset}px)`,
-
-  background: "#fff",
+  top: `calc(var(--safe-area-top) + ${64 + topOffset}px)`,
+  background: theme.palette.background.paper,
   zIndex: 1,
-
-  // mobile landscape
-  "@media (min-width:0px) and (orientation: landscape)": {
-    top: `calc(var(--safe-area-top) + ${48 + topOffset}px)`,
-  },
-
-  // desktop
-  "@media (min-width:600px)": {
-    top: `calc(var(--safe-area-top) + ${64 + topOffset}px)`,
-  },
 }));
 
 export const EventAttributeEditContainer = styled(Box)(({ theme }) => ({

@@ -10,10 +10,16 @@ import { InvitationPanel } from "./InvitationPanel";
 import { SchedulingPageEdit } from "./SchedulingPageEdit";
 import { BookingPage } from "./BookingPage";
 import { BookingNotifications } from "./BookingNotifications";
+import { SettingsPage } from "./SettingsPage";
+import { DevUiShowcase } from "./DevUiShowcase";
 
 export const Routing = () => {
   return (
     <Routes>
+      {import.meta.env.DEV && (
+        <Route path="/dev/ui" element={<DevUiShowcase />} />
+      )}
+      <Route path={ROUTES.Settings} element={<SettingsPage />} />
       <Route path={ROUTES.EditEventPage} element={<EditEventPage />} />
       <Route
         path={ROUTES.DuplicateEventPage}

@@ -15,22 +15,22 @@
 
 import { create } from "zustand";
 import { getItem, setItem, setSecureItem } from "../common/localStorage";
+import { getUserPublicKey } from "../nostr/crypto";
+import { publishPrivateCalendarEvent } from "../nostr/events";
 import {
-  getUserPublicKey,
-  publishPrivateCalendarEvent,
-  getRelays,
-  publishToRelays,
-} from "../common/nostr";
-import * as nip59 from "../common/nip59";
-import { EventKinds } from "../common/EventConfigs";
-import { nostrRuntime } from "../common/nostrRuntime";
+  createBookingRequestsSubscription,
+  createBookingResponsesSubscription,
+  unwrapBookingRequest,
+  unwrapBookingResponse,
+  sendBookingResponse,
+} from "../nostr/booking";
+import type { StandingSubscription } from "../nostr/subscribe";
 import type {
   IBookingRequest,
   IOutgoingBooking,
   ICalendarEvent,
 } from "../utils/types";
 import { TEMP_CALENDAR_ID } from "./eventDetails";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { useSchedulingPages } from "./schedulingPages";
 import { useCalendarLists } from "./calendarLists";
 import { useBusyList } from "./busyList";
@@ -41,130 +41,6 @@ import {
   BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
   BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
 } from "../utils/constants";
-
-function subscribeBookingRequests(
-  pubkey: string,
-  onEvent: (event: Event) => void,
-  onEose?: () => void,
-) {
-  const relayList = getRelays();
-  const filter = {
-    kinds: [EventKinds.BookingRequestGiftWrap],
-    "#p": [pubkey],
-    limit: 50,
-  };
-  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
-}
-
-function subscribeBookingResponses(
-  pubkey: string,
-  onEvent: (event: Event) => void,
-  onEose?: () => void,
-) {
-  const relayList = getRelays();
-  const filter = {
-    kinds: [EventKinds.BookingResponseGiftWrap],
-    "#p": [pubkey],
-    limit: 50,
-  };
-  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
-}
-
-async function unwrapBookingRequest(giftWrap: Event): Promise<{
-  schedulingPageRef: string;
-  bookerPubkey: string;
-  start: number;
-  end: number;
-  title: string;
-  note: string;
-  dTag: string;
-  viewKey?: string;
-}> {
-  const rumor = await nip59.unwrapEvent(giftWrap);
-  const getTag = (name: string) =>
-    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
-  return {
-    schedulingPageRef: getTag("a"),
-    bookerPubkey: rumor.pubkey,
-    start: Number(getTag("start")) * 1000,
-    end: Number(getTag("end")) * 1000,
-    title: getTag("title"),
-    note: getTag("note"),
-    dTag: getTag("d"),
-    viewKey: getTag("viewKey") || undefined,
-  };
-}
-
-async function unwrapBookingResponse(giftWrap: Event): Promise<{
-  schedulingPageRef: string;
-  creatorPubkey: string;
-  start: number;
-  end: number;
-  status: "approved" | "declined";
-  eventRef?: string;
-  viewKey?: string;
-  reason?: string;
-}> {
-  const rumor = await nip59.unwrapEvent(giftWrap);
-  const getTag = (name: string) =>
-    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
-  return {
-    schedulingPageRef: getTag("a"),
-    creatorPubkey: rumor.pubkey,
-    start: Number(getTag("start")) * 1000,
-    end: Number(getTag("end")) * 1000,
-    status: getTag("status") as "approved" | "declined",
-    eventRef: getTag("event_ref") || undefined,
-    viewKey: getTag("viewKey") || undefined,
-    reason: getTag("reason") || undefined,
-  };
-}
-
-async function sendBookingResponse({
-  schedulingPageRef,
-  bookerPubkey,
-  start,
-  end,
-  status,
-  eventRef,
-  viewKey,
-  reason,
-}: {
-  schedulingPageRef: string;
-  bookerPubkey: string;
-  start: number;
-  end: number;
-  status: "approved" | "declined";
-  eventRef?: string[];
-  viewKey?: string;
-  reason?: string;
-}): Promise<Event> {
-  const userPublicKey = await getUserPublicKey();
-  const tags: string[][] = [
-    ["a", schedulingPageRef],
-    ["start", String(Math.floor(start / 1000))],
-    ["end", String(Math.floor(end / 1000))],
-    ["status", status],
-  ];
-  if (status === "approved" && eventRef) tags.push(["event_ref", ...eventRef]);
-  if (status === "approved" && viewKey) tags.push(["viewKey", viewKey]);
-  if (status === "declined" && reason) tags.push(["reason", reason]);
-
-  const giftWrap = await nip59.wrapEvent(
-    {
-      pubkey: userPublicKey,
-      created_at: Math.floor(Date.now() / 1000),
-      kind: EventKinds.BookingResponseRumor,
-      content: "",
-      tags,
-    },
-    bookerPubkey,
-    EventKinds.BookingResponseGiftWrap,
-    [["status", status]],
-  );
-  await publishToRelays(giftWrap);
-  return giftWrap;
-}
 
 const INCOMING_STORAGE_KEY = "cal:booking_requests_incoming";
 const OUTGOING_STORAGE_KEY = "cal:booking_requests_outgoing";
@@ -177,11 +53,9 @@ const saveOutgoingToStorage = (bookings: IOutgoingBooking[]) => {
   setItem(OUTGOING_STORAGE_KEY, bookings);
 };
 
-let incomingSubHandle: SubscriptionHandle | undefined;
-let outgoingSubHandle: SubscriptionHandle | undefined;
+let incomingSub: StandingSubscription | undefined;
+let outgoingSub: StandingSubscription | undefined;
 let expiryTimer: ReturnType<typeof setInterval> | undefined;
-const processedIncomingIds = new Set<string>();
-const processedOutgoingIds = new Set<string>();
 
 interface BookingRequestsState {
   incomingRequests: IBookingRequest[];
@@ -226,18 +100,15 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   },
 
   fetchIncomingRequests: async () => {
-    if (incomingSubHandle) return;
+    if (incomingSub) return;
     if (!get().isLoaded) await get().loadCached();
 
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
-    incomingSubHandle = subscribeBookingRequests(
+    incomingSub = createBookingRequestsSubscription(
       userPubkey,
       async (giftWrap: Event) => {
-        if (processedIncomingIds.has(giftWrap.id)) return;
-        processedIncomingIds.add(giftWrap.id);
-
         try {
           const details = await unwrapBookingRequest(giftWrap);
 
@@ -279,6 +150,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
         }
       },
     );
+    incomingSub.start();
 
     // Start expiry check timer
     if (!expiryTimer) {
@@ -304,18 +176,15 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   },
 
   fetchOutgoingBookings: async () => {
-    if (outgoingSubHandle) return;
+    if (outgoingSub) return;
     if (!get().isLoaded) await get().loadCached();
 
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
-    outgoingSubHandle = subscribeBookingResponses(
+    outgoingSub = createBookingResponsesSubscription(
       userPubkey,
       async (giftWrap: Event) => {
-        if (processedOutgoingIds.has(giftWrap.id)) return;
-        processedOutgoingIds.add(giftWrap.id);
-
         try {
           const details = await unwrapBookingResponse(giftWrap);
 
@@ -355,6 +224,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
         }
       },
     );
+    outgoingSub.start();
   },
 
   approveRequest: async (requestId, calendarId) => {
@@ -394,7 +264,6 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
         existingDTag: request.dTag,
         existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
-        waitForAll: false,
       });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
@@ -548,20 +417,14 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   },
 
   stopSubscriptions: () => {
-    if (incomingSubHandle) {
-      incomingSubHandle.unsubscribe();
-      incomingSubHandle = undefined;
-    }
-    if (outgoingSubHandle) {
-      outgoingSubHandle.unsubscribe();
-      outgoingSubHandle = undefined;
-    }
+    incomingSub?.stop();
+    incomingSub = undefined;
+    outgoingSub?.stop();
+    outgoingSub = undefined;
     if (expiryTimer) {
       clearInterval(expiryTimer);
       expiryTimer = undefined;
     }
-    processedIncomingIds.clear();
-    processedOutgoingIds.clear();
   },
 
   clearCached: async () => {

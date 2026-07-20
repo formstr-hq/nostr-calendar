@@ -1,22 +1,36 @@
 import { create } from "zustand";
 import { getItem, setItem } from "../common/localStorage";
 import { isMobile } from "../common/utils";
+import { AccentPresetName, defaultAccent } from "../theme/tokens";
+
+export type ThemeMode = "light" | "dark" | "system";
 
 export interface ISettings {
   layout: "day" | "week" | "month";
   filters: {
     showPublicEvents: boolean;
   };
+  themeMode: ThemeMode;
+  accent: AccentPresetName | string;
 }
 
 const localStorageKey = "cal:settings";
 
-const previousSettings = getItem<ISettings>(localStorageKey, {
+const defaultSettings: ISettings = {
   layout: "week",
   filters: {
     showPublicEvents: false,
   },
-});
+  themeMode: "system",
+  accent: defaultAccent,
+};
+
+// Spread over defaults so users with settings saved before themeMode/accent
+// existed don't end up with undefined values.
+const previousSettings: ISettings = {
+  ...defaultSettings,
+  ...getItem<Partial<ISettings>>(localStorageKey, {}),
+};
 if (isMobile) {
   previousSettings.layout = "day";
 }

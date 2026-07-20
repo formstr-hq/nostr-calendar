@@ -26,16 +26,13 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import dayjs, { Dayjs } from "dayjs";
 import { useIntl } from "react-intl";
 import { NAddr, decode } from "nostr-tools/nip19";
+import { EventKinds } from "../nostr/kinds";
 import {
-  getUserPublicKey,
-  getRelays,
-  publishToRelays,
-  defaultRelays,
-} from "../common/nostr";
-import * as nip59 from "../common/nip59";
-import { nostrRuntime } from "../common/nostrRuntime";
-import { EventKinds } from "../common/EventConfigs";
-import { nostrEventToSchedulingPage } from "../utils/parser";
+  sendBookingRequest,
+  fetchSchedulingPage,
+  createBookingIdentity,
+} from "../nostr/booking";
+import { addGossipRelays } from "../nostr/core";
 import {
   getDisplaySlots,
   type IDisplaySlot,
@@ -48,79 +45,12 @@ import { useUser } from "../stores/user";
 import { useBookingRequests } from "../stores/bookingRequests";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
-import { Header, HeaderSpacer } from "./Header";
 import { CalendarListSelect } from "./CalendarListSelect";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { nip44, getPublicKey, generateSecretKey, nip19 } from "nostr-tools";
-import { hexToBytes } from "@noble/hashes/utils.js";
-import type { Event, Filter } from "nostr-tools";
 import type {
   ISchedulingPage,
   ITimeSlot,
   IOutgoingBooking,
 } from "../utils/types";
-
-async function fetchSchedulingPage(naddr: NAddr): Promise<Event> {
-  const { data } = decode(naddr as NAddr);
-  const relays = data.relays ?? defaultRelays;
-  const filter: Filter = {
-    "#d": [data.identifier],
-    kinds: [EventKinds.SchedulingPage],
-    authors: [data.pubkey],
-  };
-  const event = await nostrRuntime.fetchOne(relays, filter);
-  if (!event) throw new Error("SCHEDULING_PAGE_NOT_FOUND");
-  return event;
-}
-
-async function sendBookingRequest({
-  schedulingPageRef,
-  creatorPubkey,
-  start,
-  end,
-  title,
-  note,
-  dTag,
-  viewKey,
-  relayHints,
-}: {
-  schedulingPageRef: string;
-  creatorPubkey: string;
-  start: number;
-  end: number;
-  title: string;
-  note: string;
-  dTag: string;
-  viewKey: string;
-  relayHints?: string[];
-}): Promise<Event> {
-  const userPublicKey = await getUserPublicKey();
-  const giftWrap = await nip59.wrapEvent(
-    {
-      pubkey: userPublicKey,
-      created_at: Math.floor(Date.now() / 1000),
-      kind: EventKinds.BookingRequestRumor,
-      content: "",
-      tags: [
-        ["a", schedulingPageRef],
-        ["start", String(Math.floor(start / 1000))],
-        ["end", String(Math.floor(end / 1000))],
-        ["title", title],
-        ["note", note],
-        ["d", dTag],
-        ["viewKey", viewKey],
-      ],
-    },
-    creatorPubkey,
-    EventKinds.BookingRequestGiftWrap,
-  );
-  const targetRelays = relayHints
-    ? [...new Set([...relayHints, ...getRelays()])]
-    : undefined;
-  await publishToRelays(giftWrap, undefined, targetRelays);
-  return giftWrap;
-}
 
 type FetchState = "loading" | "loaded" | "error";
 
@@ -158,7 +88,10 @@ export const BookingPage = () => {
     }
   }, [calendars, selectedCalendarId]);
 
-  // Fetch scheduling page data
+  // Observe the scheduling page \u2014 declarative, so it renders whenever the
+  // event arrives (cache replay or upstream sync) instead of racing a
+  // one-shot fetch timeout. A grace timer surfaces the error state for
+  // genuinely missing pages.
   useEffect(() => {
     if (!naddr) return;
     setFetchState("loading");
@@ -169,25 +102,18 @@ export const BookingPage = () => {
       setFetchState("error");
       return;
     }
-    fetchSchedulingPage(naddr as NAddr)
-      .then((event) => {
-        let eventToProcess = event;
-        try {
-          const viewSecretKey = hexToBytes(viewKey);
-          const viewPublicKey = getPublicKey(viewSecretKey);
-          const conversationKey = nip44.getConversationKey(
-            viewSecretKey,
-            viewPublicKey,
-          );
-          const decryptedTags = JSON.parse(
-            nip44.decrypt(event.content, conversationKey),
-          );
-          eventToProcess = { ...event, tags: decryptedTags };
-        } catch {
-          setFetchState("error");
-          return;
-        }
-        const parsed = nostrEventToSchedulingPage(eventToProcess);
+    let data: { identifier: string; pubkey: string; relays?: string[] };
+    try {
+      ({ data } = decode(naddr as NAddr));
+    } catch {
+      setFetchState("error");
+      return;
+    }
+    addGossipRelays(data.relays ?? []);
+
+    const subscription = fetchSchedulingPage(
+      { pubkey: data.pubkey, dTag: data.identifier, viewKeyHex: viewKey },
+      (parsed) => {
         setPage(parsed);
         // Default to first slot duration if fixed mode
         if (
@@ -197,11 +123,22 @@ export const BookingPage = () => {
           setSelectedDuration(parsed.slotDurations[0]);
         }
         setFetchState("loaded");
-      })
-      .catch((e) => {
-        console.error(e);
-        setFetchState("error");
-      });
+      },
+      () => {
+        // Wrong/stale key for this version; a later good version may
+        // still recover the page.
+        setFetchState((s) => (s === "loaded" ? s : "error"));
+      },
+    );
+    subscription.start();
+    const errorTimer = setTimeout(
+      () => setFetchState((s) => (s === "loading" ? "error" : s)),
+      20_000,
+    );
+    return () => {
+      clearTimeout(errorTimer);
+      subscription.stop();
+    };
   }, [naddr, viewKey]);
 
   // Compute available slots for the displayed week
@@ -297,10 +234,10 @@ export const BookingPage = () => {
       // Generate a d-tag and view key for the future calendar event.
       // The creator will use both when publishing the event so it
       // appears correctly in the booker's calendar list from the start.
-      const dTagRoot = `booking-${schedulingPageRef}-${selectedSlot.start.getTime()}-${Date.now()}`;
-      const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
-      const viewSecretKey = generateSecretKey();
-      const viewKey = nip19.nsecEncode(viewSecretKey);
+      const { dTag, viewKey } = createBookingIdentity(
+        schedulingPageRef,
+        selectedSlot.start.getTime(),
+      );
 
       // Extract relay hints from the scheduling page event tags
       const relayHints = page.relayHints;
@@ -382,43 +319,33 @@ export const BookingPage = () => {
 
   if (fetchState === "loading") {
     return (
-      <>
-        <Header />
-        <HeaderSpacer />
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "50vh",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      </>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "50vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (fetchState === "error" || !page) {
     return (
-      <>
-        <Header />
-        <HeaderSpacer />
-        <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
-          <Alert severity="error">
-            {!viewKey
-              ? intl.formatMessage({ id: "scheduling.publicPagesUnsupported" })
-              : intl.formatMessage({ id: "scheduling.loadError" })}
-          </Alert>
-        </Box>
-      </>
+      <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
+        <Alert severity="error">
+          {!viewKey
+            ? intl.formatMessage({ id: "scheduling.publicPagesUnsupported" })
+            : intl.formatMessage({ id: "scheduling.loadError" })}
+        </Alert>
+      </Box>
     );
   }
 
   return (
     <>
-      <Header />
-      <HeaderSpacer />
       <Box
         sx={{
           maxWidth: 900,
@@ -484,14 +411,22 @@ export const BookingPage = () => {
             mb: 2,
           }}
         >
-          <IconButton onClick={() => navigateWeek(-1)} size="small">
+          <IconButton
+            onClick={() => navigateWeek(-1)}
+            size="small"
+            aria-label="previous week"
+          >
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="subtitle1">
             {weekStart.format("MMM D")} –{" "}
             {weekEnd.subtract(1, "day").format("MMM D, YYYY")}
           </Typography>
-          <IconButton onClick={() => navigateWeek(1)} size="small">
+          <IconButton
+            onClick={() => navigateWeek(1)}
+            size="small"
+            aria-label="next week"
+          >
             <ArrowForwardIcon />
           </IconButton>
         </Box>
@@ -525,6 +460,8 @@ export const BookingPage = () => {
               return (
                 <Paper
                   key={dateKey}
+                  data-testid="booking-day-column"
+                  data-date={dateKey}
                   variant="outlined"
                   sx={{
                     p: 1.5,

@@ -33,7 +33,6 @@ import dayjs, { Dayjs } from "dayjs";
 import localeData from "dayjs/plugin/localeData";
 dayjs.extend(localeData);
 import { useSchedulingPages } from "../stores/schedulingPages";
-import { Header, HeaderSpacer } from "./Header";
 import type { ISchedulingPage, IAvailabilityWindow } from "../utils/types";
 import { ROUTES } from "../utils/routingHelper";
 import { useIntl } from "react-intl";
@@ -429,41 +428,31 @@ export const SchedulingPageEdit = () => {
   // Loading state for edit mode
   if (isEditMode && !isLoaded) {
     return (
-      <>
-        <Header />
-        <HeaderSpacer />
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "50vh",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      </>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "50vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (isEditMode && isLoaded && !existingPage) {
     return (
-      <>
-        <Header />
-        <HeaderSpacer />
-        <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
-          <Alert severity="error">
-            {intl.formatMessage({ id: "scheduling.pageNotFound" })}
-          </Alert>
-        </Box>
-      </>
+      <Box sx={{ p: 3, maxWidth: 800, mx: "auto" }}>
+        <Alert severity="error">
+          {intl.formatMessage({ id: "scheduling.pageNotFound" })}
+        </Alert>
+      </Box>
     );
   }
 
   return (
     <>
-      <Header />
-      <HeaderSpacer />
       <Box sx={{ maxWidth: 800, mx: "auto", p: isMobile ? 2 : 3 }}>
         {/* Top bar */}
         <Box
@@ -960,7 +949,10 @@ export const SchedulingPageEdit = () => {
               <TextField
                 value={savedPageUrl}
                 size="small"
-                slotProps={{ input: { readOnly: true } }}
+                slotProps={{
+                  input: { readOnly: true },
+                  htmlInput: { "aria-label": "booking page link" },
+                }}
                 sx={{
                   flex: 1,
                   "& .MuiInputBase-input": { fontSize: "0.75rem" },

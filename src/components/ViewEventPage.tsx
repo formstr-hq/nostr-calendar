@@ -2,9 +2,8 @@ import { NAddr } from "nostr-tools/nip19";
 import React from "react";
 import { useParams, useSearchParams } from "react-router";
 import type { ICalendarEvent } from "../utils/types";
-import { fetchCalendarEvent, viewPrivateEvent } from "../common/nostr";
+import { fetchCalendarEvent, viewPrivateEvent } from "../nostr/events";
 import { nostrEventToCalendar } from "../utils/parser";
-import { Header, HeaderSpacer } from "./Header";
 import { Alert, Box, CircularProgress } from "@mui/material";
 import { CalendarEventView } from "./CalendarEvent";
 import { useIntl } from "react-intl";
@@ -122,26 +121,22 @@ export const ViewEventPage = () => {
     return null;
   }
   return (
-    <>
-      <Header />
-      <Box
-        component={"main"}
-        style={{ width: "100%", minHeight: `max(100vh, 100%)` }}
-      >
-        <HeaderSpacer />
-        {calendarEventLoadState.fetchState === "loading" ? (
-          <LoaderRenderer />
-        ) : null}
-        {calendarEventLoadState.error !== null ? (
-          <ErrorRenderer error={calendarEventLoadState.error} />
-        ) : null}
-        {calendarEventLoadState.event !== null ? (
-          <CalendarEventView
-            event={calendarEventLoadState.event}
-            display="page"
-          />
-        ) : null}
-      </Box>
-    </>
+    <Box
+      component={"main"}
+      style={{ width: "100%", minHeight: `max(100vh, 100%)` }}
+    >
+      {calendarEventLoadState.fetchState === "loading" ? (
+        <LoaderRenderer />
+      ) : null}
+      {calendarEventLoadState.error !== null ? (
+        <ErrorRenderer error={calendarEventLoadState.error} />
+      ) : null}
+      {calendarEventLoadState.event !== null ? (
+        <CalendarEventView
+          event={calendarEventLoadState.event}
+          display="page"
+        />
+      ) : null}
+    </Box>
   );
 };

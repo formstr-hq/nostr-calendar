@@ -17,6 +17,7 @@ export enum ROUTES {
   SchedulingPageEdit = "/schedule/edit/:naddr",
   SchedulingPagePublic = "/schedule/:naddr",
   Bookings = "/bookings",
+  Settings = "/settings",
 }
 
 export function getEventPage(

@@ -16,34 +16,6 @@ html.ios-native {
   --iphone-safe-area-bottom: calc(16px + var(--safe-area-bottom));
 }
 
-@font-face {
-  font-family: "Menlo";
-  src: url("/fonts/Menlo-Regular.ttf");
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: "Menlo";
-  src: url("/fonts/Menlo-Bold.ttf");
-  font-weight: bold;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: "Menlo";
-  src: url("/fonts/Menlo-Italic.ttf");
-  font-weight: normal;
-  font-style: italic;
-}
-
-@font-face {
-  font-family: "Menlo";
-  src: url("/fonts/Menlo-BoldItalic.ttf");
-  font-weight: bold;
-  font-style: italic;
-}
-
 html {
   width: 100vw;
   height: 100vh;
@@ -64,13 +36,5 @@ body {
 }
 
 html.ios-native {
-  height: 100dvh;
   overscroll-behavior: none;
-  overflow: hidden;
-}
-
-html.ios-native body,
-html.ios-native #root,
-html.ios-native .App {
-  overflow: hidden;
 }

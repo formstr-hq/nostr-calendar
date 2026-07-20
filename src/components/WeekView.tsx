@@ -1,4 +1,11 @@
-import { alpha, Box, Divider, Typography, useTheme } from "@mui/material";
+import {
+  alpha,
+  Box,
+  Divider,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import dayjs, { Dayjs } from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
@@ -13,12 +20,12 @@ import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
 import { StyledSecondaryHeader } from "./StyledComponents";
+import { MOBILE_TOPBAR_ROW2_HEIGHT } from "./ui/TopBar";
 import { TimeMarker } from "./TimeMarker";
 import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
-import { isIOSNative } from "../utils/platform";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -28,8 +35,19 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
   const start = date.startOf("week");
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   const theme = useTheme();
-  const headerContent = (
-    <>
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  return (
+    <StyledSecondaryHeader
+      zIndex={1}
+      topOffset={isMobile ? MOBILE_TOPBAR_ROW2_HEIGHT : 0}
+      textAlign="center"
+      display="grid"
+      gridTemplateColumns="repeat(7, 1fr)"
+      flexDirection={"row"}
+      alignItems={"center"}
+      paddingY={theme.spacing(1)}
+      paddingLeft={"60px"}
+    >
       {days.map((day) => (
         <Box
           display={"flex"}
@@ -43,46 +61,7 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
           <DateLabel day={day}></DateLabel>
         </Box>
       ))}
-    </>
-  );
-
-  if (!isIOSNative()) {
-    return (
-      <StyledSecondaryHeader
-        zIndex={1}
-        topOffset={40 + 8}
-        textAlign="center"
-        display="grid"
-        gridTemplateColumns="repeat(7, 1fr)"
-        flexDirection={"row"}
-        alignItems={"center"}
-        paddingY={theme.spacing(1)}
-        bgcolor={"white"}
-        paddingLeft={"60px"}
-      >
-        {headerContent}
-      </StyledSecondaryHeader>
-    );
-  }
-
-  return (
-    <Box
-      zIndex={1}
-      textAlign="center"
-      display="grid"
-      gridTemplateColumns="repeat(7, 1fr)"
-      flexDirection={"row"}
-      alignItems={"center"}
-      paddingY={theme.spacing(1)}
-      bgcolor={"white"}
-      paddingLeft={"60px"}
-      sx={{
-        flexShrink: 0,
-        position: "relative",
-      }}
-    >
-      {headerContent}
-    </Box>
+    </StyledSecondaryHeader>
   );
 };
 
@@ -122,11 +101,16 @@ export function WeekView({ events, date }: ViewProps) {
       {hasAnyAllDay && (
         <Box
           display="flex"
-          sx={{ borderBottom: "1px solid #ddd", minHeight: 24 }}
+          sx={{
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            minHeight: 24,
+          }}
         >
           <Box
             width={60}
-            borderRight="1px solid #ddd"
+            borderRight="1px solid"
+            sx={{ borderColor: "divider" }}
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -136,9 +120,19 @@ export function WeekView({ events, date }: ViewProps) {
               {intl.formatMessage({ id: "event.allDayLabel" })}
             </Typography>
           </Box>
-          <Box flex={1} display="grid" gridTemplateColumns="repeat(7, 1fr)">
+          <Box
+            flex={1}
+            minWidth={0}
+            display="grid"
+            gridTemplateColumns="repeat(7, 1fr)"
+          >
             {days.map((day) => (
-              <Box key={day.toString()} p={0.5} borderLeft="1px solid #eee">
+              <Box
+                key={day.toString()}
+                p={0.5}
+                borderLeft="1px solid"
+                sx={{ borderColor: "divider", minWidth: 0, overflow: "hidden" }}
+              >
                 {allDayForDay(day.startOf("day").valueOf()).map((evt) => (
                   <AllDayEventChip key={`${evt.id}:${evt.begin}`} event={evt} />
                 ))}
@@ -160,7 +154,12 @@ export function WeekView({ events, date }: ViewProps) {
           </Box>
 
           {/* Days */}
-          <Box flex={1} display="grid" gridTemplateColumns="repeat(7, 1fr)">
+          <Box
+            flex={1}
+            minWidth={0}
+            display="grid"
+            gridTemplateColumns="repeat(7, 1fr)"
+          >
             {days.map((day) => {
               const laidOut = layoutDayEvents(
                 getEventSegmentsForDay(
@@ -173,10 +172,13 @@ export function WeekView({ events, date }: ViewProps) {
                 <Box
                   key={day.toString()}
                   position="relative"
-                  borderLeft="1px solid #eee"
+                  borderLeft="1px solid"
                   ref={containerRef}
                   sx={{
+                    borderColor: "divider",
                     cursor: "pointer",
+                    minWidth: 0,
+                    overflow: "hidden",
                     background: isWeekend(day)
                       ? alpha(theme.palette.primary.main, 0.1)
                       : "transparent",
@@ -189,6 +191,7 @@ export function WeekView({ events, date }: ViewProps) {
                     <Box
                       onClick={handleCellClick}
                       data-date={day.format("YYYY-MM-DD")}
+                      data-testid="day-hour-cell"
                       key={h}
                       height={60}
                       px={0.5}

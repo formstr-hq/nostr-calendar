@@ -1,6 +1,5 @@
 // import { useDraggable } from "@dnd-kit/core";
 import {
-  alpha,
   Box,
   Button,
   Dialog,
@@ -10,9 +9,7 @@ import {
   Divider,
   IconButton,
   Link,
-  Paper,
   Stack,
-  Theme,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -21,7 +18,7 @@ import {
 import { ICalendarEvent } from "../utils/types";
 import { PositionedEvent } from "../common/calendarEngine";
 import { TimeRenderer } from "./TimeRenderer";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CloseIcon from "@mui/icons-material/Close";
@@ -32,11 +29,10 @@ import Edit from "@mui/icons-material/Edit";
 import FileCopy from "@mui/icons-material/FileCopy";
 import Delete from "@mui/icons-material/Delete";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import dayjs from "dayjs";
 import { exportICS, isMobile } from "../common/utils";
-import { editPrivateCalendarEvent, encodeNAddr } from "../common/nostr";
-import type { RSVPRecord } from "../common/nostr";
+import { editPrivateCalendarEvent, encodeNAddr } from "../nostr/events";
+import type { RSVPRecord } from "../nostr/rsvp";
 import {
   getDuplicateEventPage,
   getEditEventPage,
@@ -47,11 +43,6 @@ import { getAppBaseUrl, isNative } from "../utils/platform";
 import { useNotifications } from "../stores/notifications";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useTimeBasedEvents } from "../stores/events";
-import { useDeviceCalendars } from "../stores/deviceCalendars";
-import {
-  DEVICE_CALENDAR_ID_PREFIX,
-  deviceCalendarColor,
-} from "../utils/deviceCalendarAdapter";
 import { useIntl, type IntlShape } from "react-intl";
 import { useUser } from "../stores/user";
 import { DeleteEventDialog } from "./DeleteEventDialog";
@@ -75,6 +66,13 @@ import { RSVPBar } from "./RSVPBar";
 import { RespondPanel } from "./RespondPanel";
 import { RSVPParticipantList } from "./RSVPParticipantList";
 import { CalendarEventState } from "../common/types";
+import { EventChip } from "./ui/EventChip";
+import { EventQuickPeek } from "./ui/EventQuickPeek";
+import { useEventModal } from "../hooks/useEventModal";
+import {
+  useResolvedCalendarColor,
+  getEventChipColor,
+} from "../utils/eventChipColor";
 import {
   areNotificationOffsetsEqual,
   clearNotificationPreference,
@@ -102,83 +100,6 @@ export interface CalendarEventViewProps {
   onClose?: () => void;
 }
 
-/**
- * Resolves the display color for an event by checking, in order:
- * 1. The owning Nostr calendar list's color, if `event.calendarId` matches one
- * 2. The device calendar's hex color when `event.source === "device"`
- * 3. `undefined` (caller falls back to the theme palette)
- */
-function useResolvedCalendarColor(event: ICalendarEvent): string | undefined {
-  const nostrCalendars = useCalendarLists.getState().calendars;
-  const deviceCalendars = useDeviceCalendars((s) => s.calendars);
-
-  const owning = event.calendarId
-    ? nostrCalendars.find((c) => c.id === event.calendarId)
-    : undefined;
-  if (owning?.color) return owning.color;
-
-  if (event.source === "device" && event.calendarId) {
-    const nativeId = event.calendarId.startsWith(DEVICE_CALENDAR_ID_PREFIX)
-      ? event.calendarId.slice(DEVICE_CALENDAR_ID_PREFIX.length)
-      : event.calendarId;
-    const info = deviceCalendars.find((c) => c.id === nativeId);
-    if (info) return deviceCalendarColor(info);
-  }
-  return undefined;
-}
-
-/**
- * Returns color scheme for an event card based on its type:
- * - Invitation events: grey background with dashed border
- * - Private events with a calendar: themed by the calendar's color
- * - Other private events: default dark theme
- * - Public events: semi-transparent primary
- */
-function getColorScheme(
-  event: ICalendarEvent,
-  theme: Theme,
-  calendarColor?: string,
-) {
-  // Invitation events get a distinct grey/dashed style
-  if (event.isInvitation) {
-    return {
-      color: theme.palette.text.secondary,
-      backgroundColor: "#e0e0e0",
-      border: "2px dashed #999",
-    };
-  }
-
-  // Device-sourced events use the full calendar color so they carry the same
-  // visual weight as other calendars.
-  if (event.source === "device" && calendarColor) {
-    return {
-      color: "#fff",
-      backgroundColor: calendarColor,
-      border: `1px solid ${alpha(calendarColor, 0.9)}`,
-    };
-  }
-
-  // Private events themed by their calendar's color
-  if (event.isPrivateEvent && calendarColor) {
-    return {
-      color: "#fff",
-      backgroundColor: alpha(calendarColor, 0.7),
-    };
-  }
-
-  if (event.isPrivateEvent) {
-    return {
-      color: "#fff",
-      backgroundColor: theme.palette.primary.light,
-    };
-  }
-
-  return {
-    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-    color: "#fff",
-  };
-}
-
 function getEventDisplayTitle(
   event: ICalendarEvent,
   intl: IntlShape,
@@ -204,56 +125,62 @@ export function CalendarEventCard({
   offset = "0px",
 }: CalendarEventCardProps) {
   // const { attributes, listeners, setNodeRef } = useDraggable({ id: event.id });
-  const [open, setOpen] = useState(false);
-  const handleClose = () => setOpen(false);
+  const chipRef = useRef<HTMLElement>(null);
+  const [peekOpen, setPeekOpen] = useState(false);
+  const modal = useEventModal();
   const intl = useIntl();
   const theme = useTheme();
 
   const resolvedColor = useResolvedCalendarColor(event);
-
-  const colorScheme = getColorScheme(event, theme, resolvedColor);
+  const { color, isPublic } = getEventChipColor(event, theme, resolvedColor);
   const title = getEventDisplayTitle(event, intl);
+  const time = event.allDay
+    ? undefined
+    : dayjs(event.renderBegin).format("HH:mm");
+
   return (
     <>
-      <Paper
-        // ref={setNodeRef}
-        // {...listeners}
-        // {...attributes}
-        onClick={() => setOpen(true)}
+      <Box
+        data-testid="event-card"
         sx={{
           position: "absolute",
-          backgroundColor: colorScheme.backgroundColor,
-          border: colorScheme.border,
           top: `calc(${event.top}px + ${offset})`,
           left: `${(event.col / event.colSpan) * 100}%`,
           width: `${100 / event.colSpan}%`,
           height: event.height,
-          p: 0.5,
-          cursor: "pointer",
-          userSelect: "none",
           overflow: "hidden",
-          textOverflow: "clip",
         }}
       >
-        <Typography
-          variant="caption"
-          color={colorScheme.color}
-          fontWeight={600}
-        >
-          {event.source === "device" && (
-            <PhoneAndroidIcon
-              sx={{ fontSize: 12, mr: 0.5, verticalAlign: "middle" }}
-            />
-          )}
-          {title}
-        </Typography>
-      </Paper>
-      <CalendarEventView
-        event={event}
-        display="modal"
-        open={open}
-        onClose={handleClose}
-      />
+        <EventChip
+          ref={chipRef}
+          title={title}
+          color={color}
+          isPublic={isPublic}
+          time={time}
+          onClick={() => setPeekOpen(true)}
+          sx={{ height: "100%", alignItems: "flex-start" }}
+        />
+      </Box>
+      {peekOpen && (
+        <EventQuickPeek
+          mode="event"
+          anchorEl={chipRef.current}
+          entry={{ event, color, isPublic }}
+          onClose={() => setPeekOpen(false)}
+          onOpen={(e) => {
+            setPeekOpen(false);
+            modal.open(e);
+          }}
+        />
+      )}
+      {modal.event && (
+        <CalendarEventView
+          event={modal.event}
+          display="modal"
+          open
+          onClose={modal.close}
+        />
+      )}
     </>
   );
 }
@@ -474,27 +401,43 @@ function ActionButtons({
       )}
 
       {!isNative && (
-        <IconButton size={iconSize} onClick={() => exportICS(event)}>
+        <IconButton
+          size={iconSize}
+          onClick={() => exportICS(event)}
+          aria-label={intl.formatMessage({ id: "event.downloadDetails" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.downloadDetails" })}>
             <Download fontSize={iconSize} />
           </Tooltip>
         </IconButton>
       )}
       {isEditable && (
-        <IconButton size={iconSize} onClick={duplicateEvent}>
+        <IconButton
+          size={iconSize}
+          onClick={duplicateEvent}
+          aria-label={intl.formatMessage({ id: "event.duplicateEvent" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.duplicateEvent" })}>
             <FileCopy fontSize={iconSize} />
           </Tooltip>
         </IconButton>
       )}
       {isEditable && (
-        <IconButton size={iconSize} onClick={editEvent}>
+        <IconButton
+          size={iconSize}
+          onClick={editEvent}
+          aria-label={intl.formatMessage({ id: "event.editEvent" })}
+        >
           <Tooltip title={intl.formatMessage({ id: "event.editEvent" })}>
             <Edit fontSize={iconSize} />
           </Tooltip>
         </IconButton>
       )}
-      <IconButton size={iconSize} onClick={() => setDeleteDialogOpen(true)}>
+      <IconButton
+        size={iconSize}
+        onClick={() => setDeleteDialogOpen(true)}
+        aria-label={intl.formatMessage({ id: "event.deleteEvent" })}
+      >
         <Tooltip title={intl.formatMessage({ id: "event.deleteEvent" })}>
           <Delete fontSize={iconSize} />
         </Tooltip>
@@ -917,47 +860,47 @@ function ScheduledNotificationsSection({ event }: { event: ICalendarEvent }) {
 
 /** Compact pill used in the all-day banner row of Day and Week views. */
 export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
-  const [open, setOpen] = useState(false);
+  const chipRef = useRef<HTMLElement>(null);
+  const [peekOpen, setPeekOpen] = useState(false);
+  const modal = useEventModal();
   const intl = useIntl();
   const theme = useTheme();
 
   const resolvedColor = useResolvedCalendarColor(event);
-  const colorScheme = getColorScheme(event, theme, resolvedColor);
+  const { color, isPublic } = getEventChipColor(event, theme, resolvedColor);
+  const title = getEventDisplayTitle(event, intl);
 
   return (
     <>
-      <Box
-        onClick={() => setOpen(true)}
-        sx={{
-          bgcolor: colorScheme.backgroundColor,
-          border: colorScheme.border,
-          borderRadius: 0.5,
-          px: 0.5,
-          mb: 0.25,
-          cursor: "pointer",
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-        }}
-      >
-        <Typography
-          variant="caption"
-          sx={{ color: colorScheme.color, fontWeight: 600 }}
-        >
-          {event.source === "device" && (
-            <PhoneAndroidIcon
-              sx={{ fontSize: 12, mr: 0.5, verticalAlign: "middle" }}
-            />
-          )}
-          {getEventDisplayTitle(event, intl)}
-        </Typography>
+      <Box data-testid="event-card" sx={{ mb: 0.25 }}>
+        <EventChip
+          ref={chipRef}
+          title={title}
+          color={color}
+          isPublic={isPublic}
+          onClick={() => setPeekOpen(true)}
+        />
       </Box>
-      <CalendarEventView
-        event={event}
-        display="modal"
-        open={open}
-        onClose={() => setOpen(false)}
-      />
+      {peekOpen && (
+        <EventQuickPeek
+          mode="event"
+          anchorEl={chipRef.current}
+          entry={{ event, color, isPublic }}
+          onClose={() => setPeekOpen(false)}
+          onOpen={(e) => {
+            setPeekOpen(false);
+            modal.open(e);
+          }}
+        />
+      )}
+      {modal.event && (
+        <CalendarEventView
+          event={modal.event}
+          display="modal"
+          open
+          onClose={modal.close}
+        />
+      )}
     </>
   );
 }

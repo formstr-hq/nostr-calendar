@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { fetchUserProfile } from "../common/nostr";
+import { fetchUserProfile } from "../nostr/profiles";
 
 export interface IParticipant {
   publicKey: string;

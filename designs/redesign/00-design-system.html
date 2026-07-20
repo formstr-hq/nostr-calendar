@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Design System — Tokens</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111111; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000; }
+    #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #111111; z-index: 9999; }
+    #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
+    #__bundler_placeholder { color: #999; font-size: 14px; }
+  </style>
+  <noscript>
+    <style>#__bundler_loading { display: none; }</style>
+    <div style="position:fixed;bottom:12px;left:12px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#999;background:rgba(255,255,255,0.9);padding:6px 12px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.08);z-index:10000;">
+      This page requires JavaScript to display.
+    </div>
+  </noscript>
+</head>
+<body>
+  <div id="__bundler_thumbnail"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#111111"></rect><rect x="450" y="220" width="300" height="60" rx="10" fill="#e2554e"></rect><text x="600" y="470" font-family="sans-serif" font-size="120" font-weight="800" fill="#ffffff" text-anchor="middle">F</text></svg></div>
+  <div id="__bundler_loading">Unpacking...</div>
+
+  <script>
+    
+document.addEventListener('DOMContentLoaded', async function() {
+  const loading = document.getElementById('__bundler_loading');
+  function setStatus(msg) { if (loading) loading.textContent = msg; }
+
+  const FONT_MIME = /^(font[/]|application[/](x-)?font-|application[/]vnd\.ms-fontobject)/i;
+  const MIME_TOKEN = /^[\w.+-]+[/][\w.+-]+$/;
+  function toBase64(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(bin);
+  }
+
+  // Error sink persists across replaceWith since it's on window, not the DOM.
+  window.addEventListener('error', function(e) {
+    // Failed resource loads (CSP-blocked links, scripts, images) fire plain
+    // events at the element — warn only; real JS errors carry message/error.
+    if (!e.message && !e.error && e.target && e.target !== window) {
+      console.warn('[bundle] resource failed to load:',
+        e.target.tagName, String(e.target.src || e.target.href || ''));
+      return;
+    }
+    var p = document.body || document.documentElement;
+    var d = document.getElementById('__bundler_err') || p.appendChild(document.createElement('div'));
+    d.id = '__bundler_err';
+    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5c2b2e;z-index:99999;white-space:pre-wrap;max-height:40vh;overflow:auto';
+    d.textContent = (d.textContent ? d.textContent + String.fromCharCode(10) : '') +
+      '[bundle] ' + (e.message || e.type) +
+      (e.filename ? ' (' + e.filename.slice(0, 60) + ':' + e.lineno + ')' : '');
+  }, true);
+
+  try {
+    const manifestEl = document.querySelector('script[type="__bundler/manifest"]');
+    const templateEl = document.querySelector('script[type="__bundler/template"]');
+    if (!manifestEl || !templateEl) {
+      setStatus('Error: missing bundle data');
+      console.error('[bundler] Missing script tags — manifestEl:', !!manifestEl, 'templateEl:', !!templateEl);
+      return;
+    }
+
+    const manifest = JSON.parse(manifestEl.textContent);
+    let template = JSON.parse(templateEl.textContent);
+
+    // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
+    // document's manifest; frame srcs carry an about:blank#<uuid> marker
+    // instead of a substitutable uuid. Every document mints the blobs for
+    // its OWN frames — from local text at the root, or text obtained from
+    // its DIRECT parent over the relay protocol below — so each frame
+    // navigation stays same-origin with its initiator and a deduped page
+    // loads at any depth on any host, including a file:// download's
+    // opaque origins (where a blob minted by one document cannot be
+    // navigated to by another).
+    const pageOrderEl = document.querySelector('script[type="__bundler/page_order"]');
+    const pageOrder = pageOrderEl ? JSON.parse(pageOrderEl.textContent) : [];
+    const pageSet = new Set(pageOrder);
+    const pageTexts = {};
+
+    // ── Nested-page text protocol (parent-chain relay) ──
+    // Page bundles ship once, in the ROOT document's manifest. Every
+    // document mints the blobs for its OWN frames, obtaining page text
+    // through a strict parent-chain relay: a document only ever SENDS to
+    // its direct parent (which, for every document the publisher's own
+    // runtime minted, is another publisher document) and only ACCEPTS
+    // text from that direct parent; requests from below are honored only
+    // for the document's own child frames, and the ROOT never sends
+    // upward at all. That last rule is load-bearing: the artifact host's
+    // frame-ancestors allows claude.ai (and friends) to frame an
+    // artifact, so window.top can be a FOREIGN document — a top-addressed
+    // protocol would hand page uuids to that ancestor and accept forged
+    // "page text" from it, minting attacker HTML as an artifact-origin
+    // blob document. The chain never touches the ancestor: requests stop
+    // at the root, replies are origin-addressed per hop (never '*' when
+    // an origin exists), and both directions are origin-gated (on https
+    // a foreign sender's origin can never equal this document's; in
+    // opaque contexts — file:// — everything serializes as 'null', where
+    // an embedded EXTERNAL frame still fails the gate by carrying its
+    // own real origin, and a sandboxed child of such a frame is excluded
+    // by the own-child-frames check plus uuid unguessability). Shape is
+    // deny-by-default: one request form, one reply form, no error
+    // replies.
+    // window.origin is the SERIALIZED SECURITY origin ('null' in opaque
+    // contexts such as a sandboxed preview iframe) — location.origin is
+    // computed from the URL and stays 'https://…' even when the document
+    // is sandboxed, which would misgate every opaque chain.
+    const OWN_TARGET = /^https?:[/][/]/.test(window.origin || '')
+      ? window.origin
+      : '*';
+    function trustedOrigin(e) {
+      if (e.origin === window.origin) return true; // https chains; opaque==opaque
+      // file:// trees: Chrome serializes the file document's origin as
+      // 'file://' while the blob: documents it mints serialize as 'null',
+      // so the two legitimate shapes can never string-match — accept the
+      // pair in both directions. https origins never serialize as either,
+      // and sender identity (own child frame / direct parent) is checked
+      // separately.
+      return (
+        (e.origin === 'null' &&
+          (window.origin === 'file://' ||
+            window.location.protocol === 'file:')) ||
+        (/^file:/.test(e.origin) && window.origin === 'null')
+      );
+    }
+    // Non-empty only in the root document (nested bundles ship an empty
+    // island), so it doubles as the root marker: the root answers from
+    // local text and treats a miss as authoritative — never relaying to
+    // its (possibly foreign) parent.
+    const isPageRoot = pageOrder.length > 0;
+    const blobUrls = {};
+    const resourceBlobs = {};
+    const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    const pendingFrames = {}; // uuid -> [{el, frag}] awaiting text for own frames
+    const pendingRelays = {}; // uuid -> [childWindow] awaiting text to pass down
+    function mountPage(el, frag, text) {
+      const pageBlob = new Blob([text], { type: 'text/html' });
+      const u = URL.createObjectURL(pageBlob);
+      resourceBlobs[u] = pageBlob;
+      el.src = u + frag;
+    }
+    function deliverPage(uuid, text) {
+      const frames = pendingFrames[uuid];
+      delete pendingFrames[uuid];
+      if (frames) for (const f of frames) mountPage(f.el, f.frag, text);
+      const relays = pendingRelays[uuid];
+      delete pendingRelays[uuid];
+      if (relays) {
+        for (const cw of relays) {
+          try { cw.postMessage({ __bundler_page: uuid, __bundler_text: text }, OWN_TARGET); } catch (err) { /* gone */ }
+        }
+      }
+    }
+    function ownFrameWindows() {
+      const out = [];
+      for (const f of Array.from(document.querySelectorAll('iframe'))) {
+        try { if (f.contentWindow) out.push(f.contentWindow); } catch (err) { /* detached */ }
+      }
+      return out;
+    }
+    window.addEventListener('message', function (e) {
+      const d = e.data;
+      if (!d || typeof d !== 'object' || !e.source) return;
+      // Origin gate first; the structural checks below (own-child-frames
+      // for requests, direct-parent + solicited-uuid for replies, the
+      // root's never-relay rule) are what hold in fully opaque chains
+      // where origin strings can't discriminate — a sandboxed root's
+      // FOREIGN wrapper still fails all three even though both serialize
+      // as real-vs-'null' rather than matching.
+      if (!trustedOrigin(e)) return;
+      if (typeof d.__bundler_need === 'string' && UUID_SHAPE.test(d.__bundler_need)) {
+        // Requests are honored only for this document's own child frames.
+        if (ownFrameWindows().indexOf(e.source) < 0) return;
+        const uuid = d.__bundler_need;
+        const text = pageTexts[uuid];
+        if (typeof text === 'string') {
+          try { e.source.postMessage({ __bundler_page: uuid, __bundler_text: text }, OWN_TARGET); } catch (err) { /* gone */ }
+          return;
+        }
+        if (isPageRoot || window.parent === window) return; // authoritative miss
+        const waiting = pendingRelays[uuid];
+        if (waiting) {
+          if (waiting.indexOf(e.source) < 0) waiting.push(e.source);
+          return;
+        }
+        // Never-answered uuids would otherwise accumulate forever under a
+        // request spray; past the cap (far above any real page count) new
+        // relays are dropped rather than remembered.
+        if (Object.keys(pendingRelays).length >= 128) return;
+        pendingRelays[uuid] = [e.source];
+        window.parent.postMessage({ __bundler_need: uuid }, OWN_TARGET);
+      } else if (
+        typeof d.__bundler_page === 'string' &&
+        UUID_SHAPE.test(d.__bundler_page) &&
+        typeof d.__bundler_text === 'string'
+      ) {
+        // The shape test is load-bearing beyond tidiness: the solicited
+        // check below uses the in operator, which matches prototype keys
+        // ('__proto__', 'constructor') — an unshaped key would reach
+        // deliverPage and throw, painting the error banner.
+        // Text is accepted only from the direct parent — the document
+        // that minted this one.
+        if (e.source !== window.parent || window.parent === window) return;
+        if (!(d.__bundler_page in pendingFrames) && !(d.__bundler_page in pendingRelays)) return;
+        deliverPage(d.__bundler_page, d.__bundler_text);
+      }
+    });
+
+    const uuids = Object.keys(manifest);
+    setStatus('Unpacking ' + uuids.length + ' assets...');
+
+    await Promise.all(uuids.map(async (uuid) => {
+      const entry = manifest[uuid];
+      try {
+        const binaryStr = atob(entry.data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        let finalBytes = bytes;
+        if (entry.compressed) {
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(bytes);
+            writer.close();
+            const chunks = [];
+            let totalLen = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              totalLen += value.length;
+            }
+            finalBytes = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const chunk of chunks) { finalBytes.set(chunk, offset); offset += chunk.length; }
+          } else {
+            console.warn('DecompressionStream not available, asset ' + uuid + ' may not render');
+          }
+        }
+
+        if (pageSet.has(uuid)) {
+          pageTexts[uuid] = new TextDecoder().decode(finalBytes);
+          return;
+        }
+        if (FONT_MIME.test(entry.mime) && MIME_TOKEN.test(entry.mime)) {
+          // Strict artifact hosts allow font-src data: but not blob:.
+          blobUrls[uuid] = 'data:' + entry.mime + ';base64,' +
+            (entry.compressed ? toBase64(finalBytes) : entry.data);
+        } else {
+          const blob = new Blob([finalBytes], { type: entry.mime });
+          blobUrls[uuid] = URL.createObjectURL(blob);
+          resourceBlobs[blobUrls[uuid]] = blob;
+        }
+      } catch (err) {
+        console.error('Failed to decode asset ' + uuid + ':', err);
+        const blob = new Blob([], { type: entry.mime });
+        blobUrls[uuid] = URL.createObjectURL(blob);
+        resourceBlobs[blobUrls[uuid]] = blob;
+      }
+    }));
+
+    const extResEl = document.querySelector('script[type="__bundler/ext_resources"]');
+    const extResources = extResEl ? JSON.parse(extResEl.textContent) : [];
+    const resourceMap = {};
+    for (const entry of extResources) {
+      if (blobUrls[entry.uuid]) resourceMap[entry.id] = blobUrls[entry.uuid];
+    }
+
+    // Artifact-host CSP (connect-src 'self') refuses fetch() of blob: URLs —
+    // consumers read these Blobs directly. Survives the swap like the error sink.
+    window.__resourceBlobs = resourceBlobs;
+
+    setStatus('Rendering...');
+    // Page uuids have no blob here — they ride inside about:blank#<uuid>
+    // frame markers the pass below resolves after the swap.
+    for (const uuid of uuids) {
+      if (pageSet.has(uuid)) continue;
+      template = template.split(uuid).join(blobUrls[uuid]);
+    }
+
+    // Strip integrity + crossorigin — blob URLs from a file:// document inherit
+    // a null origin, so crossorigin forces a CORS fetch that SRI then rejects.
+    // The manifest bytes are ours; SRI protects against CDN compromise, not this.
+    template = template.replace(/\s+integrity="[^"]*"/gi, '').replace(/\s+crossorigin="[^"]*"/gi, '');
+
+    const resourceScript = '<script>window.__resources = ' +
+      JSON.stringify(resourceMap).replace(/<\//g, '<\\/') +
+      ';</' + 'script>';
+    // Inject after <head> so the DOCTYPE stays first; prepending the script
+    // would push the parser into quirks mode. DOMParser always emits a <head>
+    // (synthesizing one if the source HTML omitted it) but may carry
+    // attributes through, so match the full opening tag. slice() rather than
+    // replace() keeps us clear of $-pattern substitution in resourceScript.
+    const headOpen = template.match(/<head[^>]*>/i);
+    if (headOpen) {
+      const i = headOpen.index + headOpen[0].length;
+      template = template.slice(0, i) + resourceScript + template.slice(i);
+    }
+
+    // Parse the template and swap the root element. Scripts inserted via
+    // DOMParser/replaceWith are inert per spec — re-create each with
+    // createElement so they execute, awaiting onload for src scripts to
+    // preserve ordering (React before ReactDOM before Babel before text/babel).
+    const doc = new DOMParser().parseFromString(template, 'text/html');
+    document.documentElement.replaceWith(doc.documentElement);
+
+    // Resolve page-frame markers: mint this document's own blob for each
+    // framed page — from local text when this is the root, otherwise by
+    // asking the direct parent over the relay protocol above. An
+    // unanswered request leaves the frame on about:blank, the same
+    // degraded state as a refused embed.
+    {
+      const MARKER = /^about:blank#([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(#.*)?$/;
+      const needed = [];
+      for (const el of Array.from(document.querySelectorAll('iframe'))) {
+        const m = MARKER.exec(el.getAttribute('src') || '');
+        if (!m) continue;
+        const text = pageTexts[m[1]];
+        if (typeof text === 'string') {
+          mountPage(el, m[2] || '', text);
+        } else if (window.parent !== window && !isPageRoot) {
+          const had = pendingFrames[m[1]];
+          (pendingFrames[m[1]] = had || []).push({ el: el, frag: m[2] || '' });
+          if (!had) needed.push(m[1]);
+        }
+      }
+      for (const uuid of needed) {
+        window.parent.postMessage({ __bundler_need: uuid }, OWN_TARGET);
+      }
+    }
+
+    const dead = Array.from(document.scripts);
+    for (const old of dead) {
+      const s = document.createElement('script');
+      for (const a of old.attributes) s.setAttribute(a.name, a.value);
+      s.textContent = old.textContent;
+      // text/babel scripts with a src: read and inline. transformScriptTags
+      // does XHR against the src, but blob:null/ from a file:// origin is
+      // silently dropped. Inlining makes it a plain inline babel script,
+      // which transformScriptTags handles unconditionally.
+      if ((s.type === 'text/babel' || s.type === 'text/jsx') && s.src) {
+        const pre = resourceBlobs[s.src.split('#')[0]];
+        s.textContent = pre ? await pre.text() : await (await fetch(s.src)).text();
+        s.removeAttribute('src');
+      }
+      const p = s.src ? new Promise(function(r) { s.onload = s.onerror = r; }) : null;
+      old.replaceWith(s);
+      if (p) await p;
+    }
+    // Babel standalone auto-transforms type=text/babel on DOMContentLoaded,
+    // which fired before we swapped the document. Trigger manually if present.
+    if (window.Babel && typeof window.Babel.transformScriptTags === 'function') {
+      window.Babel.transformScriptTags();
+    }
+  } catch (err) {
+    setStatus('Error unpacking: ' + err.message);
+    console.error('Bundle unpack error:', err);
+  }
+});
+
+  </script>
+
+  <script type="__bundler/manifest">
+{}
+  </script>
+
+  <script type="__bundler/ext_resources">
+[]
+  </script>
+
+  <script type="__bundler/page_order">
+[]
+  </script>
+
+  <script type="__bundler/template">
+"<!DOCTYPE html>\n<html><head>\n<meta charset=\"utf-8\">\n<title>Design System — Tokens<\u002Ftitle>\n<style>\n  html,body{margin:0;padding:0;background:#f4f4f3;font-family:Inter,system-ui,-apple-system,sans-serif}\n  *{box-sizing:border-box}\n  .frame{width:1440px;padding:40px 48px 56px;position:relative}\n  .grain{position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,rgba(11,11,12,.025) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(11,11,12,.025) 0 1px,transparent 1px 40px);height:160px;pointer-events:none}\n  h2{font-size:11px;font-weight:700;letter-spacing:1.5px;color:#9a9a97;margin:0 0 14px;text-transform:uppercase}\n  .cols{display:flex;gap:40px;position:relative}\n  .col{flex:1;min-width:0}\n  .swatch{border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:11.5px}\n  .swatch b{display:block;margin-bottom:4px}\n  a{color:#111}\n<\u002Fstyle>\n<\u002Fhead>\n<body>\n<div class=\"frame\">\n<div class=\"grain\"><\u002Fdiv>\n<div style=\"display:flex;align-items:center;gap:16px;margin-bottom:40px;position:relative\">\n  <div style=\"width:44px;height:44px;border-radius:12px;background:#111;position:relative;overflow:hidden;flex-shrink:0\">\n    <div style=\"position:absolute;top:0;left:0;right:0;height:13px;background:#e2554e\"><\u002Fdiv>\n    <div style=\"position:absolute;top:2px;left:0;right:0;text-align:center;font-size:6.5px;font-weight:800;color:rgba(255,255,255,.88)\">JAN<\u002Fdiv>\n    <div style=\"position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:19px;font-weight:800;color:#fff\">3<\u002Fdiv>\n  <\u002Fdiv>\n  <div><div style=\"font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#0b0b0c\">Formstr Calendar<\u002Fdiv>\n  <div style=\"font-size:13px;color:#686865\">Design system · v1 · Inter · warm paper + Formstr orange<\u002Fdiv><\u002Fdiv>\n<\u002Fdiv>\n\n<div class=\"cols\">\n  <div class=\"col\">\n    <h2>Color — Light<\u002Fh2>\n    <div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:24px\">\n      <div class=\"swatch\" style=\"background:#f4f4f3;border:1px solid #d8d8d6;color:#0b0b0c\"><b>canvas<\u002Fb><span style=\"color:#686865\">#f4f4f3<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#fff;border:1px solid #d8d8d6;color:#0b0b0c\"><b>surface<\u002Fb><span style=\"color:#686865\">#ffffff<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#e4e4e2;color:#0b0b0c\"><b>border / grid<\u002Fb><span style=\"color:#686865\">#e4e4e2<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#0b0b0c;color:#fff\"><b>text<\u002Fb><span style=\"color:#9a9a97\">#0b0b0c<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#686865;color:#fff\"><b>text-2<\u002Fb><span style=\"color:#e4e4e2\">#686865<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#9a9a97;color:#fff\"><b>text-3<\u002Fb><span style=\"color:#f4f4f3\">#9a9a97<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#111;color:#fff;font-weight:700\"><b>accent<\u002Fb><span style=\"color:#e6e6e4\">#111111<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#f0f0ef;border:1px solid #dcdcda;color:#1a1a1a\"><b>accent-soft<\u002Fb><span style=\"color:#6b6b68\">#f0f0ef<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:linear-gradient(135deg,#111,#2a2a2a);color:#fff;font-weight:700\"><b>brand-grad<\u002Fb><span style=\"color:#fff3e0\">111 → 2a2a2a<\u002Fspan><\u002Fdiv>\n    <\u002Fdiv>\n    <h2>Color — Dark<\u002Fh2>\n    <div style=\"background:#121212;border-radius:12px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:24px\">\n      <div class=\"swatch\" style=\"background:#1a1a1a;border:1px solid #2c2c2c;color:#f2f2f0;margin:0\"><b>surface<\u002Fb><span style=\"color:#a3a3a0\">#1a1a1a<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#242424;color:#f2f2f0;margin:0\"><b>raised<\u002Fb><span style=\"color:#a3a3a0\">#242424<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#f5f5f4;color:#fff;font-weight:700;margin:0\"><b>accent<\u002Fb><span style=\"color:#e6e6e4\">#f5f5f4<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#121212;border:1px solid #2c2c2c;color:#f2f2f0;margin:0\"><b>canvas<\u002Fb><span style=\"color:#a3a3a0\">#121212<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#2c2c2c;color:#f2f2f0;margin:0\"><b>border<\u002Fb><span style=\"color:#a3a3a0\">#2c2c2c<\u002Fspan><\u002Fdiv>\n      <div class=\"swatch\" style=\"background:#121212;border:1px solid #2c2c2c;color:#f2f2f0;margin:0\"><b>text<\u002Fb><span style=\"color:#a3a3a0\">#f2f2f0 / a8a49b<\u002Fspan><\u002Fdiv>\n    <\u002Fdiv>\n    <h2>Calendar colors<\u002Fh2>\n    <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;font-size:12px;margin-bottom:24px\">\n      <div>● <b style=\"color:#111;font-weight:600\">Personal<\u002Fb> <span style=\"color:#9a9a97\">#111111<\u002Fspan><\u002Fdiv>\n      <div>🔵 <b style=\"color:#111;font-weight:600\">Work<\u002Fb> <span style=\"color:#9a9a97\">#3B82F6<\u002Fspan><\u002Fdiv>\n      <div>🟢 <b style=\"color:#111;font-weight:600\">Family<\u002Fb> <span style=\"color:#9a9a97\">#10B981<\u002Fspan><\u002Fdiv>\n      <div>🟣 <b style=\"color:#111;font-weight:600\">Meetups<\u002Fb> <span style=\"color:#9a9a97\">#8B5CF6<\u002Fspan><\u002Fdiv>\n      <div>🔴 <b style=\"color:#111;font-weight:600\">Deadlines<\u002Fb> <span style=\"color:#9a9a97\">#F43F5E<\u002Fspan><\u002Fdiv>\n      <div style=\"color:#686865\">public tint = color @ 12%<\u002Fdiv>\n    <\u002Fdiv>\n    <h2>Accent theme presets<\u002Fh2>\n    <div style=\"display:flex;gap:10px;margin-bottom:6px\">\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#111;outline:2px solid #111;outline-offset:3px\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#0ea5e9\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#10b981\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#8b5cf6\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#f43f5e\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#0b0b0c\"><\u002Fspan>\n      <span style=\"width:28px;height:28px;border-radius:14px;background:#fff;border:1.5px solid #d8d8d6;font-size:13px;color:#686865;display:flex;align-items:center;justify-content:center\">+<\u002Fspan>\n    <\u002Fdiv>\n    <div style=\"font-size:11.5px;color:#686865\">Ember (default) · Ocean · Forest · Grape · Rose · Ink · Custom hex<\u002Fdiv>\n  <\u002Fdiv>\n\n  <div class=\"col\">\n    <h2>Typography — Inter<\u002Fh2>\n    <div style=\"display:flex;flex-direction:column;gap:14px;margin-bottom:24px;font-size:11px;color:#9a9a97\">\n      <div style=\"display:flex;justify-content:space-between;align-items:baseline\"><span style=\"font-size:28px;font-weight:800;letter-spacing:-0.6px;color:#0b0b0c\">July 2026<\u002Fspan><span>28 / 800 · view title<\u002Fspan><\u002Fdiv>\n      <div style=\"display:flex;justify-content:space-between;align-items:baseline\"><span style=\"font-size:18px;font-weight:700;color:#0b0b0c\">Nostr Meetup — Bitcoin Park<\u002Fspan><span>18 / 700 · event title<\u002Fspan><\u002Fdiv>\n      <div style=\"display:flex;justify-content:space-between;align-items:baseline\"><span style=\"font-size:13.5px;color:#0b0b0c\">Body copy for descriptions and dialogs sits at 13.5px.<\u002Fspan><span>13.5 / 400<\u002Fspan><\u002Fdiv>\n      <div style=\"display:flex;justify-content:space-between;align-items:baseline\"><span style=\"font-size:12px;color:#686865\">Secondary — times, locations, participants.<\u002Fspan><span>12 / 400 · text-2<\u002Fspan><\u002Fdiv>\n      <div style=\"font-size:11px;font-weight:700;letter-spacing:1.5px;color:#9a9a97\">SECTION LABEL — 11 / 700 / +1.5<\u002Fdiv>\n    <\u002Fdiv>\n\n    <h2>Buttons<\u002Fh2>\n    <div style=\"display:flex;align-items:center;gap:12px;margin-bottom:24px\">\n      <button style=\"height:40px;padding:0 22px;border-radius:10px;border:none;background:#111;color:#fff;font-size:13.5px;font-weight:600;font-family:inherit\">New event<\u002Fbutton>\n      <button style=\"height:40px;padding:0 20px;border-radius:10px;border:1.5px solid #d8d8d6;background:#fff;color:#0b0b0c;font-size:13.5px;font-weight:600;font-family:inherit\">Today<\u002Fbutton>\n      <button style=\"height:40px;padding:0 20px;border-radius:10px;border:none;background:#f0f0ef;color:#1a1a1a;font-size:13.5px;font-weight:600;font-family:inherit\">Subtle<\u002Fbutton>\n      <span style=\"font-size:13.5px;font-weight:600;color:#686865\">Ghost<\u002Fspan>\n      <button style=\"width:40px;height:40px;border-radius:10px;border:1.5px solid #d8d8d6;background:#fff;font-size:16px;font-family:inherit\">+<\u002Fbutton>\n    <\u002Fdiv>\n\n    <h2>Segmented control<\u002Fh2>\n    <div style=\"display:flex;align-items:center;gap:16px;margin-bottom:24px\">\n      <div style=\"display:flex;background:#ececea;border-radius:10px;padding:3px;width:264px\">\n        <span style=\"flex:1;text-align:center;padding:7px 0;border-radius:8px;background:#fff;box-shadow:0 0 0 1px rgba(11,11,12,.08);font-size:12.5px;font-weight:600;color:#0b0b0c\">Month<\u002Fspan>\n        <span style=\"flex:1;text-align:center;padding:7px 0;font-size:12.5px;color:#686865\">Week<\u002Fspan>\n        <span style=\"flex:1;text-align:center;padding:7px 0;font-size:12.5px;color:#686865\">Day<\u002Fspan>\n      <\u002Fdiv>\n      <span style=\"font-size:11px;color:#9a9a97\">keys: M / W / D<\u002Fspan>\n    <\u002Fdiv>\n\n    <h2>Inputs<\u002Fh2>\n    <div style=\"display:flex;gap:16px;margin-bottom:24px\">\n      <div style=\"width:260px;height:40px;border:1.5px solid #d8d8d6;border-radius:10px;display:flex;align-items:center;padding:0 14px;font-size:12.5px;color:#9a9a97\">🔍 Search events…   ⌘K<\u002Fdiv>\n      <div style=\"width:186px;height:40px;border:1.8px solid #111;border-radius:10px;display:flex;align-items:center;padding:0 14px;font-size:12.5px;color:#0b0b0c\">Focused field<\u002Fdiv>\n    <\u002Fdiv>\n\n    <h2>Controls<\u002Fh2>\n    <div style=\"display:flex;align-items:center;gap:16px;margin-bottom:24px\">\n      <span style=\"width:44px;height:24px;border-radius:12px;background:#111;display:inline-block;position:relative\"><span style=\"position:absolute;top:2px;left:22px;width:20px;height:20px;border-radius:10px;background:#fff\"><\u002Fspan><\u002Fspan>\n      <span style=\"width:44px;height:24px;border-radius:12px;background:#d8d8d6;display:inline-block;position:relative\"><span style=\"position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#fff\"><\u002Fspan><\u002Fspan>\n      <span style=\"width:20px;height:20px;border-radius:6px;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px\">✓<\u002Fspan>\n      <span style=\"width:20px;height:20px;border-radius:6px;border:1.5px solid #d8d8d6;display:inline-block\"><\u002Fspan>\n      <span style=\"width:18px;height:18px;border-radius:9px;border:2px solid #111;display:flex;align-items:center;justify-content:center\"><span style=\"width:9px;height:9px;border-radius:5px;background:#111\"><\u002Fspan><\u002Fspan>\n      <span style=\"width:18px;height:18px;border-radius:9px;border:2px solid #d8d8d6;display:inline-block\"><\u002Fspan>\n    <\u002Fdiv>\n\n    <h2>Event chip — month<\u002Fh2>\n    <div style=\"display:flex;gap:24px;align-items:center;margin-bottom:8px\">\n      <div style=\"background:#3b82f6;color:#fff;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600\">9:30  Team sync<\u002Fdiv>\n      <span style=\"font-size:11px;color:#686865\">← private<\u002Fspan>\n      <div style=\"background:#8b5cf61f;color:#5b21b6;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700\">🌐 15:00  Nostr meetup<\u002Fdiv>\n      <span style=\"font-size:11px;color:#686865\">← public<\u002Fspan>\n    <\u002Fdiv>\n    <div style=\"font-size:11.5px;color:#686865;margin-bottom:24px\">private = solid + white 600 · public = 12% tint + globe + bold color text · no bars · h 24 · r 6<\u002Fdiv>\n\n    <h2>Event block — week / day<\u002Fh2>\n    <div style=\"display:flex;gap:16px;margin-bottom:24px\">\n      <div style=\"width:170px;padding:10px 12px;border-radius:10px;background:#8b5cf61f;color:#5b21b6\">\n        <div style=\"font-size:12.5px;font-weight:700\">🌐 Nostr meetup<\u002Fdiv>\n        <div style=\"font-size:11px;font-weight:600;margin-top:6px\">15:00 – 17:00<\u002Fdiv>\n        <div style=\"font-size:11px;font-weight:600\">Bitcoin Park<\u002Fdiv>\n      <\u002Fdiv>\n      <div>\n        <div style=\"width:170px;padding:8px 12px;border-radius:10px 10px 0 0;background:#3b82f6;color:#fff;margin-bottom:2px\">\n          <div style=\"font-size:12px;font-weight:700\">Design review<\u002Fdiv>\n          <div style=\"font-size:9.5px;opacity:.75\">14:00 – 15:30<\u002Fdiv>\n        <\u002Fdiv>\n        <div style=\"width:170px;padding:8px 12px;border-radius:0 0 10px 10px;background:#3b82f61a;border:1.5px dashed #3b82f659;color:#1d4ed8;font-size:12px;font-weight:600\">Drag ghost · 30 min<\u002Fdiv>\n      <\u002Fdiv>\n    <\u002Fdiv>\n  <\u002Fdiv>\n\n  <div class=\"col\">\n    <h2>Date cell states<\u002Fh2>\n    <div style=\"display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:24px\">\n      <div style=\"border:1px solid #e4e4e2;border-radius:10px;padding:12px;text-align:center\"><div style=\"font-size:13px;font-weight:600;color:#0b0b0c;margin-bottom:34px;text-align:left\">14<\u002Fdiv><div style=\"font-size:10.5px;color:#9a9a97\">default<\u002Fdiv><\u002Fdiv>\n      <div style=\"border:1px solid #e4e4e2;border-radius:10px;padding:12px;text-align:center\"><div style=\"text-align:left;margin-bottom:20px\"><span style=\"width:26px;height:26px;border-radius:13px;background:#111;color:#fff;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center\">19<\u002Fspan><\u002Fdiv><div style=\"font-size:10.5px;color:#9a9a97\">today<\u002Fdiv><\u002Fdiv>\n      <div style=\"border:1px solid #e4e4e2;border-radius:10px;padding:12px;background:#f5f5f4;text-align:center\"><div style=\"font-size:13px;font-weight:600;color:#b0b0ad;margin-bottom:34px;text-align:left\">2<\u002Fdiv><div style=\"font-size:10.5px;color:#9a9a97\">other month<\u002Fdiv><\u002Fdiv>\n      <div style=\"border:1.8px solid #111;border-radius:10px;padding:12px;text-align:center\"><div style=\"font-size:13px;font-weight:600;color:#0b0b0c;margin-bottom:34px;text-align:left\">21<\u002Fdiv><div style=\"font-size:10.5px;color:#9a9a97\">selected<\u002Fdiv><\u002Fdiv>\n    <\u002Fdiv>\n\n    <h2>Now indicator<\u002Fh2>\n    <div style=\"position:relative;padding:16px 0 24px;border-top:1px solid #e4e4e2;border-bottom:1px solid #e4e4e2;margin-bottom:24px\">\n      <div style=\"position:absolute;left:0;right:0;top:16px;height:2px;background:#111\"><\u002Fdiv>\n      <span style=\"position:absolute;left:0;top:11px;width:10px;height:10px;border-radius:5px;background:#111\"><\u002Fspan>\n      <span style=\"position:absolute;left:-12px;top:1px;background:#111;color:#fff;font-size:10.5px;font-weight:700;border-radius:9px;padding:3px 10px\">13:40<\u002Fspan>\n    <\u002Fdiv>\n\n    <h2>Nostr identity<\u002Fh2>\n    <div style=\"display:flex;align-items:center;gap:0;margin-bottom:24px\">\n      <span style=\"width:32px;height:32px;border-radius:16px;background:#dcdcda;color:#1a1a1a;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center\">RD<\u002Fspan>\n      <span style=\"width:32px;height:32px;border-radius:16px;background:#c7d8f9;color:#1d4ed8;border:2px solid #f4f4f3;margin-left:-6px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center\">AK<\u002Fspan>\n      <span style=\"width:32px;height:32px;border-radius:16px;background:#d6f5e9;color:#0f766e;border:2px solid #f4f4f3;margin-left:-6px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center\">MI<\u002Fspan>\n      <span style=\"width:32px;height:32px;border-radius:16px;background:#ececea;color:#686865;border:2px solid #f4f4f3;margin-left:-6px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center\">+5<\u002Fspan>\n      <span style=\"margin-left:16px;background:#d6f5e9;border-radius:14px;padding:6px 16px;font-size:11.5px;font-weight:600;color:#0f766e;display:flex;align-items:center;gap:6px\">🟢 Going · 8<\u002Fspan>\n      <span style=\"margin-left:8px;border:1px solid #d8d8d6;background:#fff;border-radius:14px;padding:6px 14px;font-size:11.5px;font-weight:600;color:#686865\">Maybe<\u002Fspan>\n    <\u002Fdiv>\n\n    <h2>Relay status<\u002Fh2>\n    <div style=\"border:1px solid #d8d8d6;border-radius:15px;padding:7px 16px;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#686865;margin-bottom:24px\">🟢🟢🟢⚪ 3/4 relays<\u002Fdiv>\n\n    <h2>Elevation + radius<\u002Fh2>\n    <div style=\"display:flex;gap:16px;margin-bottom:24px\">\n      <div style=\"width:120px;height:72px;border:1px solid #e4e4e2;border-radius:12px;padding:12px;font-size:11.5px\"><b>card r12<\u002Fb><div style=\"color:#9a9a97;font-size:10.5px;margin-top:6px\">border only<\u002Fdiv><\u002Fdiv>\n      <div style=\"width:120px;height:72px;border-radius:14px;box-shadow:0 8px 24px rgba(11,11,12,.12);border:1px solid #e4e4e2;padding:12px;font-size:11.5px\"><b>popover r14<\u002Fb><div style=\"color:#9a9a97;font-size:10.5px;margin-top:6px\">0 8 24 · 12%<\u002Fdiv><\u002Fdiv>\n      <div style=\"width:120px;height:72px;border-radius:16px;box-shadow:0 16px 48px rgba(11,11,12,.18);border:1px solid #e4e4e2;padding:12px;font-size:11.5px\"><b>modal r16<\u002Fb><div style=\"color:#9a9a97;font-size:10.5px;margin-top:6px\">0 16 48 · 18%<\u002Fdiv><\u002Fdiv>\n    <\u002Fdiv>\n\n    <h2>Spacing — 8pt grid<\u002Fh2>\n    <div style=\"display:flex;align-items:center;gap:8px;margin-bottom:24px\">\n      <span style=\"width:8px;height:20px;background:#dcdcda\"><\u002Fspan>\n      <span style=\"width:16px;height:20px;background:#b3b3af\"><\u002Fspan>\n      <span style=\"width:24px;height:20px;background:#8a8a86\"><\u002Fspan>\n      <span style=\"width:32px;height:20px;background:#111\"><\u002Fspan>\n      <span style=\"font-size:11.5px;color:#686865;margin-left:8px\">8 · 16 · 24 · 32<\u002Fspan>\n    <\u002Fdiv>\n  <\u002Fdiv>\n<\u002Fdiv>\n\n<h2 style=\"margin-top:8px\">Event chips on dark<\u002Fh2>\n<div style=\"background:#121212;border-radius:12px;padding:16px 20px;display:flex;gap:16px;align-items:center;margin-bottom:32px\">\n  <div style=\"background:#3b82f6;color:#fff;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600\">9:30  Team sync<\u002Fdiv>\n  <div style=\"background:#a78bfa29;color:#cdbcfd;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700\">🌐 15:00  Nostr meetup<\u002Fdiv>\n  <span style=\"font-size:10.5px;color:#a3a3a0\">private solid · public = 16% tint + globe, light color text<\u002Fspan>\n<\u002Fdiv>\n\n<div style=\"background:#fff;border:1px solid #e4e4e2;border-radius:14px;padding:24px 28px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px\">\n  <div><h2>1 · Calm paper, loud ink<\u002Fh2><div style=\"font-size:11.5px;color:#686865\">Warm neutrals everywhere; orange only for now, today, and primary actions.<\u002Fdiv><\u002Fdiv>\n  <div><h2>2 · Color = calendar<\u002Fh2><div style=\"font-size:11.5px;color:#686865\">Event color always means its calendar. Never decorative.<\u002Fdiv><\u002Fdiv>\n  <div><h2>3 · Keyboard first<\u002Fh2><div style=\"font-size:11.5px;color:#686865\">C create · T today · M/W/D views · ←/→ navigate · ⌘K search.<\u002Fdiv><\u002Fdiv>\n  <div><h2>4 · Own your data<\u002Fh2><div style=\"font-size:11.5px;color:#686865\">Relay state, encryption and publish status are visible, never buried.<\u002Fdiv><\u002Fdiv>\n<\u002Fdiv>\n<\u002Fdiv>\n\n\n<\u002Fbody><\u002Fhtml>"
+  </script>
+</body>
+</html>

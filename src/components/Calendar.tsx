@@ -1,16 +1,15 @@
+import { useEffect } from "react";
 import { useTimeBasedEvents } from "../stores/events";
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
-import { WeekView } from "./WeekView";
+import { WeekView, WeekHeader } from "./WeekView";
 import { useLayout } from "../hooks/useLayout";
-import { CalendarHeader } from "./CalendarHeader";
 import { Box } from "@mui/material";
 import { SwipeableView } from "./SwipeableView";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { useVisibleDeviceEvents } from "../hooks/useVisibleDeviceEvents";
-import { isIOSNative } from "../utils/platform";
 
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
@@ -19,6 +18,13 @@ function Calendar() {
   const { layout } = useLayout();
   const { date } = useDateWithRouting();
   const visibleDeviceEvents = useVisibleDeviceEvents(date, layout);
+
+  // A view that overflows (e.g. a wide grid before it reflows) can leave the
+  // window scrolled; without this, switching views/dates keeps that offset,
+  // showing the next view mid-scroll instead of from the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [layout, date]);
 
   const visibleCalendars = new Set(
     calendars.filter((cal) => cal.isVisible).map((cal) => cal.id),
@@ -33,8 +39,9 @@ function Calendar() {
     ...visibleDeviceEvents,
   ];
 
-  const calendarViews = (
-    <>
+  return (
+    <Box p={2}>
+      {layout === "week" && <WeekHeader date={date} />}
       {layout === "day" && <SwipeableView View={DayView} events={allEvents} />}
       {layout === "week" && (
         <SwipeableView View={WeekView} events={allEvents} />
@@ -42,42 +49,6 @@ function Calendar() {
       {layout === "month" && (
         <SwipeableView View={MonthView} events={allEvents} />
       )}
-    </>
-  );
-
-  if (!isIOSNative()) {
-    return (
-      <Box p={2}>
-        <CalendarHeader />
-        {calendarViews}
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      p={2}
-      sx={{
-        height: "100%",
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
-      <CalendarHeader />
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-          overscrollBehavior: "contain",
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        {calendarViews}
-      </Box>
     </Box>
   );
 }

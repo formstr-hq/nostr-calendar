@@ -21,7 +21,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { useRelayStore } from "../stores/relays";
-import { defaultRelays, getRelays, publishRelayList } from "../common/nostr";
+import { publishRelayList } from "../nostr/relays";
+import { defaultRelays, getRelays } from "../common/relayConfig";
 import { useIntl } from "react-intl";
 
 export function RelayManager() {
@@ -187,6 +188,7 @@ export function RelayManager() {
                   secondaryAction={
                     <IconButton
                       edge="end"
+                      aria-label="remove relay"
                       onClick={() => handleRemove(relay)}
                       size="small"
                     >

@@ -8,7 +8,9 @@ A decentralized calendar application built on the Nostr protocol. Users can crea
 - **Build Tool**: Vite 7
 - **State Management**: Zustand
 - **UI Library**: Material-UI (MUI) 7 with Emotion
-- **Nostr**: nostr-tools for protocol integration
+- **Nostr networking**: `@formstr/local-relay` — a Web Worker "local relay" that owns
+  every socket; the app only declares interests (`observe`) and publishes. Wiring in
+  `src/dataLayer/`. nostr-tools is used for crypto/encoding only (NIP-44, NIP-19).
 - **Mobile**: Capacitor 8 for iOS/Android deployment
 - **Dates**: date-fns and dayjs
 - **i18n**: react-intl
@@ -37,7 +39,7 @@ src/
 │   ├── participants.ts   # Participant profile cache
 │   └── locale.ts         # Language/locale state
 ├── common/               # Core business logic
-│   ├── nostr.ts          # Nostr relay communication
+│   ├── nostr.ts          # Nostr domain logic (build/sign/encrypt events, observe/publish via dataLayer)
 │   ├── nip59.ts          # NIP-59 gift wrap encryption
 │   ├── EventConfigs.ts   # Nostr event kind definitions
 │   ├── calendarEngine.ts # Event layout algorithm
@@ -166,3 +168,7 @@ Events are fetched from and published to:
 - wss://nostr-pub.wellorder.net
 - wss://nostr.mom
 - wss://nos.lol
+
+## E2E Testing
+- Run the script defined in package json to start the tests
+- Always look at the test files and not the architecture documents. They might be outdated

@@ -1,0 +1,426 @@
+# Redesign Progress
+
+Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the end of every session.
+
+| Phase | Status | Date | Notes |
+|---|---|---|---|
+| Phase 0 — Safety net | done | 2026-07-19 | Baseline recorded, one fragile selector hardened |
+| Phase 1 — Theme & tokens | done | 2026-07-19 | `src/theme/` built, old `src/theme.ts` deleted |
+| Phase 2 — Shell & primitives | done | 2026-07-19 | `AppShell`/`TopBar`/`Sidebar`/`MobileTabBar` built, `Header`/`CalendarSidebar`/`CalendarHeader`/`TempThemeToggle` deleted |
+| Phase 3 — Nostr consolidation | done | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted |
+| F-VIEWS | done | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred |
+| F-EVENT-VIEW | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-EVENT-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-LOGIN | unblocked (0–3 done) | | |
+| F-SET | unblocked (0–3 done) | | nostr inputs: not provided; `/settings` route is an empty placeholder |
+| F-NOTIF | unblocked (0–3 done) | | nostr inputs: not provided (1052→1059 decision) |
+| F-CAL-MGMT | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-BOOK-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-BOOK-INBOX | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-BOOK-PUBLIC | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-EVENT-LINK | unblocked (0–3 done) | | nostr inputs: not provided |
+
+## Session log
+
+<!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-20 — Rebase onto `main` — rebased `local-relay-migration` (this whole
+  redesign, one squash commit) onto `origin/main`, which had moved 4 commits
+  (duplicate-event dTag fix, Android notifications, iOS App/deep-links/secure-
+  storage, iOS notifications) since this branch forked. 22 files conflicted;
+  resolved by keeping the redesign's architecture and porting main's
+  functional changes into it, not the reverse. Key decisions:
+  - **`common/nostr.ts` vs `src/nostr/`**: main's dTag fix (route through
+    `getPersistedCalendarEventId` instead of a raw `TEMP_CALENDAR_ID` check,
+    so duplicated events get a fresh d-tag instead of colliding with the
+    original) was ported into `src/nostr/events.ts` at the same two call
+    sites; `common/nostr.ts` stays deleted (superseded by Phase 3).
+  - **iOS safe-area handling**: main's `Header.tsx`/`CalendarHeader.tsx`/
+    `theme.ts` had grown a `--safe-area-top`/`--safe-area-bottom` system
+    (notch/home-indicator insets) that the redesign's `TopBar`/`MobileTabBar`
+    never accounted for — a real regression for the iOS app, not just a
+    conflict artifact. Ported: `TopBar`/`MobileTabBar` get
+    `padding-top`/`padding-bottom: var(--safe-area-*)`; `StyledSecondaryHeader`
+    (`WeekHeader`'s sticky offset) wraps its constant offset in
+    `calc(var(--safe-area-top) + …)`; the theme's `MuiDialog`/
+    `MuiDialogContent`/`MuiDialogTitle`/`MuiDialogActions` overrides gained
+    main's mobile-fullscreen-dialog + safe-area-padded title/actions rules
+    (`src/theme/theme.ts`). `main.css` keeps the `--safe-area-*` custom
+    properties and `overscroll-behavior: none` on `html.ios-native`.
+  - **Not ported**: main's `html.ios-native` internal-scroll-container model
+    (`overflow: hidden` on `html`/`body`/`#root`/`.App` + a per-view `flex:1;
+    overflowY:auto` pane, used by the old `Header`+`CalendarHeader`+
+    `Calendar.tsx` stack). This directly conflicts with the redesign's
+    documented "the whole document scrolls, there is no internal scroll
+    container" decision (see F-VIEWS entry below) — reintroducing it would
+    silently re-break that. Kept the single-scroll model; dropped the ref'd
+    scroll-container reset in `App.tsx` in favor of `window.scrollTo`.
+    **Needs a real iOS-device check** — the redesign's mobile work was only
+    verified via Playwright + `agent-browser`, never on-device, and this is
+    exactly the kind of thing (momentum scroll, keyboard-avoidance, sticky
+    header behavior in a WKWebView) that can differ from desktop-browser
+    testing.
+  - **Public routes were fully broken**: `App.tsx`'s Phase-2 rewrite gated
+    all of `<Routing/>` on `{user && …}`, silently dropping main's
+    `shouldRenderRouting` (renders for `Boolean(user) || publicRoute`) — so
+    `/event/:naddr` and `/schedule/:id` rendered **nothing** for a logged-out
+    visitor, pre-dating this rebase (bug already present on `local-relay-
+    migration` before main's commits were involved). Fixed while resolving
+    the conflict: logged-in → `AppShell`, logged-out-but-public → bare
+    `<Routing/>` (no chrome, matches these being standalone share links),
+    else nothing (login modal shown). Removed the now-dead
+    `usesStandaloneHeader`/`STANDALONE_HEADER_PATTERNS` (Header-era per-route
+    header toggle, superseded by Phase 2's global `AppShell` wrap).
+  - **`e2e/web/tests/respond.spec.ts`** had a test asserting the *old*,
+    now-incorrect behavior (blocking login dialog, event never rendered for
+    a logged-out visitor) — written against the pre-fix bug above, before
+    this rebase pulled in main's real public-route feature. Rewrote it to
+    assert the actual intended behavior: the event renders standalone, and
+    `RespondPanel`'s inline "Login with Nostr" / "Continue as Guest" prompt
+    shows instead of a blocking dialog (this also means the guest-continue
+    path — previously called out in this same test as "currently
+    unreachable on web" — is now reachable).
+  - Dropped (not reconciled) 4 unit-test files main had extended
+    (`duplicateEvent.test.ts`, `notifications.test.ts`,
+    `secureKeyStorage.test.ts`, `calendarEventIdentity.test.ts`) — consistent
+    with this branch's Phase-0/3 policy of deleting Vitest unit tests in
+    favor of e2e coverage (`vitest.config.ts` is gone). Flagging since main
+    added real assertions here (iOS secure-storage roundtrip, notification
+    scheduling edge cases) that have no e2e equivalent yet — worth a look
+    before this ships, not a rebase-mechanics call.
+  - Fixed one bad auto-merge Git produced on its own (not a real conflict,
+    so it built silently and only surfaced via `pnpm typecheck`):
+    `SidebarContent.tsx` (renamed from `CalendarSidebar.tsx`) picked up an
+    `isMobile`-gated safe-area padding hunk from main's non-conflicting diff
+    context, but the redesign's `SidebarContent` has no `isMobile` in scope —
+    added `useMediaQuery(theme.breakpoints.down("sm"))` locally and removed
+    a resulting duplicate `p: 2` key.
+  - Verified: `pnpm typecheck && pnpm lint` clean (0 errors, same
+    pre-existing warnings). `pnpm test:e2e`: 45 passed, 1 skipped (same
+    baseline). `pnpm build` succeeds.
+
+- 2026-07-20 — F-VIEWS follow-up #2 — the actual root cause of the mobile layout complaints,
+  found by finally driving a real browser (`agent-browser`, mobile viewport 390×844) instead of
+  reasoning from screenshots: **`TopBar.tsx`'s mobile layout packed logo, date label, view
+  switcher, Today button, bell, and avatar into one non-wrapping flex row that is simply wider
+  than any phone viewport** — measured `scrollWidth: 591` vs `innerWidth: 390` before the fix.
+  This predates F-VIEWS (built in Phase 2, never manually verified on mobile — sandboxed
+  networking blocked it then too) but was surfaced by this phase's mobile month work and was
+  the real reason the header/grid looked "overflowing"/"carried forward" across every view: three
+  prior fixes this session (BottomSheet mount pattern, grid `minWidth:0`, scroll reset) were all
+  independently correct but were treating symptoms of this one root cause.
+  - Split `TopBar` into two rows on mobile: row 1 keeps logo/open-calendars/date/bell/avatar; the
+    Month/Week/Day `SegmentedControl` + Today button move to a new second row below it — matching
+    what mockup `09` (mobile month) actually specifies (segmented control + Today chip on their
+    own row under the main bar), not an invented layout.
+  - Added `MOBILE_TOPBAR_ROW2_HEIGHT` (48) alongside the existing `TOPBAR_HEIGHT` (64) export;
+    `WeekHeader`'s sticky `topOffset` now adds it on mobile so the week day-header still sticks
+    directly below the taller mobile header instead of being covered by it.
+  - Verified with real measurements, not screenshots: `document.documentElement.scrollWidth ===
+    window.innerWidth` (390) on Month/Week/Day at 390px after the fix (was 591 before); desktop
+    (1400px) screenshot confirms the single-row layout is unchanged. Also exercised the mobile
+    agenda `BottomSheet` end-to-end in the real browser — opens, shows the day's events, closes
+    cleanly with no leftover `document.body` style — confirming the earlier vaul mount-pattern fix
+    holds up outside of reasoning-from-screenshots.
+  - `pnpm typecheck && pnpm lint`: clean. `pnpm test:e2e`: 45 passed, 1 skipped (same baseline),
+    including the `mobile` project which exercises this exact TopBar.
+
+- 2026-07-20 — F-VIEWS follow-up #1 (post-session bug hunt with user) — three real bugs found via
+  live mobile testing, all fixed, e2e re-confirmed green (45 passed, 1 skipped):
+  1. **Removed the auto-scroll-to-8am effect** added earlier this session (`WeekView.tsx`/
+     `DayView.tsx`). It used `scrollIntoView({block:"start"})` on an hour-cell ref, but the app has
+     no internal scroll container for the hour grid — the whole document scrolls — so this scrolled
+     the *entire window* on every mount, independent of viewport width. Symptom reported by user:
+     "the header is introducing scroll" and a large excess scroll region past the mobile tab bar.
+     Not worth reintroducing without a real internal scroll container; dropped as a cosmetic nicety
+     that caused more harm than it added.
+  2. **`MonthView`'s mobile agenda `BottomSheet` was conditionally mounted/unmounted**
+     (`{mobileAgendaDay && <BottomSheet open ...>}`) instead of staying mounted with `open` toggled
+     — the wrong usage pattern for vaul (its body-scroll-lock cleanup runs on close, not on
+     unmount). Split into two states (`mobileAgendaDay` for content, `mobileSheetOpen` for
+     visibility) so `BottomSheet` renders once per mobile session and only toggles `open`, matching
+     `AppShell`'s existing (correct) pattern for the sidebar sheet.
+  3. **Grid day-columns had no `minWidth:0`** on `WeekView`'s/`DayView`'s flex/grid-item day
+     columns — the classic flexbox/grid "min-width: auto" trap: an `EventChip`'s nowrap title could
+     force its column wider than its track, cascading into real horizontal page overflow (user saw
+     only 3 of 7 month columns on screen, with a huge blank area). Added `minWidth:0` +
+     `overflow:"hidden"` to every day-column and to `EventChip`'s own title span (which had the same
+     bug one level down — the ellipsis span wasn't shrinking either).
+  4. Added a `useEffect` in `Calendar.tsx` resetting `window.scrollTo(0,0)` on `layout`/`date`
+     change — previously nothing reset scroll position between view switches, so bug #3's overflow
+     on one view was still visible (as leftover scroll offset) after switching to another view even
+     once the overflow itself was fixed elsewhere, matching the user's "carried forward into month
+     view" observation.
+  - Diagnosed collaboratively with the user via live devtools inspection (checked the vaul
+    Content's DOM parent — confirmed direct child of `<body>`, ruling out a transform-containing-
+    block theory — and viewport width at the reported breakpoint) rather than guessing blind; two
+    of the four fixes (`BottomSheet` mount pattern, grid `minWidth:0`) were identified by reasoning
+    from the app's actual layout architecture once screenshots narrowed down where the scroll was
+    coming from.
+
+- 2026-07-20 — F-VIEWS — Restyled Month/Week/Day per mockups `01,02,03,04,08,09,10`. No nostr
+  layer inputs (read-only views over existing stores, confirmed by user).
+  - **Scope decisions** (see `docs/REDESIGN_MASTER_PLAN.md` F-VIEWS section for the discussion):
+    quick-peek popover (mockup 02-B) and Month's day-agenda overflow popover (02-A) are **in**,
+    meta-only (no inline RSVP buttons/relay-status footer — those stay in the full modal until
+    F-EVENT-VIEW). Drag-to-move (02-C) is **deferred** to a later phase since it touches
+    write/republish logic, not just view rendering — the inert `DndContext`/commented
+    `useDraggable` scaffolding is untouched. Day view's persistent 400px detail rail (mockup 04)
+    is **out of scope** (overlaps F-EVENT-VIEW). Kept the full 24h Week/Day grid (mockups show
+    08:00–20:00) to avoid shifting `event-crud.spec.ts`'s `.nth(10)` hour-cell index — added an
+    auto-scroll-to-8am on mount instead (`scrollIntoView` on a ref'd hour cell; a naive
+    `scrollTo` on the grid container was tried first and silently did nothing, since the grid
+    isn't its own scroll container — the page itself scrolls).
+  - `EventChip` (`src/components/ui/EventChip.tsx`) extended with a `time` prop, an `sx` passthrough
+    (array-merged, so callers can override height/alignment for the absolute-positioned Week/Day
+    case), token-based radius, and `forwardRef` (needed to anchor the popover).
+  - New `src/utils/eventChipColor.ts`: extracted `useResolvedCalendarColor` out of
+    `CalendarEvent.tsx` (now shared by Month/Week/Day) plus a new plain-data
+    `resolveCalendarColor`/`getEventChipColor` pair — the plain form exists specifically so
+    Month's day-agenda popover can resolve colors for a whole list of events without calling a
+    hook inside `.map()`.
+  - New `src/hooks/useEventModal.ts`: one shared `{event, isOpen, open, close}` state instead of
+    each card owning its own `CalendarEventView` dialog state.
+  - New `src/components/ui/EventQuickPeek.tsx`: shared popover, `mode="event"` (title, time/
+    location, calendar+recurrence icon, read-only RSVP avatar stack + "N going" via the existing
+    `useEventRsvps` hook, "Open →" link) and `mode="agenda"` (Month's "+N more", lists the day's
+    events as `EventChip` rows, "Open day view →"). RSVP avatars use raw pubkeys for initials, not
+    resolved profile names/pictures — resolving per-avatar profile data would need a hook-per-item
+    (not callable from a flat `.map()`), and this is explicitly meta-only per the user's call, not
+    the full RSVP UI.
+  - `CalendarEventCard`/`AllDayEventChip` in `CalendarEvent.tsx` rewritten on `EventChip` +
+    `EventQuickPeek` + `useEventModal`, replacing their bespoke `Paper`/`Typography` markup and
+    `getColorScheme()` (deleted — its hardcoded `#e0e0e0`/`#999`/`#fff`/dashed-border styling had
+    no remaining callers once both were rewritten). Click now opens the quick-peek first, "Open"
+    opens the full modal — same interaction across all three views. **Dropped**: the invitation
+    dashed-border style and the device-source phone icon overlay (both were `getColorScheme`-only
+    nuances with no test coverage) — invitations/device events still render distinctly via
+    `EventChip`'s solid (non-public) variant, just without those two visual details.
+  - `MonthView.tsx` rewritten: events render as `EventChip` (was plain unclickable `Typography`,
+    silently truncated past 3 with no indicator — a real bug, now fixed with an explicit "+N more"
+    opening the day-agenda popover). Today badge was already free (`DateLabel`'s existing
+    `highlighted` IconButton variant, already used here). Mobile (`down('sm')`): dots instead of
+    chip text, tapping a day opens a bottom sheet with that day's agenda.
+  - **vaul replaces MUI Drawer in `BottomSheet.tsx`** (per your call): `src/components/ui/
+    BottomSheet.tsx` rewritten on `vaul`'s `Drawer.Root/Portal/Overlay/Content/Handle`, same
+    external props (`open`, `onClose`, `children`) so its existing 4 call sites (`Sidebar.tsx`,
+    `SidebarContent.tsx`, `AppShell.tsx`, `DevUiShowcase.tsx`) needed no changes. `vaul@1.1.2`
+    added as a dependency (confirmed React 19 peer support before adding).
+  - `WeekView.tsx`/`DayView.tsx`: hardcoded `#ddd`/`#eee`/`bgcolor="white"` replaced with
+    `divider`/`background.paper` theme references; added `data-testid="day-hour-cell"` to
+    WeekView's hour cells for parity with DayView (confirmed no spec depended on its absence).
+  - Added master-plan guardrail #4 addendum generalizing the sx-cleanup rule (prefer theme slot
+    overrides / local `styled()` over repeated inline `sx`) for all future phases, per your ask.
+  - Removed a stray `console.log("ALL_EVENTS", ...)` in `Calendar.tsx` found during exploration.
+  - **E2E regression found and fixed in the same change** (guardrail #2): quick-peek intercepting
+    the first click broke every spec that clicked an event expecting the full modal to open
+    directly. Fixed at the root — `e2e/web/helpers.ts`'s `openEventModal`/`openEventEditor`
+    (already the single shared helper for 4 of the 6 affected specs) now click through the
+    popover's "Open →" link. The other 2 specs (`event-duplicate.spec.ts`, `event-edit.spec.ts`)
+    had duplicated the same inline click-then-expect-dialog pattern instead of using the helper —
+    switched them onto `openEventModal` too, which incidentally de-duplicated that pattern rather
+    than adding a third copy of the fix.
+  - `pnpm typecheck && pnpm lint`: clean (0 errors; same pre-existing warnings). `pnpm test:e2e`:
+    45 passed, 1 skipped (same pre-existing `event-participants` fixme) — matching the Phase 0–3
+    baseline exactly, after the helper fix above. Not manually verified in a live browser this
+    session (same sandboxed-networking constraint as Phase 2); relied on the full Playwright pass
+    across chromium + mobile projects.
+
+- 2026-07-20 — Phase 3 — Built `src/nostr/` and drained `common/nostr.ts` (1350
+  lines), `common/nip59.ts`, `common/EventConfigs.ts`, and `common/calendarList.ts`
+  into it; all four deleted. Zero wire-format changes except the two pre-approved
+  bug fixes.
+  - `kinds.ts` (moved `EventKinds` verbatim), `core.ts` (`buildAndSign`, `makeDTag`,
+    `nextCreatedAt`, `publishSignedEvent`, `addGossipRelays` — kills the ~11
+    sign-and-hash copies and the d-tag/relay-hint idioms), `fetch.ts`
+    (`fetchLatest`/`fetchAll` over `collectOnce`, kills the 9 identical
+    `collectOnce`-fetch shells), `subscribe.ts` (`createSubscription` standing-
+    subscription factory: handle + start-guard + optional id-dedup Set).
+  - `crypto.ts`: single `getUserPublicKey`; NIP-59 gift wrap
+    (`wrapEvent`/`unwrapEvent`, moved from `nip59.ts`, dropping stray
+    `console.log("SIGNER-DECRYPT", ...)` debug lines but keeping the
+    `decryptGate` concurrency guard byte-for-byte — protects against duplicate
+    permission popups on external signers); two **deliberately distinct**
+    primitives instead of one merged pair, per investigation of the actual call
+    sites: `selfEncrypt`/`selfDecrypt` (conversation-key with a raw secret key
+    the caller already holds — private RSVPs, private calendar events,
+    scheduling-page viewKeys) vs `signerEncrypt`/`signerDecrypt` (asks the
+    logged-in user's own signer — calendar lists, scheduling-page keys, gift-wrap
+    seal/wrap layers). `fetchOwnSchedulingPageKeys` previously called
+    `signer.nip44Decrypt` directly, bypassing the concurrency gate — now routed
+    through `signerDecrypt`, closing that gap. Confirmed scheduling-page
+    viewKeys are deliberately raw hex (not nsec, unlike calendar-event/RSVP
+    viewKeys) — call sites keep decoding their own key format; the shared
+    primitives only take already-decoded `Uint8Array`.
+  - Domain modules built on the above: `events.ts`, `rsvp.ts`, `calendars.ts`
+    (from `calendarList.ts`), `busy.ts`, `relays.ts`, `profiles.ts`, `reports.ts`,
+    `schedulingKeys.ts`, `forms.ts`, `booking.ts`.
+  - **Bug fixes** (in `events.ts`'s `publishPublicCalendarEvent`): `["name", title]`
+    → `["title", title]`; the location loop's `["image", location]` →
+    `["location", location]` (confirmed via `utils/parser.ts` that the parser
+    already read both `title`/`name` and already treated `location` as its own
+    field — write-side-only fix, no migration needed).
+  - `subscribe.ts`'s factory applied to `stores/bookingRequests.ts`'s two
+    standing subscriptions (now in `nostr/booking.ts` as
+    `createBookingRequestsSubscription`/`createBookingResponsesSubscription`,
+    `dedupeById: true`) and to a newly-named `fetchSchedulingPage` in
+    `nostr/booking.ts` covering `BookingPage.tsx`'s inline
+    `dataLayer.observe`+decrypt effect (a 6th hand-rolled subscription found
+    during exploration, not in the plan's original list of 4).
+    `stores/invitations.ts`, `stores/schedulingPages.ts`, `stores/events.ts` keep
+    their existing bespoke dedup/batching logic (buffer+timer, createdAt-based
+    "newer wins") — deliberately not forced onto the factory, since their
+    semantics differ from the simple id-dedup shape.
+  - Moved `BookingPage.tsx`'s protocol code out: module-level `sendBookingRequest`,
+    the inline gift-wrap/gossip-relay/nip44-decrypt `useEffect`, and the
+    dTag/viewKey generation in `handleBookingSubmit` all now live in
+    `nostr/booking.ts` (`sendBookingRequest`, `fetchSchedulingPage`,
+    `createBookingIdentity`); the component no longer imports `dataLayer`,
+    `nip44`, or any crypto primitives directly.
+  - Deleted 3 confirmed-dead functions (zero callers anywhere, including
+    internally), per user confirmation: `wrapManyEvents`, `unwrapManyEvents`
+    (`nip59.ts`), `createDefaultCalendar` (`calendarList.ts`). Everything else
+    initially flagged (`getDetailsFromGiftWrap`, `fetchRelayLists`, nip59's
+    duplicate `getUserPublicKey`, `createRumor`/`createSeal`/`createWrap`,
+    `encryptCalendarList`/`decryptCalendarList`) turned out to be used
+    internally by other functions in the same file — kept, just made
+    module-private in their new home.
+  - Repointed all ~21 importers of `common/nostr`/`common/nip59`/
+    `common/EventConfigs`/`common/calendarList` (stores, components, hooks,
+    `dataLayer/relay.worker.ts`, `common/signer/index.ts`) to the new
+    `src/nostr/*` modules. Mechanical import-path swap; no component was
+    reclassified into container/presenter (that split is per-flow work, not
+    Phase 3 scope).
+  - Added `@typescript-eslint/no-restricted-imports` in `eslint.config.js`
+    barring `@formstr/local-relay` and raw `nip44` imports outside
+    `src/nostr/**`, `src/stores/**` (stores are explicitly allowed per D1 — "the
+    14 Zustand stores are reused as-is"), `src/dataLayer/**` (implements the
+    local-relay client itself), and `src/App.tsx` (pre-existing app-lifecycle
+    pause/resume wiring, out of scope). Type-only imports (e.g. `ObserveHandle`)
+    are exempt via `allowTypeImports`.
+  - `pnpm typecheck && pnpm lint`: clean (0 errors; same pre-existing warnings
+    as prior sessions). `pnpm test:e2e`: full suite green — 45 passed, 1 skipped
+    (same pre-existing `event-participants` fixme), matching the Phase 0–2
+    baseline exactly. Note: an early full-suite run in this session showed 11
+    failures, traced to a stale process squatting on port 5173 that Playwright's
+    `reuseExistingServer` silently reused instead of rebuilding — killing it and
+    rerunning with `CI=true` (forcing a fresh build) reproduced the clean
+    baseline; not a real regression.
+
+- 2026-07-19 — Phase 2 — Built the app shell and `src/components/ui/` primitives per D1/D3:
+  - Primitives: `SectionLabel` (wraps the theme's `overline` typography variant),
+    `SegmentedControl` (generic pill switch, used for the ViewSwitcher), `EventChip`
+    (public/private per `publicTint`/`calendarColors`, not yet wired into any view),
+    `AvatarStack` (not yet consumed by the shell), `RelayStatusDots`, `BottomSheet` (MUI
+    `Drawer anchor="bottom"`), `MiniCalendar` (wraps MUI's static `DateCalendar`, chosen over a
+    hand-built grid so day cells keep the `gridcell` a11y role the e2e suite already depends on).
+  - **Deviation from the mockups, by design:** the ViewSwitcher is a `SegmentedControl` pill
+    (3 always-visible radio options) instead of the old button+dropdown-menu pattern — this
+    matches what the mockup's TopBar literally shows. `navigation.spec.ts`/`mobile.spec.ts`
+    were rewritten accordingly (`getByRole("radio", ...)` instead of button→menuitem).
+  - **RelayStatusDots is a real, presentational component but not wired to live per-relay
+    connection state** — no such plumbing exists anywhere in the app (only a publish-scoped
+    status hook, `useRelayPublishStatus`). `useRelayStatusPlaceholder` reports every configured
+    relay as `"ok"`. Deferred; flagged in the hook's own comment.
+  - Search box in `TopBar` is rendered per the mockup (placeholder text, `⌘K` focuses it) but
+    **not wired to real search** — no search backend exists anywhere in the app; out of scope
+    for a shell phase.
+  - `AppShell.tsx` composes `TopBar` + `Sidebar` (desktop, `useMediaQuery(down("sm"))`, the same
+    breakpoint every other component already uses) + `MobileTabBar` (mobile) + the routed
+    content, owns the "new event" dialog (same `<CalendarEventEdit open event={null}
+    mode="create"/>` shape `WeekView`/`DayView` already use for cell-click creation) and the
+    mobile "open calendars" `BottomSheet`. `useKeyboardShortcuts` adds C/T/M/W/D/arrows/⌘K,
+    ignored while focus is in a text field.
+  - `SidebarContent.tsx` is shared verbatim between the desktop rail (`ui/Sidebar.tsx`) and the
+    mobile `BottomSheet` — one component, not two. It absorbs `CalendarSidebar.tsx`'s calendar
+    list (`data-testid="calendar-row"`/`"calendar-visibility-checkbox"` preserved) and
+    `CalendarManageDialog` wiring, `SchedulingPagesList` for "BOOKING PAGES", and a Settings
+    link + theme toggle (replaces `TempThemeToggle`, deleted). **Kept beyond the mockup, to avoid
+    regressing existing features:** a second footer row with the About/Privacy/Contact links and
+    `ICSUpload` that used to live in `Header`/`CalendarSidebar` — the mockup's sidebar footer
+    only shows Settings + theme toggle.
+  - `useCalendarTopBarProps`/`SidebarContent` derive the visible date **from the pathname
+    directly** (new `getDateFromPathname`/`getLayoutFromPathname` in `dateBasedRouting.ts`), not
+    via `useParams()`/`useLayout()`/`useDateWithRouting()` — those depend on `useParams()`, which
+    only sees params from the closest *matched* `<Route>`, and `TopBar`/`Sidebar` are mounted in
+    `AppShell` **above** `<Routes>`. Missed this on the first pass (deep-linking to `/d/...` fell
+    back to "today" everywhere in the shell); fixed before landing.
+  - Deleted `Header.tsx`, `CalendarHeader.tsx`, `CalendarSidebar.tsx`, `theme/TempThemeToggle.tsx`.
+    Five pages (`BookingPage`, `SchedulingPageEdit`, `NotificationEventPage`,
+    `BookingNotifications`, `ViewEventPage`) each rendered their own extra `<Header/>` + spacer as
+    a loading/error/standalone-page pattern — now redundant since `AppShell` wraps all of
+    `<Routing/>` globally, so all five were stripped down to just their content `Box`.
+    `CalendarHeader`'s in-view row is gone; `WeekView`'s `WeekHeader` (the weekday header strip)
+    moved to render directly from `Calendar.tsx` instead, with its `topOffset` (`StyledSecondaryHeader`)
+    reset from `40+8` to `0` since there's no more in-flow `CalendarHeader` box above it — the new
+    global `TopBar` is a constant `TOPBAR_HEIGHT = 64` on all breakpoints, so
+    `StyledComponents.tsx`'s old mobile-portrait/landscape (56/48) sticky offsets collapsed to one
+    constant `64 + topOffset` too.
+  - Added `/settings` route (`SettingsPage.tsx`, intentionally empty — real content is F-SET) and
+    a `/dev/ui` route (gated by `import.meta.env.DEV`, no prior precedent for that idiom in the
+    repo) showing each new primitive for light/dark eyeballing.
+  - `e2e/web/helpers.ts`: `openSidebar`/`createCalendarViaSidebar`/`openBookingsViaSidebar` no
+    longer click a hamburger or press Escape to close a drawer — the desktop Sidebar has no
+    open/close state anymore. This helper is shared by `calendar-management`, `respond`, `rsvp`,
+    and `booking` specs, all of which needed no other changes.
+  - `pnpm typecheck && pnpm lint`: clean (0 errors; same 5 pre-existing warnings, confirmed
+    unaffected by diffing against a stash). `pnpm test:e2e`: full suite green — 45 passed, 1
+    skipped (pre-existing `event-participants` fixme, untouched).
+  - Not manually verified in a live browser this session (sandboxed environment blocks
+    localhost networking for a manual check) — verification relied on the full Playwright e2e
+    pass across both the `chromium` and `mobile` projects, which exercises the shell end-to-end
+    (desktop nav, mobile tab bar routing, the calendars bottom sheet, dark mode via existing
+    theme-toggle-dependent specs).
+
+- 2026-07-19 — Phase 1 — Built `src/theme/` per D1, transcribing tokens from
+  `designs/redesign/00-design-system.html` (decoded the `__bundler` template payload):
+  - `tokens.ts` — light/dark neutrals, border/text scales, calendar colors (Personal/Work/
+    Family/Meetups/Deadlines), accent presets (Ember/Ocean/Forest/Grape/Rose/Ink — "Ember" is
+    the design system's literal default hex `#111111`, not orange, despite the name; transcribed
+    as shown, not corrected), typography scale, radius scale (6/10/12/14/16), button heights,
+    shadows, 8pt spacing, and a `getContrastText` helper for the accent CSS-var override.
+  - `theme.ts` — `createTheme({ cssVariables: { colorSchemeSelector: "class" }, colorSchemes:
+    { light, dark } })` with component slot overrides for Button, Paper/Card, Dialog, Popover/
+    Menu, OutlinedInput, Chip, Switch, Checkbox, Tabs per the mockup specs (border-only cards,
+    1.5/1.8px border widths, 40px buttons, no ripple, tooltips with arrows).
+  - `AppThemeProvider.tsx` — wraps `ThemeProvider` (`defaultMode="system"`), syncs
+    `stores/settings.ts`'s `themeMode` into MUI's `useColorScheme().setMode` and the chosen
+    `accent` preset into `--cal-accent` / `--mui-palette-primary-main` /
+    `--mui-palette-primary-contrastText` at runtime, per D1's "override CSS variables" approach.
+  - `stores/settings.ts` — added `themeMode: "light"|"dark"|"system"` and `accent` fields;
+    existing users' stored settings (pre-dating these fields) are backfilled via a default-spread
+    rather than `getItem`'s plain default, since `getItem` doesn't merge partial stored objects.
+  - Self-hosted Inter via `@fontsource/inter` (400/500/600/700/800) imported in `main.tsx`;
+    removed the old Menlo `@font-face` rules from `main.css` and deleted the now-unused
+    `public/fonts/Menlo-*.ttf` files.
+  - Wired `AppThemeProvider` into `App.tsx` in place of the old inline `ThemeProvider`/
+    `CssBaseline`/`theme.ts`; deleted `src/theme.ts`.
+  - Added `TempThemeToggle.tsx` — fixed-position dark/light icon button (Phase 1 exit criterion
+    allows a temporary toggle; explicitly commented as removable once F-SET ships).
+  - Found and fixed one regression during manual dark-mode verification (screenshotted via a
+    throwaway Playwright script, not committed): `Header.tsx`'s `AppBar` hardcoded
+    `backgroundColor: "white"` via inline `style`, which made its icons invisible in dark mode
+    (icon color follows theme text, background didn't). Changed to
+    `sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}` —
+    a 1-line fix scoped to un-breaking dark mode, not a Phase 2 shell rebuild.
+  - Did not touch Menu/Radio component overrides beyond Checkbox (radio has no MUI slot override
+    needed — default styling reads acceptably against the new tokens).
+  - `pnpm typecheck && pnpm lint`: clean (0 errors; only pre-existing `react-hooks/exhaustive-deps`
+    / `no-explicit-any` warnings untouched by this session). `pnpm test:e2e`: 45 passed, 1 skipped
+    (same pre-existing `event-participants` fixme) — no spec changes needed, DOM/selectors
+    unaffected by the theme swap.
+
+- 2026-07-19 — Phase 0 — Ran `pnpm test:e2e` for a green baseline: 45 passed, 1 skipped
+  (`event-participants` is `test.fixme`, pre-existing failure unrelated to this work — "Bob" list
+  item never appears; not touched). Audited all 16 specs for style/DOM-coupled selectors (grep for
+  `.Mui*`/CSS-class/`nth()` locators): found one genuine risk in `scheduling-builder.spec.ts`,
+  which located a booking-page day column via `.locator(".MuiPaper-root").filter({ hasText: ... })`
+  — brittle against the F-BOOK-PUBLIC redesign. Added `data-testid="booking-day-column"` +
+  `data-date="YYYY-MM-DD"` to the day `<Paper>` in `src/components/BookingPage.tsx` (matches the
+  existing `data-date` convention in `WeekView.tsx`/`DayView.tsx`) and rewrote the spec to select
+  by that attribute. The remaining ~230 `getByRole`/`getByText` selectors across specs are
+  accessible-name/content based (button roles, visible date text) — left as-is; these are
+  Playwright-idiomatic and any that break on intentional copy/DOM changes get fixed spec-by-spec
+  per flow phase (guardrail #2), not preemptively. Full suite re-run green after the change: 45
+  passed, 1 skipped. Progress doc already existed from a prior session — no changes needed there
+  beyond this entry.

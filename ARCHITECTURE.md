@@ -852,16 +852,37 @@ User's custom relay list takes full precedence over defaults.
    - Add/remove relays, reset to defaults
    - Save → `useRelayStore.setRelays(localRelays)` + `publishRelayList(localRelays)` (kind 10002)
 
-### NostrRuntime — the communication layer (`src/common/nostrRuntime/index.ts`)
+### The local relay — the communication layer (`@formstr/local-relay` + `src/dataLayer/`)
 
-All relay communication goes through a global singleton (`line 384: export const nostrRuntime = createNostrRuntime(new SimplePool())`):
+The app owns **no sockets**. All networking runs inside a Web Worker "local relay"
+(`@formstr/local-relay`): the app only **declares interests** (`dataLayer.observe`)
+and **publishes** (`dataLayer.publishEvent`); the worker owns every connection
+decision, dedupes subscriptions by filter hash, outbox-routes per NIP-65, persists
+events to IndexedDB, and re-delivers publishes via a durable auto-retry outbox.
 
-- **SimplePool** (from nostr-tools) — manages WebSocket connections to relays
-- **EventStore** — in-memory storage with indexes by ID, kind, pubkey, and d-tag. Handles kind 5 deletion event enforcement
-- **SubscriptionManager** — deduplicates subscriptions with identical filters + relays. Reference counts subscriptions for cleanup
-- **subscribe()** (`line 92-142`) — first delivers cached events from EventStore, then opens a network subscription
-- **fetchOne()** / **querySync()** — one-shot queries with 10s timeout fallback
-- **fetchBatched()** — batches multiple `fetchOne()` calls made within 50ms into a single relay query (reduces round-trips)
+App-side wiring lives in `src/dataLayer/`:
+
+- **`bootstrap.ts`** — spawns the worker, wires NIP-42 AUTH signing to `signerManager`,
+  feeds the user's relay list as a routing-policy input (`setUserRelays`), tracks the
+  active account, and pauses/resumes sockets on page visibility. `restartDataLayerWiped()`
+  kills the worker and wipes its IndexedDB on logout.
+- **`relay.worker.ts`** — the worker entry: `RelayService` + IndexedDB storage with a
+  custom prune policy protecting every calendar-domain kind from TTL eviction.
+- **`collect.ts`** — `collectOnce(filters)`: a one-shot snapshot over streaming
+  `observe`, settling on a quiet window (the replacement for `querySync`; the local
+  EOSE only means "cache replay done", not upstream completion).
+- **`resilientObserve.ts`** — re-declares every live interest when the worker can newly
+  serve data (IndexedDB hydration finished, worker restarted after mobile suspend).
+- **`legacyTombstones.ts`** — secluded backward-compat decorator enforcing kind-5
+  `a`-tag deletions and kind-84 participant removals (the worker's store only enforces
+  kind-5 `e`-tags).
+
+Two sanctioned exceptions bypass the worker: NIP-05 resolution (plain HTTPS) and the
+NIP-46 bunker transport (a dedicated `SimplePool` inside `src/common/signer/`).
+
+Known upstream quirk (local-relay 0.4.2): the outbox fetch path drops tag filters
+(`#d`, `#a`, …) from the wire REQ for author-scoped interests — never combine
+`authors` + tag filter + `limit` in one filter, or the relay caps to the wrong events.
 
 ---
 

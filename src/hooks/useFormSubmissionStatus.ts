@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchUserFormResponse } from "../common/nostr";
+import { fetchUserFormResponse } from "../nostr/forms";
 import { getFormAddress } from "../utils/formLink";
 import type { Event as NostrEvent } from "nostr-tools";
 import { signerManager } from "../common/signer";

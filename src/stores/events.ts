@@ -20,7 +20,7 @@ import {
   fetchCalendarEvents,
   fetchPrivateCalendarEvents,
   viewPrivateEvent,
-} from "../common/nostr";
+} from "../nostr/events";
 import { isValid } from "date-fns";
 import {
   appendOne,
@@ -28,7 +28,7 @@ import {
   normalize,
   removeOne,
 } from "@voiceflow/normal-store";
-import { nostrEventToCalendar } from "../utils/parser";
+import { getDTag, nostrEventToCalendar } from "../utils/parser";
 import type { ICalendarEvent } from "../utils/types";
 import {
   scheduleEventNotifications,
@@ -47,8 +47,7 @@ import {
   getCalendarEventCoordinate,
   parseEventRef,
 } from "../utils/calendarListTypes";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
-import { getDTag } from "../common/nostrRuntime/utils/helpers";
+import type { ObserveHandle } from "@formstr/local-relay";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
 import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
@@ -98,7 +97,7 @@ const syncEventNotifications = async (
   }
 };
 
-let publicSubscription: SubscriptionHandle | undefined;
+let publicSubscription: ObserveHandle | undefined;
 
 export { ICalendarEvent };
 
@@ -159,22 +158,29 @@ const processPrivateEvent = (
     return;
   }
 
+  // The private-events observe re-emits the same cached event on every cache
+  // replay (re-subscribe, worker restart), so only touch state when this is a
+  // genuinely new or newer version — otherwise we'd re-schedule notifications
+  // and rewrite storage on every replay.
+  let changed = false;
   if (
     !isValid(new Date(parsedEvent.begin)) ||
     !isValid(new Date(parsedEvent.end))
   ) {
     console.warn("invalid date", parsedEvent, event);
-  } else {
-    if (store.allKeys.includes(parsedEvent.id)) {
-      const previousEvent = store.byKey[parsedEvent.id];
-      if (parsedEvent.createdAt > previousEvent.createdAt) {
-        store = removeOne(store, parsedEvent.id);
-        store = appendOne(store, parsedEvent.id, parsedEvent);
-      }
-    } else {
+  } else if (store.allKeys.includes(parsedEvent.id)) {
+    const previousEvent = store.byKey[parsedEvent.id];
+    if (parsedEvent.createdAt > previousEvent.createdAt) {
+      store = removeOne(store, parsedEvent.id);
       store = appendOne(store, parsedEvent.id, parsedEvent);
+      changed = true;
     }
+  } else {
+    store = appendOne(store, parsedEvent.id, parsedEvent);
+    changed = true;
   }
+  if (!changed) return;
+
   void syncEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
   saveEventsToStorage(updatedEvents);
@@ -184,10 +190,12 @@ const processPrivateEvent = (
   });
 };
 
-/**
- * Tracks which event IDs have already been fetched to avoid duplicate requests.
- */
-const processedEventIds = new Set<string>();
+// The single standing interest in the user's private calendar events, keyed by
+// the set of visible event refs. Re-declared (never leaked) whenever that set
+// changes, so removing an event from a calendar drops it from the interest and
+// a later cache replay can't resurrect it.
+let privateSubscription: ObserveHandle | undefined;
+let privateSubKey = "";
 
 export const useTimeBasedEvents = create<{
   events: ICalendarEvent[];
@@ -260,7 +268,9 @@ export const useTimeBasedEvents = create<{
     void clearNotificationPreference(id);
   },
   resetPrivateEvents: () => {
-    processedEventIds.clear();
+    privateSubscription?.unobserve();
+    privateSubscription = undefined;
+    privateSubKey = "";
     set(({ events }) => {
       const publicEvents = events.filter((evt) => !evt.isPrivateEvent);
       saveEventsToStorage([]);
@@ -288,6 +298,13 @@ export const useTimeBasedEvents = create<{
     }
   },
   clearCachedEvents: async () => {
+    // Drop the standing interests — the relay worker is restarted on logout,
+    // so stale handles would block the re-subscribe guards after re-login.
+    publicSubscription?.unobserve();
+    publicSubscription = undefined;
+    privateSubscription?.unobserve();
+    privateSubscription = undefined;
+    privateSubKey = "";
     await removeSecureItem(EVENTS_STORAGE_KEY);
     set({ events: [], eventById: {} });
   },
@@ -323,15 +340,12 @@ export const useTimeBasedEvents = create<{
   },
 
   /**
-   * Fetches private events from calendar list references.
-   *
-   * Instead of subscribing to gift wraps, this reads event refs from
-   * visible calendar lists and fetches each event by its d-tag.
-   *
-   * Event refs are split into two groups:
-   * - Non-recurring: filtered by time range (-14/+28 days)
-   * - Recurring (isRecurring=true): always fetched regardless of time range,
-   *   because old recurring events may have occurrences in the current window
+   * Declares a single standing interest in the user's private calendar events,
+   * derived from the event refs of every visible calendar list. The relay
+   * worker serves them from cache and keeps them warm; the interest is keyed by
+   * the visible set, so removing an event from a calendar drops its d-tag from
+   * the filter and the worker stops delivering it — a later cache replay can
+   * never resurrect it.
    */
   fetchPrivateEvents(customTimeRange) {
     const timeRange = getTimeRange(customTimeRange);
@@ -340,7 +354,12 @@ export const useTimeBasedEvents = create<{
       .calendars.filter((c) => c.isVisible);
     const visibleRefs = visibleCalendars.flatMap((c) => c.eventRefs);
 
-    if (visibleRefs.length === 0) return;
+    if (visibleRefs.length === 0) {
+      privateSubscription?.unobserve();
+      privateSubscription = undefined;
+      privateSubKey = "";
+      return;
+    }
 
     // Map ref coordinate (ref[0]) → calendarId
     const refToCalendarId = new Map<string, string>();
@@ -350,8 +369,7 @@ export const useTimeBasedEvents = create<{
       }
     }
 
-    // Parse refs and split into recurring vs non-recurring
-    const eventIdsToFetch: string[] = [];
+    const eventIds: string[] = [];
     const kinds = new Set<number>();
     const authorPubkeys = new Set<string>();
     const hintRelays = new Set<string>();
@@ -362,11 +380,7 @@ export const useTimeBasedEvents = create<{
 
     for (const ref of visibleRefs) {
       const parsed = parseEventRef(ref);
-
-      // Skip already-processed events
-      if (processedEventIds.has(parsed.eventDTag)) continue;
-
-      eventIdsToFetch.push(parsed.eventDTag);
+      eventIds.push(parsed.eventDTag);
       authorPubkeys.add(parsed.authorPubkey);
       kinds.add(parsed.kind);
       if (parsed.relayUrl) hintRelays.add(parsed.relayUrl);
@@ -377,44 +391,40 @@ export const useTimeBasedEvents = create<{
       });
     }
 
-    if (eventIdsToFetch.length === 0) return;
+    // Only re-declare when the visible set actually changed — this method is
+    // called on every calendars/visibility change.
+    const key = eventIds.slice().sort().join(",");
+    if (key === privateSubKey && privateSubscription) return;
+    privateSubscription?.unobserve();
+    privateSubKey = key;
 
-    // Fetch all matching events in a single subscription, using stored relay
-    // hints first so events are retrieved from where they were published.
-    fetchPrivateCalendarEvents(
+    privateSubscription = fetchPrivateCalendarEvents(
       {
-        eventIds: eventIdsToFetch,
+        eventIds,
         authors: Array.from(authorPubkeys),
         kinds: Array.from(kinds),
         relays: hintRelays.size > 0 ? Array.from(hintRelays) : undefined,
       },
       (event) => {
         const dTag = getDTag(event);
-        if (!dTag) {
-          return;
-        }
         const meta = dTag ? viewKeyMap.get(dTag) : undefined;
-        if (meta) {
-          if (meta.viewKey) {
-            const decrypted = viewPrivateEvent(event, meta.viewKey);
-            if (decrypted) {
-              processPrivateEvent(
-                decrypted,
-                timeRange,
-                meta.viewKey,
-                meta.calendarId,
-                meta.relayUrl,
-              );
-            }
-          }
-          processedEventIds.add(dTag);
+        if (!meta || !meta.viewKey) return;
+        const decrypted = viewPrivateEvent(event, meta.viewKey);
+        if (decrypted) {
+          processPrivateEvent(
+            decrypted,
+            timeRange,
+            meta.viewKey,
+            meta.calendarId,
+            meta.relayUrl,
+          );
         }
       },
     );
   },
 
   /**
-   * Fetches public calendar events from relays via nostrRuntime.
+   * Observes public calendar events through the local relay.
    */
   fetchEvents: (customTimeRange) => {
     if (publicSubscription) {

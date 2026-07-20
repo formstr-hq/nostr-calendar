@@ -52,6 +52,34 @@ export function getDateFromRoute(params: CalendarRouteParams): Dayjs {
   return dayjs();
 }
 
+/**
+ * Layout/date derived straight from a pathname string via useLocation(),
+ * rather than useParams(). Needed by components mounted above <Routes>
+ * (the shell — TopBar, Sidebar) since useParams() only sees the params of
+ * the closest matched <Route>, which doesn't include anything above it.
+ */
+export function getLayoutFromPathname(pathname: string): Layout {
+  if (pathname.startsWith("/m")) return "month";
+  if (pathname.startsWith("/d")) return "day";
+  return "week";
+}
+
+export function getDateFromPathname(pathname: string): Dayjs {
+  const day = pathname.match(/^\/d\/(\d+)\/(\d+)\/(\d+)/);
+  if (day) {
+    return getDateFromRoute({ year: day[1], month: day[2], day: day[3] });
+  }
+  const month = pathname.match(/^\/m\/(\d+)\/(\d+)/);
+  if (month) {
+    return getDateFromRoute({ year: month[1], monthNumber: month[2] });
+  }
+  const week = pathname.match(/^\/w\/(\d+)\/(\d+)/);
+  if (week) {
+    return getDateFromRoute({ year: week[1], weekNumber: week[2] });
+  }
+  return dayjs();
+}
+
 export function getRouteFromDate(date: Dayjs, type: Layout): string {
   let year = date.year();
 
