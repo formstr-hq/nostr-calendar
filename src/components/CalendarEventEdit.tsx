@@ -653,28 +653,28 @@ export function CalendarEventEdit({
         );
       }
 
-      if (mode === "create" && isPrivate) {
-        await cancelEventNotifications(savedEvent.id);
-        useNotifications.getState().removeNotifications(savedEvent.id);
+      // Preferences are persisted after the event store update. Reconcile once
+      // more here so iOS uses the newly saved offsets for creates and edits.
+      await cancelEventNotifications(savedEvent.id);
+      useNotifications.getState().removeNotifications(savedEvent.id);
 
-        const calendarPreference = calendars.find(
-          (calendar) => calendar.id === selectedCalendarId,
-        )?.notificationPreference;
+      const calendarPreference = calendars.find(
+        (calendar) => calendar.id === selectedCalendarId,
+      )?.notificationPreference;
 
-        if (
-          shouldScheduleNotifications(
-            eventToSave.notificationPreference,
-            calendarPreference,
-          )
-        ) {
-          const notifications = await scheduleEventNotifications({
-            ...savedEvent,
-            calendarId: selectedCalendarId,
-          });
-          useNotifications
-            .getState()
-            .setNotifications(savedEvent.id, notifications);
-        }
+      if (
+        shouldScheduleNotifications(
+          savedEvent.notificationPreference,
+          calendarPreference,
+        )
+      ) {
+        const notifications = await scheduleEventNotifications({
+          ...savedEvent,
+          calendarId: selectedCalendarId,
+        });
+        useNotifications
+          .getState()
+          .setNotifications(savedEvent.id, notifications);
       }
 
       // Public busy list maintenance:

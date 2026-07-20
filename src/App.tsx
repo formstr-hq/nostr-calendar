@@ -139,8 +139,8 @@ function Application() {
     });
   }, [navigate]);
 
-  // Android's worker owns scheduling, but notification permission can only be
-  // requested while the foreground app is active.
+  // Native background schedulers do not prompt; notification permission must
+  // be requested while the foreground app is active.
   useEffect(() => {
     if (!isNative || !user || !isInitialized) return;
     void requestNotificationPermission();
