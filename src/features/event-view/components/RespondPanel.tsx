@@ -11,27 +11,26 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { FormattedMessage, useIntl } from "react-intl";
+import { useIntl } from "react-intl";
 import { generateSecretKey } from "nostr-tools";
 import { bytesToHex } from "nostr-tools/utils";
-import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
-import { signerManager } from "../common/signer";
-import { buildEventRef } from "../utils/calendarListTypes";
-import type { ICalendarEvent } from "../utils/types";
-import { useCalendarLists } from "../stores/calendarLists";
-import { useInvitations } from "../stores/invitations";
-import { useTimeBasedEvents } from "../stores/events";
-import { useUser } from "../stores/user";
+import { useAcceptWithFormsFlow } from "../../../hooks/useAcceptWithFormsFlow";
+import { signerManager } from "../../../common/signer";
+import { buildEventRef } from "../../../utils/calendarListTypes";
+import type { ICalendarEvent } from "../../../utils/types";
+import { useCalendarLists } from "../../../stores/calendarLists";
+import { useInvitations } from "../../../stores/invitations";
+import { useTimeBasedEvents } from "../../../stores/events";
+import { useUser } from "../../../stores/user";
 import {
   useBusyList,
   getBusyListDefaultOptIn,
   setBusyListDefaultOptIn,
-} from "../stores/busyList";
-import { isBusyListRangeSupportedForEvent } from "../utils/busyList";
-import { CalendarListSelect } from "./CalendarListSelect";
-import { FormAttachmentRow } from "./FormAttachmentRow";
-import { FormFillerDialog } from "./FormFillerDialog";
-import { Participant } from "./Participant";
+} from "../../../stores/busyList";
+import { isBusyListRangeSupportedForEvent } from "../../../utils/busyList";
+import { CalendarListSelect } from "../../../components/CalendarListSelect";
+import { FormAttachmentRow } from "../../../components/FormAttachmentRow";
+import { FormFillerDialog } from "../../../components/FormFillerDialog";
 
 export function RespondPanel({ event }: { event: ICalendarEvent }) {
   const intl = useIntl();
@@ -239,34 +238,9 @@ export function RespondPanel({ event }: { event: ICalendarEvent }) {
           p: 1.5,
         }}
       >
-        <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
-          <Typography
-            variant="body1"
-            color="text.primary"
-            sx={{
-              display: "flex",
-              gap: "4px",
-              alignItems: "center",
-            }}
-            component="span"
-          >
-            <FormattedMessage
-              id={
-                event.isInvitation
-                  ? "invitation.invitedBy"
-                  : "invitation.createdBy"
-              }
-              values={{
-                participant: (
-                  <Participant pubKey={event.user} isAuthor={false} />
-                ),
-              }}
-            />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {intl.formatMessage({ id: "event.notInCalendar" })}
-          </Typography>
-        </Box>
+        <Typography variant="body2" color="text.secondary">
+          {intl.formatMessage({ id: "event.notInCalendar" })}
+        </Typography>
         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
           <Box sx={{ flexGrow: 1, maxWidth: 400 }}>
             <CalendarListSelect

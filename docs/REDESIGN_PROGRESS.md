@@ -9,20 +9,178 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 | Phase 2 — Shell & primitives | done | 2026-07-19 | `AppShell`/`TopBar`/`Sidebar`/`MobileTabBar` built, `Header`/`CalendarSidebar`/`CalendarHeader`/`TempThemeToggle` deleted |
 | Phase 3 — Nostr consolidation | done | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted |
 | F-VIEWS | done | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred |
-| F-EVENT-VIEW | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-EVENT-VIEW | done | 2026-07-21 | Decomposed into `src/features/event-view/`, full RSVP UI, lazy participant/profile loading, delete/duplicate restyle. **Design-fidelity pass 2026-07-21**: exact match to mockups 02/12, full-detail sections ported from 20/21 (banner, chips, location card, host row, add-to-calendar), mobile quick-peek removed in favor of the full bottom sheet |
 | F-EVENT-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
 | F-LOGIN | unblocked (0–3 done) | | |
 | F-SET | unblocked (0–3 done) | | nostr inputs: not provided; `/settings` route is an empty placeholder |
-| F-NOTIF | unblocked (0–3 done) | | nostr inputs: not provided (1052→1059 decision) |
+| F-NOTIF | unblocked (0–3 done) | | nostr inputs: not provided (1052→1059 decision); "Message host" stays unbuilt until this is resolved |
 | F-CAL-MGMT | unblocked (0–3 done) | | nostr inputs: not provided |
 | F-BOOK-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
 | F-BOOK-INBOX | unblocked (0–3 done) | | nostr inputs: not provided |
 | F-BOOK-PUBLIC | unblocked (0–3 done) | | nostr inputs: not provided |
-| F-EVENT-LINK | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-EVENT-LINK | mostly done via F-EVENT-VIEW | 2026-07-21 | `ViewEventPage` shares `CalendarEventView`, so the 2026-07-21 design-fidelity pass carried its banner/chips/sections styling here too (user's explicit choice). Still open: guest/unauthenticated RSVP nostr-layer decision, "Message host", any F-EVENT-LINK-specific polish beyond what F-EVENT-VIEW needed |
 
 ## Session log
 
 <!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-21 — F-EVENT-VIEW design-fidelity pass — Closed the gap between the
+  prior session's structural decomposition and the actual mockups. Scope:
+  exact match to `02-month-interactions` (desktop quick-peek) and
+  `12-mobile-event-details` (mobile full sheet), full-detail sections ported
+  from `20-event-link-desktop`/`21-event-link-mobile`, mobile quick-peek
+  removed entirely in favor of opening the full sheet directly. **Confirmed
+  deviations** (user-approved, all intentional): location shown as a plain
+  string (no map thumbnail/geocoding — `EventLocationCard` adds a
+  maps-search "Directions" link built from the text, not a resolved
+  address), no timezone label anywhere (already implicit — `TimeRenderer`
+  only ever formatted in local time), description kept in its existing
+  Markdown rendering (not in any of the four mockups, retained anyway),
+  relay/publish-status footer removed (`EventRsvpSection`'s
+  `RelayStatusDots` block deleted), and the mockups' "Message [host]"
+  button omitted entirely — there is no DM/messaging feature anywhere in
+  this codebase (no NIP-17 send flow), and F-NOTIF's gift-wrap kind
+  decision is still unresolved, so a real button would need protocol
+  work out of scope for a view-layer pass.
+  - **New components** (`src/features/event-view/components/`):
+    `EventBanner` (full-width banner, image or placeholder, optional
+    overlaid actions for the mobile sheet), `EventChipsRow`
+    (public/private + calendar-name + "in your calendar", derived from
+    existing `isPrivateEvent`/`findCalendarForEvent` state, no new nostr
+    calls), `EventLocationCard`, `EventHostRow` (always-visible "Hosted by
+    X", reuses `Participant`), `EventAddToCalendarButton` (wraps the
+    existing `exportICS`; there's no native calendar-insert API — Android's
+    `DeviceCalendar` plugin is read-only — so ".ics export" *is* "add to
+    calendar" here, per mockup 12's literal "Add to device calendar"
+    wording, which is also what avoided a button-label collision with
+    `RespondPanel`'s unrelated "Add to Calendar" accept-into-my-calendar
+    button — see gotcha below).
+  - **New asset**: `src/components/ui/EventBannerPlaceholder.tsx` — calm
+    generic banner for imageless events, inline SVG (not a static file) so
+    it can react to live theme state. Deliberately built as a React
+    component using `useColorScheme()` + `theme/tokens.ts`
+    (`lightTokens`/`darkTokens`), not `theme.palette.mode` — this app
+    themes via MUI CSS variables (`colorSchemeSelector: "class"`, see
+    `theme.ts`), under which `theme.palette.*` reflects the *static
+    default* scheme, not the live toggle. `EventChip.tsx` already had to
+    work around this the same way (`publicTint` via `useColorScheme`); a
+    first cut of the placeholder used `theme.palette.mode` directly and
+    rendered a bright white gradient in dark mode until live agent-browser
+    QA caught it — screenshotting light AND dark before calling a
+    theme-dependent visual "done" is the actual lesson here, not just this
+    one component.
+  - **Mobile bottom-sheet chrome**: `CalendarEventView`'s `display="modal"`
+    branch now renders `BottomSheet` (vaul) on mobile instead of a
+    fullScreen MUI `Dialog` — the title/chips moved into the shared body
+    (under the banner) for both mobile and desktop so there's no duplicate
+    title row; desktop's `Dialog` keeps an icon-only header bar
+    (`EventActionsBar`, unchanged) above the body, mobile overlays the same
+    `EventActionsBar` on the banner's top-right corner with a pill backdrop
+    for legibility over photos. `CalendarEventCard`/`AllDayEventChip` now
+    check `useMediaQuery` and skip `EventQuickPeek` on mobile entirely,
+    calling `modal.open(event)` directly; `EventQuickPeek`'s now-dead mobile
+    `BottomSheet` render branch was deleted (Month view's mobile day-agenda
+    flow already bypassed quick-peek before this session, so it needed no
+    changes). `EventQuickPeek`'s desktop popover gained an inline
+    Yes/Maybe/No RSVP `ButtonGroup` (mockup 02 shows this; the prior
+    session's "meta-only, no inline RSVP" note was itself a deliberate
+    scope-cut for that session, not a permanent constraint).
+  - **e2e regressions found and fixed in the same change**: (1) the new
+    "Add to device calendar" button's original label ("Add to calendar")
+    case-insensitively collided with `RespondPanel`'s pre-existing "Add to
+    Calendar" button under Playwright's `getByRole` name matching — one
+    failing assertion cascaded into stray test-event pollution that broke
+    three unrelated specs via retries; fixed by renaming to "Add to device
+    calendar" (matches mockup 12's literal wording anyway). (2)
+    `EventChipsRow`'s new calendar-name chip duplicated text
+    `calendar-management.spec.ts` was asserting via a bare `getByText`,
+    an intentional-per-guardrail-#2 DOM change — added
+    `data-testid="calendar-management-current-name"` to
+    `EventCalendarListManagement`'s name `Typography` and scoped the test
+    to it instead of the now-ambiguous text.
+  - `pnpm typecheck`/`pnpm lint`: clean except the same pre-existing
+    unrelated `StyledComponents.tsx` `theme.vars` error. `pnpm test:e2e`:
+    45 passed, 1 skipped (same pre-existing `event-participants` fixme).
+  - Manually verified live via `agent-browser` against `pnpm dev`: created a
+    public event with a banner image and a private event with none, checked
+    the desktop quick-peek (inline RSVP, no relay footer), the full desktop
+    dialog (chips, location card, description, host row, RSVP, add-to-
+    calendar), the mobile bottom sheet end-to-end (tap → full sheet
+    directly, no intermediate peek), the standalone public page
+    (`/event/:naddr`, confirms it inherited the same styling per this
+    session's explicit scope choice), and both banner states in light AND
+    dark mode (this is where the placeholder dark-mode bug above was
+    caught).
+
+- 2026-07-21 — F-EVENT-VIEW — Event details + RSVP, decomposed into
+  `src/features/event-view/` (first feature folder in the codebase, per D3).
+  **Nostr layer confirmation**: no kind/tag/protocol changes were needed or
+  made — `src/nostr/rsvp.ts` (kinds 31925/32069, built in Phase 3) and the
+  existing NIP-09 deletion path already cover everything in scope.
+  - **Decomposition**: `CalendarEvent.tsx` (906 lines) split into
+    `EventDetail.tsx` (composition root: `CalendarEventView` shell +
+    `CalendarEvent` body, ~250 lines) plus `components/`: `EventCard`
+    (grid-chip renderers, unchanged behavior), `EventActionsBar` (was
+    `ActionButtons`), `EventMeta`, `EventFormsSection`, `EventNotifications`
+    (was `ScheduledNotificationsSection`), `EventRsvpSection` (new),
+    `RespondPanel`, `DeleteEventDialog`, `RSVPBar`, `RSVPParticipantList`
+    (the last four moved from `src/components/` verbatim, restyle-only —
+    they were already token/theme-driven, no hardcoded colors found).
+    `src/components/CalendarEvent.tsx` is now a 7-line re-export shim so
+    `WeekView`/`DayView`/`MonthView`/`ViewEventPage`/`NotificationEventPage`
+    (which imports the `CalendarEvent` body component directly) needed no
+    changes.
+  - **Full RSVP UI**: `EventRsvpSection` adds a "N going · M maybe" summary
+    (from `useEventRsvps`' already-fetched pubkey/status map, zero new nostr
+    calls) and a relay-publish-status footer via the existing
+    `RelayStatusDots`/`useRelayStatusPlaceholder` (same placeholder-data
+    caveat as its other two call sites — no live per-relay tracking exists
+    anywhere in the app yet).
+  - **Lazy profile resolution** (per-session clarification): host/participant
+    profile resolution (`Participant`/`useGetParticipant`, one relay
+    subscription per pubkey) is deferred until the user clicks "Show
+    participants" — the summary row shows only counts + initials-only
+    avatars (raw pubkey, no fetch), mirroring the technique
+    `EventQuickPeek` already used for the same reason. This matters because
+    the same component tree is reachable unauthenticated from the public
+    standalone event page (`ViewEventPage.tsx`) — any visitor opening a
+    well-attended event must not trigger a burst of profile subscriptions.
+    RespondPanel's single host-`Participant` line (shown only when the event
+    isn't yet in the viewer's calendar) was deliberately left eager — it's
+    one fetch per view regardless of attendee count, not the O(N) case the
+    lazy-load guards against.
+    **e2e updated in the same change**: `rsvp.spec.ts`'s two participant-list
+    assertions ("view comment", "view suggested time") now click "Show
+    participants" first before those become visible — an intentional DOM
+    change per guardrail #2.
+  - **Standalone/public page** (per-session clarification): confirmed
+    `ViewEventPage.tsx` (`/event/:naddr`, F-EVENT-LINK territory) already
+    renders `CalendarEventView` unauthenticated with no auth gate (fixed in
+    the 2026-07-20 rebase), and `RespondPanel` already implements the
+    logged-out → login/guest prompt → same screen + add-to-calendar-section
+    flow. No new page was built; verified live via `agent-browser` (cleared
+    localStorage, hit the naddr link logged out, saw the prompt render with
+    no blocking modal, then injected a second identity and reloaded to
+    confirm the same screen plus the add-to-calendar section appears).
+  - **Delete/duplicate restyle**: `DeleteEventDialog`/`EventActionsBar`
+    visuals only — all three `delete-option-*` testids and the "Duplicate
+    Event"/"Delete Event"/"Edit Event" accessible names are byte-identical;
+    no recurring single-occurrence-vs-series option was added (not in scope,
+    would need its own nostr sign-off).
+  - Two new dictionary keys added (`en-US` only): `event.publishedToRelays`,
+    `rsvp.goingSummary`/`rsvp.showParticipants`/`rsvp.hideParticipants`.
+  - `pnpm typecheck`: clean except one pre-existing, unrelated error
+    (`StyledComponents.tsx` `theme.vars` — confirmed present on a clean
+    stash of this same tree before any of this session's changes).
+    `pnpm lint`: clean (0 errors; same pre-existing warnings elsewhere).
+    `pnpm test:e2e`: 45 passed, 1 skipped (same pre-existing
+    `event-participants` fixme), matching the Phase 0–3/F-VIEWS baseline.
+  - Manually verified live via `agent-browser` (`run-app` skill): created a
+    public + a private/invited-participant event as Alice, submitted RSVPs,
+    expanded/collapsed the participant list, applied the delete dialog's
+    three options, walked the duplicate flow into `CalendarEventEdit`
+    create-mode with participants preserved, and drove the standalone-page
+    logged-out/logged-in flow described above.
 
 - 2026-07-20 — Rebase onto `main` — rebased `local-relay-migration` (this whole
   redesign, one squash commit) onto `origin/main`, which had moved 4 commits

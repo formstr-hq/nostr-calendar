@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
 import { publicTint, getContrastText, radius } from "../../theme/tokens";
+import { isMobile } from "../../common/utils";
 
 interface EventChipProps {
   title: string;
@@ -40,7 +41,7 @@ export const EventChip = forwardRef<HTMLElement, EventChipProps>(
             alignItems: "center",
             gap: 0.5,
             width: "100%",
-            border: "none",
+            border: `1px solid ${resolvedMode === "dark" ? "#000000" : "#ffffff"}`,
             cursor: onClick ? "pointer" : "default",
             px: 1,
             py: 0.375,
@@ -60,7 +61,7 @@ export const EventChip = forwardRef<HTMLElement, EventChipProps>(
         ]}
       >
         {isPublic && <PublicIcon sx={{ fontSize: 13, flexShrink: 0 }} />}
-        {time && (
+        {time && !isMobile && (
           <Box component="span" sx={{ opacity: 0.85, flexShrink: 0 }}>
             {time}
           </Box>

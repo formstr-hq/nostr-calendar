@@ -20,7 +20,7 @@ export function Sidebar({ onNewEvent, onImportEvent }: SidebarProps) {
         height: "100vh",
         position: "sticky",
         top: 0,
-        bgcolor: "background.paper",
+        bgcolor: "background.canvas",
         borderRight: "1px solid",
         borderColor: "divider",
       }}

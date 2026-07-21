@@ -129,7 +129,12 @@ export function EventCalendarListManagement({
           flexShrink: 0,
         }}
       />
-      <Typography variant="body2">{calendar.title}</Typography>
+      <Typography
+        variant="body2"
+        data-testid="calendar-management-current-name"
+      >
+        {calendar.title}
+      </Typography>
       <Tooltip
         title={intl.formatMessage({
           id: "calendarManage.editCalendar",

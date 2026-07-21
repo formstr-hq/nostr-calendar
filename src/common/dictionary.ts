@@ -132,7 +132,6 @@ const dictionary: NestedObject = {
       allDayDateRange: "{start} – {end} ⋅ {label}",
       deviceReadOnly: "From your device calendar — read-only.",
       repeats: "Repeats {label}",
-      repeatsBadge: "Repeats",
       eventsCount: "events",
       open: "Open",
       going: "going",
@@ -146,6 +145,13 @@ const dictionary: NestedObject = {
       notInCalendar:
         "This event is not in any of your calendars. You will not receive notifications for this event. Add it to your calendar to receive notifications.",
       scheduledNotifications: "Scheduled Notifications",
+      publishedToRelays: "Published to {count} relay(s)",
+      publicEvent: "Public event",
+      privateEventChip: "Private",
+      inYourCalendar: "In your calendar",
+      hostedBy: "Event created by {participant}",
+      directions: "Directions",
+      moreOptions: "More options",
     },
     form: {
       attachments: "Forms",
@@ -192,6 +198,9 @@ const dictionary: NestedObject = {
       addNote: "Add a note",
       suggestionsHeading: "Time suggestions from participants",
       applySuggestion: "Move event to this time",
+      goingSummary: "{going} going · {maybe} maybe",
+      showParticipants: "Show participants",
+      hideParticipants: "Hide participants",
     },
     deleteEvent: {
       title: "Delete Event",

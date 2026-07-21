@@ -1,10 +1,10 @@
 import {
-  alpha,
   Box,
   IconButton,
   Paper,
   styled,
   Typography,
+  useColorScheme,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -14,6 +14,7 @@ import { ICalendarEvent } from "../utils/types";
 import { DateLabel } from "./DateLabel";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { isWeekend } from "../utils/dateHelper";
+import { lightTokens, darkTokens } from "../theme/tokens";
 import ShortcutIcon from "@mui/icons-material/Shortcut";
 import { isMobile } from "../common/utils";
 import { isEventInDateRange } from "../utils/repeatingEventsHelper";
@@ -102,6 +103,10 @@ export function MonthView({ events }: MonthViewProps) {
   const start = date.startOf("month").startOf("week");
   const theme = useTheme();
   const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"));
+  const { mode, systemMode } = useColorScheme();
+  const resolvedMode = mode === "system" ? systemMode : mode;
+  const weekendBg =
+    resolvedMode === "dark" ? darkTokens.otherMonthBg : lightTokens.otherMonthBg;
   const modal = useEventModal();
   const nostrCalendars = useCalendarLists((s) => s.calendars);
   const deviceCalendars = useDeviceCalendars((s) => s.calendars);
@@ -182,9 +187,7 @@ export function MonthView({ events }: MonthViewProps) {
               wordBreak: "break-word",
               minWidth: 0,
               cursor: isMobileViewport ? "pointer" : "default",
-              background: isWeekend(day)
-                ? alpha(theme.palette.primary.main, 0.1)
-                : "transparent",
+              background: isWeekend(day) ? weekendBg : "transparent",
             }}
           >
             <DateLabel day={day} size={30} />
@@ -263,6 +266,7 @@ export function MonthView({ events }: MonthViewProps) {
           {(color, isPublic) => (
             <EventQuickPeek
               mode="event"
+              open
               anchorEl={eventPeek.anchorEl}
               entry={{ event: eventPeek.event, color, isPublic }}
               onClose={() => setEventPeek(null)}
@@ -278,6 +282,7 @@ export function MonthView({ events }: MonthViewProps) {
       {agendaPeek && (
         <EventQuickPeek
           mode="agenda"
+          open
           anchorEl={agendaPeek.anchorEl}
           day={agendaPeek.day}
           entries={eventsForDay(events, agendaPeek.day).map((event) => {

@@ -88,13 +88,20 @@ test("user moves an event to a different calendar", async ({
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).not.toBeVisible();
 
-  // Open the event and move it.
+  // Open the event and move it. The current-calendar name now also appears
+  // in EventChipsRow's badge (mockups 12/20/21), so scope to the
+  // calendar-management row specifically rather than an ambiguous getByText.
   const modal = await openEventModal(page, title);
-  await expect(modal.getByText(firstCalendar)).toBeVisible();
+  const currentCalendarName = modal.getByTestId(
+    "calendar-management-current-name",
+  );
+  await expect(currentCalendarName).toHaveText(firstCalendar);
   await modal.getByRole("button", { name: "change calendar" }).click();
   await modal.getByTestId("calendar-list-select").click();
   await page.getByRole("option", { name: secondCalendar }).click();
   await modal.getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(modal.getByText(secondCalendar)).toBeVisible({ timeout: 20_000 });
+  await expect(currentCalendarName).toHaveText(secondCalendar, {
+    timeout: 20_000,
+  });
 });

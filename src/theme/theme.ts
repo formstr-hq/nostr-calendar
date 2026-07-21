@@ -16,6 +16,13 @@ declare module "@mui/material/IconButton" {
   }
 }
 
+declare module "@mui/material/styles" {
+  interface TypeBackground {
+    /** Warm-neutral backdrop for secondary panels (sidebar, mobile nav sheet) — the main content area uses `default`/`paper` instead. */
+    canvas: string;
+  }
+}
+
 const accentMain = accentPresets[defaultAccent];
 
 export const theme = createTheme({
@@ -29,8 +36,9 @@ export const theme = createTheme({
         primary: { main: accentMain, contrastText: "#ffffff" },
         secondary: { main: accentMain },
         background: {
-          default: lightTokens.canvas,
+          default: lightTokens.surface,
           paper: lightTokens.surface,
+          canvas: lightTokens.canvas,
         },
         text: {
           primary: lightTokens.text,
@@ -50,6 +58,7 @@ export const theme = createTheme({
         background: {
           default: darkTokens.canvas,
           paper: darkTokens.surface,
+          canvas: darkTokens.surface,
         },
         text: {
           primary: darkTokens.text,
@@ -205,6 +214,24 @@ export const theme = createTheme({
         },
       },
     },
+    MuiModal: {
+      styleOverrides: {
+        // vaul (the mobile BottomSheet's drawer library) sets
+        // `document.body.style.pointerEvents = "none"` while a sheet is
+        // open, as its own focus-containment strategy, and only its own
+        // Drawer content reclaims `auto` for itself. Every MUI Dialog/Menu/
+        // Popover/Select etc. (all built on Modal) portals to
+        // `document.body` too — a separate tree vaul doesn't know about —
+        // so without this, any of them opened from inside a bottom sheet
+        // silently inherits `pointer-events: none` and becomes completely
+        // unclickable (backdrop, content, everything) despite rendering
+        // fine visually. Reclaiming `auto` here, once, covers every modal
+        // in the app instead of requiring a per-component workaround.
+        root: {
+          pointerEvents: "auto",
+        },
+      },
+    },
     MuiPopover: {
       styleOverrides: {
         paper: {
@@ -296,5 +323,17 @@ export const theme = createTheme({
         },
       },
     },
+  },
+  zIndex: {
+    // vaul's mobile BottomSheet drawer content sits at z-index 1301 (see
+    // BottomSheet.tsx) — outside MUI's own z-index scale entirely, since
+    // vaul/Radix isn't a MUI component. Any MUI modal (Dialog/Menu/Popover/
+    // Select/…) opened from inside a bottom sheet needs a base higher than
+    // that to render above it. 1350 clears vaul's 1301 while staying below
+    // MUI's own defaults for snackbar (1400) and tooltip (1500), so this
+    // doesn't tie or invert against them — and MUI's own stacking
+    // increments for multiple simultaneously-open modals still apply on
+    // top of this base, unaffected.
+    modal: 1350,
   },
 });

@@ -12,9 +12,9 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CommentIcon from "@mui/icons-material/Comment";
 import dayjs from "dayjs";
 import { useIntl } from "react-intl";
-import { RSVPStatus, type ICalendarEvent } from "../utils/types";
-import type { RSVPRecord } from "../nostr/rsvp";
-import { Participant } from "./Participant";
+import { RSVPStatus, type ICalendarEvent } from "../../../utils/types";
+import type { RSVPRecord } from "../../../nostr/rsvp";
+import { Participant } from "../../../components/Participant";
 
 function getRSVPDetails(record: RSVPRecord | undefined, event: ICalendarEvent) {
   if (!record) {

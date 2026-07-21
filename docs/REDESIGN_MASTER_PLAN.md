@@ -14,7 +14,7 @@ The app works but has four structural problems:
 1. **UI is being redesigned.** New design lives in `designs/redesign/` — 24 self-contained HTML
    mockups exported from claude.ai/design, with a complete token system ("calm paper, loud ink":
    warm neutrals, ink-black accent, dark mode, accent presets, Inter, 8pt grid). The mockups are a
-   **guideline**, not a spec — they show features that are *not* to be built yet. Per-flow scope is
+   **guideline**, not a spec — they show features that are _not_ to be built yet. Per-flow scope is
    specified by the user when a flow is picked up.
 2. **Nostr layer is duplicated and hard to scale.** `src/common/nostr.ts` is a 1350-line hub;
    sign-and-hash, d-tag generation, self-encryption, fetcher shells, and subscription lifecycles are
@@ -91,6 +91,7 @@ each protocol change ships together with the UI that exercises it and its E2E sp
 ### D5. E2E contract is API
 
 The following are treated as public API and must not silently change:
+
 - localStorage auth injection: `calendar:keys` (`{pubkey, secret}`) + `calendar:userData`, consumed
   by the legacy restore path in `src/common/signer/index.ts` (~lines 193–202). Keep working forever
   (or migrate tests in the same PR).
@@ -119,6 +120,7 @@ The following are treated as public API and must not silently change:
 ### Phase 1 — Design tokens & theme (foundation)
 
 Build `src/theme/` per D1. Steps:
+
 1. Extract the `Theme`/`CalColor` objects from the shared module inside
    `designs/redesign/01-month-view-desktop.html` (decode the `__bundler` payload; the tokens are
    listed in this plan's source exploration and in `00-design-system.html`).
@@ -171,7 +173,7 @@ Create `src/nostr/` and drain `src/common/nostr.ts` into it:
 - **Exit criteria:** `common/nostr.ts` deleted or reduced to re-exports; full E2E green; published
   events byte-compatible except the two tag fixes above.
 
-*Phases 1–2 and 3 are independent — can be done in either order or interleaved.*
+_Phases 1–2 and 3 are independent — can be done in either order or interleaved._
 
 ---
 
@@ -193,23 +195,24 @@ Template for the inputs (copy into the session prompt):
 ```
 
 ### F-VIEWS — Month / Week / Day views
+
 - **Current:** `Calendar.tsx` → `MonthView.tsx` / `WeekView.tsx` / `DayView.tsx`, date routing in
   `utils/dateBasedRouting.ts`, `hooks/useDateWithRouting.ts`.
 - **Design:** `01` `02` (interactions: hover popover, quick view, drag-move) `03` `04` `08` (dark)
   `09` `10` (mobile month/day).
 - **E2E:** `calendar-management`, `navigation`, `mobile`, parts of `event-crud` (grid selectors:
   `day-hour-cell`, `data-date`).
-- **Nostr layer inputs:** *(fill in — likely none, views are read-only over stores)*
+- **Nostr layer inputs:** _(fill in — likely none, views are read-only over stores)_
 
 ### F-EVENT-VIEW — Event details + RSVP
+
 - **Current:** `CalendarEvent.tsx` (976 — decompose), `RespondPanel.tsx`, `hooks/useEventRsvps.ts`.
 - **Design:** `12` (mobile bottom sheet), event popovers in `02`.
 - **E2E:** `rsvp`, `respond`, `event-delete`, `event-duplicate` (`rsvp-*`, `delete-option-*`).
-- **Nostr layer inputs:** *(fill in — candidate decisions: add NIP-52 `p`/`e` tags to 31925 RSVPs
-  (additive, safe); keep or standardize the custom suggested-time `start`/`end` tags; private RSVP
-  32069 stays per NIP-52E?)*
+- **Nostr layer inputs:** _this is a view only change. nostr layer should not need changing ideally. confirm and report back_
 
 ### F-EVENT-EDIT — Create / edit event
+
 - **Current:** `CalendarEventEdit.tsx` (1808) — **follow `docs/refactor-calendar-event-edit.md`**,
   it already specifies the decomposition (recurrence utils, CustomRecurrenceDialog, section
   components, useEventSave hook, ~400-line composition root). Also `EditEventPage.tsx`,
@@ -218,19 +221,21 @@ Template for the inputs (copy into the session prompt):
   by npub/NIP-05, Formstr form attach, "More options"), `11` (mobile sheet).
 - **E2E:** `event-crud`, `event-edit`, `event-recurrence`, `event-participants`
   (`recurrence-select`, `recurrence-end-mode`).
-- **Nostr layer inputs:** *(fill in — candidate decisions: adopt 31922 all-day events?
+- **Nostr layer inputs:** _(fill in — candidate decisions: adopt 31922 all-day events?
   add `start_tzid`/`end_tzid`? recurrence stays NIP-32 `L/l` rrule per NIP-52R? Formstr-form
-  attach scope?)*
+  attach scope?)_
 
 ### F-LOGIN — Auth
+
 - **Current:** `LoginModal.tsx` (967 — decompose into per-method panels), `Auth.tsx`,
   `UserMenu.tsx`, `common/signer/index.ts` (do not break legacy restore — E2E contract D5).
 - **Design:** `22` `23` (method list → expandable panels: NIP-07, nsec+passphrase, NIP-46 QR,
   create account).
 - **E2E:** `auth` (`login-submit-nsec`, injection contract).
-- **Nostr layer inputs:** *(fill in — likely none; signer stack unchanged)*
+- **Nostr layer inputs:** _(fill in — likely none; signer stack unchanged)_
 
 ### F-SET — Settings (NEW surface)
+
 - **Current:** none (`/settings` route added in Phase 2; `stores/settings.ts`, `stores/relays.ts`,
   `RelayManager` UI exists somewhere in components).
 - **Design:** `06` (general: week start, 12/24h, timezone, default view/duration, reminders, work
@@ -238,19 +243,21 @@ Template for the inputs (copy into the session prompt):
   **Follow memory/feedback: no iOS-style settings — switches/chips for toggles, dropdowns for
   selects, on mobile too.**
 - **E2E:** `relay-manager` (relays UI moves here); new spec for appearance.
-- **Nostr layer inputs:** *(fill in — candidate: sync settings/appearance across devices via a
-  self-encrypted replaceable event? Which kind? Or local-only for now?)*
+- **Nostr layer inputs:** _(fill in — candidate: sync settings/appearance across devices via a
+  self-encrypted replaceable event? Which kind? Or local-only for now?)_
 
 ### F-NOTIF — Notifications / invitations
+
 - **Current:** `InvitationPanel.tsx`, `NotificationEventPage.tsx`, `stores/invitations.ts`,
   `stores/notifications.ts`, gift-wrap flow (kinds 52/1052), participant-removal kind 84.
 - **Design:** no dedicated screen; bell in TopBar + Alerts tab in MobileTabBar.
 - **E2E:** `invitations` (`invitation-card`).
-- **Nostr layer inputs:** *(fill in — **the big one: gift-wrap kind 1052 → NIP-59-standard 1059?**
+- **Nostr layer inputs:** _(fill in — **the big one: gift-wrap kind 1052 → NIP-59-standard 1059?**
   Needs dual-read (accept both) + decide write cutoff, since old app versions won't see 1059
-  wraps. Kind 84 removal stays per NIP-52E?)*
+  wraps. Kind 84 removal stays per NIP-52E?)_
 
-### F-BOOK-EDIT — Booking page editor        |  F-BOOK-INBOX — Bookings inbox  |  F-BOOK-PUBLIC — Public booking link
+### F-BOOK-EDIT — Booking page editor | F-BOOK-INBOX — Bookings inbox | F-BOOK-PUBLIC — Public booking link
+
 - **Current:** `SchedulingPageEdit.tsx` (1030), `BookingNotifications.tsx` (571),
   `BookingPage.tsx` (753), `utils/availabilityHelper.ts` (596), stores `schedulingPages.ts`,
   `bookingRequests.ts`, `busyList.ts`. Kinds 31927/32680/31926 + rumors 57/1057/58/1058 per
@@ -258,41 +265,43 @@ Template for the inputs (copy into the session prompt):
 - **Design:** `14`–`19` (editor w/ live preview, Incoming/Outgoing inbox, Calendly-style public
   page; mobile variants). Treat as three separately schedulable sub-flows.
 - **E2E:** `booking`, `scheduling-builder` (`booking-request-card`).
-- **Nostr layer inputs:** *(fill in per sub-flow — booking kinds stay custom per the NIP proposal?
-  same 1052→1059 gift-wrap question applies to 1057/1058)*
+- **Nostr layer inputs:** _(fill in per sub-flow — booking kinds stay custom per the NIP proposal?
+  same 1052→1059 gift-wrap question applies to 1057/1058)_
 
 ### F-EVENT-LINK — Public event landing page
+
 - **Current:** `ViewEventPage.tsx` (public naddr view). Design shows banner, going/maybe counts,
   guest RSVP, add-to-calendar (Formstr/.ics/Google), "Message host" — **most of this is
   in the not-yet bucket; scope strictly per session instructions.**
 - **Design:** `20` `21`.
 - **E2E:** `ics`, parts of `rsvp`.
-- **Nostr layer inputs:** *(fill in — guest/unauthenticated RSVP? banner image tag (fixes the
-  image tag properly)? counts require fetching all RSVPs)*
+- **Nostr layer inputs:** _(fill in — guest/unauthenticated RSVP? banner image tag (fixes the
+  image tag properly)? counts require fetching all RSVPs)_
 
 ### F-CAL-MGMT — Calendar list management
+
 - **Current:** `stores/calendarLists.ts`, `common/calendarList.ts` (kind 32123 self-encrypted),
   sidebar calendar toggles.
 - **Design:** sidebar in `01`+, calendar color editors in `07`.
 - **E2E:** `calendar-management` (`calendar-row`, `calendar-list-select`,
   `calendar-visibility-checkbox`).
-- **Nostr layer inputs:** *(fill in — stay on 32123 per NIP-52E vs also publish public NIP-52
-  31924 calendars for interop? calendar color as a tag?)*
+- **Nostr layer inputs:** _(fill in — stay on 32123 per NIP-52E vs also publish public NIP-52
+  31924 calendars for interop? calendar color as a tag?)_
 
 ---
 
 ## 5. NIP compliance track (cross-cutting)
 
-| Change | Risk | Strategy | When |
-|---|---|---|---|
-| `image`→`location` tag bug | none (bug fix) | write-side fix | Phase 3 |
-| `name`→`title` tag | none (parser reads both) | write `title`, read both | Phase 3 |
-| RSVP `p`/`e` tags | none (additive) | just add | F-EVENT-VIEW |
-| `start_tzid`/`end_tzid` | none (additive) | just add | F-EVENT-EDIT |
-| 31922 all-day events | medium — new kind, old clients won't see them | decide in F-EVENT-EDIT inputs | F-EVENT-EDIT |
-| Gift wrap 1052→1059 (and 1057/1058) | **high — breaks old clients' inboxes** | dual-read first, dual-write or cutoff per user decision | F-NOTIF / F-BOOK |
-| Custom kinds (32678, 32069, 32123, 31926, 31927, 32680, 84) | interop-only | keep, but keep `nips/NIP-52E.md`, `NIP-52R.md`, `NIP-Appointment-Scheduling.md` in lockstep with code; fix doc-vs-code drift as found | ongoing |
-| Public 31924 calendars | optional interop win | decide in F-CAL-MGMT | F-CAL-MGMT |
+| Change                                                      | Risk                                          | Strategy                                                                                                                              | When             |
+| ----------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `image`→`location` tag bug                                  | none (bug fix)                                | write-side fix                                                                                                                        | Phase 3          |
+| `name`→`title` tag                                          | none (parser reads both)                      | write `title`, read both                                                                                                              | Phase 3          |
+| RSVP `p`/`e` tags                                           | none (additive)                               | just add                                                                                                                              | F-EVENT-VIEW     |
+| `start_tzid`/`end_tzid`                                     | none (additive)                               | just add                                                                                                                              | F-EVENT-EDIT     |
+| 31922 all-day events                                        | medium — new kind, old clients won't see them | decide in F-EVENT-EDIT inputs                                                                                                         | F-EVENT-EDIT     |
+| Gift wrap 1052→1059 (and 1057/1058)                         | **high — breaks old clients' inboxes**        | dual-read first, dual-write or cutoff per user decision                                                                               | F-NOTIF / F-BOOK |
+| Custom kinds (32678, 32069, 32123, 31926, 31927, 32680, 84) | interop-only                                  | keep, but keep `nips/NIP-52E.md`, `NIP-52R.md`, `NIP-Appointment-Scheduling.md` in lockstep with code; fix doc-vs-code drift as found | ongoing          |
+| Public 31924 calendars                                      | optional interop win                          | decide in F-CAL-MGMT                                                                                                                  | F-CAL-MGMT       |
 
 **Rule:** every wire-format change updates the matching doc in `nips/`/`PROTOCOL.md` in the same
 change, and states its migration story (dual-read window, write cutoff, affected old versions).
@@ -321,7 +330,7 @@ Prompt template to start a session:
 
 ```
 Read docs/REDESIGN_MASTER_PLAN.md and docs/REDESIGN_PROGRESS.md.
-We're doing <Phase N / F-XXX>. 
+We're doing <Phase N / F-XXX>.
 
 Scope for this session: <exactly what to build; what shown in mockups to SKIP>
 
@@ -333,6 +342,7 @@ finish; update REDESIGN_PROGRESS.md and any touched nips/ docs.
 ```
 
 Per-session exit checklist:
+
 - [ ] `pnpm typecheck && pnpm lint`
 - [ ] `pnpm test:e2e` (at minimum the specs listed for the flow; full suite at phase completion)
 - [ ] No component imports `dataLayer`/`nip44` directly (Phase 3 onward)

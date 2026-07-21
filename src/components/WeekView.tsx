@@ -1,8 +1,8 @@
 import {
-  alpha,
   Box,
   Divider,
   Typography,
+  useColorScheme,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -19,6 +19,7 @@ import {
 import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
+import { lightTokens, darkTokens } from "../theme/tokens";
 import { StyledSecondaryHeader } from "./StyledComponents";
 import { MOBILE_TOPBAR_ROW2_HEIGHT } from "./ui/TopBar";
 import { TimeMarker } from "./TimeMarker";
@@ -83,7 +84,10 @@ export function WeekView({ events, date }: ViewProps) {
     setDialogOpen(true);
   };
 
-  const theme = useTheme();
+  const { mode, systemMode } = useColorScheme();
+  const resolvedMode = mode === "system" ? systemMode : mode;
+  const weekendBg =
+    resolvedMode === "dark" ? darkTokens.otherMonthBg : lightTokens.otherMonthBg;
 
   const DAY_MS = 24 * 60 * 60 * 1000;
   const allDayForDay = (dayStartMs: number) =>
@@ -179,9 +183,7 @@ export function WeekView({ events, date }: ViewProps) {
                     cursor: "pointer",
                     minWidth: 0,
                     overflow: "hidden",
-                    background: isWeekend(day)
-                      ? alpha(theme.palette.primary.main, 0.1)
-                      : "transparent",
+                    background: isWeekend(day) ? weekendBg : "transparent",
                   }}
                 >
                   {/* Day header */}

@@ -84,6 +84,9 @@ test("participant adds a note the host can read", async ({
   // arrives via relay subscription — reload until it shows up.
   await expect(async () => {
     await navigate(alice, eventUrl);
+    // Participant profile resolution is deferred until expanded (avoids a
+    // burst of per-participant relay subscriptions on every event open).
+    await alice.getByRole("button", { name: "Show participants" }).click();
     await expect(
       alice.getByRole("button", { name: "view comment" }),
     ).toBeVisible({ timeout: 5_000 });
@@ -117,6 +120,7 @@ test("host applies a participant's suggested time", async ({
   // arrives from the relay).
   await expect(async () => {
     await navigate(alice, eventUrl);
+    await alice.getByRole("button", { name: "Show participants" }).click();
     await expect(
       alice.getByRole("button", { name: "view suggested time" }),
     ).toBeVisible({ timeout: 5_000 });

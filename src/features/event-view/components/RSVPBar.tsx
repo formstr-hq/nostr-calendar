@@ -15,11 +15,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, ButtonGroup, Stack, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { useIntl } from "react-intl";
-import { ICalendarEvent } from "../utils/types";
-import { RSVPStatus } from "../utils/types";
-import type { RSVPPayload, RSVPRecord } from "../nostr/rsvp";
-import { SuggestedTime } from "./SuggestedTime";
-import { AddNote } from "./AddNote";
+import { ICalendarEvent } from "../../../utils/types";
+import { RSVPStatus } from "../../../utils/types";
+import type { RSVPPayload, RSVPRecord } from "../../../nostr/rsvp";
+import { SuggestedTime } from "../../../components/SuggestedTime";
+import { AddNote } from "../../../components/AddNote";
 
 interface RSVPBarProps {
   event: ICalendarEvent;

@@ -16,24 +16,24 @@ import {
   CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { useCalendarLists } from "../stores/calendarLists";
-import { useTimeBasedEvents } from "../stores/events";
-import { useUser } from "../stores/user";
+import { useCalendarLists } from "../../../stores/calendarLists";
+import { useTimeBasedEvents } from "../../../stores/events";
+import { useUser } from "../../../stores/user";
 import {
   publishDeletionEvent,
   publishParticipantRemovalEvent,
-} from "../nostr/events";
-import { useInvitations } from "../stores/invitations";
-import { useBusyList } from "../stores/busyList";
-import type { ICalendarEvent } from "../utils/types";
-import { EventKinds } from "../nostr/kinds";
-import { TimeRenderer } from "./TimeRenderer";
-import { getEventDisplayRange } from "../utils/eventOccurrence";
+} from "../../../nostr/events";
+import { useInvitations } from "../../../stores/invitations";
+import { useBusyList } from "../../../stores/busyList";
+import type { ICalendarEvent } from "../../../utils/types";
+import { EventKinds } from "../../../nostr/kinds";
+import { TimeRenderer } from "../../../components/TimeRenderer";
+import { getEventDisplayRange } from "../../../utils/eventOccurrence";
 import { useIntl } from "react-intl";
 import {
   findCalendarForEvent,
   getCalendarEventCoordinate,
-} from "../utils/calendarListTypes";
+} from "../../../utils/calendarListTypes";
 
 type DeleteOption = "deleteForEveryone" | "removeFromCalendar" | "ignore";
 

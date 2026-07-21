@@ -74,6 +74,7 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
         <BottomSheet
           open={mobileSheetOpen}
           onClose={() => setMobileSheetOpen(false)}
+          background="canvas"
         >
           <SidebarContent
             onNewEvent={openNewEvent}

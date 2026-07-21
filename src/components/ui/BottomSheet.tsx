@@ -5,10 +5,17 @@ interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  /** "paper" (default, white) for content sheets; "canvas" for the mobile nav drawer, matching the desktop Sidebar's warm-neutral backdrop. */
+  background?: "paper" | "canvas";
 }
 
 /** vaul drawer anchored to the bottom, r20 top corners + grabber, native swipe-to-dismiss. */
-export function BottomSheet({ open, onClose, children }: BottomSheetProps) {
+export function BottomSheet({
+  open,
+  onClose,
+  children,
+  background = "paper",
+}: BottomSheetProps) {
   return (
     <Drawer.Root
       open={open}
@@ -36,7 +43,7 @@ export function BottomSheet({ open, onClose, children }: BottomSheetProps) {
             flexDirection: "column",
             borderTopLeftRadius: radius.modal,
             borderTopRightRadius: radius.modal,
-            backgroundColor: "var(--mui-palette-background-paper)",
+            backgroundColor: `var(--mui-palette-background-${background})`,
             zIndex: 1301,
             outline: "none",
           }}
