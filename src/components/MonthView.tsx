@@ -106,7 +106,9 @@ export function MonthView({ events }: MonthViewProps) {
   const { mode, systemMode } = useColorScheme();
   const resolvedMode = mode === "system" ? systemMode : mode;
   const weekendBg =
-    resolvedMode === "dark" ? darkTokens.otherMonthBg : lightTokens.otherMonthBg;
+    resolvedMode === "dark"
+      ? darkTokens.otherMonthBg
+      : lightTokens.otherMonthBg;
   const modal = useEventModal();
   const nostrCalendars = useCalendarLists((s) => s.calendars);
   const deviceCalendars = useDeviceCalendars((s) => s.calendars);

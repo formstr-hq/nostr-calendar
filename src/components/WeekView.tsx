@@ -87,7 +87,9 @@ export function WeekView({ events, date }: ViewProps) {
   const { mode, systemMode } = useColorScheme();
   const resolvedMode = mode === "system" ? systemMode : mode;
   const weekendBg =
-    resolvedMode === "dark" ? darkTokens.otherMonthBg : lightTokens.otherMonthBg;
+    resolvedMode === "dark"
+      ? darkTokens.otherMonthBg
+      : lightTokens.otherMonthBg;
 
   const DAY_MS = 24 * 60 * 60 * 1000;
   const allDayForDay = (dayStartMs: number) =>
