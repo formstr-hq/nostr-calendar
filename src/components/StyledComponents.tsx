@@ -11,7 +11,7 @@ export const StyledSecondaryHeader = styled(Box, {
 })<SecondaryHeaderProps>(({ theme, topOffset = 0 }) => ({
   position: "sticky",
   top: `calc(var(--safe-area-top) + ${64 + topOffset}px)`,
-  background: theme.palette.background.paper,
+  background: theme.vars.palette.background.paper,
   zIndex: 1,
 }));
 

@@ -28,7 +28,13 @@ export function MiniCalendar({ date, onSelect }: MiniCalendarProps) {
         maxHeight: 280,
         "& .MuiPickersCalendarHeader-root": { pl: 1, pr: 0.5 },
         "& .MuiDayCalendar-weekDayLabel": { fontSize: 11 },
-        "& .MuiPickersDay-root": { fontSize: 12.5 },
+        "& .MuiPickersDay-root": {
+          fontSize: 12.5,
+          width: 28,
+          height: 28,
+          margin: "0 1px",
+          flexShrink: 0,
+        },
       }}
     />
   );

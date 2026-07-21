@@ -1,4 +1,4 @@
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useState } from "react";
 import { Box, useMediaQuery, useTheme } from "@mui/material";
 import { useNavigate } from "react-router";
 import { Sidebar } from "./ui/Sidebar";
@@ -29,13 +29,11 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
 
   const [newEventOpen, setNewEventOpen] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const openNewEvent = () => setNewEventOpen(true);
 
   useKeyboardShortcuts({
     onNewEvent: openNewEvent,
-    onFocusSearch: () => searchInputRef.current?.focus(),
     topBar,
   });
 
@@ -54,7 +52,6 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
         }}
       >
         <TopBar
-          ref={searchInputRef}
           isMobile={isMobile}
           unreadCount={unreadCount}
           onBellClick={() => navigate("/notifications")}

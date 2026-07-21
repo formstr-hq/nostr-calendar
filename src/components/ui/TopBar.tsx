@@ -1,16 +1,8 @@
-import { forwardRef, ReactNode } from "react";
-import {
-  Badge,
-  Box,
-  IconButton,
-  InputBase,
-  Link,
-  Typography,
-} from "@mui/material";
+import { ReactNode } from "react";
+import { Badge, Box, IconButton, Link, Typography } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import SearchIcon from "@mui/icons-material/Search";
 import CalendarViewMonthIcon from "@mui/icons-material/CalendarViewMonth";
 import { SegmentedControl } from "./SegmentedControl";
 import { RelayStatusDots, RelayStatusEntry } from "./RelayStatusDots";
@@ -44,25 +36,22 @@ interface TopBarProps {
   avatarSlot: ReactNode;
 }
 
-export const TopBar = forwardRef<HTMLInputElement, TopBarProps>(function TopBar(
-  {
-    isMobile,
-    mode,
-    title,
-    dateLabel,
-    view,
-    onViewChange,
-    onPrev,
-    onNext,
-    onToday,
-    unreadCount,
-    onBellClick,
-    onOpenCalendars,
-    relays,
-    avatarSlot,
-  },
-  searchInputRef,
-) {
+export function TopBar({
+  isMobile,
+  mode,
+  title,
+  dateLabel,
+  view,
+  onViewChange,
+  onPrev,
+  onNext,
+  onToday,
+  unreadCount,
+  onBellClick,
+  onOpenCalendars,
+  relays,
+  avatarSlot,
+}: TopBarProps) {
   const viewSwitcher = mode === "calendar" && view && onViewChange && (
     <SegmentedControl
       aria-label="Calendar view"
@@ -121,18 +110,24 @@ export const TopBar = forwardRef<HTMLInputElement, TopBarProps>(function TopBar(
         <Link
           href="/"
           underline="none"
-          sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexShrink: 0,
+            color: "text.primary",
+          }}
         >
-          <img
-            src="/formstr.png"
-            alt="Formstr Calendar"
-            style={{ height: 28, width: "auto" }}
-          />
           {!isMobile && (
             <Typography sx={{ fontWeight: 800, fontSize: 15 }}>
-              Formstr Calendar
+              Calendar by
             </Typography>
           )}
+          <img
+            src="/formstr.png"
+            alt="Formstr"
+            style={{ height: 28, width: "auto" }}
+          />
         </Link>
 
         {isMobile && onOpenCalendars && (
@@ -172,39 +167,20 @@ export const TopBar = forwardRef<HTMLInputElement, TopBarProps>(function TopBar(
 
         <Box sx={{ flex: 1 }} />
 
-        {!isMobile && (
-          <InputBase
-            inputRef={searchInputRef}
-            placeholder="Search    ⌘K"
-            startAdornment={
-              <SearchIcon
-                sx={{ fontSize: 18, mr: 0.75, color: "text.disabled" }}
-              />
-            }
-            sx={{
-              width: 204,
-              height: 34,
-              px: 1.25,
-              fontSize: 13,
-              borderRadius: 2.5,
-              border: "1.5px solid",
-              borderColor: "divider",
-            }}
-          />
-        )}
-
         {!isMobile && viewSwitcher}
         {!isMobile && todayButton}
 
-        <IconButton
-          aria-label="Notifications"
-          onClick={onBellClick}
-          size="small"
-        >
-          <Badge badgeContent={unreadCount} color="error">
-            <NotificationsIcon fontSize="small" />
-          </Badge>
-        </IconButton>
+        {!isMobile && (
+          <IconButton
+            aria-label="Notifications"
+            onClick={onBellClick}
+            size="small"
+          >
+            <Badge badgeContent={unreadCount} color="error">
+              <NotificationsIcon fontSize="small" />
+            </Badge>
+          </IconButton>
+        )}
 
         {!isMobile && <RelayStatusDots relays={relays} />}
 
@@ -229,4 +205,4 @@ export const TopBar = forwardRef<HTMLInputElement, TopBarProps>(function TopBar(
       )}
     </Box>
   );
-});
+}

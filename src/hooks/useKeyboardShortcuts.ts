@@ -3,7 +3,6 @@ import type { CalendarTopBarProps } from "./useCalendarTopBarProps";
 
 interface KeyboardShortcutsOptions {
   onNewEvent: () => void;
-  onFocusSearch: () => void;
   topBar: CalendarTopBarProps;
 }
 
@@ -16,21 +15,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-/** Global shortcuts: C new event, T today, M/W/D view, arrows prev/next, Cmd/Ctrl+K search. */
+/** Global shortcuts: C new event, T today, M/W/D view, arrows prev/next. */
 export function useKeyboardShortcuts({
   onNewEvent,
-  onFocusSearch,
   topBar,
 }: KeyboardShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
-
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        onFocusSearch();
-        return;
-      }
 
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
@@ -66,5 +58,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onNewEvent, onFocusSearch, topBar]);
+  }, [onNewEvent, topBar]);
 }
