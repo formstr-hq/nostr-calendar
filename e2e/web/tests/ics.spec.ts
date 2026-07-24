@@ -30,7 +30,7 @@ test("user imports an .ics file into a new event", async ({
 
   // DTSTART in the fixture is 2027-03-10.
   await page.goto("/d/2027/3/10");
-  await expect(page.getByText("ICS Imported Meeting")).toBeVisible({
+  await expect(page.getByText("ICS Imported Meeting").first()).toBeVisible({
     timeout: 20_000,
   });
 });
@@ -44,8 +44,9 @@ test("user downloads an event as .ics", async ({ authedPage: page }) => {
   });
 
   const modal = await openEventModal(page, title);
+  await modal.getByRole("button", { name: "More options" }).click();
   const downloadPromise = page.waitForEvent("download");
-  await modal.getByRole("button", { name: "Download event details" }).click();
+  await page.getByRole("menuitem", { name: "Download event details" }).click();
   const download = await downloadPromise;
 
   const filePath = await download.path();

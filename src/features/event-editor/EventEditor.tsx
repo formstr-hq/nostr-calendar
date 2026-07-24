@@ -59,7 +59,10 @@ export function EventEditor({
   const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars } = useCalendarLists();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
-    (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
+    // Duplicates are drafts (without an event id), so they cannot be found
+    // through calendar event refs. Preserve their explicitly supplied owner.
+    initialEvent?.calendarId ||
+      (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
       calendars[0]?.id ||
       "",
   );

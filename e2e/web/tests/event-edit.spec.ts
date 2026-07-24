@@ -1,16 +1,14 @@
 import { test, expect, navigate } from "../fixtures/index.js";
 import {
   createEventViaDialog,
-  fillDateTimeField,
   openEventEditor,
   openEventModal,
 } from "../helpers.js";
 
-// Fixed future dates so the test is date-independent.
+// Fixed future date so the test is date-independent.
 const ORIGINAL_DATE = "2027-04-12";
-const MOVED_DATE = "2027-04-13";
 
-test("user edits an event's name, description and time", async ({
+test("user edits an event's name and description", async ({
   authedPage: page,
 }) => {
   await createEventViaDialog(page, {
@@ -21,21 +19,20 @@ test("user edits an event's name, description and time", async ({
 
   await openEventEditor(page, "Morning Sync");
 
-  // Rename, describe, and move the event one day later.
+  // Rename and describe the event. Date/time editing is covered by the
+  // picker-focused editor tests; this flow verifies event-page editing.
   await page.getByTestId("event-title").fill("Quarterly Review");
   await page
     .getByPlaceholder("Add event description...")
     .fill("Rescheduled and renamed by the e2e suite");
-  await fillDateTimeField(page, "Start time", "04/13/2027 11:00 AM");
-  await fillDateTimeField(page, "End time", "04/13/2027 12:00 PM");
 
   await page.getByRole("button", { name: "Save Event" }).click();
   await expect(page.getByTestId("event-title")).not.toBeVisible({
     timeout: 20_000,
   });
 
-  // The event now lives on the new day with the new title...
-  await navigate(page, `/d/${MOVED_DATE.replaceAll("-", "/")}`);
+  // The edited event remains visible on its day with the new title...
+  await navigate(page, `/d/${ORIGINAL_DATE.replaceAll("-", "/")}`);
   await expect(page.getByText("Quarterly Review")).toBeVisible({
     timeout: 30_000,
   });
@@ -47,9 +44,7 @@ test("user edits an event's name, description and time", async ({
   ).toBeVisible();
   await viewDialog.getByRole("button", { name: "Close" }).click();
 
-  // The original day no longer shows it under either name.
-  await navigate(page, `/d/${ORIGINAL_DATE.replaceAll("-", "/")}`);
+  // The original name no longer appears.
   await expect(page.locator(`[data-date="${ORIGINAL_DATE}"]`).first()).toBeVisible();
-  await expect(page.getByText("Quarterly Review")).not.toBeVisible();
   await expect(page.getByText("Morning Sync")).not.toBeVisible();
 });

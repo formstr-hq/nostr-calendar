@@ -115,7 +115,8 @@ test("participant ignores an accepted invitation via the delete dialog", async (
 
   // Now opt out as a participant: delete dialog → "Ignore invitation".
   const modal = await openEventModal(alice, title);
-  await modal.getByRole("button", { name: "Delete Event" }).click();
+  await modal.getByRole("button", { name: "More options" }).click();
+  await alice.getByRole("menuitem", { name: "Delete Event" }).click();
   const deleteDialog = alice
     .getByRole("dialog")
     .filter({ hasText: "Delete Event" });

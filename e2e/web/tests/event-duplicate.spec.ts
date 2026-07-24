@@ -14,7 +14,8 @@ test("user duplicates an event and saves the copy", async ({
 
   // Open the event and choose Duplicate.
   const dialog = await openEventModal(page, "Origin Event");
-  await dialog.getByRole("button", { name: "Duplicate Event" }).click();
+  await dialog.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Duplicate Event" }).click();
 
   // The duplicate opens the create form prefilled with the original's data.
   await expect(page.getByText("Create New Event")).toBeVisible();

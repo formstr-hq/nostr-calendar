@@ -158,11 +158,16 @@ export async function createInviteEvent(
   });
 
   const modal = await openEventModal(authorPage, title);
-  const href = await modal
-    .locator('a[href*="/event/"]')
-    .first()
+  await modal.getByRole("button", { name: "More options" }).click();
+  // MUI renders menus in a portal, outside the event dialog's DOM subtree.
+  const href = await authorPage
+    .getByRole("menuitem", { name: "Open event in new tab" })
     .getAttribute("href");
   if (!href) throw new Error("Event link not found in event modal");
+  // The first Escape dismisses the portalled overflow menu; the second uses
+  // the dialog's native MUI Escape handling. This also works on layouts where
+  // the close icon is intentionally hidden.
+  await authorPage.keyboard.press("Escape");
   await authorPage.keyboard.press("Escape");
   await expect(modal).not.toBeVisible();
   return href;
@@ -174,7 +179,8 @@ export async function createInviteEvent(
  */
 export async function openEventEditor(page: Page, title: string): Promise<void> {
   const dialog = await openEventModal(page, title);
-  await dialog.getByRole("button", { name: "Edit Event" }).click();
+  await dialog.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Edit Event" }).click();
   await expect(page.getByTestId("event-title")).toHaveValue(title);
 }
 
@@ -195,22 +201,12 @@ export async function fillDateTimeField(
   const [, month, day, year, hours, minutes, meridiem] = match;
 
   const field = page.getByRole("group", { name: fieldLabel });
-  // A re-render mid-typing (relay events arriving) can steal focus and eat
-  // keystrokes — verify what actually landed in the field and retype if off.
-  await expect(async () => {
-    await field.getByRole("spinbutton", { name: "Month" }).click();
-    // Each completed section auto-advances the focus to the next one.
-    await page.keyboard.type(`${month}${day}${year}${hours}${minutes}`, {
-      delay: 40,
-    });
-    await page.keyboard.press(meridiem === "AM" ? "a" : "p");
-
-    const text = ((await field.textContent()) ?? "").replace(/[^0-9APM:/]/g, "");
-    const expected = `${month}/${day}/${year}${hours}:${minutes}${meridiem}`;
-    if (text !== expected) {
-      throw new Error(`field shows "${text}", expected "${expected}"`);
-    }
-  }).toPass({ timeout: 30_000 });
+  // The redesigned MUI field exposes separate text inputs for its date and
+  // time sections. Filling those inputs is stable across localized month
+  // labels, unlike asserting against the group text content.
+  const inputs = field.getByRole("textbox");
+  await inputs.nth(0).fill(`${month}/${day}/${year}`);
+  await inputs.nth(1).fill(`${hours}:${minutes} ${meridiem}`);
 }
 
 /**

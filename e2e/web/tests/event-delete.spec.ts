@@ -14,7 +14,8 @@ import {
 
 async function openDeleteDialog(page: import("@playwright/test").Page, title: string) {
   const modal = await openEventModal(page, title);
-  await modal.getByRole("button", { name: "Delete Event" }).click();
+  await modal.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Delete Event" }).click();
   const deleteDialog = page.getByRole("dialog").filter({ hasText: "Delete Event" });
   await expect(deleteDialog).toBeVisible();
   return deleteDialog;
@@ -55,4 +56,3 @@ test("user removes an event from their calendar only", async ({
   await expect(dialog).not.toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(title)).not.toBeVisible();
 });
-
