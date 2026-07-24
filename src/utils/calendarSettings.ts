@@ -1,7 +1,7 @@
 import type { Dayjs } from "dayjs";
 import type { TimeFormat, WeekStart } from "../stores/settings";
 
-const weekStartIndex: Record<WeekStart, number> = {
+export const weekStartIndex: Record<WeekStart, number> = {
   sunday: 0,
   monday: 1,
   saturday: 6,

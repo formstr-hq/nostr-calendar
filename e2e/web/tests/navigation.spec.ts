@@ -5,7 +5,7 @@ test("home path redirects to the current week", async ({
   authedPage: page,
 }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/w\/\d{4}\/\d{1,2}$/);
+  await expect(page).toHaveURL(/\/w\/\d{4}\/\d{1,3}$/);
 });
 
 test("view switcher switches between day, week and month views", async ({
@@ -19,7 +19,64 @@ test("view switcher switches between day, week and month views", async ({
   await expect(page).toHaveURL(/\/m\/\d{4}\/\d{1,2}$/);
 
   await page.getByRole("radio", { name: "Week", exact: true }).click();
-  await expect(page).toHaveURL(/\/w\/\d{4}\/\d{1,2}$/);
+  await expect(page).toHaveURL(/\/w\/\d{4}\/\d{1,3}$/);
+});
+
+async function setWeekStart(
+  page: Parameters<typeof navigate>[0],
+  weekStart: "Monday" | "Sunday" | "Saturday",
+) {
+  await navigate(page, "/settings/general");
+  await page.getByLabel("Start week on").click();
+  await page.getByRole("option", { name: weekStart }).click();
+  await expect(page.getByLabel("Start week on")).toHaveText(weekStart);
+}
+
+test("today uses Monday as the week route start", async ({
+  authedPage: page,
+}) => {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const startOfYear = new Date(monday.getFullYear(), 0, 1);
+  const dayOfYear =
+    Math.floor((monday.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
+
+  await setWeekStart(page, "Monday");
+  await navigate(page, "/w/2026/5");
+  await page.getByRole("button", { name: "go to today" }).click();
+
+  await expect(page).toHaveURL(
+    new RegExp(`/w/${monday.getFullYear()}/${dayOfYear}$`),
+  );
+});
+
+test("Sunday week navigation advances using Sunday starts", async ({
+  authedPage: page,
+}) => {
+  await setWeekStart(page, "Sunday");
+  await navigate(page, "/w/2026/4");
+
+  await page.getByRole("button", { name: "next period" }).click();
+  await expect(page).toHaveURL(/\/w\/2026\/11$/);
+
+  await page.getByRole("button", { name: "previous period" }).click();
+  await expect(page).toHaveURL(/\/w\/2026\/4$/);
+});
+
+test("Saturday weeks navigate over the year boundary", async ({
+  authedPage: page,
+}) => {
+  await setWeekStart(page, "Saturday");
+  await navigate(page, "/w/2026/3");
+
+  await page.getByRole("button", { name: "previous period" }).click();
+  await expect(page).toHaveURL(/\/w\/2025\/361$/);
+
+  await page.getByRole("button", { name: "next period" }).click();
+  await expect(page).toHaveURL(/\/w\/2026\/3$/);
+  await page.getByRole("button", { name: "next period" }).click();
+  await expect(page).toHaveURL(/\/w\/2026\/10$/);
 });
 
 test("prev / next / today navigate the month view", async ({

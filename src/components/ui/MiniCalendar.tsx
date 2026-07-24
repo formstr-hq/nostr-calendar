@@ -3,9 +3,15 @@ import {
   DateCalendarProps,
 } from "@mui/x-date-pickers/DateCalendar";
 import dayjs, { Dayjs } from "dayjs";
+import updateLocale from "dayjs/plugin/updateLocale";
+import type { WeekStart } from "../../stores/settings";
+import { weekStartIndex } from "../../utils/calendarSettings";
+
+dayjs.extend(updateLocale);
 
 interface MiniCalendarProps {
   date: Dayjs;
+  weekStart: WeekStart;
   onSelect: (date: Dayjs) => void;
 }
 
@@ -14,7 +20,10 @@ interface MiniCalendarProps {
  * Wraps MUI's static DateCalendar (not the popup DatePicker) so day cells
  * keep the accessible gridcell role e2e specs already rely on.
  */
-export function MiniCalendar({ date, onSelect }: MiniCalendarProps) {
+export function MiniCalendar({ date, weekStart, onSelect }: MiniCalendarProps) {
+  // MUI's Dayjs adapter reads the locale's `weekStart` for the month grid.
+  // Keep the sidebar picker in sync with the calendar preference.
+  dayjs.updateLocale(date.locale(), { weekStart: weekStartIndex[weekStart] });
   const onChange: DateCalendarProps["onChange"] = (newDate) => {
     if (newDate) onSelect(newDate);
   };

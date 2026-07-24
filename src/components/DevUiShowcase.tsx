@@ -74,7 +74,7 @@ export function DevUiShowcase() {
         <Box sx={{ p: 2 }}>Bottom sheet content</Box>
       </BottomSheet>
 
-      <MiniCalendar date={date} onSelect={setDate} />
+      <MiniCalendar date={date} weekStart="monday" onSelect={setDate} />
     </Box>
   );
 }

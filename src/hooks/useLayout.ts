@@ -13,6 +13,7 @@ export const useLayout = (): {
   const params = useParams();
   const navigate = useNavigate();
   const updateSetting = useSettings((state) => state.updateSetting);
+  const weekStart = useSettings((state) => state.settings.general.weekStart);
   let currentLayout: Layout = "week";
   if (location.pathname.startsWith("/m")) {
     currentLayout = "month";
@@ -26,7 +27,7 @@ export const useLayout = (): {
   }, [currentLayout, location.pathname, updateSetting]);
   const updateLayout = (newLayout: Layout) => {
     const date = getDateFromRoute(params);
-    const route = getRouteFromDate(date, newLayout);
+    const route = getRouteFromDate(date, newLayout, weekStart);
     navigate(route);
   };
   return { layout: currentLayout, updateLayout };

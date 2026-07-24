@@ -68,14 +68,15 @@ export function useCalendarTopBarProps(): CalendarTopBarProps {
   const date = getDateFromPathname(location.pathname);
 
   const move = useCallback(
-    (dir: number) => navigate(getRouteFromDate(date.add(dir, layout), layout)),
-    [date, layout, navigate],
+    (dir: number) =>
+      navigate(getRouteFromDate(date.add(dir, layout), layout, weekStart)),
+    [date, layout, navigate, weekStart],
   );
 
   const onToday = useCallback(() => {
-    const route = getRouteFromDate(dayjs(), layout);
+    const route = getRouteFromDate(dayjs(), layout, weekStart);
     if (route !== location.pathname) navigate(route);
-  }, [layout, location.pathname, navigate]);
+  }, [layout, location.pathname, navigate, weekStart]);
 
   if (!isCalendarRoute) {
     return { mode: "title", title: staticTitleFor(location.pathname) };
@@ -85,7 +86,8 @@ export function useCalendarTopBarProps(): CalendarTopBarProps {
     mode: "calendar",
     dateLabel: formatDateLabel(date, layout, weekStart),
     view: layout,
-    onViewChange: (newLayout) => navigate(getRouteFromDate(date, newLayout)),
+    onViewChange: (newLayout) =>
+      navigate(getRouteFromDate(date, newLayout, weekStart)),
     onPrev: () => move(-1),
     onNext: () => move(1),
     onToday,

@@ -7,8 +7,9 @@ import { getRouteFromDate } from "../utils/dateBasedRouting";
 export function Index() {
   const navigate = useNavigate();
   const layout = useSettings((state) => state.settings.layout);
+  const weekStart = useSettings((state) => state.settings.general.weekStart);
   useEffect(() => {
-    navigate(getRouteFromDate(dayjs(), layout), { replace: true });
-  }, [layout, navigate]);
+    navigate(getRouteFromDate(dayjs(), layout, weekStart), { replace: true });
+  }, [layout, navigate, weekStart]);
   return <></>;
 }

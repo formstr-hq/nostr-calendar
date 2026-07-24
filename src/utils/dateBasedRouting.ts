@@ -1,9 +1,7 @@
 import dayjs, { Dayjs } from "dayjs";
-import weekOfYear from "dayjs/plugin/weekOfYear";
 import type { Layout } from "../hooks/useLayout";
-
-dayjs.extend(weekOfYear);
-
+import { startOfConfiguredWeek } from "./calendarSettings";
+import type { WeekStart } from "../stores/settings";
 type DayRouteParams = {
   year: string;
   month: string;
@@ -17,7 +15,8 @@ type MonthRouteParams = {
 
 type WeekRouteParams = {
   year: string;
-  weekNumber: string;
+  /** One-based day of year on which this displayed week starts. */
+  startDayOfWeek: string;
 };
 
 type CalendarRouteParams =
@@ -39,13 +38,13 @@ export function getDateFromRoute(params: CalendarRouteParams): Dayjs {
     return dayjs(`${year}-${params.monthNumber}-01`);
   }
 
-  // Week route: /w/:year/:weekNumber
-  if (year && "weekNumber" in params) {
-    // Use local week boundaries so rendered days line up with local midnight.
-    return dayjs()
-      .year(Number(year))
-      .week(Number(params.weekNumber))
-      .startOf("week");
+  // Week route: /w/:year/:startDayOfWeek. The second segment is the
+  // one-based day of the year, not a locale/ISO week number. This keeps the
+  // route independent of the user's configured first day of week.
+  if (year && "startDayOfWeek" in params) {
+    return dayjs(`${year}-01-01`)
+      .startOf("day")
+      .add(Number(params.startDayOfWeek) - 1, "day");
   }
 
   // fallback (optional)
@@ -75,13 +74,17 @@ export function getDateFromPathname(pathname: string): Dayjs {
   }
   const week = pathname.match(/^\/w\/(\d+)\/(\d+)/);
   if (week) {
-    return getDateFromRoute({ year: week[1], weekNumber: week[2] });
+    return getDateFromRoute({ year: week[1], startDayOfWeek: week[2] });
   }
   return dayjs();
 }
 
-export function getRouteFromDate(date: Dayjs, type: Layout): string {
-  let year = date.year();
+export function getRouteFromDate(
+  date: Dayjs,
+  type: Layout,
+  weekStart: WeekStart = "monday",
+): string {
+  const year = date.year();
 
   switch (type) {
     case "day": {
@@ -98,11 +101,9 @@ export function getRouteFromDate(date: Dayjs, type: Layout): string {
     }
 
     case "week": {
-      const weekNumber = date.week();
-      if (weekNumber === 1) {
-        year = date.endOf("week").year();
-      }
-      return `/w/${year}/${weekNumber}`;
+      const start = startOfConfiguredWeek(date, weekStart);
+      const startDayOfYear = start.diff(start.startOf("year"), "day") + 1;
+      return `/w/${start.year()}/${startDayOfYear}`;
     }
   }
 }
