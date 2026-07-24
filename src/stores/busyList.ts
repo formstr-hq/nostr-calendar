@@ -19,9 +19,9 @@
 import { create } from "zustand";
 import {
   fetchBusyListsForUser as fetchBusyListsForUserNostr,
-  getUserPublicKey,
   publishBusyList,
-} from "../common/nostr";
+} from "../nostr/busy";
+import { getUserPublicKey } from "../nostr/crypto";
 import {
   busyListMonthKey,
   busyListMonthKeysForRange,

@@ -30,7 +30,7 @@ NIP-52E uses a **view key** pattern: event content is encrypted with a randomly 
 | 32678 | Private Time-Based Calendar Event | Parameterized replaceable |
 | 32681 | Private Day Event | Parameterized replaceable |
 | 1052  | Calendar Event Gift Wrap | Regular (NIP-59) |
-| 52    | Calendar Event Rumor | Unsigned (inside gift wrap) |
+| 14    | Calendar Event Invitation Rumor | Unsigned (inside gift wrap; [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) "chat message" kind, reused) |
 | 32123 | Private Calendar List | Parameterized replaceable |
 | 84    | Participant Removal | Regular |
 | 31926 | Public Busy List | Parameterized replaceable |
@@ -228,30 +228,38 @@ Recipients see incoming gift wraps as **invitations** — they must explicitly a
 
 ### Three-Layer NIP-59 Structure
 
-**Layer 1 — Rumor** (kind `52`, unsigned, not broadcast):
+**Layer 1 — Rumor** (kind `14`, unsigned, not broadcast):
+
+The rumor kind is [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md)'s `14` ("chat message"), reused deliberately so the invitation reads as a real DM in any NIP-17-compliant client, not just this app.
 
 ```json
 {
-  "kind": 52,
+  "kind": 14,
   "pubkey": "<sender hex pubkey>",
   "created_at": <unix timestamp>,
   "tags": [
+    ["p", "<recipient hex pubkey>"],
     ["a", "<32678|32681>:<author hex pubkey>:<event d-tag>", "<relay hint URL>"],
-    ["viewKey", "<nsec-encoded view secret key>"]
+    ["viewKey", "<nsec-encoded view secret key>"],
+    ["signing_nsec", "<nsec-encoded ephemeral key the gift wrap is signed with>"]
   ],
-  "content": "",
+  "content": "<sender display name> has invited you to the <event title> on <formatted date>",
   "id": "<rumor id>"
 }
 ```
 
 The `a` tag uses the standard NIP-01 parameterized address format: `kind:pubkey:d-tag`. Use `32678` for time-based events and `32681` for day events. The relay hint is the URL of a relay that accepted the private event, so the recipient can fetch it.
 
+The `signing_nsec` tag is the nsec-encoding of the *same* ephemeral secret key the outer gift wrap (Layer 3) is signed with. It only ever exists inside the encrypted rumor, so only the recipient can read it — see "Recipient Deletion" below for why it's there. Invitations sent before this tag existed simply omit it; treat it as optional.
+
 **Layer 2 — Seal** (kind `13`, signed by sender):
 - `content`: `nip44Encrypt(recipientPubkey, JSON.stringify(rumor))`
 
-**Layer 3 — Gift Wrap** (kind `1052`, signed by a random ephemeral key):
+**Layer 3 — Gift Wrap** (kind `1052`, signed by the same random ephemeral key referenced by `signing_nsec`):
 - `content`: `nip44Encrypt(ephemeralKey, recipientPubkey, JSON.stringify(seal))`
-- `tags`: `[["p", "<recipient hex pubkey>"]]`
+- `tags`: `[["p", "<recipient hex pubkey>"], ["k", "1052"]]`
+
+The `k` tag exists so this app can pick calendar-invitation wraps out from other NIP-59-wrapped content sharing the same outer kind (e.g. if a future change unifies gift-wrap kinds — see the NIP compliance track in `docs/REDESIGN_MASTER_PLAN.md`), without requiring readers to fully unwrap first. Its value is fixed at `"1052"` regardless of the wrap's actual kind, since it identifies the *invitation* semantic, not the wire kind.
 
 ### Fetching Gift Wraps
 
@@ -261,7 +269,13 @@ Clients subscribe with:
 { "kinds": [1052], "#p": ["<user hex pubkey>"] }
 ```
 
-Unwrap: gift wrap → seal → rumor → extract the `a` tag coordinate and `viewKey`.
+Unwrap: gift wrap → seal → rumor → extract the `a` tag coordinate and `viewKey`. Rumor kind and content are not otherwise validated — readers should tolerate both the current kind-`14` rumor and legacy kind-`52`, empty-content rumors from before this change.
+
+### Recipient Deletion
+
+Gift wraps are signed by a random ephemeral key that the recipient doesn't otherwise hold, so relays enforcing [NIP-09](./NIP-09.md) (deletion only accepted from the target event's own author) would normally never let the recipient delete an unwanted invitation. The `signing_nsec` rumor tag closes that gap: once decrypted, the recipient can sign a kind `5` deletion event (`["e", "<gift wrap id>"]`) with that same key and publish it, which NIP-09-compliant relays accept as coming from the wrap's own author.
+
+This is in addition to, not a replacement for, the existing kind `84` participant-removal notice — the Android background worker (`InvitationWorker.java`) suppresses future notifications for a gift wrap by checking for a matching kind-84 event, and never decrypts anything, so that mechanism keeps working unchanged regardless of relay-side deletion support.
 
 ### Invitation Acceptance
 
@@ -271,7 +285,7 @@ When the user accepts an invitation:
 2. Add the reference to the user's chosen calendar list (kind `32123`)
 3. Re-publish the updated calendar list
 
-When the user dismisses an invitation, it is hidden locally and not added to any calendar.
+When the user dismisses an invitation, it is hidden locally, a kind `84` notice is published, and — when a `signing_nsec` is available — the gift wrap is also deleted per "Recipient Deletion" above.
 
 ### Deduplication
 
@@ -576,13 +590,16 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
 6. Build event ref: ["32678|32681:{authorPubkey}:{dTag}", "{relayHint}", "{nsec(viewSecretKey)}"]
 7. Add event ref to creator's calendar list (kind 32123), re-encrypt, re-publish
 8. Update the relevant month's busy list (kind 31926) with the event's time block
-9. For each participant (including creator):
-   a. Create rumor (kind 52):
-      tags: [["a", "32678|32681:{authorPubkey}:{dTag}", "{relayHint}"],
-             ["viewKey", "{nsec(viewSecretKey)}"]]
-      content: ""
+9. Generate ephemeralKey (random) — signs the gift wrap, shared with each participant below
+10. For each participant (including creator):
+   a. Create rumor (kind 14):
+      tags: [["p", "{participantPubkey}"],
+             ["a", "32678|32681:{authorPubkey}:{dTag}", "{relayHint}"],
+             ["viewKey", "{nsec(viewSecretKey)}"],
+             ["signing_nsec", "{nsec(ephemeralKey)}"]]
+      content: "{senderDisplayName} has invited you to the {title} on {formattedDate}"
    b. Seal (kind 13): encrypt rumor for recipient using sender's key
-   c. Gift Wrap (kind 1052): encrypt seal using ephemeral key, tag with recipient pubkey
+   c. Gift Wrap (kind 1052): encrypt seal using ephemeralKey, tags: [["p", recipientPubkey], ["k", "1052"]]
    d. Fetch recipient's NIP-65 inbox relays → publish gift wrap there
 ```
 
@@ -592,7 +609,7 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
 1. Subscribe: { kinds: [1052], "#p": [myPubkey] }
 2. For each gift wrap received:
    a. Unwrap: gift wrap → seal → rumor
-   b. Extract event coordinate, relayHint, and viewKey from rumor tags
+   b. Extract event coordinate, relayHint, viewKey, and (if present) signingNsec from rumor tags
    c. Check if event d-tag already exists in any calendar list → skip if so
    d. Fetch from relayHint first, then fall back to known relays:
       { kinds: [32678, 32681], "#d": [eventDTag], authors: [authorPubkey] }
@@ -601,7 +618,8 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
    a. Build event ref: [coordinate, relayHint, nsecViewKey]
       (relayHint comes from the rumor's a tag — the author's chosen fetch relay)
    b. Add to chosen calendar list (kind 32123), re-publish
-4. User dismisses: hide locally, do not add to calendar
+4. User dismisses: hide locally, publish kind-84 participant-removal notice, and — if
+   signingNsec is present — sign+publish a kind-5 NIP-09 deletion of the gift wrap with it
 ```
 
 ### Loading Calendar Events at Startup

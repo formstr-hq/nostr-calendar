@@ -103,6 +103,7 @@ export const ParticipantAdd = ({
       }}
     >
       <TextField
+        size="small"
         error={!!errorMessageId}
         helperText={
           errorMessageId

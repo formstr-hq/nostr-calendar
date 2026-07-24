@@ -4,17 +4,26 @@ import type { Layout } from "./useLayout";
 import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { DeviceCalendar } from "../plugins/deviceCalendar";
 import { deviceCalendarIdFor } from "../utils/deviceCalendarAdapter";
+import { useSettings } from "../stores/settings";
+import { startOfConfiguredWeek } from "../utils/calendarSettings";
+import type { WeekStart } from "../stores/settings";
 
-function getDeviceEventRange(date: Dayjs, layout: Layout) {
+function getDeviceEventRange(
+  date: Dayjs,
+  layout: Layout,
+  weekStart: WeekStart,
+) {
   let rangeStart = date.startOf("day");
   let rangeEnd = date.endOf("day");
 
   if (layout === "week") {
-    rangeStart = date.startOf("week").startOf("day");
-    rangeEnd = date.endOf("week").endOf("day");
+    rangeStart = startOfConfiguredWeek(date, weekStart);
+    rangeEnd = rangeStart.add(6, "day").endOf("day");
   } else if (layout === "month") {
-    rangeStart = date.startOf("month").startOf("week").startOf("day");
-    rangeEnd = date.endOf("month").endOf("week").endOf("day");
+    rangeStart = startOfConfiguredWeek(date.startOf("month"), weekStart);
+    rangeEnd = startOfConfiguredWeek(date.endOf("month"), weekStart)
+      .add(6, "day")
+      .endOf("day");
   }
 
   return {
@@ -26,6 +35,7 @@ function getDeviceEventRange(date: Dayjs, layout: Layout) {
 }
 
 export function useVisibleDeviceEvents(date: Dayjs, layout: Layout) {
+  const weekStart = useSettings((state) => state.settings.general.weekStart);
   const deviceInit = useDeviceCalendars((state) => state.init);
   const deviceSyncPermission = useDeviceCalendars(
     (state) => state.syncPermission,
@@ -76,7 +86,7 @@ export function useVisibleDeviceEvents(date: Dayjs, layout: Layout) {
 
   useEffect(() => {
     if (devicePermission !== "granted") return;
-    void deviceRefreshEvents(getDeviceEventRange(date, layout));
+    void deviceRefreshEvents(getDeviceEventRange(date, layout, weekStart));
   }, [
     date,
     deviceCalendars,
@@ -84,6 +94,7 @@ export function useVisibleDeviceEvents(date: Dayjs, layout: Layout) {
     deviceRefreshEvents,
     deviceVisibility,
     layout,
+    weekStart,
   ]);
 
   const visibleDeviceCalendarIds = new Set(

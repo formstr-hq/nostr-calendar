@@ -14,16 +14,17 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ObserveHandle } from "@formstr/local-relay";
 import {
   fetchPrivateEventRSVPs,
   fetchPublicEventRSVPs,
-  getAllResponsesForForm,
   publishPrivateRSVPEvent,
   publishPublicRSVPEvent,
   RSVPPayload,
   RSVPRecord,
-} from "../common/nostr";
-import { EventKinds } from "../common/EventConfigs";
+} from "../nostr/rsvp";
+import { getAllResponsesForForm } from "../nostr/forms";
+import { EventKinds } from "../nostr/kinds";
 import { ICalendarEvent } from "../utils/types";
 import { useUser } from "../stores/user";
 import { getFormAddress } from "../utils/formLink";
@@ -90,7 +91,7 @@ export function useEventRsvps(
       });
     };
 
-    let handle: { close?: () => void; unsubscribe?: () => void } | null = null;
+    let handle: ObserveHandle | null = null;
     if (event.isPrivateEvent) {
       if (!event.viewKey) {
         setIsLoading(false);
@@ -114,8 +115,7 @@ export function useEventRsvps(
     const loadingTimer = setTimeout(() => setIsLoading(false), 4000);
     return () => {
       clearTimeout(loadingTimer);
-      handle?.close?.();
-      handle?.unsubscribe?.();
+      handle?.unobserve();
     };
   }, [event, eventCoord, myPubkey]);
 

@@ -1,16 +1,14 @@
-import { ThemeProvider, CssBaseline, Box } from "@mui/material";
-import { theme } from "./theme";
-import { useEffect, useRef, useState } from "react";
+import { AppThemeProvider } from "./theme/AppThemeProvider";
+import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
 import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
 import dictionary, { NestedObject } from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
-import RelayManager from "./components/RelayManager";
 import { BrowserRouter, useLocation, useNavigate } from "react-router";
 import { Routing } from "./components/Routing";
-import { Header, HeaderSpacer } from "./components/Header";
+import { AppShell } from "./components/AppShell";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
@@ -30,11 +28,13 @@ import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { notifyAppReady } from "./plugins/appReady";
 import { AppLoadingBar } from "./components/AppLoadingBar";
+import { getDataLayer } from "@formstr/local-relay";
+
 import { useInvitations } from "./stores/invitations";
 import { useBusyList } from "./stores/busyList";
 import { busyListMonthKeysForRange } from "./utils/dateHelper";
 import { useDateWithRouting } from "./hooks/useDateWithRouting";
-import { isPublicAppPath, usesStandaloneHeader } from "./utils/deepLinks";
+import { isPublicAppPath } from "./utils/deepLinks";
 import { useNativeDeepLinks } from "./hooks/useNativeDeepLinks";
 
 const browserLocale =
@@ -57,7 +57,6 @@ function Application() {
   const [importedEvent, setImportedEvent] = useState<ICalendarEvent | null>(
     null,
   );
-  const contentRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const fetchPrivateEvents = useTimeBasedEvents(
@@ -65,7 +64,6 @@ function Application() {
   );
   const { calendars, isLoaded: calendarsLoaded } = useCalendarLists();
   const publicRoute = isPublicAppPath(location.pathname);
-  const standaloneHeaderRoute = usesStandaloneHeader(location.pathname);
   const shouldRenderRouting = isInitialized && (Boolean(user) || publicRoute);
   const iosNative = isIOSNative();
 
@@ -76,11 +74,6 @@ function Application() {
   useEffect(() => {
     document.documentElement.classList.toggle("ios-native", iosNative);
   }, [iosNative]);
-
-  useEffect(() => {
-    if (!iosNative) return;
-    contentRef.current?.scrollTo({ top: 0, left: 0 });
-  }, [iosNative, location.pathname, location.search]);
 
   const { fetchInvitations, stopInvitations } = useInvitations();
 
@@ -170,6 +163,27 @@ function Application() {
     };
   }, []);
 
+  // Close every relay socket when the app is backgrounded and reopen on
+  // resume — the worker keeps the store and standing interests either way.
+  useEffect(() => {
+    if (!isNative) return;
+
+    let cleanup: (() => void) | undefined;
+    import("@capacitor/app").then(({ App: CapApp }) => {
+      const listener = CapApp.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) getDataLayer().resume();
+        else getDataLayer().pause();
+      });
+      cleanup = () => {
+        listener.then((l) => l.remove());
+      };
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, []);
+
   // Update last invitation fetch time when app resumes (for background invitation worker)
   useEffect(() => {
     if (!isNative || !user) return;
@@ -220,19 +234,7 @@ function Application() {
   useNativeDeepLinks();
 
   return (
-    <Box
-      className="App"
-      sx={{
-        ...(iosNative && {
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          overflow: "hidden",
-        }),
-      }}
-    >
-      {!standaloneHeaderRoute && <Header onImportEvent={setImportedEvent} />}
-
+    <>
       <ICSListener
         importedEvent={importedEvent}
         onClose={() => setImportedEvent(null)}
@@ -243,27 +245,18 @@ function Application() {
         onClose={() => updateLoginModal(false)}
       />
 
-      <RelayManager />
-      {!standaloneHeaderRoute && <HeaderSpacer />}
-
       <AppLoadingBar />
 
-      <Box
-        ref={contentRef}
-        sx={{
-          ...(iosNative && {
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            overflowX: "hidden",
-            overscrollBehavior: "contain",
-            WebkitOverflowScrolling: "touch",
-          }),
-        }}
-      >
-        {shouldRenderRouting ? <Routing /> : null}
-      </Box>
-    </Box>
+      {user ? (
+        <AppShell onImportEvent={setImportedEvent}>
+          <Routing />
+        </AppShell>
+      ) : shouldRenderRouting ? (
+        // Logged-out visitor on a public route (shared event / booking
+        // page): render the route content directly, no app chrome.
+        <Routing />
+      ) : null}
+    </>
   );
 }
 
@@ -306,12 +299,11 @@ export default function App() {
         dateAdapter={AdapterDayjs}
         adapterLocale={dayjsLocale}
       >
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
+        <AppThemeProvider>
           <BrowserRouter>
             <Application />
           </BrowserRouter>
-        </ThemeProvider>
+        </AppThemeProvider>
       </LocalizationProvider>
     </IntlProvider>
   );

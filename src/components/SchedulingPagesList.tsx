@@ -133,6 +133,7 @@ export const SchedulingPagesList = ({
                   <IconButton
                     edge="end"
                     size="small"
+                    aria-label="copy booking link"
                     onClick={() => handleCopyLink(page.id)}
                   >
                     <ContentCopyIcon sx={{ fontSize: 16 }} />
@@ -141,6 +142,7 @@ export const SchedulingPagesList = ({
                 <Tooltip title={formatMessage({ id: "scheduling.openLink" })}>
                   <IconButton
                     size="small"
+                    aria-label="open booking link"
                     component="a"
                     href={getPageUrl(page)}
                     target="_blank"
@@ -150,13 +152,18 @@ export const SchedulingPagesList = ({
                   </IconButton>
                 </Tooltip>
                 <Tooltip title={formatMessage({ id: "navigation.edit" })}>
-                  <IconButton size="small" onClick={() => handleEdit(page.id)}>
+                  <IconButton
+                    size="small"
+                    aria-label="edit booking page"
+                    onClick={() => handleEdit(page.id)}
+                  >
                     <EditIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title={formatMessage({ id: "navigation.delete" })}>
                   <IconButton
                     size="small"
+                    aria-label="delete booking page"
                     onClick={() => handleDelete(page.id)}
                   >
                     <DeleteIcon sx={{ fontSize: 16 }} />

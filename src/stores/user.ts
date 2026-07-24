@@ -10,13 +10,15 @@ import {
 import { signerManager } from "../common/signer";
 import { useTimeBasedEvents } from "./events";
 import { cancelAllNotifications } from "../utils/notifications";
-import { defaultRelays, fetchRelayList } from "../common/nostr";
+import { fetchRelayList } from "../nostr/relays";
+import { defaultRelays } from "../common/relayConfig";
 import { useRelayStore } from "./relays";
 import { useCalendarLists } from "./calendarLists";
 import { useInvitations } from "./invitations";
 import { useBookingRequests } from "./bookingRequests";
 import { useSchedulingPages } from "./schedulingPages";
-import { nostrRuntime } from "../common/nostrRuntime";
+import { restartDataLayerWiped } from "../dataLayer/bootstrap";
+import { useSettings } from "./settings";
 import {
   BG_KEY_USER_PUBKEY,
   BG_KEY_RELAYS,
@@ -86,11 +88,10 @@ export const useUser = create<{
     await removeSecureItem(BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME);
     await removeSecureItem(BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME);
     logger.log("logout: background worker keys cleared");
-    const pubkey = useUser.getState().user?.pubkey;
-    if (pubkey) {
-      logger.log("logout: clearing offline event cache for", pubkey);
-      await nostrRuntime.clearOfflineCache(pubkey);
-    }
+    // Kill the relay worker and wipe its IndexedDB event cache — nothing of
+    // the account's data survives logout on this device.
+    await restartDataLayerWiped();
+    logger.log("logout: local relay wiped and restarted");
     set({ user: null, isInitialized: false });
     localStorage.removeItem(USER_STORAGE_KEY);
     logger.log("logout: complete");
@@ -131,11 +132,6 @@ const onUserChange = async () => {
     });
   if (cachedUser) {
     logger.log("onUserChange: cached user found", cachedUser.pubkey);
-    // Always hydrate — sets offlineCachePubkey so persistAcceptedEvent works.
-    // Must run on every app start, not just when the user changes.
-    logger.log("onUserChange: hydrating offline event cache");
-    await nostrRuntime.hydrateOfflineEvents(cachedUser.pubkey);
-
     if (currentUser?.pubkey !== cachedUser.pubkey) {
       logger.log("onUserChange: new user detected, resetting private events");
       const eventManager = useTimeBasedEvents.getState();
@@ -179,11 +175,9 @@ const syncUserNetworkState = async (pubkey: string) => {
       "relays",
     );
     useRelayStore.getState().setRelays(userRelays);
-
-    logger.log("syncUserNetworkState: fetching deletion events");
-    await nostrRuntime.fetchDeletionEvents(userRelays, pubkey);
-    logger.log("syncUserNetworkState: fetching participant removal events");
-    await nostrRuntime.fetchParticipantRemovalEvents(userRelays, pubkey);
+    await useSettings.getState().syncGeneralSettings(pubkey);
+    // Deletion (kind 5) and participant-removal (kind 84) enforcement is a
+    // standing interest owned by the dataLayer bootstrap — nothing to fetch.
 
     await setSecureItem(BG_KEY_USER_PUBKEY, pubkey);
     await setSecureItem(BG_KEY_RELAYS, userRelays);

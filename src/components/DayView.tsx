@@ -15,6 +15,8 @@ import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
+import { useSettings } from "../stores/settings";
+import { hourLabel, parseHour } from "../utils/calendarSettings";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -22,6 +24,11 @@ dayjs.extend(isSameOrAfter);
 
 export function DayView({ events, date }: ViewProps) {
   const intl = useIntl();
+  const { timeFormat, workingHours } = useSettings(
+    (state) => state.settings.general,
+  );
+  const workStartHour = parseHour(workingHours.start);
+  const workEndHour = parseHour(workingHours.end);
   const dayStart = date.startOf("day").valueOf();
   const dayEnd = dayStart + 24 * 60 * 60 * 1000;
   const allDayEvents = events.filter(
@@ -34,7 +41,8 @@ export function DayView({ events, date }: ViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clickedDateTime, setClickedDateTime] = useState<number | undefined>();
-  const handleCellClick = (event: React.MouseEvent<HTMLDivElement>) => {
+
+  const handleCellClick = (event: React.MouseEvent<HTMLElement>) => {
     const time = getTimeFromCell(event, containerRef);
     if (time) {
       setClickedDateTime(time);
@@ -47,11 +55,16 @@ export function DayView({ events, date }: ViewProps) {
       {allDayEvents.length > 0 && (
         <Box
           display="flex"
-          sx={{ borderBottom: "1px solid #ddd", minHeight: 24 }}
+          sx={{
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            minHeight: 24,
+          }}
         >
           <Box
             width={60}
-            borderRight="1px solid #ddd"
+            borderRight="1px solid"
+            sx={{ borderColor: "divider" }}
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -60,7 +73,7 @@ export function DayView({ events, date }: ViewProps) {
               {intl.formatMessage({ id: "event.allDayLabel" })}
             </Typography>
           </Box>
-          <Box flex={1} p={0.5}>
+          <Box flex={1} minWidth={0} overflow="hidden" p={0.5}>
             {allDayEvents.map((evt) => (
               <AllDayEventChip key={`${evt.id}:${evt.begin}`} event={evt} />
             ))}
@@ -70,28 +83,54 @@ export function DayView({ events, date }: ViewProps) {
       <DndContext>
         <Box display="flex" height={24 * 60}>
           {/* Time column */}
-          <Box width={60} borderRight="1px solid #ddd">
+          <Box
+            width={60}
+            borderRight="1px solid"
+            sx={{ borderColor: "divider" }}
+          >
             {Array.from({ length: 24 }).map((_, h) => (
               <Box key={h} height={60} px={0.5}>
-                <Typography variant="caption">{h}:00</Typography>
+                <Typography variant="caption">
+                  {hourLabel(h, timeFormat)}
+                </Typography>
               </Box>
             ))}
           </Box>
 
           {/* Events */}
-          <Box flex={1} position="relative" ref={containerRef}>
-            <TimeMarker offset="0px" />
+          <Box
+            flex={1}
+            minWidth={0}
+            overflow="hidden"
+            position="relative"
+            ref={containerRef}
+          >
+            <TimeMarker offset="0px" isCurrent={date.isSame(dayjs(), "day")} />
             {/* Hour Divider */}
             <Box display={"flex"} flexDirection={"column"}>
               {Array.from({ length: 24 }).map((_, h) => (
                 <Box
+                  component="button"
                   data-date={date.format("YYYY-MM-DD")}
+                  data-testid="day-hour-cell"
                   onClick={handleCellClick}
                   key={h}
-                  height={60}
-                  px={0.5}
+                  aria-label="time slot"
                   sx={{
+                    height: 60,
+                    px: 0.5,
                     cursor: "pointer",
+                    border: "none",
+                    background: "transparent",
+                    display: "block",
+                    width: "100%",
+                    p: 0,
+                    textAlign: "left",
+                    bgcolor:
+                      h < workStartHour || h >= workEndHour
+                        ? "action.hover"
+                        : "transparent",
+                    "&:hover": { bgcolor: "action.selected" },
                   }}
                 >
                   <Divider />

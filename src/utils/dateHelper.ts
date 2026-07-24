@@ -6,6 +6,29 @@ export function isWeekend(date: string | Date | Dayjs): boolean {
   return day === 0 || day === 6;
 }
 
+/**
+ * True when an event spans one or more complete local days: starts and ends
+ * at local midnight (hour/minute 00:00) some whole number of days apart.
+ * There is no explicit "all day" toggle in the editor — this is derived
+ * purely from begin/end so any event that happens to span full days (e.g. a
+ * multi-day trip) renders as an all-day chip automatically.
+ *
+ * Deliberately checks only hour/minute, not seconds/ms: the event editor's
+ * DateTimePicker has no seconds field, so a value the user set to "12:00 AM"
+ * still carries whatever seconds/ms it inherited from the picker's initial
+ * "now" default — an exact-millisecond midnight check would never match
+ * anything a user could actually create through the UI.
+ */
+export function isAllDayEvent(begin: number, end: number): boolean {
+  if (!(end > begin)) return false;
+  const start = dayjs(begin);
+  const finish = dayjs(end);
+  if (start.hour() !== 0 || start.minute() !== 0) return false;
+  if (finish.hour() !== 0 || finish.minute() !== 0) return false;
+  const durationDays = finish.startOf("day").diff(start.startOf("day"), "day");
+  return durationDays >= 1;
+}
+
 export const formatDateTime = (timestamp: number) =>
   new Date(timestamp).toLocaleString();
 

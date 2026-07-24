@@ -7,7 +7,13 @@ import type {
   IBusyList,
   IBusyRange,
 } from "./types";
-import { getRelays } from "../common/nostr";
+import { getRelays } from "../common/relayConfig";
+import { isAllDayEvent } from "./dateHelper";
+
+export const getDTag = (event: Event): string | null => {
+  const tag = event.tags.find((tag) => tag[0] === "d");
+  return tag && tag[1] ? tag[1] : null;
+};
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -109,6 +115,7 @@ export const nostrEventToCalendar = (
         break;
     }
   });
+  parsedEvent.allDay = isAllDayEvent(parsedEvent.begin, parsedEvent.end);
   return parsedEvent;
 };
 

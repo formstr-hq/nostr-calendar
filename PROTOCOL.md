@@ -6,18 +6,19 @@ This document describes the Nostr event kinds, encryption schemes, and data flow
 
 ## Event Kinds
 
-| Kind  | Name | Type | Description |
-|-------|------|------|-------------|
-| 31923 | Public Calendar Event | Parameterized replaceable | NIP-52 time-based calendar event. Content and tags are plaintext. |
-| 32678 | Private Calendar Event | Parameterized replaceable | Encrypted calendar event (regular or recurring). Content is NIP-44 encrypted with a view key. Recurring events include an RRULE tag in the encrypted payload. |
-| 32123 | Calendar List | Parameterized replaceable | Self-encrypted list of event references, organized into named colored collections. |
-| 1052  | Calendar Event Gift Wrap | Regular | NIP-59 gift wrap containing a sealed rumor with a view key for a private event. Used for invitations. |
-| 13    | Seal | Regular | NIP-59 seal. Intermediate layer: sender encrypts the rumor for the recipient, then signs it. |
+| Kind  | Name                      | Type                      | Description                                                                                                                                                   |
+| ----- | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 31923 | Public Calendar Event     | Parameterized replaceable | NIP-52 time-based calendar event. Content and tags are plaintext.                                                                                             |
+| 32678 | Private Calendar Event    | Parameterized replaceable | Encrypted calendar event (regular or recurring). Content is NIP-44 encrypted with a view key. Recurring events include an RRULE tag in the encrypted payload. |
+| 32123 | Calendar List             | Parameterized replaceable | Self-encrypted list of event references, organized into named colored collections.                                                                            |
+| 1052  | Calendar Event Gift Wrap  | Regular                   | NIP-59 gift wrap containing a sealed rumor with a view key for a private event. Used for invitations.                                                         |
+| 13    | Seal                      | Regular                   | NIP-59 seal. Intermediate layer: sender encrypts the rumor for the recipient, then signs it.                                                                  |
+| 30078 | Application-specific Data | Parameterized replaceable | NIP-78 self-encrypted user preferences.                                                                                                                       |
 
 ### Rumor Kinds (unsigned, inside seals)
 
-| Kind | Name | Description |
-|------|------|-------------|
+| Kind | Name                 | Description                                                                                          |
+| ---- | -------------------- | ---------------------------------------------------------------------------------------------------- |
 | 52   | Calendar Event Rumor | Unsigned event inside a gift wrap (kind 1052). Contains the event's `a`-tag reference and `viewKey`. |
 
 ---
@@ -119,22 +120,22 @@ Each `"a"` tag in the decrypted content follows a standard NIP `a`-tag coordinat
 
 **First value** (standard `a`-tag coordinate):
 
-| Field | Description |
-|-------|-------------|
-| `kind` | Nostr event kind (`32678`) |
-| `authorPubkey` | Hex public key of the event author |
-| `eventDTag` | The event's unique `"d"` tag identifier |
+| Field          | Description                             |
+| -------------- | --------------------------------------- |
+| `kind`         | Nostr event kind (`32678`)              |
+| `authorPubkey` | Hex public key of the event author      |
+| `eventDTag`    | The event's unique `"d"` tag identifier |
 
 **Second value** (optional relay URL):
 
-| Field | Description |
-|-------|-------------|
+| Field      | Description                                                            |
+| ---------- | ---------------------------------------------------------------------- |
 | `relayUrl` | Relay URL where the event can be found (empty string if not specified) |
 
 **Third value**:
 
-| Field | Description |
-|-------|-------------|
+| Field     | Description                               |
+| --------- | ----------------------------------------- |
 | `viewKey` | nsec-encoded key for decrypting the event |
 
 ### Visibility
@@ -283,16 +284,40 @@ Gift Wrap (kind 1052)
             └─ Used to build event ref when invitation is accepted
 ```
 
+## General Settings Sync (NIP-78 kind 30078)
+
+General calendar preferences are synced as one parameterized replaceable
+application-data event:
+
+```
+kind: 30078
+tags: [["d", "calendar/general_settings"]]
+content: nip44_encrypt_to_self(JSON.stringify({
+  "weekStart": "monday",
+  "timeFormat": "24h",
+  "defaultCalendarId": "<calendar d-tag or empty>",
+  "defaultDuration": 30,
+  "defaultReminderMinutes": 10,
+  "workingHours": { "start": "09:00", "end": "18:00" }
+}))
+```
+
+The content is encrypted and decrypted through the logged-in user's signer
+with their own pubkey. On startup the newest matching event is applied over
+the app defaults. If none exists, the defaults remain active. Calendar layout
+(day/week/month) is intentionally device-local and records the last view
+accessed; theme and filtering preferences also remain outside this event.
+
 ## Caching Strategy
 
 All data is cached in secure storage for offline/instant access:
 
-| Storage Key | Contents |
-|-------------|----------|
-| `cal:calendar_lists` | Array of `ICalendarList` objects (decrypted) |
-| `cal:calendar_visibility` | Map of `calendarId → boolean` (client-side only) |
-| `cal:events` | Array of `ICalendarEvent` objects (decrypted, parsed) |
-| `cal:invitations` | Array of `IInvitation` objects (pending invitations) |
+| Storage Key               | Contents                                              |
+| ------------------------- | ----------------------------------------------------- |
+| `cal:calendar_lists`      | Array of `ICalendarList` objects (decrypted)          |
+| `cal:calendar_visibility` | Map of `calendarId → boolean` (client-side only)      |
+| `cal:events`              | Array of `ICalendarEvent` objects (decrypted, parsed) |
+| `cal:invitations`         | Array of `IInvitation` objects (pending invitations)  |
 
 On startup, cached data is loaded first for immediate display, then relay fetches update the state by merging (newer versions win).
 

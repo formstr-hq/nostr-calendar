@@ -33,7 +33,12 @@ export function DateLabel({
         height: `${size}px`,
       }}
     >
-      <Typography fontSize={`${fontSize}rem`} variant="body1" fontWeight={600}>
+      <Typography
+        fontSize={`${fontSize}rem`}
+        variant="body1"
+        fontWeight={600}
+        sx={{ color: isToday ? "primary.contrastText" : "text.primary" }}
+      >
         {day.date()}
       </Typography>
     </IconButton>

@@ -154,7 +154,7 @@ export function layoutDayEvents(
 }
 
 export const getTimeFromCell = (
-  event: React.MouseEvent<HTMLDivElement>,
+  event: React.MouseEvent<HTMLElement>,
   containerRef: RefObject<HTMLDivElement | null>,
   offsetHours = 0,
 ) => {

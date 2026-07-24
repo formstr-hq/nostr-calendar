@@ -34,7 +34,7 @@ import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import { FormAttachmentRow } from "./FormAttachmentRow";
-import type { ReportType } from "../common/nostr";
+import type { ReportType } from "../nostr/reports";
 
 export function InvitationPanel() {
   const intl = useIntl();
@@ -147,6 +147,7 @@ export function InvitationPanel() {
       {pendingInvitations.map((invitation) => (
         <Paper
           key={invitation.giftWrapId}
+          data-testid="invitation-card"
           sx={{
             mb: 2,
             p: 2,
