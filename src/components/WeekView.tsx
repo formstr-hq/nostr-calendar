@@ -204,7 +204,7 @@ export function WeekView({ events, date }: ViewProps) {
                 >
                   {/* Day header */}
 
-                  {day.isSame(dayjs(), "day") && <TimeMarker />}
+                  {day.isSame(dayjs(), "day") && <TimeMarker isCurrent />}
                   {Array.from({ length: 24 }).map((_, h) => (
                     <Box
                       onClick={handleCellClick}

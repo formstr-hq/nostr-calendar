@@ -105,7 +105,7 @@ export function DayView({ events, date }: ViewProps) {
             position="relative"
             ref={containerRef}
           >
-            <TimeMarker offset="0px" />
+            <TimeMarker offset="0px" isCurrent={date.isSame(dayjs(), "day")} />
             {/* Hour Divider */}
             <Box display={"flex"} flexDirection={"column"}>
               {Array.from({ length: 24 }).map((_, h) => (

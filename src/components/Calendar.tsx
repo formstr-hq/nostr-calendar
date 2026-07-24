@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTimeBasedEvents } from "../stores/events";
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
@@ -19,12 +19,28 @@ function Calendar() {
   const { date } = useDateWithRouting();
   const visibleDeviceEvents = useVisibleDeviceEvents(date, layout);
 
-  // A view that overflows (e.g. a wide grid before it reflows) can leave the
-  // window scrolled; without this, switching views/dates keeps that offset,
-  // showing the next view mid-scroll instead of from the top.
+  const didInitialScroll = useRef(false);
+
+  // Bring the current time into view once, after the calendar has mounted.
+  // Subsequent date changes intentionally keep the document's scroll offset.
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [layout, date]);
+    if (didInitialScroll.current) return;
+    didInitialScroll.current = true;
+
+    const frame = window.requestAnimationFrame(() => {
+      const marker = document.querySelector<HTMLElement>(
+        '[data-current-time-marker="true"]',
+      );
+      if (!marker) return;
+      const top = marker.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        top: Math.max(0, top - window.innerHeight * 0.35),
+        left: 0,
+        behavior: "auto",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const visibleCalendars = new Set(
     calendars.filter((cal) => cal.isVisible).map((cal) => cal.id),

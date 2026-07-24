@@ -7,6 +7,7 @@ import CalendarViewMonthIcon from "@mui/icons-material/CalendarViewMonth";
 import { SegmentedControl } from "./SegmentedControl";
 import { RelayStatusDots, RelayStatusEntry } from "./RelayStatusDots";
 import type { Layout } from "../../hooks/useLayout";
+import { Link as RouterLink } from "react-router";
 
 export const TOPBAR_HEIGHT = 64;
 /** Height of the mobile-only second row (view switcher + Today) below the main bar. */
@@ -108,7 +109,8 @@ export function TopBar({
         }}
       >
         <Link
-          href="/"
+          component={RouterLink}
+          to="/"
           underline="none"
           sx={{
             display: "flex",

@@ -9,13 +9,18 @@ const Dot = styled("div")`
   border-radius: 100%;
 `;
 
-export const TimeMarker = ({ offset = "0px" }: { offset?: string }) => {
+export const TimeMarker = ({
+  offset = "0px",
+  isCurrent = false,
+}: {
+  offset?: string;
+  isCurrent?: boolean;
+}) => {
   const getCurrentTimeInHour = () => dayjs().hour() + dayjs().minute() / 60;
 
   const [currentTimeInHour, updateCurrentTimeInHour] =
     useState(getCurrentTimeInHour);
   const intervalId = useRef<number | null>(null);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (intervalId.current) {
@@ -31,15 +36,9 @@ export const TimeMarker = ({ offset = "0px" }: { offset?: string }) => {
     };
   }, []);
 
-  useEffect(() => {
-    if (wrapperRef.current) {
-      wrapperRef.current.scrollIntoView();
-    }
-  }, []);
-
   return (
     <Box
-      ref={wrapperRef}
+      data-current-time-marker={isCurrent ? "true" : undefined}
       sx={{
         // height of each hour block is 60px
         top: `calc(${offset} + 60 * ${currentTimeInHour}px)`,

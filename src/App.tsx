@@ -75,14 +75,6 @@ function Application() {
     document.documentElement.classList.toggle("ios-native", iosNative);
   }, [iosNative]);
 
-  // The app has no internal scroll container (the document itself scrolls,
-  // per the redesign's shell architecture) so reset window scroll on
-  // navigation instead of a ref'd container.
-  useEffect(() => {
-    if (!iosNative) return;
-    window.scrollTo({ top: 0, left: 0 });
-  }, [iosNative, location.pathname, location.search]);
-
   const { fetchInvitations, stopInvitations } = useInvitations();
 
   // When user is logged in, fetch calendar lists and invitations.

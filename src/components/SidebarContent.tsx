@@ -14,6 +14,7 @@ import CircleIcon from "@mui/icons-material/Circle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import ContrastIcon from "@mui/icons-material/Contrast";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { useLocation, useNavigate } from "react-router";
 import { Dayjs } from "dayjs";
@@ -70,7 +71,16 @@ export function SidebarContent({
   const themeMode = useSettings((s) => s.settings.themeMode);
   const weekStart = useSettings((s) => s.settings.general.weekStart);
   const updateSetting = useSettings((s) => s.updateSetting);
-  const isDark = themeMode === "dark";
+  const nextThemeMode =
+    themeMode === "dark" ? "light" : themeMode === "light" ? "system" : "dark";
+  const themeIcon =
+    themeMode === "dark" ? (
+      <DarkModeIcon fontSize="small" />
+    ) : themeMode === "light" ? (
+      <LightModeIcon fontSize="small" />
+    ) : (
+      <ContrastIcon fontSize="small" />
+    );
 
   const {
     calendars,
@@ -307,17 +317,11 @@ export function SidebarContent({
             {intl.formatMessage({ id: "sidebar.settingsLink" })}
           </Button>
           <IconButton
-            onClick={() =>
-              updateSetting("themeMode", isDark ? "light" : "dark")
-            }
-            aria-label="toggle dark mode"
+            onClick={() => updateSetting("themeMode", nextThemeMode)}
+            aria-label={`Theme: ${themeMode}`}
             size="small"
           >
-            {isDark ? (
-              <DarkModeIcon fontSize="small" />
-            ) : (
-              <LightModeIcon fontSize="small" />
-            )}
+            {themeIcon}
           </IconButton>
         </Box>
 

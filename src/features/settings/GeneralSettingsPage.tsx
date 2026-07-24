@@ -8,6 +8,7 @@ import {
   type WeekStart,
 } from "../../stores/settings";
 import { SettingsCard, SettingsRow } from "./components/SettingsCard";
+import { hourLabel, parseHour } from "../../utils/calendarSettings";
 
 const durations: DefaultDuration[] = [25, 30, 55, 60];
 const reminders = [0, 5, 10, 15, 30, 60];
@@ -148,7 +149,7 @@ export function GeneralSettingsPage() {
             >
               {times.map((time) => (
                 <MenuItem key={time} value={time}>
-                  {time}
+                  {hourLabel(parseHour(time), general.timeFormat)}
                 </MenuItem>
               ))}
             </Select>
@@ -166,7 +167,7 @@ export function GeneralSettingsPage() {
             >
               {times.map((time) => (
                 <MenuItem key={time} value={time}>
-                  {time}
+                  {hourLabel(parseHour(time), general.timeFormat)}
                 </MenuItem>
               ))}
             </Select>
