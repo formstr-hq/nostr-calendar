@@ -18,6 +18,7 @@ import { useInvitations } from "./invitations";
 import { useBookingRequests } from "./bookingRequests";
 import { useSchedulingPages } from "./schedulingPages";
 import { restartDataLayerWiped } from "../dataLayer/bootstrap";
+import { useSettings } from "./settings";
 import {
   BG_KEY_USER_PUBKEY,
   BG_KEY_RELAYS,
@@ -174,6 +175,7 @@ const syncUserNetworkState = async (pubkey: string) => {
       "relays",
     );
     useRelayStore.getState().setRelays(userRelays);
+    await useSettings.getState().syncGeneralSettings(pubkey);
     // Deletion (kind 5) and participant-removal (kind 84) enforcement is a
     // standing interest owned by the dataLayer bootstrap — nothing to fetch.
 

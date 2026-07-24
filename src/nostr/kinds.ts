@@ -29,6 +29,9 @@ export enum EventKinds {
   // Relay List (NIP-65)
   RelayList = 10002,
 
+  // Application-specific data (NIP-78)
+  ApplicationData = 30078,
+
   // Appointment Scheduling
   SchedulingPage = 31927,
   BookingRequestGiftWrap = 1057,

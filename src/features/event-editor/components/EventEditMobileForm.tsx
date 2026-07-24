@@ -40,11 +40,11 @@ export function EventEditMobileForm(props: EventEditFormProps) {
       }}
     >
       <Box sx={{ px: 2 }}>
-          <EventEditHeaderMobile
-            mode={mode}
-            display={display}
-            isPrivate={isPrivate}
-            onClose={handleClose}
+        <EventEditHeaderMobile
+          mode={mode}
+          display={display}
+          isPrivate={isPrivate}
+          onClose={handleClose}
         />
       </Box>
 

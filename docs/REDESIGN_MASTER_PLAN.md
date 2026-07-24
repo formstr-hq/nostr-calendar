@@ -81,6 +81,7 @@ E2E specs green (updated in the same change when DOM legitimately changed).
   example of this decomposition — follow its pattern for the other giants.
 - **Container/presenter:** store-wiring and protocol calls live in the container/hook; presenters
   get props and are theme-only. Presenters must not import `dataLayer` or `common/nostr`.
+- All strings should be added to the dictionary and used through react-intl
 
 ### D4. Nostr layer: consolidate first (zero behavior change), protocol changes only per-flow
 
@@ -246,9 +247,21 @@ Template for the inputs (copy into the session prompt):
   hours), `07` (appearance: theme, accent presets, density, calendar colors), `13` (mobile).
   **Follow memory/feedback: no iOS-style settings — switches/chips for toggles, dropdowns for
   selects, on mobile too.**
-- **E2E:** `relay-manager` (relays UI moves here); new spec for appearance.
-- **Nostr layer inputs:** _(fill in — candidate: sync settings/appearance across devices via a
-  self-encrypted replaceable event? Which kind? Or local-only for now?)_
+- **Scope**: This is a huge but simple section. all of these settings will also need to be implemented in the calendar app as well. Here is the full scope
+  1. All the sub sections of the settings will have there own routes
+  2. Make the mobile sections similar to desktop. However, instead of right sidebar, mobile will have a collapsible settings panel
+  3. General Settings - these settings will be stored using nip 78 application specific data. check nostr layer inputs
+     1. Start week on, time format should be there. timezone related settings should be removed
+     2. default calendar and default duration(25min, 30min, 55min, 60min), reminder should be there. remove snap
+     3. default view should be the view user last accessed - store it in local storage.
+     4. only working hours setting should be there.
+     5. For mobile, there should be a dropdown or an input field. check the location field in the calendar event edit section for the implementation
+  4. Calendars - make the section but keep it empty. will be filled during the later phases
+  5. Relays and sync - the existing relay settings modal will come here.
+  6. Nuke all other sections - they are not needed for now
+
+- **E2E:** `relay-manager` (relays UI moves here); new spec for general settings.
+- **Nostr layer inputs:** _use NIP-78 for syncing this. d tag is 'calendar/general_settings'. the content is self encrypted json. When the app inits, the settings are also fetched and applied. If there is no settings found then default settings are applied_
 
 ### F-NOTIF — Notifications / invitations
 

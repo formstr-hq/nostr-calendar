@@ -1,23 +1,14 @@
 import { useNavigate } from "react-router";
-import { ROUTES } from "../utils/routingHelper";
 import { useEffect } from "react";
 import dayjs from "dayjs";
-import weekOfYear from "dayjs/plugin/weekOfYear";
-
-dayjs.extend(weekOfYear);
+import { useSettings } from "../stores/settings";
+import { getRouteFromDate } from "../utils/dateBasedRouting";
 
 export function Index() {
-  const year = dayjs().get("year");
-  const weekNumber = dayjs().week();
   const navigate = useNavigate();
+  const layout = useSettings((state) => state.settings.layout);
   useEffect(() => {
-    navigate(
-      ROUTES.WeekCalendar.replace(":year", year.toString()).replace(
-        ":weekNumber",
-        weekNumber.toString(),
-      ),
-      { replace: true },
-    );
-  }, [navigate]);
+    navigate(getRouteFromDate(dayjs(), layout), { replace: true });
+  }, [layout, navigate]);
   return <></>;
 }

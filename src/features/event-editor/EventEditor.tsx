@@ -30,6 +30,7 @@ import { useEventDateTime } from "./hooks/useEventDateTime";
 import { EventEditDesktopForm } from "./components/EventEditDesktopForm";
 import { EventEditMobileForm } from "./components/EventEditMobileForm";
 import type { EventEditFormProps } from "./components/types";
+import { useSettings } from "../../stores/settings";
 
 interface EventEditorProps {
   open: boolean;
@@ -58,20 +59,31 @@ export function EventEditor({
   const { user } = useUser();
   const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars } = useCalendarLists();
+  const generalSettings = useSettings((state) => state.settings.general);
+  const configuredCalendarExists = calendars.some(
+    (calendar) => calendar.id === generalSettings.defaultCalendarId,
+  );
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
     // Duplicates are drafts (without an event id), so they cannot be found
     // through calendar event refs. Preserve their explicitly supplied owner.
     initialEvent?.calendarId ||
       (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
+      (configuredCalendarExists ? generalSettings.defaultCalendarId : "") ||
       calendars[0]?.id ||
       "",
   );
 
   useEffect(() => {
     if (!selectedCalendarId && calendars.length > 0) {
-      setSelectedCalendarId(calendars[0].id);
+      setSelectedCalendarId(
+        calendars.some(
+          (calendar) => calendar.id === generalSettings.defaultCalendarId,
+        )
+          ? generalSettings.defaultCalendarId
+          : calendars[0].id,
+      );
     }
-  }, [calendars.length, selectedCalendarId]);
+  }, [calendars, generalSettings.defaultCalendarId, selectedCalendarId]);
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
@@ -82,7 +94,7 @@ export function EventEditor({
     }
 
     const begin = initialDateTime || Date.now();
-    const end = begin + 60 * 60 * 1000;
+    const end = begin + generalSettings.defaultDuration * 60 * 1000;
 
     return {
       begin,
@@ -109,7 +121,9 @@ export function EventEditor({
     };
   });
   const [notificationOffsets, setNotificationOffsets] = useState<number[]>(
-    DEFAULT_NOTIFICATION_OFFSETS,
+    generalSettings.defaultReminderMinutes > 0
+      ? [generalSettings.defaultReminderMinutes]
+      : [],
   );
   const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] =
     useState(!initialEvent?.id);
@@ -180,7 +194,11 @@ export function EventEditor({
     }
 
     if (!initialEvent?.id) {
-      setNotificationOffsets(DEFAULT_NOTIFICATION_OFFSETS);
+      setNotificationOffsets(
+        generalSettings.defaultReminderMinutes > 0
+          ? [generalSettings.defaultReminderMinutes]
+          : [],
+      );
       setNotificationPreferencesLoaded(true);
       return () => {
         active = false;
@@ -206,7 +224,7 @@ export function EventEditor({
     return () => {
       active = false;
     };
-  }, [initialEvent?.id, open]);
+  }, [generalSettings.defaultReminderMinutes, initialEvent?.id, open]);
 
   const notificationsValid =
     notificationPreferencesLoaded &&

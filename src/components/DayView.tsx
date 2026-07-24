@@ -15,6 +15,8 @@ import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
+import { useSettings } from "../stores/settings";
+import { hourLabel, parseHour } from "../utils/calendarSettings";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -22,6 +24,11 @@ dayjs.extend(isSameOrAfter);
 
 export function DayView({ events, date }: ViewProps) {
   const intl = useIntl();
+  const { timeFormat, workingHours } = useSettings(
+    (state) => state.settings.general,
+  );
+  const workStartHour = parseHour(workingHours.start);
+  const workEndHour = parseHour(workingHours.end);
   const dayStart = date.startOf("day").valueOf();
   const dayEnd = dayStart + 24 * 60 * 60 * 1000;
   const allDayEvents = events.filter(
@@ -83,7 +90,9 @@ export function DayView({ events, date }: ViewProps) {
           >
             {Array.from({ length: 24 }).map((_, h) => (
               <Box key={h} height={60} px={0.5}>
-                <Typography variant="caption">{h}:00</Typography>
+                <Typography variant="caption">
+                  {hourLabel(h, timeFormat)}
+                </Typography>
               </Box>
             ))}
           </Box>
@@ -117,6 +126,11 @@ export function DayView({ events, date }: ViewProps) {
                     width: "100%",
                     p: 0,
                     textAlign: "left",
+                    bgcolor:
+                      h < workStartHour || h >= workEndHour
+                        ? "action.hover"
+                        : "transparent",
+                    "&:hover": { bgcolor: "action.selected" },
                   }}
                 >
                   <Divider />

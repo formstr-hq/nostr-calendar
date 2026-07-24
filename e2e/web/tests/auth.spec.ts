@@ -43,7 +43,7 @@ test("user creates a new account with key backup", async ({ browser }) => {
 
   // Backup step: acknowledging is gated on actually copying the key.
   await expect(page.getByText("Back up your key")).toBeVisible();
-  const acknowledge = page.getByRole("button", { name: "I've backed it up" });
+  const acknowledge = page.getByRole("button", { name: "I've saved it" });
   await expect(acknowledge).toBeDisabled();
   await page.getByRole("button", { name: "Copy ncryptsec" }).click();
   await expect(acknowledge).toBeEnabled();

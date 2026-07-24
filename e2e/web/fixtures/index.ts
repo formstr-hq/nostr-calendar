@@ -1,4 +1,9 @@
-import { test as base, type Page, type BrowserContext } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type Page,
+  type BrowserContext,
+} from "@playwright/test";
 import {
   TEST_KEYS,
   TEST_PASSPHRASE,
@@ -15,7 +20,7 @@ import {
 // explicitly in auth.spec.ts.
 export async function injectAuth(
   context: BrowserContext,
-  key: TestKey = TEST_KEYS.alice,
+  key: Pick<TestKey, "pubkey" | "secretHex"> = TEST_KEYS.alice,
   name?: string,
 ): Promise<void> {
   await context.addInitScript(
@@ -57,25 +62,23 @@ export async function signIn(
   ]).catch(() => {});
   if (await avatar.isVisible()) return;
 
-  try {
-    // First-time login: passphrase field not shown yet — pick "Existing Key" and fill ncryptsec.
-    const passphraseField = page.getByLabel("Passphrase");
-    if (!(await passphraseField.isVisible())) {
-      await page.getByRole("button", { name: /Existing Key/ }).click();
-      await page.getByLabel("ncryptsec").fill(key.ncryptsec);
-    }
-
-    await passphraseField.fill(TEST_PASSPHRASE);
-    const signInButton = page.getByRole("button", {
-      name: "Sign in",
-      exact: true,
-    });
-    await expect(signInButton).toBeEnabled();
-    await signInButton.click();
-    await avatar.waitFor({ state: "visible", timeout: 10_000 });
-  } catch {
-    // No login modal — session already active (e.g. extension signer)
+  await expect(dialog).toBeVisible();
+  const ncryptsecField = dialog.getByTestId("login-input-ncryptsec");
+  if (!(await ncryptsecField.isVisible())) {
+    await dialog.getByRole("button", { name: /Existing Key/ }).click();
   }
+  await expect(ncryptsecField).toBeVisible();
+  if (!(await ncryptsecField.inputValue())) {
+    await ncryptsecField.fill(key.ncryptsec);
+  }
+
+  await dialog.getByLabel("Passphrase", { exact: true }).fill(TEST_PASSPHRASE);
+  const signInButton = dialog.getByRole("button", {
+    name: /^(Sign in|Log In)$/,
+  });
+  await expect(signInButton).toBeEnabled();
+  await signInButton.click();
+  await avatar.waitFor({ state: "visible", timeout: 10_000 });
 }
 
 // Navigate to a URL and handle the passphrase prompt that reappears on each

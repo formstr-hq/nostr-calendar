@@ -1,8 +1,8 @@
 import { Box, Button, IconButton, Typography } from "@mui/material";
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
 import { useIntl } from "react-intl";
+import { useNavigate } from "react-router";
 import { RelayDots } from "../../../components/RelayDots";
-import { useRelayStore } from "../../../stores/relays";
 import { getRelays } from "../../../common/relayConfig";
 import type { RelayStatusMap } from "../../../utils/types";
 
@@ -49,6 +49,7 @@ export function EventEditFooter({
   totalCount,
 }: EventEditFooterProps) {
   const intl = useIntl();
+  const navigate = useNavigate();
   const isPublishing = publishingRelays.length > 0;
   const relaysToShow = isPublishing ? publishingRelays : getRelays();
 
@@ -97,7 +98,8 @@ export function EventEditFooter({
         >
           <IconButton
             size="small"
-            onClick={() => useRelayStore.getState().updateRelayModal(true)}
+            aria-label={intl.formatMessage({ id: "settings.relays" })}
+            onClick={() => navigate("/settings/relays")}
           >
             <SettingsInputAntennaIcon fontSize="small" />
           </IconButton>

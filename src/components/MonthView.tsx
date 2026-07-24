@@ -31,6 +31,11 @@ import {
 import { useCalendarLists } from "../stores/calendarLists";
 import { useDeviceCalendars } from "../stores/deviceCalendars";
 import { CalendarEventView } from "./CalendarEvent";
+import { useSettings } from "../stores/settings";
+import {
+  formatCalendarTime,
+  startOfConfiguredWeek,
+} from "../utils/calendarSettings";
 
 interface MonthViewProps {
   events: ICalendarEvent[];
@@ -80,6 +85,7 @@ function DayCellEvent({
   onPeek: (el: HTMLElement, event: ICalendarEvent) => void;
 }) {
   const ref = useRef<HTMLElement>(null);
+  const timeFormat = useSettings((state) => state.settings.general.timeFormat);
   return (
     <ChipColor event={event}>
       {(color, isPublic) => (
@@ -88,7 +94,11 @@ function DayCellEvent({
           title={event.title}
           color={color}
           isPublic={isPublic}
-          time={event.allDay ? undefined : dayjs(event.begin).format("HH:mm")}
+          time={
+            event.allDay
+              ? undefined
+              : formatCalendarTime(dayjs(event.begin), timeFormat)
+          }
           onClick={() => ref.current && onPeek(ref.current, event)}
         />
       )}
@@ -99,8 +109,14 @@ function DayCellEvent({
 export function MonthView({ events }: MonthViewProps) {
   const intl = useIntl();
   const { date, setDate } = useDateWithRouting();
-  const end = date.endOf("month").endOf("week");
-  const start = date.startOf("month").startOf("week");
+  const { weekStart, timeFormat } = useSettings(
+    (state) => state.settings.general,
+  );
+  const start = startOfConfiguredWeek(date.startOf("month"), weekStart);
+  const end = startOfConfiguredWeek(date.endOf("month"), weekStart).add(
+    6,
+    "day",
+  );
   const theme = useTheme();
   const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"));
   const { mode, systemMode } = useColorScheme();
@@ -158,7 +174,7 @@ export function MonthView({ events }: MonthViewProps) {
               fontWeight={600}
               marginBottom={theme.spacing(1)}
             >
-              {dayjs().weekday(index).format("ddd")}
+              {start.add(index, "day").format("ddd")}
             </Typography>
           );
         })}
@@ -304,7 +320,7 @@ export function MonthView({ events }: MonthViewProps) {
               isPublic,
               time: event.allDay
                 ? undefined
-                : dayjs(event.begin).format("HH:mm"),
+                : formatCalendarTime(dayjs(event.begin), timeFormat),
             };
           })}
           onClose={() => setAgendaPeek(null)}

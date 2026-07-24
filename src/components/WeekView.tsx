@@ -27,13 +27,20 @@ import { useRef, useState } from "react";
 import CalendarEventEdit from "./CalendarEventEdit";
 import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
+import { useSettings } from "../stores/settings";
+import {
+  hourLabel,
+  parseHour,
+  startOfConfiguredWeek,
+} from "../utils/calendarSettings";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export const WeekHeader = ({ date }: { date: Dayjs }) => {
-  const start = date.startOf("week");
+  const weekStart = useSettings((state) => state.settings.general.weekStart);
+  const start = startOfConfiguredWeek(date, weekStart);
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -68,7 +75,12 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
 
 export function WeekView({ events, date }: ViewProps) {
   const intl = useIntl();
-  const start = date.startOf("week");
+  const { weekStart, timeFormat, workingHours } = useSettings(
+    (state) => state.settings.general,
+  );
+  const start = startOfConfiguredWeek(date, weekStart);
+  const workStartHour = parseHour(workingHours.start);
+  const workEndHour = parseHour(workingHours.end);
 
   const days = Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
 
@@ -154,7 +166,9 @@ export function WeekView({ events, date }: ViewProps) {
             <TimeMarker />
             {Array.from({ length: 24 }).map((_, h) => (
               <Box key={h} height={60} px={0.5}>
-                <Typography variant="caption">{h}:00</Typography>
+                <Typography variant="caption">
+                  {hourLabel(h, timeFormat)}
+                </Typography>
               </Box>
             ))}
           </Box>
@@ -199,6 +213,12 @@ export function WeekView({ events, date }: ViewProps) {
                       key={h}
                       height={60}
                       px={0.5}
+                      sx={{
+                        bgcolor:
+                          h < workStartHour || h >= workEndHour
+                            ? "action.hover"
+                            : "transparent",
+                      }}
                     >
                       <Divider />
                     </Box>

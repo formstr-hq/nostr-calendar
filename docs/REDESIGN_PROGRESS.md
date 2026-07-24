@@ -10,9 +10,9 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 | Phase 3 — Nostr consolidation | done                         | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | F-VIEWS                       | done                         | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | F-EVENT-VIEW                  | done                         | 2026-07-21 | Decomposed into `src/features/event-view/`, full RSVP UI, lazy participant/profile loading, delete/duplicate restyle. **Design-fidelity pass 2026-07-21**: exact match to mockups 02/12, full-detail sections ported from 20/21 (banner, chips, location card, host row, add-to-calendar), mobile quick-peek removed in favor of the full bottom sheet                                                                                                                                                                                                                                                                                                 |
-| F-EVENT-EDIT                  | done                         | 2026-07-24 | Decomposed into `src/features/event-editor/`, exact match to mockups 05/11 (desktop modal / mobile sheet) per the approved deviation list. Nostr layer (NIP-17 invitation rumors, `signing_nsec`, `k=1052` wrap tag) was already on the branch prior to this session; this session was UI-only. **e2e not run this session** (explicit scope skip) — `event-crud`/`event-edit`/`event-recurrence`/`event-participants` specs are known-broken after the DOM/header restructuring (mobile now uses `BottomSheet` instead of `Dialog fullScreen`, mobile header moved Cancel/Save into the header bar) and need a follow-up e2e-fix session before merge |
-| F-LOGIN                       | in progress                  | 2026-07-24 | Rebuilt auth presentation and added `key.txt` ncryptsec backup/import; validation in progress                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| F-SET                         | unblocked (0–3 done)         |            | nostr inputs: not provided; `/settings` route is an empty placeholder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| F-EVENT-EDIT                  | done                         | 2026-07-24 | Decomposed into `src/features/event-editor/`, exact match to mockups 05/11 (desktop modal / mobile sheet) per the approved deviation list. Nostr layer (NIP-17 invitation rumors, `signing_nsec`, `k=1052` wrap tag) was already on the branch prior to this session; `event-crud`, `event-edit`, and all recurrence specs validated green in the F-SET full-suite pass (`event-participants` remains the longstanding fixme)                                                                                                                                                                                                                               |
+| F-LOGIN                       | in progress                  | 2026-07-24 | Rebuilt auth presentation and added `key.txt` ncryptsec backup/import; all current auth specs validated green in the F-SET full-suite pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-SET                         | done                         | 2026-07-24 | General, Calendars placeholder, and Relays & Sync shipped as routed responsive sections; general preferences sync through self-encrypted NIP-78 kind 30078 and are applied throughout calendar views/editor defaults                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | F-NOTIF                       | unblocked (0–3 done)         |            | nostr inputs: not provided (1052→1059 decision); "Message host" stays unbuilt until this is resolved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | F-CAL-MGMT                    | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | F-BOOK-EDIT                   | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -23,6 +23,48 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 ## Session log
 
 <!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-24 — F-SET — Replaced the `/settings` placeholder with the scoped
+  Settings surface and deliberately omitted every section the master-plan
+  scope says to nuke (Appearance, Notifications, Booking pages,
+  Import/export, shortcuts, account/about). The resulting feature lives in
+  `src/features/settings/` and has independent routes for
+  `/settings/general`, `/settings/calendars`, and `/settings/relays`.
+  Desktop uses the persistent settings rail; mobile uses a collapsible
+  section panel with the same dropdown-based controls (no iOS-style rows).
+  The Calendars section is intentionally empty for its later phase.
+  - **NIP-78 sync:** added kind `30078` application-specific data support in
+    `src/nostr/settings.ts`. General settings publish as a parameterized
+    replaceable event with `d=calendar/general_settings` and NIP-44
+    self-encrypted JSON content. Login initialization fetches/decrypts the
+    newest event and applies it over defaults; missing/invalid/unavailable
+    remote state leaves local defaults active. Writes are serialized so rapid
+    changes preserve last-write order. The exact payload and local-only
+    exclusions are documented in `PROTOCOL.md`.
+  - **General behavior:** implemented week start (Monday/Sunday/Saturday),
+    12/24-hour time, default calendar, event duration (25/30/55/60 minutes),
+    default reminder, and working-hours start/end. Week start now drives
+    month/week grid boundaries, headers, top-bar ranges, and native-device
+    fetch windows. Time format drives hour gutters, event chips/details, and
+    event-editor time fields. Working hours shade out-of-hours rows. New
+    events inherit the configured calendar, duration, and reminder. The last
+    calendar layout accessed remains local-only and is used by `/` on the
+    next visit, per scope.
+  - **Relay move:** deleted the global `RelayManager` dialog and moved its
+    add/remove/validate/reset/save/publish behavior inline to Relays & Sync.
+    The user-menu Relays item and event-editor antenna now navigate to that
+    route. Existing NIP-65 relay publishing behavior is unchanged.
+  - **E2E/API maintenance:** migrated `relay-manager.spec.ts` to the routed
+    surface; added isolated-user general-settings coverage (including NIP-78
+    reload persistence and event defaults) plus mobile collapse/navigation
+    coverage. Hardened the redesigned auth helper/copy label, month
+    navigation's rapid-click assertion, and a case-sensitive scheduling
+    selector exposed by parallel full-suite execution.
+  - `pnpm` was unavailable in this environment, so equivalent local binaries
+    were used: `tsc --noEmit -p tsconfig.app.json` and `eslint . --quiet` are
+    clean; Vite production/test build is clean apart from the existing
+    chunk-size advisory. Full Playwright suite: **48 passed, 1 skipped**
+    (the existing `event-participants` fixme), zero failures.
 
 - 2026-07-24 — F-EVENT-EDIT — UI rebuild against mockups `05-event-create-modal`
   (desktop) and `11-mobile-event-create` (mobile), decoded via the

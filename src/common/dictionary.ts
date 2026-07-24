@@ -385,6 +385,28 @@ const dictionary: NestedObject = {
       relayListHint: "Relays used for the nostrconnect QR session",
       relayRequired: "At least one relay is required for QR login.",
     },
+    settings: {
+      general: "General",
+      calendars: "Calendars",
+      relays: "Relays & sync",
+      generalDescription: "Date, time and default behaviours.",
+      calendarsDescription:
+        "Calendar-specific settings will be available in a later phase.",
+      relaysDescription:
+        "Choose where your calendar data is read, synced and published.",
+      basics: "Basics",
+      newEvents: "New events",
+      calendarViews: "Week & day views",
+      weekStart: "Start week on",
+      timeFormat: "Time format",
+      defaultCalendar: "Default calendar",
+      firstCalendar: "First available calendar",
+      defaultDuration: "Default duration",
+      defaultReminder: "Default reminder",
+      workingHours: "Working hours",
+      workingHoursHint: "Hours outside this range are shaded.",
+      connectedRelays: "Connected relays",
+    },
     relay: {
       manageRelays: "Manage Relays",
       relayUrlError: "Relay URL must start with wss:// or ws://",

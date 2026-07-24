@@ -11,7 +11,7 @@ async function startNewPage(page: Page, title: string) {
 }
 
 async function createAndGetShareUrl(page: Page): Promise<string> {
-  await page.getByRole("button", { name: "Create page" }).click();
+  await page.getByRole("button", { name: "Create page", exact: true }).click();
   await expect(page.getByText("Scheduling page created!")).toBeVisible({
     timeout: 20_000,
   });
@@ -39,7 +39,10 @@ test("durations, weekly availability and blocked dates persist across edit", asy
   await expect(monday).not.toBeChecked();
 
   // Blocked dates: add one (defaults are fine — we only check persistence).
-  await page.getByRole("button", { name: "Add Date", exact: true }).nth(1).click();
+  await page
+    .getByRole("button", { name: "Add Date", exact: true })
+    .nth(1)
+    .click();
 
   const shareUrl = await createAndGetShareUrl(page);
   const naddr = shareUrl.match(/\/schedule\/(naddr[^?]+)/)?.[1];
@@ -47,12 +50,16 @@ test("durations, weekly availability and blocked dates persist across edit", asy
 
   // Reopen in edit mode: everything persisted.
   await navigate(page, `/schedule/edit/${naddr}`);
-  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue(
-    title,
-  );
+  await expect(
+    page.getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(title);
   await expect(page.getByRole("button", { name: "45m" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Monday" })).not.toBeChecked();
-  await expect(page.getByText("No blocked dates", { exact: false })).not.toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Monday" }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByText("No blocked dates", { exact: false }),
+  ).not.toBeVisible();
 });
 
 test("public booking page offers the configured durations", async ({
@@ -100,7 +107,10 @@ test("blocked dates remove that day's slots from the public page", async ({
 
   // Two "Add Date" buttons on the page: one-off windows first, blocked
   // dates second.
-  await page.getByRole("button", { name: "Add Date", exact: true }).nth(1).click();
+  await page
+    .getByRole("button", { name: "Add Date", exact: true })
+    .nth(1)
+    .click();
 
   // Pick the date via the calendar popup — typing sections into this
   // controlled DatePicker stores transient invalid values and blanks it.

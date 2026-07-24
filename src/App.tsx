@@ -6,7 +6,6 @@ import { IntlProvider } from "react-intl";
 import { flattenMessages } from "./common/utils";
 import dictionary, { NestedObject } from "./common/dictionary";
 import LoginModal from "./components/LoginModal";
-import RelayManager from "./components/RelayManager";
 import { BrowserRouter, useLocation, useNavigate } from "react-router";
 import { Routing } from "./components/Routing";
 import { AppShell } from "./components/AppShell";
@@ -254,7 +253,6 @@ function Application() {
         onClose={() => updateLoginModal(false)}
       />
 
-      <RelayManager />
       <AppLoadingBar />
 
       {user ? (

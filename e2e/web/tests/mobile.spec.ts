@@ -34,3 +34,17 @@ test("mobile calendars bottom sheet opens and closes", async ({
   await page.keyboard.press("Escape");
   await expect(page.getByText("Calendars", { exact: true })).not.toBeVisible();
 });
+
+test("mobile settings panel collapses and navigates sections", async ({
+  authedPage: page,
+}) => {
+  await page.goto("/settings/general");
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Relays & sync", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/settings\/relays$/);
+  await expect(
+    page.getByRole("heading", { name: "Relays & sync" }),
+  ).toBeVisible();
+});

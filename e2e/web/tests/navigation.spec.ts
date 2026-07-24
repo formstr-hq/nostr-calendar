@@ -1,7 +1,9 @@
 import { test, expect } from "../fixtures/index.js";
 import { navigate } from "../fixtures/index.js";
 
-test("home path redirects to the current week", async ({ authedPage: page }) => {
+test("home path redirects to the current week", async ({
+  authedPage: page,
+}) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/w\/\d{4}\/\d{1,2}$/);
 });
@@ -32,6 +34,7 @@ test("prev / next / today navigate the month view", async ({
   await expect(dateLabel).toHaveText("August 2026");
 
   await page.getByRole("button", { name: "previous period" }).click();
+  await expect(dateLabel).toHaveText("July 2026");
   await page.getByRole("button", { name: "previous period" }).click();
   await expect(dateLabel).toHaveText("June 2026");
 

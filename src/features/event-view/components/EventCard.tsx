@@ -13,6 +13,8 @@ import {
 } from "../../../utils/eventChipColor";
 import { getEventDisplayTitle } from "../lib/getEventDisplayTitle";
 import { CalendarEventView } from "../EventDetail";
+import { useSettings } from "../../../stores/settings";
+import { formatCalendarTime } from "../../../utils/calendarSettings";
 
 interface CalendarEventCardProps {
   event: PositionedEvent;
@@ -29,13 +31,14 @@ export function CalendarEventCard({
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const timeFormat = useSettings((state) => state.settings.general.timeFormat);
 
   const resolvedColor = useResolvedCalendarColor(event);
   const { color, isPublic } = getEventChipColor(event, theme, resolvedColor);
   const title = getEventDisplayTitle(event, intl);
   const time = event.allDay
     ? undefined
-    : dayjs(event.renderBegin).format("HH:mm");
+    : formatCalendarTime(dayjs(event.renderBegin), timeFormat);
 
   // Mobile skips the quick peek and opens the full event bottom sheet
   // directly (design 21's full-detail sections replace it there).

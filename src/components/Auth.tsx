@@ -3,7 +3,7 @@ import { useUser } from "../stores/user";
 import { useIntl } from "react-intl";
 import { useEffect } from "react";
 import { npubEncode } from "nostr-tools/nip19";
-import { useRelayStore } from "../stores/relays";
+import { useNavigate } from "react-router";
 
 export const Auth = ({
   onClose,
@@ -17,6 +17,7 @@ export const Auth = ({
   );
   const hasUserLoggedIn = !!user;
   const intl = useIntl();
+  const navigate = useNavigate();
 
   useEffect(() => {
     initializeUser();
@@ -48,7 +49,8 @@ export const Auth = ({
   const name = user?.name;
 
   const handleOpenRelays = () => {
-    useRelayStore.getState().updateRelayModal(true);
+    onClose?.();
+    navigate("/settings/relays");
   };
 
   const handleCopyNpub = () => {

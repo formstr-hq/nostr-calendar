@@ -20,6 +20,7 @@ import {
   CollapseToggle,
   sectionLabelSx,
 } from "./styled";
+import { useSettings } from "../../../stores/settings";
 
 const compactFieldSx = {
   "& .MuiInput-root:before, & .MuiInput-root:after": { display: "none" },
@@ -84,6 +85,8 @@ export function WhenFields(props: WhenFieldsProps) {
     calendarSlot,
   } = props;
   const intl = useIntl();
+  const timeFormat = useSettings((state) => state.settings.general.timeFormat);
+  const pickerFormat = timeFormat === "12h" ? "h:mm A" : "HH:mm";
 
   const recurrenceTrigger = (
     <RecurrenceSelector
@@ -158,6 +161,7 @@ export function WhenFields(props: WhenFieldsProps) {
               <TimePicker
                 value={beginTime}
                 onChange={onBeginTimeChange}
+                format={pickerFormat}
                 slotProps={{
                   textField: {
                     variant: "standard",
@@ -178,11 +182,16 @@ export function WhenFields(props: WhenFieldsProps) {
               <TimePicker
                 value={endTime}
                 onChange={onEndTimeChange}
+                format={pickerFormat}
                 slotProps={{
                   textField: {
                     variant: "standard",
                     size: "small",
                     sx: compactFieldSx,
+                    inputProps: {
+                      "data-testid": "event-end-time",
+                      "aria-label": "event end time",
+                    },
                   },
                 }}
               />
@@ -267,6 +276,7 @@ export function WhenFields(props: WhenFieldsProps) {
             <TimePicker
               value={beginTime}
               onChange={onBeginTimeChange}
+              format={pickerFormat}
               slotProps={{
                 textField: {
                   size: "small",
@@ -282,7 +292,17 @@ export function WhenFields(props: WhenFieldsProps) {
             <TimePicker
               value={endTime}
               onChange={onEndTimeChange}
-              slotProps={{ textField: { size: "small", sx: { width: 110 } } }}
+              format={pickerFormat}
+              slotProps={{
+                textField: {
+                  size: "small",
+                  sx: { width: 110 },
+                  inputProps: {
+                    "data-testid": "event-end-time",
+                    "aria-label": "event end time",
+                  },
+                },
+              }}
             />
           </>
         )}

@@ -7,15 +7,20 @@ import {
   getLayoutFromPathname,
   getRouteFromDate,
 } from "../utils/dateBasedRouting";
+import { useSettings } from "../stores/settings";
+import { startOfConfiguredWeek } from "../utils/calendarSettings";
+import type { WeekStart } from "../stores/settings";
 
 function formatDateLabel(
   date: ReturnType<typeof dayjs>,
   layout: Layout,
+  weekStart: WeekStart,
 ): string {
   if (layout === "month") return date.format("MMMM YYYY");
   if (layout === "day") return date.format("MMM D, YYYY");
-  return `${date.startOf("week").format("DD")}-${date
-    .endOf("week")
+  const start = startOfConfiguredWeek(date, weekStart);
+  return `${start.format("DD")}-${start
+    .add(6, "day")
     .format("DD")} ${date.format("MMM YY")}`;
 }
 
@@ -52,6 +57,7 @@ export interface CalendarTopBarProps {
 export function useCalendarTopBarProps(): CalendarTopBarProps {
   const location = useLocation();
   const navigate = useNavigate();
+  const weekStart = useSettings((state) => state.settings.general.weekStart);
 
   const isCalendarRoute =
     location.pathname.startsWith("/m") ||
@@ -77,7 +83,7 @@ export function useCalendarTopBarProps(): CalendarTopBarProps {
 
   return {
     mode: "calendar",
-    dateLabel: formatDateLabel(date, layout),
+    dateLabel: formatDateLabel(date, layout, weekStart),
     view: layout,
     onViewChange: (newLayout) => navigate(getRouteFromDate(date, newLayout)),
     onPrev: () => move(-1),
