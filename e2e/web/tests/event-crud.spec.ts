@@ -39,5 +39,5 @@ test("user opens the app and creates a calendar event", async ({ authedPage: pag
 
   // The dialog closes and the new event appears on the calendar grid
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByText("Team Standup")).toBeVisible();
+  await expect(page.getByText("Team Standup").first()).toBeVisible();
 });

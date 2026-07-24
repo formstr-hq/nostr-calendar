@@ -6,10 +6,12 @@ import {
   getPublicKey,
   generateSecretKey,
   finalizeEvent,
+  nip19,
 } from "nostr-tools";
 import { getConversationKey, encrypt, decrypt } from "nostr-tools/nip44";
 import { Seal } from "nostr-tools/kinds";
 import { signerManager } from "../common/signer";
+import { EventKinds } from "./kinds";
 
 type Rumor = UnsignedEvent & { id: string };
 
@@ -145,9 +147,9 @@ function createWrap(
   seal: NostrEvent,
   recipientPublicKey: string,
   kind: number,
-  extraTags: string[][] = [],
+  extraTags: string[][],
+  randomKey: Uint8Array,
 ): NostrEvent {
-  const randomKey = generateSecretKey();
   const template: EventTemplate = {
     kind,
     content: encrypt(
@@ -160,15 +162,26 @@ function createWrap(
   return finalizeEvent(template, randomKey);
 }
 
+/**
+ * `event` may be a plain template or a builder that receives the nsec-encoded
+ * ephemeral key the wrap will be signed with — callers that want the
+ * recipient to be able to self-sign a NIP-09 deletion of the wrap (they
+ * otherwise never see this key) embed it in the rumor via the builder form.
+ */
 export async function wrapEvent(
-  event: Partial<UnsignedEvent>,
+  event:
+    | Partial<UnsignedEvent>
+    | ((signingNsec: string) => Partial<UnsignedEvent>),
   recipientPublicKey: string,
   kind: number,
   extraTags: string[][] = [],
 ): Promise<NostrEvent> {
-  const rumor = await createRumor(event);
+  const randomKey = generateSecretKey();
+  const resolvedEvent =
+    typeof event === "function" ? event(nip19.nsecEncode(randomKey)) : event;
+  const rumor = await createRumor(resolvedEvent);
   const seal = await createSeal(rumor, recipientPublicKey);
-  return createWrap(seal, recipientPublicKey, kind, extraTags);
+  return createWrap(seal, recipientPublicKey, kind, extraTags, randomKey);
 }
 
 /**
@@ -181,4 +194,25 @@ export async function wrapEvent(
 export async function unwrapEvent(wrap: NostrEvent): Promise<Rumor> {
   const seal = await signerDecrypt<NostrEvent>(wrap.pubkey, wrap.content);
   return signerDecrypt<Rumor>(seal.pubkey, seal.content);
+}
+
+/**
+ * Builds a NIP-09 deletion event (kind 5) signed by a raw secret key rather
+ * than the logged-in user's signer. Lets a gift-wrap *recipient* delete the
+ * wrap itself: relays enforcing NIP-09 only accept a deletion signed by the
+ * same pubkey as the target event, and gift wraps are signed by a random
+ * ephemeral key the recipient never otherwise holds — see the
+ * `signing_nsec` rumor tag on calendar-event invitations.
+ */
+export function buildSelfSignedDeletion(
+  secretKey: Uint8Array,
+  eventIds: string[],
+): NostrEvent {
+  const template: EventTemplate = {
+    kind: EventKinds.DeletionEvent,
+    content: "",
+    created_at: now(),
+    tags: eventIds.map((id) => ["e", id]),
+  };
+  return finalizeEvent(template, secretKey);
 }

@@ -21,6 +21,7 @@ import {
   removeSecureItem,
 } from "../common/localStorage";
 import {
+  deleteGiftWrapAsRecipient,
   fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
   viewPrivateEvent,
@@ -260,6 +261,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           status: "pending",
           pubkey: rumor.authorPubkey,
           kind: rumor.kind,
+          signingNsec: rumor.signingNsec,
         });
       },
       () => {}, // EOSE ignored — processing is timer-based
@@ -348,10 +350,19 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         (inv) => inv.giftWrapId === giftWrapId,
       );
       if (dismissedInvitation) {
+        // Kind-84 notice: the Android background worker suppresses future
+        // notifications for this gift wrap by checking for this event — keep
+        // publishing it regardless of whether a real deletion also succeeds.
         publishParticipantRemovalEvent({
           kinds: [EventKinds.CalendarEventGiftWrap],
           eventIds: [dismissedInvitation?.originalInvitationId],
         });
+        if (dismissedInvitation.signingNsec) {
+          void deleteGiftWrapAsRecipient(
+            dismissedInvitation.originalInvitationId,
+            dismissedInvitation.signingNsec,
+          );
+        }
       }
 
       const unreadCount = updated.filter((i) => i.status === "pending").length;
@@ -379,6 +390,13 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       relayHint: invitation.relayHint,
       reportType,
     });
+
+    if (invitation.signingNsec) {
+      void deleteGiftWrapAsRecipient(
+        invitation.originalInvitationId,
+        invitation.signingNsec,
+      );
+    }
 
     set((state) => {
       const updated = state.invitations.filter(

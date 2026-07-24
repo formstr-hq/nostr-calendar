@@ -71,6 +71,12 @@ export interface IInvitation {
   relayHint?: string;
   /** Resolved event data (populated after fetching and decrypting) */
   event?: ICalendarEvent;
+  /**
+   * nsec of the ephemeral key the gift wrap was signed with, embedded by the
+   * sender so the recipient can self-sign a NIP-09 deletion of the wrap.
+   * Absent on invitations sent before this field existed.
+   */
+  signingNsec?: string;
   /** Timestamp when the invitation was received */
   receivedAt: number;
   /** Current status of the invitation */

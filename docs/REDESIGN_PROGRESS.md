@@ -10,7 +10,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 | Phase 3 — Nostr consolidation | done | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted |
 | F-VIEWS | done | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred |
 | F-EVENT-VIEW | done | 2026-07-21 | Decomposed into `src/features/event-view/`, full RSVP UI, lazy participant/profile loading, delete/duplicate restyle. **Design-fidelity pass 2026-07-21**: exact match to mockups 02/12, full-detail sections ported from 20/21 (banner, chips, location card, host row, add-to-calendar), mobile quick-peek removed in favor of the full bottom sheet |
-| F-EVENT-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
+| F-EVENT-EDIT | done | 2026-07-24 | Decomposed into `src/features/event-editor/`, exact match to mockups 05/11 (desktop modal / mobile sheet) per the approved deviation list. Nostr layer (NIP-17 invitation rumors, `signing_nsec`, `k=1052` wrap tag) was already on the branch prior to this session; this session was UI-only. **e2e not run this session** (explicit scope skip) — `event-crud`/`event-edit`/`event-recurrence`/`event-participants` specs are known-broken after the DOM/header restructuring (mobile now uses `BottomSheet` instead of `Dialog fullScreen`, mobile header moved Cancel/Save into the header bar) and need a follow-up e2e-fix session before merge |
 | F-LOGIN | unblocked (0–3 done) | | |
 | F-SET | unblocked (0–3 done) | | nostr inputs: not provided; `/settings` route is an empty placeholder |
 | F-NOTIF | unblocked (0–3 done) | | nostr inputs: not provided (1052→1059 decision); "Message host" stays unbuilt until this is resolved |
@@ -23,6 +23,152 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 ## Session log
 
 <!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-24 — F-EVENT-EDIT — UI rebuild against mockups `05-event-create-modal`
+  (desktop) and `11-mobile-event-create` (mobile), decoded via the
+  `__bundler/template` JSON-decode technique (now documented in
+  `REDESIGN_MASTER_PLAN.md` §8 guardrail 7, added this session as Step 0).
+  Nostr-layer work (NIP-17 invitation rumors, `signing_nsec` rumor tag,
+  `k=1052` wrap tag, `docs/refactor-calendar-event-edit.md`'s decomposition)
+  was already present on the branch as an uncommitted diff before this
+  session started — this session touched UI only, confirmed no wire-format
+  changes were made.
+  - **New `src/features/event-editor/`**: `EventEditor.tsx` (composition
+    root — all state/hooks moved verbatim from the 1808-line
+    `CalendarEventEdit.tsx`, plus new `allDay` state/handlers and the
+    mobile/desktop presenter + Dialog/BottomSheet/page chrome switch). First
+    cut landed at 596 lines (over the file-size guardrail's 500-line hard
+    alarm) because it also carried the full recurrence and all-day/date-time
+    state machines inline; split those into `hooks/useRecurrenceState.ts`
+    and `hooks/useEventDateTime.ts` (pure logic, no JSX) before finishing
+    the session, bringing the composition root to 403 lines — still above
+    the ~300 target (inherent to fanning out one `EventEditFormProps` object
+    to two large presenter trees plus the Dialog/BottomSheet/page chrome
+    decision) but comfortably under the hard alarm.
+    `components/{EventEditHeaderDesktop,EventEditHeaderMobile,
+    EventEditDesktopForm,EventEditMobileForm,EventEditFooter,WhenFields,
+    CalendarLocationGroup,EventAttachmentsSection,EventNotesSection,
+    EventNotificationsSection,styled,types}.tsx`,
+    `hooks/{useEventSave,useRelayPublishStatus}.ts` (moved from `src/hooks/`,
+    only consumer). `src/components/CalendarEventEdit.tsx` is now a 1-line
+    re-export shim, so `WeekView`/`DayView`/`AppShell`/`ICSListener`/
+    `EditEventPage`/`DuplicateEventPage` needed no import changes (same
+    pattern F-EVENT-VIEW used). Deleted the now-unused
+    `EventAttributeEditContainer` from `StyledComponents.tsx` (confirmed via
+    grep it had no other consumer).
+  - **Approved deviations from the literal mockups** (full list + rationale
+    in the kickoff plan, `/home/rama/.claude/plans/magical-leaping-coral.md`):
+    skip AI-detection hint + Timezone field (auto-detected, no UI); no
+    Public/Private toggle (lock/Private indicator only rendered when
+    `isPrivate` is actually true, so legacy public events don't lie about
+    it); mobile Notes section added (mockup omits it); no file-attachment
+    dropzone on either platform (Formstr-form-link attach only — the
+    mockup's "Saved forms" quick-picker has no real data source anywhere in
+    the app, dropped per guardrail 1); mobile Invitees is its own group
+    section reusing `EventParticipants`; mobile Location is a tap-to-edit
+    row inside the Calendar group; Calendar stays `CalendarListSelect`
+    restyled as a pill trigger (desktop) / row (mobile); **"All day" is a
+    real UI toggle** (confirmed with the user this session — see below);
+    Notifications gets its own section on both platforms; Image URL kept
+    under the title on both platforms; relay footer restyled but all
+    existing functionality (retry, partial-publish note, error snackbar)
+    preserved; mobile modal header adopts Cancel/title+lock/Save in the
+    header bar, desktop and both platforms' `display="page"` keep
+    back-arrow-header + bottom-action-row; mobile modal switched from
+    `Dialog fullScreen` to `BottomSheet` (vaul).
+  - **"All day" toggle mechanics** (deviation confirmed at kickoff: skip the
+    mockup's separate "different end date" toggle, keep always-visible
+    start **and** end date pickers on both platforms — more capable than
+    the mockup's toggle-gated single date, zero regression risk): toggling
+    on snaps `begin`→start of the selected day and `end`→start of the day
+    after the selected end date, remembering the pre-toggle times in a ref
+    so toggling off restores them (or a 09:00–10:00 default if there were
+    none, e.g. a fresh page load). Initial state on edit is derived via
+    the existing `isAllDayEvent(initialEvent.begin, initialEvent.end)`
+    (built in a prior session); "More options" also auto-opens on load
+    when the initial event is all-day or has a custom recurrence rule, so
+    the active advanced settings aren't hidden by default. Storage shape is
+    unchanged — `useEventSave` already recomputes `allDay` from `begin`/`end`
+    at save time, untouched this session. Verified live: create → toggle
+    all-day on → save → shows as a single-day all-day chip on the correct
+    day (F-VIEWS' existing `AllDayEventChip`, already wired to
+    `isAllDayEvent`, needed no changes) → re-open for edit → toggle
+    correctly re-derives `true` and un-collapses More Options → toggle off
+    → restores sensible default times.
+  - **RecurrenceSelector restyle** (`src/components/RecurrenceSelector.tsx`,
+    only consumer is this feature): added a `section?: "trigger" | "details"
+    | "full"` prop so the compact frequency pill (main WHEN row,
+    `data-testid="recurrence-select"` preserved) and the
+    custom-rule-summary/end-mode sub-controls (inside "More options",
+    `data-testid="recurrence-end-mode"` preserved) can be placed in two
+    different regions of the new layout while sharing one set of
+    state/handlers — explicitly sanctioned by the kickoff plan's "pill-
+    styled wrapper props" allowance, no behavior change, verified live via
+    the Custom Rule flow (opens `CustomRecurrenceDialog`, applies, shows
+    "Every week on Monday" pill + summary/edit-link in More Options).
+  - **CalendarListSelect restyle** (`src/components/CalendarListSelect.tsx`,
+    5 other call sites untouched — new `variant` prop is opt-in, default
+    unset preserves their exact prior look): added `variant?: "pill" | "row"`
+    for the desktop pill (next to Repeat) and mobile group-row placements.
+  - **Bug found and fixed during live QA** (not present before this
+    session): the desktop/mobile calendar-pill refactor above initially
+    extracted the shared `<MenuItem>` list into a `<>...</>` Fragment
+    variable reused across the three `<Select>` render branches — MUI's
+    `Select`/`Menu` only recognize direct `MenuItem` children and silently
+    treat a Fragment as one opaque, unrecognized child ("MUI: The Select
+    component doesn't accept a Fragment as a child" console warning), which
+    broke the calendar dropdown's option list and threw an "out-of-range
+    value" warning for the selected calendar. Fixed by making `menuItems` a
+    plain keyed array instead of a Fragment (MUI's own suggested fix).
+    Caught by driving the real app via `agent-browser`, not by
+    typecheck/lint (both clean throughout, since this is a runtime-only
+    React children shape issue) — reinforces the standing lesson from prior
+    sessions that live manual QA catches a different class of bug than
+    static checks.
+  - New dictionary keys, `en-US` only (`event.when/people/where/notesLabel/
+    allDay/showAs/busy/free/attachmentsToggle/save/invitees/repeatLabel/
+    dateLabel/startsLabel/endsLabel/endsOnLabel`).
+  - F-EVENT-EDIT's design note "all-day events get a chip at the top of
+    week/day view" was already implemented in the F-VIEWS session
+    (`AllDayEventChip`, wired to `isAllDayEvent`) — confirmed via grep,
+    no work needed this session.
+  - `pnpm typecheck`: clean. `pnpm lint`: 0 errors, 9 warnings — same
+    pre-existing warnings as prior sessions (`App.tsx`,
+    `DuplicateEventPage.tsx`, `EditEventPage.tsx`, `Index.tsx`,
+    `data/fakeEvents.ts`, `hooks/useEventRsvps.ts`, `utils/rsvpHelpers.ts`)
+    plus one pre-existing `calendars` exhaustive-deps warning moved verbatim
+    from the old `CalendarEventEdit.tsx` into `EventEditor.tsx` (not a new
+    regression — same code, same warning, just a new file location).
+  - **`pnpm test:e2e` not run** (explicit scope skip, per this session's
+    instructions). `event-crud.spec.ts`, `event-edit.spec.ts`,
+    `event-recurrence.spec.ts`, `event-participants.spec.ts` are expected to
+    have broken selectors — mobile no longer uses a `Dialog fullScreen`
+    (now `BottomSheet`), the mobile header moved Cancel/Save into the header
+    bar instead of a bottom action row, and several role/text selectors
+    around the WHEN section changed shape (date+time split into separate
+    pickers, Repeat/Calendar became pills). A follow-up e2e-fix session
+    should diff against this entry's actual DOM (not guess) per guardrail 2.
+    E2E-contract testids preserved: `event-title`, `event-start-time` (now on
+    the begin-time `TimePicker`'s input), `calendar-list-select` + "Add new
+    calendar" menu item, `recurrence-select` + `recurrence-end-mode`,
+    "Enter participant nPub" placeholder, "Save Event" text (desktop) — note
+    mobile's compact header button now reads "Save" (new `event.save` key,
+    space-constrained), not "Save Event".
+  - **Manually verified live** via `run-app` skill + `agent-browser` against
+    `pnpm dev`: desktop create (title/image/WHEN row/People/Where/
+    Attachments/Notes/Notifications/footer all render and scroll correctly),
+    all-day toggle on/off round-trip (see above), custom recurrence dialog
+    end-to-end, calendar pill dropdown (post-fix), full edit round-trip via
+    `display="page"` (`EditEventPage`, back-arrow header, More Options
+    auto-expanded, All-day pre-checked), mobile create via `BottomSheet`
+    (header Cancel/title+lock/Save, all group cards, location tap-to-edit
+    commit-on-blur, calendar row dropdown, save-and-close), and both
+    platforms in light **and** dark mode (desktop + mobile create dialogs
+    screenshotted in dark, tokens read correctly with no hardcoded-color
+    contrast issues). Not exercised live: relay-retry-after-failure (no way
+    to force a relay failure in this sandboxed setup) and the
+    Formstr-form-attach-link flow (component internals unchanged from the
+    working original, chrome-only restyle, lower risk).
 
 - 2026-07-21 — F-EVENT-VIEW design-fidelity pass — Closed the gap between the
   prior session's structural decomposition and the actual mockups. Scope:

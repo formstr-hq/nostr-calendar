@@ -6,6 +6,7 @@ import {
   Filter,
 } from "nostr-tools";
 import { v4 as uuid } from "uuid";
+import dayjs from "dayjs";
 import { dataLayer, type ObserveHandle } from "@formstr/local-relay";
 import type { ICalendarEvent } from "../stores/events";
 import { getPersistedCalendarEventId } from "../utils/calendarEventIdentity";
@@ -16,7 +17,9 @@ import {
   getTagValue,
   wrapEvent,
   unwrapEvent,
+  buildSelfSignedDeletion,
 } from "./crypto";
+import { fetchUserProfile } from "./profiles";
 import {
   AddressPointer,
   NAddr,
@@ -40,6 +43,27 @@ import { fetchLatest } from "./fetch";
 import { fetchRelayList, fetchRelayLists } from "./relays";
 
 const logger = createLogger("NOSTR_CORE");
+
+function getSenderDisplayName(profileEvent: Event | null, pubkey: string) {
+  if (profileEvent) {
+    try {
+      const profile = JSON.parse(profileEvent.content);
+      const name = profile.display_name || profile.name;
+      if (name) return name as string;
+    } catch {
+      // Malformed profile content — fall through to the pubkey fallback.
+    }
+  }
+  return nip19.npubEncode(pubkey).slice(0, 12);
+}
+
+function buildInvitationMessage(
+  senderName: string,
+  title: string,
+  beginMs: number,
+) {
+  return `${senderName} has invited you to the ${title} on ${dayjs(beginMs).format("MMM D, YYYY")}`;
+}
 
 /**
  * Publishes a private calendar event and sends gift-wrap invitations to participants.
@@ -165,31 +189,42 @@ export async function publishPrivateCalendarEvent(
   // so each gift wrap (p-tagging its recipient) routes to the recipient's own
   // relays — not just the author's.
   const targetPubKeys = Array.from(new Set([...event.participants]));
-  const [, ...giftWraps] = await Promise.all([
+  const [userProfile] = await Promise.all([
+    fetchUserProfile(userPublicKey),
     fetchRelayLists(targetPubKeys),
-    ...targetPubKeys.map(async (participant) => {
+  ]);
+  const senderName = getSenderDisplayName(userProfile, userPublicKey);
+  const invitationMessage = buildInvitationMessage(
+    senderName,
+    event.title,
+    event.begin,
+  );
+  const giftWraps = await Promise.all(
+    targetPubKeys.map(async (participant) => {
       const giftWrapEvent = await wrapEvent(
-        {
+        (signingNsec) => ({
           pubkey: userPublicKey,
           created_at: Math.floor(Date.now() / 1000),
-          kind: EventKinds.CalendarEventRumor,
-          content: "",
+          kind: EventKinds.CalendarEventInvitationRumor,
+          content: invitationMessage,
           tags: [
+            ["p", participant],
             [
               "a",
               `${eventKind}:${signedEvent.pubkey}:${dTag}`,
               publishedRelayHint,
             ],
             ["viewKey", nip19.nsecEncode(viewSecretKey)],
+            ["signing_nsec", signingNsec],
           ],
-        },
+        }),
         participant,
         EventKinds.CalendarEventGiftWrap,
-        invitationGiftWrapTags,
+        [...invitationGiftWrapTags, ["k", "1052"]],
       );
       return { giftWrap: giftWrapEvent, participant };
     }),
-  ]);
+  );
   await Promise.all(
     giftWraps.map(({ giftWrap: gw }) => publishSignedEvent(gw)),
   );
@@ -252,30 +287,42 @@ export async function editPrivateCalendarEvent(
   const previousSet = new Set(previousParticipants);
   const newParticipants = event.participants.filter((p) => !previousSet.has(p));
   if (newParticipants.length > 0) {
-    const [, ...giftWraps] = await Promise.all([
+    const [userProfile] = await Promise.all([
+      fetchUserProfile(userPublicKey),
       fetchRelayLists(newParticipants),
-      ...newParticipants.map(async (participant) => {
+    ]);
+    const senderName = getSenderDisplayName(userProfile, userPublicKey);
+    const invitationMessage = buildInvitationMessage(
+      senderName,
+      event.title,
+      event.begin,
+    );
+    const giftWraps = await Promise.all(
+      newParticipants.map(async (participant) => {
         const giftWrapEvent = await wrapEvent(
-          {
+          (signingNsec) => ({
             pubkey: userPublicKey,
             created_at: Math.floor(Date.now() / 1000),
-            kind: EventKinds.CalendarEventRumor,
-            content: "",
+            kind: EventKinds.CalendarEventInvitationRumor,
+            content: invitationMessage,
             tags: [
+              ["p", participant],
               [
                 "a",
                 `${eventKind}:${userPublicKey}:${dTag}`,
                 publishedRelayHint,
               ],
               ["viewKey", nip19.nsecEncode(viewSecretKey)],
+              ["signing_nsec", signingNsec],
             ],
-          },
+          }),
           participant,
           EventKinds.CalendarEventGiftWrap,
+          [["k", "1052"]],
         );
         return { giftWrap: giftWrapEvent, participant };
       }),
-    ]);
+    );
     await Promise.all(
       giftWraps.map(({ giftWrap: gw }) => publishSignedEvent(gw)),
     );
@@ -321,6 +368,9 @@ export async function getDetailsFromGiftWrap(giftWrapEvent: Event) {
   if (!viewKey) {
     throw new Error("invalid rumor: viewKey not found");
   }
+  // Present on invitations sent after the NIP-17 rumor switch; absent on
+  // older still-pending invitations decrypted from before that change.
+  const signingNsec = getTagValue(rumor.tags, "signing_nsec") || undefined;
   return {
     eventId,
     viewKey,
@@ -328,7 +378,26 @@ export async function getDetailsFromGiftWrap(giftWrapEvent: Event) {
     kind,
     relayHint,
     createdAt: rumor.created_at,
+    message: rumor.content || undefined,
+    signingNsec,
   };
+}
+
+/**
+ * Deletes a gift wrap on behalf of its recipient via NIP-09, using the
+ * ephemeral signing key the sender embedded in the (encrypted) rumor —
+ * see the `signing_nsec` tag added in `getDetailsFromGiftWrap`. Older
+ * invitations sent before that change have no `signingNsec` and can't be
+ * deleted this way; callers should fall back to the existing kind-84
+ * participant-removal notice for those.
+ */
+export async function deleteGiftWrapAsRecipient(
+  giftWrapId: string,
+  signingNsec: string,
+): Promise<void> {
+  const secretKey = nip19.decode(signingNsec as NSec).data;
+  const deletion = buildSelfSignedDeletion(secretKey, [giftWrapId]);
+  await publishSignedEvent(deletion);
 }
 
 /**
@@ -352,6 +421,8 @@ export const fetchCalendarGiftWraps = (
     relayHint: string;
     originalInvitationId: string;
     createdAt: number;
+    message?: string;
+    signingNsec?: string;
   }) => void,
   onEose: () => void,
 ): ObserveHandle => {

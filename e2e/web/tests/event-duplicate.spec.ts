@@ -27,6 +27,6 @@ test("user duplicates an event and saves the copy", async ({
 
   // Both the original and the copy are on the calendar.
   await navigate(page, `/d/${TEST_DATE.replaceAll("-", "/")}`);
-  await expect(page.getByText("Origin Event")).toBeVisible();
-  await expect(page.getByText("Cloned Event")).toBeVisible();
+  await expect(page.getByText("Origin Event").first()).toBeVisible();
+  await expect(page.getByText("Cloned Event").first()).toBeVisible();
 });

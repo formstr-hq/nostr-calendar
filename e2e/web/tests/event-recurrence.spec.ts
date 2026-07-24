@@ -18,6 +18,9 @@ async function pickRecurrence(page: Page, dialog: Locator, option: string) {
 }
 
 async function endAfterOccurrences(page: Page, dialog: Locator, count: number) {
+  // The rebuilt editor keeps the frequency trigger in the WHEN row and moves
+  // recurrence end controls into the intentional "More options" disclosure.
+  await dialog.getByRole("button", { name: /More options/ }).click();
   await dialog.getByTestId("recurrence-end-mode").click();
   await page.getByRole("option", { name: "After", exact: true }).click();
   await dialog.getByLabel("Occurrences").fill(String(count));

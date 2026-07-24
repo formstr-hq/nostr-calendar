@@ -62,7 +62,7 @@ export async function createEventViaDialog(
   await dialog.getByRole("button", { name: "Save Event" }).click();
 
   await expect(dialog).not.toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(title)).toBeVisible();
+  await expect(page.getByText(title).first()).toBeVisible();
 }
 
 /**

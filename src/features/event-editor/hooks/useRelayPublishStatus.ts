@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { normalizeURL } from "nostr-tools/utils";
-import type { RelayStatusMap } from "../utils/types";
+import type { RelayStatusMap } from "../../../utils/types";
 
 function normalizeRelays(relays: string[]): string[] {
   return Array.from(new Set(relays.map(normalizeURL)));

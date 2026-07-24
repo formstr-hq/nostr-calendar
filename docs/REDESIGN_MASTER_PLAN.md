@@ -219,11 +219,14 @@ Template for the inputs (copy into the session prompt):
   `DuplicateEventPage.tsx`, `utils/repeatingEventsHelper.ts`.
 - **Design:** `05` (desktop modal: underline title, WHEN block, busy/free, public/private, people
   by npub/NIP-05, Formstr form attach, "More options"), `11` (mobile sheet).
+  1. If an event spans the complee day, it should be displayed as an all day chip at the top of the week and day view just below the date bar. the designs do not exist strictly for this, but do it.
 - **E2E:** `event-crud`, `event-edit`, `event-recurrence`, `event-participants`
   (`recurrence-select`, `recurrence-end-mode`).
-- **Nostr layer inputs:** _(fill in — candidate decisions: adopt 31922 all-day events?
-  add `start_tzid`/`end_tzid`? recurrence stays NIP-32 `L/l` rrule per NIP-52R? Formstr-form
-  attach scope?)_
+- **Nostr layer inputs:** There are a few changes to be made:
+  1. I want to change the participant invitation kind. Participant invitation kinds are now Nip 17 DMs. The content of the rumor should be the text: 'X has invited you to the <Event title> on <Date>'. The rest of the structured information should go into the tags as usual.
+  2. The outer event(gift wrap) should contain a k tag with the value of 1052 to fetch only the invitation event kinds.
+  3. Also add another tag inside the rumor: ['signing_nsec', <nsec with which the main gift wrap is signed>]. The main idea is that the invited user should be able to delete the gift wrap.
+  4. There will need to be changes in the invitation flow. Add these changes as notes in the that phase in this document.
 
 ### F-LOGIN — Auth
 
@@ -249,12 +252,31 @@ Template for the inputs (copy into the session prompt):
 ### F-NOTIF — Notifications / invitations
 
 - **Current:** `InvitationPanel.tsx`, `NotificationEventPage.tsx`, `stores/invitations.ts`,
-  `stores/notifications.ts`, gift-wrap flow (kinds 52/1052), participant-removal kind 84.
+  `stores/notifications.ts`, gift-wrap flow (kind 1052, rumor kind 14 as of F-EVENT-EDIT — see
+  below), participant-removal kind 84.
 - **Design:** no dedicated screen; bell in TopBar + Alerts tab in MobileTabBar.
 - **E2E:** `invitations` (`invitation-card`).
 - **Nostr layer inputs:** _(fill in — **the big one: gift-wrap kind 1052 → NIP-59-standard 1059?**
   Needs dual-read (accept both) + decide write cutoff, since old app versions won't see 1059
   wraps. Kind 84 removal stays per NIP-52E?)_
+- **Notes carried over from F-EVENT-EDIT's invitation-flow rework** (per its nostr layer inputs
+  item 4 — read before scoping this phase):
+  - The invitation rumor is now kind `14` (NIP-17 chat message) with real content (`"{sender} has
+    invited you to the {title} on {date}"`), not empty-content kind `52`. `getDetailsFromGiftWrap`
+    returns this as `message`; `IInvitation`/`InvitationPanel` don't surface it yet — F-NOTIF should
+    decide whether to show it (mockups have no invitation-card spec either way).
+  - The gift wrap gained a `["signing_nsec", ...]` rumor tag (the ephemeral key it's signed with)
+    and a `["k", "1052"]` wrap tag. `dismissInvitation`/`reportInvitation` now also publish a NIP-09
+    kind-5 deletion signed with that key when present (see `deleteGiftWrapAsRecipient` in
+    `nostr/events.ts`) — this is additive to, not a replacement for, the kind-84 notice, since
+    `InvitationWorker.java` (Android background worker) keys its own-notification suppression off
+    kind 84 and never decrypts anything, so it needed no changes and must keep receiving kind 84.
+  - If this phase moves the wrap kind to 1059, keep the `k=1052` tag semantics (it identifies the
+    *invitation* content, independent of the wrap's own kind) so old and new wraps stay
+    distinguishable from booking/DM traffic sharing the same outer kind.
+  - Old pending invitations (rumor kind `52`, no `signing_nsec`) still decode fine — nothing
+    validates rumor kind, and `signingNsec`/`message` are optional — but they can't use the new
+    NIP-09 deletion path; the kind-84 fallback still covers them.
 
 ### F-BOOK-EDIT — Booking page editor | F-BOOK-INBOX — Bookings inbox | F-BOOK-PUBLIC — Public booking link
 
@@ -355,7 +377,7 @@ Per-session exit checklist:
 ## 8. Guardrails (repeat every session)
 
 1. **Designs are guidelines.** Build only what the session scope says. Mockup features not in
-   scope (Message host, add-to-Google, forms attach UI, accent sync, search, drag-to-move, …)
+   scope (Message host, add-to-Google, accent sync, search, drag to move …)
    are skipped without asking.
 2. **E2E green is the definition of done** for every phase. A failing spec is either a real
    regression (fix the app) or an intentional DOM change (fix the spec in the same change).
@@ -371,3 +393,20 @@ Per-session exit checklist:
    at least the piece you're working on into the feature folder.
 6. **Settings controls:** switches/chips for toggles, dropdowns for selects — including mobile.
    No iOS-style settings lists.
+7. **Design-decoding technique — use this instead of screenshotting.** Each
+   `designs/redesign/*.html` mockup is a self-contained "bundler" export: a `<script
+   type="__bundler/manifest">` (shared runtime asset blobs, identical across mockups) plus a
+   `<script type="__bundler/template">` whose text content is a **JSON-encoded string of the real
+   page HTML**, including the unminified `<script type="text/babel">` JSX source (styles object,
+   mock state, full component tree, interaction handlers). Decode with:
+
+   ```python
+   import re, json
+   content = open("designs/redesign/NN-name.html").read()
+   m = re.search(r'<script type="__bundler/template">(.*?)</script>', content, re.DOTALL)
+   html_source = json.loads(m.group(1))  # contains the real <script type="text/babel"> JSX
+   ```
+
+   This recovers exact copy, state shapes, and interaction logic (collapse/toggle behavior, hover
+   states, conditional rendering) that a screenshot can't show. Decode every mockup a flow phase
+   touches before building against it.

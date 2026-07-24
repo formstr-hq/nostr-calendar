@@ -1,7 +1,14 @@
 export enum EventKinds {
   PrivateCalendarEvent = 32678,
   CalendarEventGiftWrap = 1052,
+  /** @deprecated superseded by CalendarEventInvitationRumor (kind 14) — no longer written, kept for historical reference */
   CalendarEventRumor = 52,
+  /** NIP-17 kind 14 ("chat message") reused as the invitation rumor kind so
+   * the invite reads as a real DM in any NIP-17 client. The gift wrap that
+   * carries it is additionally tagged `["k", "1052"]` so this app can pick
+   * invitation wraps out from other NIP-59-wrapped content sharing the same
+   * outer kind. */
+  CalendarEventInvitationRumor = 14,
   PrivateRSVPEvent = 32069,
   // Public Events
   PublicCalendarEvent = 31923,

@@ -15,14 +15,3 @@ export const StyledSecondaryHeader = styled(Box, {
     theme.vars?.palette.background.paper ?? theme.palette.background.paper,
   zIndex: 1,
 }));
-
-export const EventAttributeEditContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  gap: theme.spacing(2),
-  alignItems: "center",
-
-  [theme.breakpoints.down("sm")]: {
-    alignItems: "start",
-    flexDirection: "column",
-  },
-}));
