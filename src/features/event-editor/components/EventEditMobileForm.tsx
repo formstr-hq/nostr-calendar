@@ -106,7 +106,7 @@ export function EventEditMobileForm(props: EventEditFormProps) {
         <CalendarLocationGroup
           selectedCalendarId={selectedCalendarId}
           onCalendarChange={setSelectedCalendarId}
-          calendarsEmpty={calendars.length === 0}
+          calendarsEmpty={mode === "create" && calendars.length === 0}
           location={eventDetails.location}
           onLocationChange={(location) => updateField("location", location)}
         />

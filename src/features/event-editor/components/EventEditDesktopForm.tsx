@@ -114,16 +114,14 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
             label={intl.formatMessage({ id: "event.calendar" })}
           />
         }
+        calendarHelper={
+          mode === "create" && calendars.length === 0 ? (
+            <Typography variant="caption" color="warning.main">
+              {intl.formatMessage({ id: "event.calendarRequired" })}
+            </Typography>
+          ) : undefined
+        }
       />
-      {calendars.length === 0 && (
-        <Typography
-          variant="caption"
-          color="warning.main"
-          sx={{ mt: -2, mb: 3, display: "block" }}
-        >
-          {intl.formatMessage({ id: "event.calendarRequired" })}
-        </Typography>
-      )}
 
       <Box sx={{ mb: 3 }}>
         <SectionLabel sx={sectionLabelSx}>

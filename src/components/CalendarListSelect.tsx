@@ -73,10 +73,22 @@ export function CalendarListSelect({
 
   const renderValue = (selected: string) => {
     const cal = calendars.find((c) => c.id === selected);
+    const hasSelectedCalendar = Boolean(cal);
     return (
-      <Box display="flex" alignItems="center" gap={1}>
-        <CircleIcon sx={{ fontSize: 12, color: cal?.color }} />
-        {cal?.title || intl.formatMessage({ id: "event.selectCalendar" })}
+      <Box
+        display="flex"
+        alignItems="center"
+        gap={1}
+        color={hasSelectedCalendar ? undefined : "warning.main"}
+      >
+        <CircleIcon
+          sx={{
+            fontSize: 12,
+            color: cal?.color || "warning.main",
+          }}
+        />
+        {cal?.title ||
+          intl.formatMessage({ id: "addToCalendar.selectCalendar" })}
       </Box>
     );
   };
@@ -113,6 +125,7 @@ export function CalendarListSelect({
       {variant === "pill" ? (
         <Select
           value={value}
+          displayEmpty
           onChange={(e) => handleChange(e.target.value)}
           SelectDisplayProps={selectDisplayProps}
           renderValue={renderValue}
@@ -130,6 +143,7 @@ export function CalendarListSelect({
       ) : variant === "row" ? (
         <Select
           value={value}
+          displayEmpty
           onChange={(e) => handleChange(e.target.value)}
           SelectDisplayProps={selectDisplayProps}
           renderValue={renderValue}
@@ -150,6 +164,7 @@ export function CalendarListSelect({
           <InputLabel>{displayLabel}</InputLabel>
           <Select
             value={value}
+            displayEmpty
             label={displayLabel}
             onChange={(e) => handleChange(e.target.value)}
             SelectDisplayProps={selectDisplayProps}

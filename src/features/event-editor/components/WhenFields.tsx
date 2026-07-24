@@ -62,6 +62,8 @@ interface WhenFieldsProps {
   onPublishBusyChange: (value: boolean) => void;
   /** Desktop only: rendered next to the Repeat pill (the Calendar pill). */
   calendarSlot?: React.ReactNode;
+  /** Desktop only: rendered on a full row below the Repeat/Calendar pills. */
+  calendarHelper?: React.ReactNode;
 }
 
 export function WhenFields(props: WhenFieldsProps) {
@@ -83,6 +85,7 @@ export function WhenFields(props: WhenFieldsProps) {
     supportsBusyListPublish,
     onPublishBusyChange,
     calendarSlot,
+    calendarHelper,
   } = props;
   const intl = useIntl();
   const timeFormat = useSettings((state) => state.settings.general.timeFormat);
@@ -280,7 +283,7 @@ export function WhenFields(props: WhenFieldsProps) {
               slotProps={{
                 textField: {
                   size: "small",
-                  sx: { width: 110 },
+                  sx: { width: 140 },
                   inputProps: {
                     "data-testid": "event-start-time",
                     "aria-label": "event start time",
@@ -296,7 +299,7 @@ export function WhenFields(props: WhenFieldsProps) {
               slotProps={{
                 textField: {
                   size: "small",
-                  sx: { width: 110 },
+                  sx: { width: 140 },
                   inputProps: {
                     "data-testid": "event-end-time",
                     "aria-label": "event end time",
@@ -316,9 +319,20 @@ export function WhenFields(props: WhenFieldsProps) {
         />
       </Box>
 
-      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", mb: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1.5,
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+        }}
+      >
         {recurrenceTrigger}
         {calendarSlot}
+        {calendarHelper && (
+          <Box sx={{ flexBasis: "100%" }}>{calendarHelper}</Box>
+        )}
       </Box>
 
       <CollapseToggle onClick={onToggleMore} size="small">
