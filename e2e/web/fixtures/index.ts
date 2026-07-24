@@ -1,9 +1,9 @@
+import { test as base, type Page, type BrowserContext } from "@playwright/test";
 import {
-  test as base,
-  type Page,
-  type BrowserContext,
-} from "@playwright/test";
-import { TEST_KEYS, TEST_PASSPHRASE, type TestKey } from "../../relay/seed/keys.js";
+  TEST_KEYS,
+  TEST_PASSPHRASE,
+  type TestKey,
+} from "../../relay/seed/keys.js";
 
 // ─── Fast auth (default) ─────────────────────────────────────────────────────
 //
@@ -66,7 +66,12 @@ export async function signIn(
     }
 
     await passphraseField.fill(TEST_PASSPHRASE);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    const signInButton = page.getByRole("button", {
+      name: "Sign in",
+      exact: true,
+    });
+    await expect(signInButton).toBeEnabled();
+    await signInButton.click();
     await avatar.waitFor({ state: "visible", timeout: 10_000 });
   } catch {
     // No login modal — session already active (e.g. extension signer)
@@ -102,25 +107,39 @@ async function fastAuthedPage(
   await injectAuth(context, key, name);
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByTestId("user-avatar").waitFor({ state: "visible", timeout: 15_000 });
+  await page
+    .getByTestId("user-avatar")
+    .waitFor({ state: "visible", timeout: 15_000 });
   return { page, context };
 }
 
 export const test = base.extend<Fixtures>({
   authedPage: async ({ browser }, use) => {
-    const { page, context } = await fastAuthedPage(browser, TEST_KEYS.alice, "Alice");
+    const { page, context } = await fastAuthedPage(
+      browser,
+      TEST_KEYS.alice,
+      "Alice",
+    );
     await use(page);
     await context.close();
   },
 
   bobPage: async ({ browser }, use) => {
-    const { page, context } = await fastAuthedPage(browser, TEST_KEYS.bob, "Bob");
+    const { page, context } = await fastAuthedPage(
+      browser,
+      TEST_KEYS.bob,
+      "Bob",
+    );
     await use(page);
     await context.close();
   },
 
   carolPage: async ({ browser }, use) => {
-    const { page, context } = await fastAuthedPage(browser, TEST_KEYS.carol, "Carol");
+    const { page, context } = await fastAuthedPage(
+      browser,
+      TEST_KEYS.carol,
+      "Carol",
+    );
     await use(page);
     await context.close();
   },

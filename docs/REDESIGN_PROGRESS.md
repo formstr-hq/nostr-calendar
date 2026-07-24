@@ -2,23 +2,23 @@
 
 Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the end of every session.
 
-| Phase | Status | Date | Notes |
-|---|---|---|---|
-| Phase 0 — Safety net | done | 2026-07-19 | Baseline recorded, one fragile selector hardened |
-| Phase 1 — Theme & tokens | done | 2026-07-19 | `src/theme/` built, old `src/theme.ts` deleted |
-| Phase 2 — Shell & primitives | done | 2026-07-19 | `AppShell`/`TopBar`/`Sidebar`/`MobileTabBar` built, `Header`/`CalendarSidebar`/`CalendarHeader`/`TempThemeToggle` deleted |
-| Phase 3 — Nostr consolidation | done | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted |
-| F-VIEWS | done | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred |
-| F-EVENT-VIEW | done | 2026-07-21 | Decomposed into `src/features/event-view/`, full RSVP UI, lazy participant/profile loading, delete/duplicate restyle. **Design-fidelity pass 2026-07-21**: exact match to mockups 02/12, full-detail sections ported from 20/21 (banner, chips, location card, host row, add-to-calendar), mobile quick-peek removed in favor of the full bottom sheet |
-| F-EVENT-EDIT | done | 2026-07-24 | Decomposed into `src/features/event-editor/`, exact match to mockups 05/11 (desktop modal / mobile sheet) per the approved deviation list. Nostr layer (NIP-17 invitation rumors, `signing_nsec`, `k=1052` wrap tag) was already on the branch prior to this session; this session was UI-only. **e2e not run this session** (explicit scope skip) — `event-crud`/`event-edit`/`event-recurrence`/`event-participants` specs are known-broken after the DOM/header restructuring (mobile now uses `BottomSheet` instead of `Dialog fullScreen`, mobile header moved Cancel/Save into the header bar) and need a follow-up e2e-fix session before merge |
-| F-LOGIN | unblocked (0–3 done) | | |
-| F-SET | unblocked (0–3 done) | | nostr inputs: not provided; `/settings` route is an empty placeholder |
-| F-NOTIF | unblocked (0–3 done) | | nostr inputs: not provided (1052→1059 decision); "Message host" stays unbuilt until this is resolved |
-| F-CAL-MGMT | unblocked (0–3 done) | | nostr inputs: not provided |
-| F-BOOK-EDIT | unblocked (0–3 done) | | nostr inputs: not provided |
-| F-BOOK-INBOX | unblocked (0–3 done) | | nostr inputs: not provided |
-| F-BOOK-PUBLIC | unblocked (0–3 done) | | nostr inputs: not provided |
-| F-EVENT-LINK | mostly done via F-EVENT-VIEW | 2026-07-21 | `ViewEventPage` shares `CalendarEventView`, so the 2026-07-21 design-fidelity pass carried its banner/chips/sections styling here too (user's explicit choice). Still open: guest/unauthenticated RSVP nostr-layer decision, "Message host", any F-EVENT-LINK-specific polish beyond what F-EVENT-VIEW needed |
+| Phase                         | Status                       | Date       | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------- | ---------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 0 — Safety net          | done                         | 2026-07-19 | Baseline recorded, one fragile selector hardened                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Phase 1 — Theme & tokens      | done                         | 2026-07-19 | `src/theme/` built, old `src/theme.ts` deleted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Phase 2 — Shell & primitives  | done                         | 2026-07-19 | `AppShell`/`TopBar`/`Sidebar`/`MobileTabBar` built, `Header`/`CalendarSidebar`/`CalendarHeader`/`TempThemeToggle` deleted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Phase 3 — Nostr consolidation | done                         | 2026-07-20 | `src/nostr/` built, `common/{nostr,nip59,EventConfigs,calendarList}.ts` deleted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| F-VIEWS                       | done                         | 2026-07-20 | Month/Week/Day restyled on tokens + EventChip; quick-peek popover + day-agenda overflow added; mobile month dots+vaul sheet; drag-to-move deferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| F-EVENT-VIEW                  | done                         | 2026-07-21 | Decomposed into `src/features/event-view/`, full RSVP UI, lazy participant/profile loading, delete/duplicate restyle. **Design-fidelity pass 2026-07-21**: exact match to mockups 02/12, full-detail sections ported from 20/21 (banner, chips, location card, host row, add-to-calendar), mobile quick-peek removed in favor of the full bottom sheet                                                                                                                                                                                                                                                                                                 |
+| F-EVENT-EDIT                  | done                         | 2026-07-24 | Decomposed into `src/features/event-editor/`, exact match to mockups 05/11 (desktop modal / mobile sheet) per the approved deviation list. Nostr layer (NIP-17 invitation rumors, `signing_nsec`, `k=1052` wrap tag) was already on the branch prior to this session; this session was UI-only. **e2e not run this session** (explicit scope skip) — `event-crud`/`event-edit`/`event-recurrence`/`event-participants` specs are known-broken after the DOM/header restructuring (mobile now uses `BottomSheet` instead of `Dialog fullScreen`, mobile header moved Cancel/Save into the header bar) and need a follow-up e2e-fix session before merge |
+| F-LOGIN                       | in progress                  | 2026-07-24 | Rebuilt auth presentation and added `key.txt` ncryptsec backup/import; validation in progress                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| F-SET                         | unblocked (0–3 done)         |            | nostr inputs: not provided; `/settings` route is an empty placeholder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| F-NOTIF                       | unblocked (0–3 done)         |            | nostr inputs: not provided (1052→1059 decision); "Message host" stays unbuilt until this is resolved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| F-CAL-MGMT                    | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-EDIT                   | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-INBOX                  | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-PUBLIC                 | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-EVENT-LINK                  | mostly done via F-EVENT-VIEW | 2026-07-21 | `ViewEventPage` shares `CalendarEventView`, so the 2026-07-21 design-fidelity pass carried its banner/chips/sections styling here too (user's explicit choice). Still open: guest/unauthenticated RSVP nostr-layer decision, "Message host", any F-EVENT-LINK-specific polish beyond what F-EVENT-VIEW needed                                                                                                                                                                                                                                                                                                                                          |
 
 ## Session log
 
@@ -46,9 +46,9 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     to two large presenter trees plus the Dialog/BottomSheet/page chrome
     decision) but comfortably under the hard alarm.
     `components/{EventEditHeaderDesktop,EventEditHeaderMobile,
-    EventEditDesktopForm,EventEditMobileForm,EventEditFooter,WhenFields,
-    CalendarLocationGroup,EventAttachmentsSection,EventNotesSection,
-    EventNotificationsSection,styled,types}.tsx`,
+EventEditDesktopForm,EventEditMobileForm,EventEditFooter,WhenFields,
+CalendarLocationGroup,EventAttachmentsSection,EventNotesSection,
+EventNotificationsSection,styled,types}.tsx`,
     `hooks/{useEventSave,useRelayPublishStatus}.ts` (moved from `src/hooks/`,
     only consumer). `src/components/CalendarEventEdit.tsx` is now a 1-line
     re-export shim, so `WeekView`/`DayView`/`AppShell`/`ICSListener`/
@@ -97,7 +97,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     → restores sensible default times.
   - **RecurrenceSelector restyle** (`src/components/RecurrenceSelector.tsx`,
     only consumer is this feature): added a `section?: "trigger" | "details"
-    | "full"` prop so the compact frequency pill (main WHEN row,
+| "full"` prop so the compact frequency pill (main WHEN row,
     `data-testid="recurrence-select"` preserved) and the
     custom-rule-summary/end-mode sub-controls (inside "More options",
     `data-testid="recurrence-end-mode"` preserved) can be placed in two
@@ -126,8 +126,8 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     sessions that live manual QA catches a different class of bug than
     static checks.
   - New dictionary keys, `en-US` only (`event.when/people/where/notesLabel/
-    allDay/showAs/busy/free/attachmentsToggle/save/invitees/repeatLabel/
-    dateLabel/startsLabel/endsLabel/endsOnLabel`).
+allDay/showAs/busy/free/attachmentsToggle/save/invitees/repeatLabel/
+dateLabel/startsLabel/endsLabel/endsOnLabel`).
   - F-EVENT-EDIT's design note "all-day events get a chip at the top of
     week/day view" was already implemented in the F-VIEWS session
     (`AllDayEventChip`, wired to `isAllDayEvent`) — confirmed via grep,
@@ -196,7 +196,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     calls), `EventLocationCard`, `EventHostRow` (always-visible "Hosted by
     X", reuses `Participant`), `EventAddToCalendarButton` (wraps the
     existing `exportICS`; there's no native calendar-insert API — Android's
-    `DeviceCalendar` plugin is read-only — so ".ics export" *is* "add to
+    `DeviceCalendar` plugin is read-only — so ".ics export" _is_ "add to
     calendar" here, per mockup 12's literal "Add to device calendar"
     wording, which is also what avoided a button-label collision with
     `RespondPanel`'s unrelated "Add to Calendar" accept-into-my-calendar
@@ -207,8 +207,8 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     component using `useColorScheme()` + `theme/tokens.ts`
     (`lightTokens`/`darkTokens`), not `theme.palette.mode` — this app
     themes via MUI CSS variables (`colorSchemeSelector: "class"`, see
-    `theme.ts`), under which `theme.palette.*` reflects the *static
-    default* scheme, not the live toggle. `EventChip.tsx` already had to
+    `theme.ts`), under which `theme.palette.*` reflects the _static
+    default_ scheme, not the live toggle. `EventChip.tsx` already had to
     work around this the same way (`publicTint` via `useColorScheme`); a
     first cut of the placeholder used `theme.palette.mode` directly and
     rendered a bright white gradient in dark mode until live agent-browser
@@ -353,7 +353,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     properties and `overscroll-behavior: none` on `html.ios-native`.
   - **Not ported**: main's `html.ios-native` internal-scroll-container model
     (`overflow: hidden` on `html`/`body`/`#root`/`.App` + a per-view `flex:1;
-    overflowY:auto` pane, used by the old `Header`+`CalendarHeader`+
+overflowY:auto` pane, used by the old `Header`+`CalendarHeader`+
     `Calendar.tsx` stack). This directly conflicts with the redesign's
     documented "the whole document scrolls, there is no internal scroll
     container" decision (see F-VIEWS entry below) — reintroducing it would
@@ -369,13 +369,13 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     `shouldRenderRouting` (renders for `Boolean(user) || publicRoute`) — so
     `/event/:naddr` and `/schedule/:id` rendered **nothing** for a logged-out
     visitor, pre-dating this rebase (bug already present on `local-relay-
-    migration` before main's commits were involved). Fixed while resolving
+migration` before main's commits were involved). Fixed while resolving
     the conflict: logged-in → `AppShell`, logged-out-but-public → bare
     `<Routing/>` (no chrome, matches these being standalone share links),
     else nothing (login modal shown). Removed the now-dead
     `usesStandaloneHeader`/`STANDALONE_HEADER_PATTERNS` (Header-era per-route
     header toggle, superseded by Phase 2's global `AppShell` wrap).
-  - **`e2e/web/tests/respond.spec.ts`** had a test asserting the *old*,
+  - **`e2e/web/tests/respond.spec.ts`** had a test asserting the _old_,
     now-incorrect behavior (blocking login dialog, event never rendered for
     a logged-out visitor) — written against the pre-fix bug above, before
     this rebase pulled in main's real public-route feature. Rewrote it to
@@ -421,7 +421,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     `WeekHeader`'s sticky `topOffset` now adds it on mobile so the week day-header still sticks
     directly below the taller mobile header instead of being covered by it.
   - Verified with real measurements, not screenshots: `document.documentElement.scrollWidth ===
-    window.innerWidth` (390) on Month/Week/Day at 390px after the fix (was 591 before); desktop
+window.innerWidth` (390) on Month/Week/Day at 390px after the fix (was 591 before); desktop
     (1400px) screenshot confirms the single-row layout is unchanged. Also exercised the mobile
     agenda `BottomSheet` end-to-end in the real browser — opens, shows the day's events, closes
     cleanly with no leftover `document.body` style — confirming the earlier vaul mount-pattern fix
@@ -434,7 +434,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
   1. **Removed the auto-scroll-to-8am effect** added earlier this session (`WeekView.tsx`/
      `DayView.tsx`). It used `scrollIntoView({block:"start"})` on an hour-cell ref, but the app has
      no internal scroll container for the hour grid — the whole document scrolls — so this scrolled
-     the *entire window* on every mount, independent of viewport width. Symptom reported by user:
+     the _entire window_ on every mount, independent of viewport width. Symptom reported by user:
      "the header is introducing scroll" and a large excess scroll region past the mobile tab bar.
      Not worth reintroducing without a real internal scroll container; dropped as a cosmetic nicety
      that caused more harm than it added.
@@ -506,7 +506,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     `highlighted` IconButton variant, already used here). Mobile (`down('sm')`): dots instead of
     chip text, tapping a day opens a bottom sheet with that day's agenda.
   - **vaul replaces MUI Drawer in `BottomSheet.tsx`** (per your call): `src/components/ui/
-    BottomSheet.tsx` rewritten on `vaul`'s `Drawer.Root/Portal/Overlay/Content/Handle`, same
+BottomSheet.tsx` rewritten on `vaul`'s `Drawer.Root/Portal/Overlay/Content/Handle`, same
     external props (`open`, `onClose`, `children`) so its existing 4 call sites (`Sidebar.tsx`,
     `SidebarContent.tsx`, `AppShell.tsx`, `DevUiShowcase.tsx`) needed no changes. `vaul@1.1.2`
     added as a dependency (confirmed React 19 peer support before adding).
@@ -632,7 +632,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
   - `AppShell.tsx` composes `TopBar` + `Sidebar` (desktop, `useMediaQuery(down("sm"))`, the same
     breakpoint every other component already uses) + `MobileTabBar` (mobile) + the routed
     content, owns the "new event" dialog (same `<CalendarEventEdit open event={null}
-    mode="create"/>` shape `WeekView`/`DayView` already use for cell-click creation) and the
+mode="create"/>` shape `WeekView`/`DayView` already use for cell-click creation) and the
     mobile "open calendars" `BottomSheet`. `useKeyboardShortcuts` adds C/T/M/W/D/arrows/⌘K,
     ignored while focus is in a text field.
   - `SidebarContent.tsx` is shared verbatim between the desktop rail (`ui/Sidebar.tsx`) and the
@@ -646,7 +646,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
   - `useCalendarTopBarProps`/`SidebarContent` derive the visible date **from the pathname
     directly** (new `getDateFromPathname`/`getLayoutFromPathname` in `dateBasedRouting.ts`), not
     via `useParams()`/`useLayout()`/`useDateWithRouting()` — those depend on `useParams()`, which
-    only sees params from the closest *matched* `<Route>`, and `TopBar`/`Sidebar` are mounted in
+    only sees params from the closest _matched_ `<Route>`, and `TopBar`/`Sidebar` are mounted in
     `AppShell` **above** `<Routes>`. Missed this on the first pass (deep-linking to `/d/...` fell
     back to "today" everywhere in the shell); fixed before landing.
   - Deleted `Header.tsx`, `CalendarHeader.tsx`, `CalendarSidebar.tsx`, `theme/TempThemeToggle.tsx`.
@@ -684,7 +684,7 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
     as shown, not corrected), typography scale, radius scale (6/10/12/14/16), button heights,
     shadows, 8pt spacing, and a `getContrastText` helper for the accent CSS-var override.
   - `theme.ts` — `createTheme({ cssVariables: { colorSchemeSelector: "class" }, colorSchemes:
-    { light, dark } })` with component slot overrides for Button, Paper/Card, Dialog, Popover/
+{ light, dark } })` with component slot overrides for Button, Paper/Card, Dialog, Popover/
     Menu, OutlinedInput, Chip, Switch, Checkbox, Tabs per the mockup specs (border-only cards,
     1.5/1.8px border widths, 40px buttons, no ripple, tooltips with arrows).
   - `AppThemeProvider.tsx` — wraps `ThemeProvider` (`defaultMode="system"`), syncs

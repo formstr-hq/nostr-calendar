@@ -234,8 +234,9 @@ Template for the inputs (copy into the session prompt):
   `UserMenu.tsx`, `common/signer/index.ts` (do not break legacy restore — E2E contract D5).
 - **Design:** `22` `23` (method list → expandable panels: NIP-07, nsec+passphrase, NIP-46 QR,
   create account).
-- **E2E:** `auth` (`login-submit-nsec`, injection contract).
-- **Nostr layer inputs:** _(fill in — likely none; signer stack unchanged)_
+  1. add option to download and upload ncryptsec. next to the the i have saved it button, add a download button. for uploading, if the input is blank, add a upload button. The file saved should be key.txt. and only txt files should be upload allowed. it should also work in capacitor apps.
+- **E2E:** `auth` (`login-submit-nsec`, injection contract). add an e2e test for upload/download nsec
+- **Nostr layer inputs:** _no changes required_
 
 ### F-SET — Settings (NEW surface)
 
@@ -262,7 +263,7 @@ Template for the inputs (copy into the session prompt):
 - **Notes carried over from F-EVENT-EDIT's invitation-flow rework** (per its nostr layer inputs
   item 4 — read before scoping this phase):
   - The invitation rumor is now kind `14` (NIP-17 chat message) with real content (`"{sender} has
-    invited you to the {title} on {date}"`), not empty-content kind `52`. `getDetailsFromGiftWrap`
+invited you to the {title} on {date}"`), not empty-content kind `52`. `getDetailsFromGiftWrap`
     returns this as `message`; `IInvitation`/`InvitationPanel` don't surface it yet — F-NOTIF should
     decide whether to show it (mockups have no invitation-card spec either way).
   - The gift wrap gained a `["signing_nsec", ...]` rumor tag (the ephemeral key it's signed with)
@@ -272,7 +273,7 @@ Template for the inputs (copy into the session prompt):
     `InvitationWorker.java` (Android background worker) keys its own-notification suppression off
     kind 84 and never decrypts anything, so it needed no changes and must keep receiving kind 84.
   - If this phase moves the wrap kind to 1059, keep the `k=1052` tag semantics (it identifies the
-    *invitation* content, independent of the wrap's own kind) so old and new wraps stay
+    _invitation_ content, independent of the wrap's own kind) so old and new wraps stay
     distinguishable from booking/DM traffic sharing the same outer kind.
   - Old pending invitations (rumor kind `52`, no `signing_nsec`) still decode fine — nothing
     validates rumor kind, and `signingNsec`/`message` are optional — but they can't use the new
@@ -395,7 +396,7 @@ Per-session exit checklist:
    No iOS-style settings lists.
 7. **Design-decoding technique — use this instead of screenshotting.** Each
    `designs/redesign/*.html` mockup is a self-contained "bundler" export: a `<script
-   type="__bundler/manifest">` (shared runtime asset blobs, identical across mockups) plus a
+type="__bundler/manifest">` (shared runtime asset blobs, identical across mockups) plus a
    `<script type="__bundler/template">` whose text content is a **JSON-encoded string of the real
    page HTML**, including the unminified `<script type="text/babel">` JSX source (styles object,
    mock state, full component tree, interaction handlers). Decode with:

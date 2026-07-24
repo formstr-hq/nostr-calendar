@@ -53,6 +53,45 @@ test("user creates a new account with key backup", async ({ browser }) => {
   await context.close();
 });
 
+test("ncryptsec keys can be downloaded and uploaded as key.txt", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    permissions: ["clipboard-read", "clipboard-write"],
+    acceptDownloads: true,
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Create Account/ }).click();
+  await page.getByLabel("Passphrase", { exact: true }).fill("download-pass");
+  await page.getByLabel("Confirm Passphrase").fill("download-pass");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("login-download-key").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("key.txt");
+
+  await page.getByRole("button", { name: "I've saved it" }).click();
+  await page.getByTestId("user-avatar").click();
+  await page.getByRole("menuitem", { name: /Log Out/ }).click();
+  await page.getByRole("button", { name: "Existing Key" }).click();
+  await page.getByTestId("login-upload-key-input").setInputFiles({
+    name: "key.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      await download.createReadStream().then(async (stream) => {
+        const parts: Buffer[] = [];
+        for await (const part of stream!) parts.push(part as Buffer);
+        return Buffer.concat(parts);
+      }),
+    ),
+  });
+  await expect(page.getByTestId("login-input-ncryptsec")).not.toHaveValue("");
+  await context.close();
+});
+
 test("user logs out from the user menu", async ({ authedPage: page }) => {
   await page.getByTestId("user-avatar").click();
   await page.getByRole("menuitem", { name: /Log Out/ }).click();
