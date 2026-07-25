@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useIntl } from "react-intl";
-import type { Event } from "nostr-tools";
 import type { ICalendarEvent } from "../../../utils/types";
 import type { ICalendarList } from "../../../utils/calendarListTypes";
 import {
@@ -9,6 +8,7 @@ import {
   publishPublicCalendarEvent,
 } from "../../../nostr/events";
 import { publishSignedEvent } from "../../../nostr/core";
+import { publishCalendarList } from "../../../nostr/calendars";
 import { getRelays } from "../../../common/relayConfig";
 import { EventKinds } from "../../../nostr/kinds";
 import { useTimeBasedEvents } from "../../../stores/events";
@@ -29,9 +29,15 @@ import {
   scheduleEventNotifications,
 } from "../../../utils/notifications";
 import { useNotifications } from "../../../stores/notifications";
-import { useRelayPublishStatus } from "./useRelayPublishStatus";
-import { getRelayPublishCounts } from "../../../utils/relayPublishStatus";
+import {
+  usePublishActivityStore,
+  usePublishActivity,
+  type PublishStepDefinition,
+} from "../../../stores/publishActivity";
 import { useBusyList, setBusyListDefaultOptIn } from "../../../stores/busyList";
+import { getRelayPublishCounts } from "../../../utils/relayPublishStatus";
+
+const EVENT_SAVE_FLOW_ID = "event-save";
 
 interface UseEventSaveOptions {
   mode: "create" | "edit";
@@ -63,28 +69,15 @@ export function useEventSave({
   const intl = useIntl();
   const [processing, setProcessing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const {
-    relayStatus,
-    publishingRelays,
-    initRelays,
-    onRelayComplete,
-    getFailedRelays,
-    setRelaysPending,
-    hasRelayErrors,
-    reset: resetRelayStatus,
-  } = useRelayPublishStatus();
   const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
-  const [signedEventForRetry, setSignedEventForRetry] = useState<Event | null>(
-    null,
-  );
-  const [retryingRelays, setRetryingRelays] = useState(false);
+  const [retryingStepId, setRetryingStepId] = useState<string | null>(null);
+  const flow = usePublishActivity(EVENT_SAVE_FLOW_ID);
+  const steps = flow?.steps ?? [];
 
   const handleSave = async () => {
     const relaysToPublish = getRelays();
-    initRelays(relaysToPublish);
-    setSignedEventForRetry(null);
     setRelayDetailsOpen(false);
-
+    setSaveError(null);
     setProcessing(true);
     try {
       const normalizedNotificationOffsets =
@@ -98,76 +91,288 @@ export function useEventSave({
         allDay: isAllDayEvent(eventDetails.begin, eventDetails.end),
       };
       let savedEvent: ICalendarEvent = eventToSave;
+      const hasParticipants = eventToSave.participants.length > 0;
+
+      const stepDefs: PublishStepDefinition[] = [];
 
       if (isPrivate) {
         if (mode === "edit") {
-          const updates = await editPrivateCalendarEvent(
-            eventToSave,
-            selectedCalendarId,
+          // Cached across the initial run and any later per-step retries so
+          // retrying never re-derives keys/tags — it only re-sends what was
+          // already built and signed the first time.
+          let editResult: Awaited<
+            ReturnType<typeof editPrivateCalendarEvent>
+          > | null = null;
+          let inviteStepStarted = false;
+          let calendarStepStarted = false;
+          const previousParticipantSet = new Set(
             initialEvent?.participants ?? [],
-            undefined,
-            onRelayComplete,
           );
-          setSignedEventForRetry(updates.signedEvent);
+          const hasNewParticipants = eventToSave.participants.some(
+            (p) => !previousParticipantSet.has(p),
+          );
 
-          useTimeBasedEvents.getState().updateEvent(updates.event);
-          savedEvent = updates.event;
-        } else {
-          const { eventRef, authorPubkey, calendarEvent } =
-            await publishPrivateCalendarEvent(eventToSave, {
-              onRelayComplete,
+          stepDefs.push({
+            id: "publish-event",
+            labelId: "event.step.publishEvent",
+            relays: relaysToPublish,
+            blocking: true,
+            run: async (callbacks) => {
+              if (editResult) {
+                await publishSignedEvent(editResult.signedEvent, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                });
+                return;
+              }
+              editResult = await editPrivateCalendarEvent(
+                eventToSave,
+                selectedCalendarId,
+                initialEvent?.participants ?? [],
+                undefined,
+                callbacks.onRelayComplete,
+                (url, ok) =>
+                  callbacks.reportRelayOutcome("invite-participants", url, ok),
+                (url, ok) =>
+                  callbacks.reportRelayOutcome("add-to-calendar", url, ok),
+              );
+              useTimeBasedEvents.getState().updateEvent(editResult.event);
+              savedEvent = editResult.event;
+            },
+          });
+
+          if (hasNewParticipants) {
+            stepDefs.push({
+              id: "invite-participants",
+              labelId: "event.step.inviteParticipants",
+              relays: relaysToPublish,
+              blocking: true,
+              run: async (callbacks) => {
+                if (!inviteStepStarted) {
+                  // Outcomes already arrive via publish-event's run above.
+                  inviteStepStarted = true;
+                  return;
+                }
+                if (!editResult || editResult.giftWraps.length === 0) return;
+                await Promise.all(
+                  editResult.giftWraps.map((gw) =>
+                    publishSignedEvent(gw, {
+                      onRelayComplete: callbacks.onRelayComplete,
+                    }),
+                  ),
+                );
+              },
             });
+          }
 
-          setSignedEventForRetry(calendarEvent);
-          await useCalendarLists
-            .getState()
-            .addEventToCalendar(selectedCalendarId, eventRef);
-          const { eventDTag, relayUrl, viewKey, kind } =
-            parseEventRef(eventRef);
-          savedEvent = {
-            ...eventToSave,
-            id: eventDTag,
-            kind,
-            viewKey,
-            relayHint: relayUrl,
-            user: authorPubkey,
-          };
-          useTimeBasedEvents.getState().addEvent(savedEvent);
+          stepDefs.push({
+            id: "add-to-calendar",
+            labelId: "event.step.addToCalendar",
+            relays: relaysToPublish,
+            blocking: true,
+            run: async (callbacks) => {
+              if (!calendarStepStarted) {
+                // Outcomes already arrive via publish-event's run above.
+                calendarStepStarted = true;
+                return;
+              }
+              // Retry: re-publish whichever calendar currently holds this
+              // event (the move is a no-op once already applied locally, so
+              // re-running the move itself wouldn't resend anything).
+              const calendar = useCalendarLists
+                .getState()
+                .calendars.find((c) => c.id === selectedCalendarId);
+              if (!calendar) return;
+              await publishCalendarList(calendar, {
+                onRelayComplete: callbacks.onRelayComplete,
+              });
+            },
+          });
+        } else {
+          let createResult: Awaited<
+            ReturnType<typeof publishPrivateCalendarEvent>
+          > | null = null;
+          let inviteStepStarted = false;
+          let addToCalendarStarted = false;
+
+          stepDefs.push({
+            id: "publish-event",
+            labelId: "event.step.publishEvent",
+            relays: relaysToPublish,
+            blocking: true,
+            run: async (callbacks) => {
+              if (createResult) {
+                await publishSignedEvent(createResult.calendarEvent, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                });
+                return;
+              }
+              createResult = await publishPrivateCalendarEvent(eventToSave, {
+                onRelayComplete: callbacks.onRelayComplete,
+                onInviteRelayComplete: (url, ok) =>
+                  callbacks.reportRelayOutcome("invite-participants", url, ok),
+              });
+              const { eventDTag, relayUrl, viewKey, kind } = parseEventRef(
+                createResult.eventRef,
+              );
+              savedEvent = {
+                ...eventToSave,
+                id: eventDTag,
+                kind,
+                viewKey,
+                relayHint: relayUrl,
+                user: createResult.authorPubkey,
+              };
+              useTimeBasedEvents.getState().addEvent(savedEvent);
+            },
+          });
+
+          if (hasParticipants) {
+            stepDefs.push({
+              id: "invite-participants",
+              labelId: "event.step.inviteParticipants",
+              relays: relaysToPublish,
+              blocking: true,
+              run: async (callbacks) => {
+                if (!inviteStepStarted) {
+                  inviteStepStarted = true;
+                  return;
+                }
+                if (!createResult || createResult.giftWraps.length === 0)
+                  return;
+                await Promise.all(
+                  createResult.giftWraps.map((gw) =>
+                    publishSignedEvent(gw, {
+                      onRelayComplete: callbacks.onRelayComplete,
+                    }),
+                  ),
+                );
+              },
+            });
+          }
+
+          stepDefs.push({
+            id: "add-to-calendar",
+            labelId: "event.step.addToCalendar",
+            relays: relaysToPublish,
+            blocking: true,
+            run: async (callbacks) => {
+              if (!addToCalendarStarted) {
+                addToCalendarStarted = true;
+                if (!createResult) return;
+                await useCalendarLists
+                  .getState()
+                  .addEventToCalendar(
+                    selectedCalendarId,
+                    createResult.eventRef,
+                    {
+                      onRelayComplete: callbacks.onRelayComplete,
+                    },
+                  );
+                return;
+              }
+              // Retry: addEventToCalendar no-ops once the ref is already
+              // present locally (set on the first attempt regardless of
+              // relay outcome), so re-publish the calendar as it stands now.
+              const calendar = useCalendarLists
+                .getState()
+                .calendars.find((c) => c.id === selectedCalendarId);
+              if (!calendar) return;
+              await publishCalendarList(calendar, {
+                onRelayComplete: callbacks.onRelayComplete,
+              });
+            },
+          });
         }
       } else {
-        const {
-          id: savedId,
-          pubKey,
-          signedEvent,
-        } = await publishPublicCalendarEvent(
-          eventToSave,
-          undefined,
-          onRelayComplete,
-        );
-        setSignedEventForRetry(signedEvent);
-        savedEvent = {
-          ...eventToSave,
-          id: savedId,
-          kind: EventKinds.PublicCalendarEvent,
-          user: pubKey,
-          isPrivateEvent: false,
-        };
-        useTimeBasedEvents.getState().updateEvent(savedEvent);
+        let publicResult: Awaited<
+          ReturnType<typeof publishPublicCalendarEvent>
+        > | null = null;
+
+        stepDefs.push({
+          id: "publish-event",
+          labelId: "event.step.publishEvent",
+          relays: relaysToPublish,
+          blocking: true,
+          run: async (callbacks) => {
+            if (publicResult) {
+              await publishSignedEvent(publicResult.signedEvent, {
+                onRelayComplete: callbacks.onRelayComplete,
+              });
+              return;
+            }
+            publicResult = await publishPublicCalendarEvent(
+              eventToSave,
+              undefined,
+              callbacks.onRelayComplete,
+            );
+            savedEvent = {
+              ...eventToSave,
+              id: publicResult.id,
+              kind: EventKinds.PublicCalendarEvent,
+              user: publicResult.pubKey,
+              isPrivateEvent: false,
+            };
+            useTimeBasedEvents.getState().updateEvent(savedEvent);
+          },
+        });
       }
 
+      // Notification preferences are local bookkeeping, not a relay publish
+      // — kept outside the step list, same as before.
       if (
         areNotificationOffsetsEqual(
           normalizedNotificationOffsets,
           DEFAULT_NOTIFICATION_OFFSETS,
         )
       ) {
-        await clearNotificationPreference(savedEvent.id);
+        await clearNotificationPreference(eventToSave.id);
       } else {
         await setNotificationPreference(
-          savedEvent.id,
+          eventToSave.id,
           normalizedNotificationOffsets,
         );
       }
+
+      const rangeChanged =
+        mode === "edit" &&
+        !!initialEvent &&
+        (initialEvent.begin !== eventToSave.begin ||
+          initialEvent.end !== eventToSave.end);
+      const shouldRemoveBusyRange = rangeChanged && !!initialEvent;
+      const shouldAddBusyRange =
+        publishBusy &&
+        supportsBusyListPublish &&
+        (mode === "create" || rangeChanged);
+      if (shouldRemoveBusyRange || shouldAddBusyRange) {
+        stepDefs.push({
+          id: "update-availability",
+          labelId: "event.step.updateAvailability",
+          relays: relaysToPublish,
+          blocking: false,
+          run: async (callbacks) => {
+            if (shouldRemoveBusyRange && initialEvent) {
+              await useBusyList
+                .getState()
+                .removeBusyRange(
+                  { start: initialEvent.begin, end: initialEvent.end },
+                  { onRelayComplete: callbacks.onRelayComplete },
+                );
+            }
+            if (shouldAddBusyRange) {
+              await useBusyList
+                .getState()
+                .addBusyRange(
+                  { start: eventToSave.begin, end: eventToSave.end },
+                  { onRelayComplete: callbacks.onRelayComplete },
+                );
+            }
+          },
+        });
+      }
+
+      await usePublishActivityStore
+        .getState()
+        .runFlow(EVENT_SAVE_FLOW_ID, stepDefs);
 
       // Preferences are persisted after the event store update. Reconcile once
       // more here so iOS uses the newly saved offsets for creates and edits.
@@ -193,37 +398,11 @@ export function useEventSave({
           .setNotifications(savedEvent.id, notifications);
       }
 
-      // Public busy list maintenance:
-      //  - create + opted-in        -> publish a busy range for the new event.
-      //  - edit + range changed     -> always remove the previous range
-      //                                 (idempotent) and, if opted-in, publish
-      //                                 the new one.
-      //  - edit + range unchanged   -> do nothing.
-      // Best-effort, don't block save UX on relay roundtrip.
-      const rangeChanged =
-        mode === "edit" &&
-        !!initialEvent &&
-        (initialEvent.begin !== savedEvent.begin ||
-          initialEvent.end !== savedEvent.end);
-      if (rangeChanged && initialEvent) {
-        void useBusyList.getState().removeBusyRange({
-          start: initialEvent.begin,
-          end: initialEvent.end,
-        });
-      }
-      if (
-        publishBusy &&
-        supportsBusyListPublish &&
-        (mode === "create" || rangeChanged)
-      ) {
-        void useBusyList
-          .getState()
-          .addBusyRange({ start: savedEvent.begin, end: savedEvent.end });
-      }
-
       // Persist preference so future events default to the user's last choice.
+      // Note: non-blocking steps (e.g. busy-list) may still be settling in the
+      // background — don't clear the flow state here, or their outcomes would
+      // have nowhere to land. The next handleSave call reseeds it fresh.
       setBusyListDefaultOptIn(publishBusy);
-      resetRelayStatus();
       onClose();
     } catch (e) {
       let msg = e instanceof Error ? e.message : String(e);
@@ -233,85 +412,70 @@ export function useEventSave({
       }
       console.error(msg);
       setSaveError(msg);
-      const failedRelays = getFailedRelays(relaysToPublish);
-      for (const relayUrl of failedRelays) {
-        onRelayComplete(relayUrl, false);
-      }
       setProcessing(false);
     }
   };
 
-  const handleRetryFailedRelays = async () => {
-    if (!signedEventForRetry) {
-      return;
-    }
-    const failed = getFailedRelays();
-    if (failed.length === 0) {
-      return;
-    }
-    setRetryingRelays(true);
-    setRelaysPending(failed);
+  const handleRetryStep = async (stepId: string) => {
+    setRetryingStepId(stepId);
     try {
-      // Retry is just another publish — the worker owns reaching dead relays.
-      await publishSignedEvent(signedEventForRetry, { onRelayComplete });
+      await usePublishActivityStore
+        .getState()
+        .retryStep(EVENT_SAVE_FLOW_ID, stepId);
     } catch {
-      // per-relay outcomes already set via onRelayComplete where applicable
+      // per-relay outcomes already reflected in the store
     } finally {
-      setRetryingRelays(false);
+      setRetryingStepId(null);
     }
-    const retriedOk = getFailedRelays(failed).length === 0;
-    if (retriedOk) {
+    const stillFailing = usePublishActivityStore
+      .getState()
+      .flows[EVENT_SAVE_FLOW_ID]?.steps.some((s) => s.status === "error");
+    if (!stillFailing) {
       setRelayDetailsOpen(false);
-      resetRelayStatus();
       onClose();
     }
   };
 
-  const showRelayDetailsButton =
-    hasRelayErrors && !processing && publishingRelays.length > 0;
-  const { acceptedCount, failedCount, totalCount } = getRelayPublishCounts(
-    publishingRelays,
-    relayStatus,
+  const hasErrors = steps.some((s) => s.status === "error");
+  const totals = steps.reduce(
+    (acc, step) => {
+      const counts = getRelayPublishCounts(step.relays, step.relayStatus);
+      acc.accepted += counts.acceptedCount;
+      acc.failed += counts.failedCount;
+      acc.total += counts.totalCount;
+      return acc;
+    },
+    { accepted: 0, failed: 0, total: 0 },
   );
-  const hasRelaySuccess = acceptedCount > 0;
-  /** Save succeeded for the network, but at least one relay failed (event is already on the calendar). */
   const partialSaveRelayIssues =
-    !processing &&
-    publishingRelays.length > 0 &&
-    hasRelayErrors &&
-    hasRelaySuccess;
+    !processing && hasErrors && totals.accepted > 0;
   const relayDotsLabel = partialSaveRelayIssues
     ? intl.formatMessage(
         { id: "event.relaysPartialPublishSummary" },
-        { acceptedCount, totalCount },
+        { acceptedCount: totals.accepted, totalCount: totals.total },
       )
     : intl.formatMessage(
         { id: "event.publishingToRelays" },
         { count: getRelays().length },
       );
-  const canShowRelayRetry =
-    hasRelayErrors && !!signedEventForRetry && publishingRelays.length > 0;
+  const showRelayDetailsButton = hasErrors && !processing && steps.length > 0;
 
   return {
     processing,
     saveError,
     setSaveError,
     handleSave,
-    handleRetryFailedRelays,
-    resetRelayStatus,
-    relayStatus,
-    publishingRelays,
-    signedEventForRetry,
-    retryingRelays,
+    handleRetryStep,
+    steps,
+    retryingStepId,
     relayDetailsOpen,
     setRelayDetailsOpen,
-    hasRelayErrors,
+    hasRelayErrors: hasErrors,
     partialSaveRelayIssues,
     relayDotsLabel,
-    acceptedCount,
-    failedCount,
-    totalCount,
     showRelayDetailsButton,
-    canShowRelayRetry,
+    acceptedCount: totals.accepted,
+    failedCount: totals.failed,
+    totalCount: totals.total,
   };
 }

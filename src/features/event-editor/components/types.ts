@@ -1,10 +1,11 @@
 import type { Dayjs } from "dayjs";
 import type { SelectChangeEvent } from "@mui/material";
-import type { ICalendarEvent, RelayStatusMap } from "../../../utils/types";
+import type { ICalendarEvent } from "../../../utils/types";
 import type { ICalendarList } from "../../../utils/calendarListTypes";
 import type { RepeatingFrequency } from "../../../utils/types";
 import type { RecurrenceEndMode } from "../../../utils/repeatingEventsHelper";
 import type { CUSTOM_RECURRENCE_VALUE } from "../../../components/RecurrenceSelector";
+import type { PublishStepState } from "../../../stores/publishActivity";
 
 /** Shared props for EventEditDesktopForm/EventEditMobileForm — the full content
  * block (header + sections + footer) each renders inside whatever chrome
@@ -63,12 +64,10 @@ export interface EventEditFormProps {
   handleSave: () => void;
 
   relayDotsLabel: string;
-  publishingRelays: string[];
-  relayStatus: RelayStatusMap;
+  steps: PublishStepState[];
   showRelayDetailsButton: boolean;
   partialSaveRelayIssues: boolean;
   setRelayDetailsOpen: (open: boolean) => void;
-  hasSignedEventForRetry: boolean;
   acceptedCount: number;
   failedCount: number;
   totalCount: number;

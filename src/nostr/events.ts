@@ -147,12 +147,16 @@ export async function publishPrivateCalendarEvent(
   {
     onAcceptedRelays,
     onRelayComplete,
+    onInviteRelayComplete,
     existingDTag,
     existingViewKey,
     invitationGiftWrapTags = [],
   }: {
     onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
+    /** Relay outcomes for the gift-wrap invitations, reported separately from
+     * the main event publish above (`onRelayComplete`). */
+    onInviteRelayComplete?: (url: string, success: boolean) => void;
     /** Optional pre-generated d-tag (e.g. from a booking request) */
     existingDTag?: string;
     /** Optional nsec view key provided by the booker — reuse instead of generating a new one */
@@ -226,7 +230,9 @@ export async function publishPrivateCalendarEvent(
     }),
   );
   await Promise.all(
-    giftWraps.map(({ giftWrap: gw }) => publishSignedEvent(gw)),
+    giftWraps.map(({ giftWrap: gw }) =>
+      publishSignedEvent(gw, { onRelayComplete: onInviteRelayComplete }),
+    ),
   );
 
   // Add the event reference to the creator's calendar list.
@@ -256,6 +262,8 @@ export async function editPrivateCalendarEvent(
   previousParticipants: string[] = [],
   onAcceptedRelays?: (url: string) => void,
   onRelayComplete?: (url: string, success: boolean) => void,
+  onInviteRelayComplete?: (url: string, success: boolean) => void,
+  onCalendarRelayComplete?: (url: string, success: boolean) => void,
 ) {
   const dTag = event.id;
   const viewSecretKey = nip19.decode(event.viewKey as NSec).data;
@@ -286,6 +294,7 @@ export async function editPrivateCalendarEvent(
   // recipients' own relays.
   const previousSet = new Set(previousParticipants);
   const newParticipants = event.participants.filter((p) => !previousSet.has(p));
+  let newInvitationGiftWraps: Event[] = [];
   if (newParticipants.length > 0) {
     const [userProfile] = await Promise.all([
       fetchUserProfile(userPublicKey),
@@ -323,8 +332,11 @@ export async function editPrivateCalendarEvent(
         return { giftWrap: giftWrapEvent, participant };
       }),
     );
+    newInvitationGiftWraps = giftWraps.map(({ giftWrap: gw }) => gw);
     await Promise.all(
-      giftWraps.map(({ giftWrap: gw }) => publishSignedEvent(gw)),
+      newInvitationGiftWraps.map((gw) =>
+        publishSignedEvent(gw, { onRelayComplete: onInviteRelayComplete }),
+      ),
     );
   }
 
@@ -342,7 +354,9 @@ export async function editPrivateCalendarEvent(
 
   await useCalendarLists
     .getState()
-    .moveEventToCalendar(calendarId, eventCoordinate, eventRef);
+    .moveEventToCalendar(calendarId, eventCoordinate, eventRef, {
+      onRelayComplete: onCalendarRelayComplete,
+    });
 
   return {
     // Carry the published timestamp forward so a follow-up edit of this
@@ -350,6 +364,7 @@ export async function editPrivateCalendarEvent(
     event: { ...event, createdAt: signedEvent.created_at },
     calendarId,
     signedEvent,
+    giftWraps: newInvitationGiftWraps,
   };
 }
 

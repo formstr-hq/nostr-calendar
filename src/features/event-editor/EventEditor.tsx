@@ -18,7 +18,7 @@ import {
   DEFAULT_NOTIFICATION_OFFSETS,
   getNotificationPreference,
 } from "../../utils/notificationPreferences";
-import { RelayPublishDialog } from "../../components/RelayPublishDialog";
+import { PublishActivityDialog } from "../../components/PublishActivityDialog";
 import { getBusyListDefaultOptIn } from "../../stores/busyList";
 import { uniqueParticipants } from "../../utils/participants";
 import { CustomRecurrenceDialog } from "../../components/CustomRecurrenceDialog";
@@ -238,11 +238,9 @@ export function EventEditor({
     saveError,
     setSaveError,
     handleSave,
-    handleRetryFailedRelays,
-    relayStatus,
-    publishingRelays,
-    signedEventForRetry,
-    retryingRelays,
+    handleRetryStep,
+    steps,
+    retryingStepId,
     relayDetailsOpen,
     setRelayDetailsOpen,
     partialSaveRelayIssues,
@@ -251,7 +249,6 @@ export function EventEditor({
     failedCount,
     totalCount,
     showRelayDetailsButton,
-    canShowRelayRetry,
   } = useEventSave({
     mode,
     initialEvent,
@@ -323,12 +320,10 @@ export function EventEditor({
     handleClose,
     handleSave,
     relayDotsLabel,
-    publishingRelays,
-    relayStatus,
+    steps,
     showRelayDetailsButton,
     partialSaveRelayIssues,
     setRelayDetailsOpen,
-    hasSignedEventForRetry: !!signedEventForRetry,
     acceptedCount,
     failedCount,
     totalCount,
@@ -351,14 +346,12 @@ export function EventEditor({
   );
 
   const relayPublishDialog = (
-    <RelayPublishDialog
+    <PublishActivityDialog
       open={relayDetailsOpen}
-      relays={publishingRelays}
-      relayStatus={relayStatus}
+      steps={steps}
       onClose={() => setRelayDetailsOpen(false)}
-      onRetry={handleRetryFailedRelays}
-      retrying={retryingRelays}
-      showRetry={canShowRelayRetry}
+      onRetryStep={handleRetryStep}
+      retryingStepId={retryingStepId}
     />
   );
 

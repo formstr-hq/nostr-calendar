@@ -1,10 +1,7 @@
-import { Box, Button, IconButton, Typography } from "@mui/material";
-import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
+import { Box, Button, Typography } from "@mui/material";
 import { useIntl } from "react-intl";
-import { useNavigate } from "react-router";
-import { RelayDots } from "../../../components/RelayDots";
-import { getRelays } from "../../../common/relayConfig";
-import type { RelayStatusMap } from "../../../utils/types";
+import { PublishActivityPanel } from "../../../components/PublishActivityPanel";
+import type { PublishStepState } from "../../../stores/publishActivity";
 
 interface EventEditFooterProps {
   /** Show the Save button (bottom-right). */
@@ -19,12 +16,10 @@ interface EventEditFooterProps {
   handleClose: () => void;
   handleSave: () => void;
   relayDotsLabel: string;
-  publishingRelays: string[];
-  relayStatus: RelayStatusMap;
+  steps: PublishStepState[];
   showRelayDetailsButton: boolean;
   partialSaveRelayIssues: boolean;
   setRelayDetailsOpen: (open: boolean) => void;
-  hasSignedEventForRetry: boolean;
   acceptedCount: number;
   failedCount: number;
   totalCount: number;
@@ -37,21 +32,15 @@ export function EventEditFooter({
   buttonDisabled,
   handleClose,
   handleSave,
-  relayDotsLabel,
-  publishingRelays,
-  relayStatus,
+  steps,
   showRelayDetailsButton,
   partialSaveRelayIssues,
   setRelayDetailsOpen,
-  hasSignedEventForRetry,
   acceptedCount,
   failedCount,
   totalCount,
 }: EventEditFooterProps) {
   const intl = useIntl();
-  const navigate = useNavigate();
-  const isPublishing = publishingRelays.length > 0;
-  const relaysToShow = isPublishing ? publishingRelays : getRelays();
 
   return (
     <Box
@@ -96,18 +85,8 @@ export function EventEditFooter({
             flex: 1,
           }}
         >
-          <IconButton
-            size="small"
-            aria-label={intl.formatMessage({ id: "settings.relays" })}
-            onClick={() => navigate("/settings/relays")}
-          >
-            <SettingsInputAntennaIcon fontSize="small" />
-          </IconButton>
-          <RelayDots
-            relays={relaysToShow}
-            relayStatus={relayStatus}
-            label={relayDotsLabel}
-            idle={!isPublishing}
+          <PublishActivityPanel
+            steps={steps}
             onDetailsClick={
               showRelayDetailsButton && !partialSaveRelayIssues
                 ? () => setRelayDetailsOpen(true)
@@ -129,7 +108,6 @@ export function EventEditFooter({
             <Button
               variant="contained"
               onClick={() => setRelayDetailsOpen(true)}
-              disabled={!hasSignedEventForRetry}
               color="primary"
             >
               {intl.formatMessage({ id: "event.relayDetails" })}

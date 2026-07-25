@@ -14,7 +14,10 @@ import type { IBusyList } from "../utils/types";
  * Publishes a public busy list event (kind 31926) for one calendar month.
  * Replaces any prior version (parameterized-replaceable per `(pubkey, d)`).
  */
-export async function publishBusyList(list: IBusyList): Promise<Event> {
+export async function publishBusyList(
+  list: IBusyList,
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+): Promise<Event> {
   const pubKey = await getUserPublicKey();
   const unsigned: UnsignedEvent = {
     kind: EventKinds.PublicBusyList,
@@ -24,7 +27,7 @@ export async function publishBusyList(list: IBusyList): Promise<Event> {
     created_at: Math.floor(Date.now() / 1000),
   };
   const signedEvent = await buildAndSign(unsigned);
-  await publishSignedEvent(signedEvent);
+  await publishSignedEvent(signedEvent, callbacks);
   return signedEvent;
 }
 

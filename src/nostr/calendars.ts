@@ -143,6 +143,7 @@ async function decryptCalendarList(event: Event): Promise<ICalendarList> {
  */
 export async function publishCalendarList(
   calendarList: ICalendarList,
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
 ): Promise<Event> {
   const userPubkey = await getUserPublicKey();
   const encryptedContent = await encryptCalendarList(calendarList);
@@ -155,7 +156,7 @@ export async function publishCalendarList(
     tags: [["d", calendarList.id]],
   });
 
-  await publishSignedEvent(signedEvent);
+  await publishSignedEvent(signedEvent, callbacks);
 
   return signedEvent;
 }
@@ -220,6 +221,7 @@ export async function createCalendar(
 export async function addEventToCalendarList(
   calendarList: ICalendarList,
   eventRef: string[],
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
 ): Promise<ICalendarList> {
   // Avoid duplicate refs (compare by coordinate, i.e. first element)
   if (calendarList.eventRefs.some((ref) => ref[0] === eventRef[0])) {
@@ -231,7 +233,7 @@ export async function addEventToCalendarList(
     eventRefs: [...calendarList.eventRefs, eventRef],
   };
 
-  const publishedEvent = await publishCalendarList(updated);
+  const publishedEvent = await publishCalendarList(updated, callbacks);
   return { ...updated, createdAt: publishedEvent.created_at };
 }
 
@@ -241,13 +243,14 @@ export async function addEventToCalendarList(
 export async function removeEventFromCalendarList(
   calendarList: ICalendarList,
   eventRef: string[],
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
 ): Promise<ICalendarList> {
   const updated: ICalendarList = {
     ...calendarList,
     eventRefs: calendarList.eventRefs.filter((ref) => ref[0] !== eventRef[0]),
   };
 
-  const publishedEvent = await publishCalendarList(updated);
+  const publishedEvent = await publishCalendarList(updated, callbacks);
   return { ...updated, createdAt: publishedEvent.created_at };
 }
 
@@ -261,6 +264,7 @@ export async function moveEventBetweenCalendarLists(
   targetCalendarId: string,
   eventCoordinate: string,
   eventRef: string[],
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
 ): Promise<{ source?: ICalendarList; target: ICalendarList } | null> {
   // Find which calendar currently contains the event
   const sourceCalendar = calendars.find(
@@ -282,13 +286,19 @@ export async function moveEventBetweenCalendarLists(
   // Remove from source calendar if found
   let updatedSource: ICalendarList | undefined;
   if (sourceCalendar) {
-    updatedSource = await removeEventFromCalendarList(sourceCalendar, [
-      eventCoordinate,
-    ]);
+    updatedSource = await removeEventFromCalendarList(
+      sourceCalendar,
+      [eventCoordinate],
+      callbacks,
+    );
   }
 
   // Add to target calendar
-  const updatedTarget = await addEventToCalendarList(targetCalendar, eventRef);
+  const updatedTarget = await addEventToCalendarList(
+    targetCalendar,
+    eventRef,
+    callbacks,
+  );
 
   return { source: updatedSource, target: updatedTarget };
 }

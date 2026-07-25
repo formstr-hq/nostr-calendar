@@ -65,14 +65,20 @@ interface BusyListState {
    * affected month. Idempotent: if an exact `[start,end]` already exists in
    * a month it is not duplicated.
    */
-  addBusyRange: (range: IBusyRange) => Promise<void>;
+  addBusyRange: (
+    range: IBusyRange,
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<void>;
 
   /**
    * Remove a busy range previously added via `addBusyRange`. Matches by
    * exact start/end pair so callers must pass the same values used at add
    * time. No-op if not found.
    */
-  removeBusyRange: (range: IBusyRange) => Promise<void>;
+  removeBusyRange: (
+    range: IBusyRange,
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<void>;
 
   /**
    * Fetch another user's busy lists for the given months. Used by booking
@@ -117,7 +123,7 @@ export const useBusyList = create<BusyListState>((set, get) => ({
     });
   },
 
-  addBusyRange: async (range) => {
+  addBusyRange: async (range, callbacks) => {
     if (!Number.isFinite(range.start) || !Number.isFinite(range.end)) return;
     if (range.end <= range.start) return;
 
@@ -159,7 +165,7 @@ export const useBusyList = create<BusyListState>((set, get) => ({
     await Promise.all(
       toPublish.map(async (list) => {
         try {
-          const event = await publishBusyList(list);
+          const event = await publishBusyList(list, callbacks);
           set((state) => ({
             ownLists: {
               ...state.ownLists,
@@ -177,7 +183,7 @@ export const useBusyList = create<BusyListState>((set, get) => ({
     );
   },
 
-  removeBusyRange: async (range) => {
+  removeBusyRange: async (range, callbacks) => {
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
@@ -208,7 +214,7 @@ export const useBusyList = create<BusyListState>((set, get) => ({
     await Promise.all(
       toPublish.map(async (list) => {
         try {
-          const event = await publishBusyList(list);
+          const event = await publishBusyList(list, callbacks);
           set((state) => ({
             ownLists: {
               ...state.ownLists,

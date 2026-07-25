@@ -106,6 +106,13 @@ const dictionary: NestedObject = {
       public: "Public",
       publishingToRelays: "Publishing to {count} relay(s)",
       publishingEvent: "Publishing Event",
+      publishActivityTitle: "Publish Activity",
+      step: {
+        publishEvent: "Publishing event",
+        inviteParticipants: "Inviting participants",
+        addToCalendar: "Adding to calendar",
+        updateAvailability: "Updating availability",
+      },
       relaysPublishStatus: "Relays{complete}",
       eventSaved: "Your event has been saved",
       noRelaysAccepted:
@@ -656,6 +663,13 @@ const dictionary: NestedObject = {
       public: "Öffentlich",
       publishingToRelays: "Veröffentlichung an {count} Relay(s)",
       publishingEvent: "Termin veröffentlichen",
+      publishActivityTitle: "Veröffentlichungsaktivität",
+      step: {
+        publishEvent: "Termin wird veröffentlicht",
+        inviteParticipants: "Teilnehmer werden eingeladen",
+        addToCalendar: "Wird zum Kalender hinzugefügt",
+        updateAvailability: "Verfügbarkeit wird aktualisiert",
+      },
       relaysPublishStatus: "Relays{complete}",
       eventSaved: "Ihr Termin wurde gespeichert",
       noRelaysAccepted:

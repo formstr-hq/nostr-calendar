@@ -158,12 +158,10 @@ export function EventEditMobileForm(props: EventEditFormProps) {
           handleClose={props.handleClose}
           handleSave={props.handleSave}
           relayDotsLabel={props.relayDotsLabel}
-          publishingRelays={props.publishingRelays}
-          relayStatus={props.relayStatus}
+          steps={props.steps}
           showRelayDetailsButton={props.showRelayDetailsButton}
           partialSaveRelayIssues={props.partialSaveRelayIssues}
           setRelayDetailsOpen={props.setRelayDetailsOpen}
-          hasSignedEventForRetry={props.hasSignedEventForRetry}
           acceptedCount={props.acceptedCount}
           failedCount={props.failedCount}
           totalCount={props.totalCount}

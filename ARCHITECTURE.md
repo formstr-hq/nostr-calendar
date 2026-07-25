@@ -21,6 +21,7 @@ A step-by-step trace of the entire application from entry file to every user int
 - [15. Relay Management](#15-relay-management)
 - [16. Logout Flow](#16-logout-flow)
 - [17. Nostr Event Kinds Reference](#17-nostr-event-kinds-reference)
+- [18. Publish Activity Tracking (Multi-Step Publish Feedback)](#18-publish-activity-tracking-multi-step-publish-feedback)
 
 ---
 
