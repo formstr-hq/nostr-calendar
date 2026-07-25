@@ -14,6 +14,8 @@ type FormAttachmentRowProps = {
   eventAuthor?: string;
   onFill?: (attachment: IFormAttachment) => void;
   showSubmissionStatus?: boolean;
+  /** Check a participant's response instead of the active user's response. */
+  checkPubkey?: string;
 };
 
 export function FormAttachmentRow({
@@ -21,6 +23,7 @@ export function FormAttachmentRow({
   eventAuthor,
   onFill,
   showSubmissionStatus = !!onFill,
+  checkPubkey,
 }: FormAttachmentRowProps) {
   const intl = useIntl();
   const { user } = useUser();
@@ -28,7 +31,7 @@ export function FormAttachmentRow({
   const { naddr, viewKey } = attachment;
   const { status } = useFormSubmissionStatus(
     showSubmissionStatus ? attachment.naddr : undefined,
-    user?.pubkey,
+    checkPubkey ?? user?.pubkey,
   );
   const submitted = status.state === "submitted";
   const formResponseLoading = status.state === "loading";
@@ -93,6 +96,17 @@ export function FormAttachmentRow({
             </Button>
           )}
         </>
+      )}
+      {showSubmissionStatus && submitted && !onFill && (
+        <Typography
+          data-testid="booking-form-submitted"
+          variant="caption"
+          color="success.main"
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+        >
+          <CheckCircleIcon fontSize="inherit" />
+          Submitted
+        </Typography>
       )}
       {canViewResponsesInFormstr && (
         <Button

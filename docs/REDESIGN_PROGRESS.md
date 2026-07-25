@@ -16,14 +16,51 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 | F-NOTIF                       | done                         | 2026-07-25 | New calendar invitations publish as NIP-59 kind 1059 with `k=1052`; legacy 1052 is dual-read. Android worker updated; NIP-09 gift-wrap tombstones and warning report action retained.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | F-CAL-MGMT                    | done                         | 2026-07-25 | Settings → Calendars now provides create/edit/delete and calendar color management; sidebar visibility controls and existing kind-32123 behavior retained; async save/delete feedback added                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | F-BOOK Foundation (protocol)  | done                         | 2026-07-25 | Booking gift wraps migrated to NIP-59 kind 1059 (`k=1057`/`k=1058`); legacy 1057/1058 dual-read. Added anonymous booking identity, `signing_nsec`/dismiss, and scheduling-page `formAttachments`. Zero UI touched — see session log below                                                                                                                                                                                                                                                                                                                                                                                                          |
-| F-BOOK-EDIT                   | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| F-BOOK-INBOX                  | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| F-BOOK-PUBLIC                 | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-EDIT                   | in progress                  | 2026-07-25 | Editor decomposed into `src/features/booking-editor/`; desktop editor now follows mockup 14's two-column shape with a live preview, canonical booking-link QR card, and relay card. Mobile follows mockup 17's row/sheet pattern and only shows the compact working link.                                                                                                                                                                                                                                                                                                                                 |
+| F-BOOK-INBOX                  | in progress                  | 2026-07-25 | `/bookings` now uses the feature-based list/detail inbox, page filtering, pending/upcoming/resolved buckets, verified NIP-05 identity, requester form status, conflict callout, and resolved-item archive actions. E2E coverage remains to be updated.                                                                                                                                                                                                                                                                                                                                 |
+| F-BOOK-PUBLIC                 | done                         | 2026-07-25 | Public booking page now follows the booking-link layout: desktop has a host panel, month calendar, and selected-day slots; mobile uses the compact profile/date-strip presentation. Its footer contains only the viewer/host timezone summary, and established booking contracts remain unchanged.                                                                                                                                                                                                                                                                                                                                                                                                       |
 | F-EVENT-LINK                  | mostly done via F-EVENT-VIEW | 2026-07-21 | `ViewEventPage` shares `CalendarEventView`, so the 2026-07-21 design-fidelity pass carried its banner/chips/sections styling here too (user's explicit choice). Still open: guest/unauthenticated RSVP nostr-layer decision, "Message host", any F-EVENT-LINK-specific polish beyond what F-EVENT-VIEW needed                                                                                                                                                                                                                                                                                                                                          |
 
 ## Session log
 
 <!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-25 — F-BOOK-PUBLIC — Booking dates with no open slots are now crossed out and disabled. Public routes remain chrome-free after a guest logs in; the selected slot resumes directly at confirmation, and a successful request uses React Router to enter `/bookings` with its locally stored outgoing request.
+
+- 2026-07-25 — F-BOOK-PUBLIC — Completed the visual fidelity pass for the public booking page. Desktop now uses the booking-link card treatment with a dedicated host/duration panel; mobile collapses it into the centered profile and compact seven-day strip from mockup `19`. Existing slot controls, blocked-date markers, confirmation dialog, and the timezone-footer contract remain intact. `tsc`, ESLint, and the Vite production build pass. The focused Playwright suite could not start in this sandbox because port 5173 is occupied by an inaccessible host process.
+
+- 2026-07-25 — F-BOOK-PUBLIC — Finished the public booking-link presentation from the in-progress responsive layout. The page footer now contains only `Shown in your timezone (UTC+X) · HH:MM for the host.`; the viewer offset and host time are calculated from the browser and scheduling-page IANA timezones. `booking.spec.ts` exercises this public-page contract through the shared booking flow. App type-checking is green; focused browser validation is pending because this checkout lacks the Vite executable.
+
+- 2026-07-25 — F-BOOK-INBOX — Began the booking inbox redesign. The former
+  `BookingNotifications.tsx` is a compatibility re-export for
+  `features/booking-inbox/BookingInbox.tsx`; the new responsive inbox has
+  incoming/outgoing tabs, an all-pages filter, client-side PENDING/UPCOMING/
+  RESOLVED sections, desktop list/detail presentation, and inline mobile
+  expansion. Detail panels now show profile identity, actively verified
+  NIP-05 (only after the identifier resolves to the booker key), timezone,
+  busy-list overlap, attached intake-form completion for the actual booker,
+  existing accept/decline controls, and archive actions for resolved entries.
+  NIP-05 resolution is shared through `src/nostr/nip05.ts`; the participant
+  cache now retains the profile's claimed identifier, and
+  `FormAttachmentRow` accepts an optional `checkPubkey` without changing
+  existing call sites. Typecheck is clean; focused E2E work remains.
+
+- 2026-07-25 — F-BOOK-EDIT — Began the booking-page editor redesign, keeping
+  the Foundation protocol work intact. The former 1,018-line
+  `SchedulingPageEdit.tsx` is now a compatibility re-export for
+  `features/booking-editor/`; form state/save effects and desktop/mobile
+  section presenters are separated. Multiple availability windows per weekday
+  and Formstr form attachments are retained. The desktop form now has the
+  mockup 14 two-column layout: a live Desktop/Mobile public-page preview, a
+  persistent share card with the one working `naddr + viewKey` URL and QR code,
+  and a relay information card. The mobile form follows mockup 17's tappable
+  rows and BottomSheets, with only a compact copyable share link (no desktop
+  preview, QR, or relay pills). Deliberately omitted per the approved plan:
+  auto-generated meeting links, social-trust signals, host messaging, manual
+  timezone override, and per-relay health reporting. Typecheck and focused
+  booking-editor lint are clean. Focused `scheduling-builder.spec.ts`: **4
+  passed** (duration persistence, public durations, blocked-date display, and
+  form-attachment persistence).
 
 - 2026-07-25 — F-BOOK Foundation (protocol layer, no UI) — Unblocks
   F-BOOK-EDIT/F-BOOK-INBOX/F-BOOK-PUBLIC per the master plan's "land the

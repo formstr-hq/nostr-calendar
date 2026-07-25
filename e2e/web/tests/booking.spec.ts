@@ -24,11 +24,11 @@ test("user creates a booking link and edits it", async ({
   await page.getByRole("button", { name: "New Page" }).click();
   await page.waitForURL("**/schedule/create");
 
-  await page.getByRole("textbox", { name: "Title", exact: true }).fill("Office Hours");
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill("Office Hours");
   await page.getByRole("button", { name: "Create page" }).click();
-  await expect(page.getByText("Scheduling page created!")).toBeVisible({
-    timeout: 20_000,
-  });
+  await page.waitForURL("**/schedule/edit/naddr*", { timeout: 20_000 });
 
   // The shareable link (with viewKey) is displayed after saving.
   const pageUrl = await page.getByLabel("booking page link").inputValue();
@@ -50,10 +50,9 @@ test("user creates a booking link and edits it", async ({
 
   // Reload the editor to confirm the changes persisted on the relay.
   await navigate(page, `/schedule/edit/${naddr}`);
-  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue(
-    "Office Hours v2",
-    { timeout: 30_000 },
-  );
+  await expect(
+    page.getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue("Office Hours v2", { timeout: 30_000 });
   await expect(page.getByRole("checkbox", { name: "Saturday" })).toBeChecked();
 });
 

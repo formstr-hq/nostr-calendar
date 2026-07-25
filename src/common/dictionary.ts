@@ -171,7 +171,7 @@ const dictionary: NestedObject = {
     },
     form: {
       attachments: "Forms",
-      inputPlaceholder: "Paste form naddr or Formstr URL",
+      inputPlaceholder: "Paste form URL",
       addAttachment: "Add",
       removeAttachment: "Remove form",
       invalidInput: "Could not recognize a form naddr in that input.",
@@ -534,6 +534,14 @@ const dictionary: NestedObject = {
       deletePageTitle: "Delete Booking Link",
       deletePageWarning:
         "Are you sure you want to delete this booking link? Users will not be able to use this link to book more events. Already booked events will remain in the calendars.",
+      durationsHelp: "Selected durations appear as cards on your page",
+      publishingToRelays: "Publishing to {count} relay(s)",
+      availability: "Availability",
+      notSet: "Not set",
+      none: "None",
+      daysCount: "{count} day(s)",
+      detailsConfigured: "Details added",
+      detailsEmpty: "Add details",
     },
   },
   "de-DE": {
@@ -682,7 +690,7 @@ const dictionary: NestedObject = {
     },
     form: {
       attachments: "Formulare",
-      inputPlaceholder: "Formular-naddr oder Formstr-URL einfügen",
+      inputPlaceholder: "Formular-URL einfügen",
       addAttachment: "Hinzufügen",
       removeAttachment: "Formular entfernen",
       invalidInput: "In der Eingabe wurde keine Formular-naddr erkannt.",
@@ -1019,6 +1027,14 @@ const dictionary: NestedObject = {
       deletePageTitle: "Buchungslink löschen",
       deletePageWarning:
         "Möchten Sie diesen Buchungslink wirklich löschen? Über diesen Link können keine neuen Termine mehr gebucht werden. Bereits gebuchte Termine bleiben in den Kalendern erhalten.",
+      durationsHelp: "Ausgewählte Dauern erscheinen als Karten auf Ihrer Seite",
+      publishingToRelays: "Veröffentlichung an {count} Relay(s)",
+      availability: "Verfügbarkeit",
+      notSet: "Nicht festgelegt",
+      none: "Keine",
+      daysCount: "{count} Tag(e)",
+      detailsConfigured: "Details hinzugefügt",
+      detailsEmpty: "Details hinzufügen",
     },
   },
 };

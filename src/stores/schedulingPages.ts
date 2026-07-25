@@ -80,7 +80,10 @@ function getOwnSchedulingPageKeyIndex(): Map<string, string> {
   return ownSchedulingPageKeyIndex ?? new Map();
 }
 
-async function publishSchedulingPage(page: ISchedulingPage): Promise<{
+async function publishSchedulingPage(
+  page: ISchedulingPage,
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+): Promise<{
   event: Event;
   viewKey: string;
 }> {
@@ -115,7 +118,9 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
     ),
   });
 
-  await publishSignedEvent(signedEvent);
+  await publishSignedEvent(signedEvent, {
+    onRelayComplete: callbacks?.onRelayComplete,
+  });
 
   // Publish a self-encrypted kind-32680 record so the page is recoverable
   // on a fresh device or after a refresh on web (where secure storage is
@@ -181,8 +186,12 @@ interface SchedulingPagesState {
   fetchPages: () => Promise<void>;
   createPage: (
     page: Omit<ISchedulingPage, "id" | "eventId" | "user" | "createdAt">,
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
   ) => Promise<ISchedulingPage>;
-  updatePage: (page: ISchedulingPage) => Promise<ISchedulingPage>;
+  updatePage: (
+    page: ISchedulingPage,
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<ISchedulingPage>;
   deletePage: (pageId: string) => Promise<void>;
   getPageById: (pageId: string) => ISchedulingPage | undefined;
   getNAddr: (page: ISchedulingPage) => string;
@@ -275,7 +284,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     );
   },
 
-  createPage: async (pageData) => {
+  createPage: async (pageData, callbacks) => {
     const userPubkey = await getUserPublicKey();
     const id = makeDTag(`${JSON.stringify(pageData)}-${Date.now()}`);
 
@@ -287,7 +296,10 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
       createdAt: 0,
     };
 
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      callbacks,
+    );
     page.eventId = signedEvent.id;
     page.viewKey = viewKey;
     page.createdAt = signedEvent.created_at;
@@ -307,8 +319,11 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     return page;
   },
 
-  updatePage: async (page) => {
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+  updatePage: async (page, callbacks) => {
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      callbacks,
+    );
     const updated = {
       ...page,
       eventId: signedEvent.id,

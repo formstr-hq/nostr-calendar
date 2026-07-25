@@ -8,16 +8,21 @@ interface EventFormAttachmentsProps {
   attachedForms: IFormAttachment[];
   onAdd: (form: IFormAttachment) => void;
   onRemove: (naddr: string) => void;
+  /** Maximum number of forms that can be attached. Omit for no limit. */
+  maxAttachments?: number;
 }
 
 export function EventFormAttachments({
   attachedForms,
   onAdd,
   onRemove,
+  maxAttachments,
 }: EventFormAttachmentsProps) {
   const intl = useIntl();
   const [formInput, setFormInput] = useState("");
   const [formInputError, setFormInputError] = useState<string | null>(null);
+  const canAddAttachment =
+    maxAttachments === undefined || attachedForms.length < maxAttachments;
 
   const handleAddForm = () => {
     const parsed = parseFormInput(formInput);
@@ -81,35 +86,37 @@ export function EventFormAttachments({
         </Box>
       )}
 
-      <Box style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder={intl.formatMessage({ id: "form.inputPlaceholder" })}
-          value={formInput}
-          onChange={(e) => {
-            setFormInput(e.target.value);
-            if (formInputError) setFormInputError(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddForm();
-            }
-          }}
-          error={!!formInputError}
-          helperText={formInputError ?? undefined}
-        />
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={handleAddForm}
-          disabled={!formInput.trim()}
-          style={{ marginTop: 0, height: "auto" }}
-        >
-          {intl.formatMessage({ id: "form.addAttachment" })}
-        </Button>
-      </Box>
+      {canAddAttachment && (
+        <Box style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder={intl.formatMessage({ id: "form.inputPlaceholder" })}
+            value={formInput}
+            onChange={(e) => {
+              setFormInput(e.target.value);
+              if (formInputError) setFormInputError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddForm();
+              }
+            }}
+            error={!!formInputError}
+            helperText={formInputError ?? undefined}
+          />
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleAddForm}
+            disabled={!formInput.trim()}
+            style={{ marginTop: 0, height: "auto" }}
+          >
+            {intl.formatMessage({ id: "form.addAttachment" })}
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }

@@ -247,7 +247,7 @@ function Application() {
 
       <AppLoadingBar />
 
-      {user ? (
+      {user && !publicRoute ? (
         <AppShell onImportEvent={setImportedEvent}>
           <Routing />
         </AppShell>

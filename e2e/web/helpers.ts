@@ -256,6 +256,12 @@ export async function bookFirstSlot(
   calendarName: string,
 ): Promise<void> {
   await navigate(page, pageUrl, TEST_KEYS.bob);
+  await expect(page.getByTestId("booking-timezone-footer")).toHaveText(
+    /^Shown in your timezone \(UTC(?:[+-]\d{1,2}(?::\d{2})?)?\) · \d{2}:\d{2} for the host\.$/,
+  );
+  await expect(
+    page.getByText("Times are shown in your local timezone"),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "next week" }).click();
 
   // Slot buttons are labelled with their start time, e.g. "09:00 AM".

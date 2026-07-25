@@ -1,6 +1,7 @@
 import { test, expect, navigate } from "../fixtures/index.js";
 import { uniqueName } from "../helpers.js";
 import type { Page } from "@playwright/test";
+import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 
 // Deep coverage of the availability builder (/schedule/create). The basic
 // create + book + approve/decline flow lives in booking.spec.ts.
@@ -12,9 +13,7 @@ async function startNewPage(page: Page, title: string) {
 
 async function createAndGetShareUrl(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Create page", exact: true }).click();
-  await expect(page.getByText("Scheduling page created!")).toBeVisible({
-    timeout: 20_000,
-  });
+  await page.waitForURL("**/schedule/edit/naddr*", { timeout: 20_000 });
   const url = await page.getByLabel("booking page link").inputValue();
   expect(url).toContain("/schedule/naddr");
   return url;
@@ -112,21 +111,10 @@ test("blocked dates remove that day's slots from the public page", async ({
     .nth(1)
     .click();
 
-  // Pick the date via the calendar popup — typing sections into this
-  // controlled DatePicker stores transient invalid values and blanks it.
-  await page.getByRole("button", { name: "Choose date" }).last().click();
-  const calendar = page.getByRole("dialog");
-  const monthLabelOnPicker = blocked.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-  if (!(await calendar.getByText(monthLabelOnPicker).isVisible())) {
-    await calendar.getByRole("button", { name: "Next month" }).click();
-  }
-  await calendar
-    .getByRole("gridcell", { name: String(blocked.getDate()), exact: true })
-    .click();
-  await expect(calendar).not.toBeVisible();
+  const blockedDateField = page.getByTestId("blocked-date-input-0");
+  await blockedDateField.fill(
+    `${blocked.getFullYear()}-${String(blocked.getMonth() + 1).padStart(2, "0")}-${String(blocked.getDate()).padStart(2, "0")}`,
+  );
 
   const shareUrl = await createAndGetShareUrl(page);
 
@@ -153,4 +141,33 @@ test("blocked dates remove that day's slots from the public page", async ({
   });
   expect(await blockedColumnSlots.count()).toBeGreaterThan(0);
   await expect(blockedColumnSlots.and(bob.locator(":enabled"))).toHaveCount(0);
+});
+
+test("an attached intake form persists across edit", async ({
+  authedPage: page,
+}) => {
+  const title = uniqueName("Intake page");
+  await startNewPage(page, title);
+
+  const formNaddr = nip19.naddrEncode({
+    kind: 30168,
+    pubkey: getPublicKey(generateSecretKey()),
+    identifier: uniqueName("form"),
+  });
+
+  await page
+    .getByPlaceholder("Paste form naddr or Formstr URL")
+    .fill(formNaddr);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText(formNaddr)).toBeVisible();
+
+  const shareUrl = await createAndGetShareUrl(page);
+  const naddr = shareUrl.match(/\/schedule\/(naddr[^?]+)/)?.[1];
+  expect(naddr).toBeTruthy();
+
+  await navigate(page, `/schedule/edit/${naddr}`);
+  await expect(
+    page.getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(title, { timeout: 30_000 });
+  await expect(page.getByText(formNaddr)).toBeVisible();
 });

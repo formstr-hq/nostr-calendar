@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   Box,
   Typography,
@@ -45,7 +45,10 @@ import { useUser } from "../stores/user";
 import { useBookingRequests } from "../stores/bookingRequests";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
+import { ROUTES } from "../utils/routingHelper";
 import { CalendarListSelect } from "./CalendarListSelect";
+import { FormFillerDialog } from "./FormFillerDialog";
+import { fetchAttachedFormCached } from "../utils/formAttachment";
 import type {
   ISchedulingPage,
   ITimeSlot,
@@ -54,8 +57,29 @@ import type {
 
 type FetchState = "loading" | "loaded" | "error";
 
+function formatUtcOffset(date: Date, timeZone: string): string {
+  const offset = new Intl.DateTimeFormat("en", {
+    timeZone,
+    timeZoneName: "shortOffset",
+  })
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+
+  return offset ? offset.replace("GMT", "UTC") : "UTC+0";
+}
+
+function formatHostTime(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
 export const BookingPage = () => {
   const { naddr } = useParams<{ naddr: string }>();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const viewKey = searchParams.get("viewKey");
   const theme = useTheme();
@@ -68,9 +92,11 @@ export const BookingPage = () => {
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
   const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<ITimeSlot | null>(null);
+  const [continueAfterLogin, setContinueAfterLogin] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [bookingNote, setBookingNote] = useState("");
   const [bookingTitle, setBookingTitle] = useState("");
+  const [activeFormIndex, setActiveFormIndex] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -141,9 +167,25 @@ export const BookingPage = () => {
     };
   }, [naddr, viewKey]);
 
-  // Compute available slots for the displayed week
-  const weekStart = useMemo(() => selectedDate.startOf("week"), [selectedDate]);
-  const weekEnd = useMemo(() => weekStart.add(7, "day"), [weekStart]);
+  // Warm the shared form-template cache as soon as a booking page arrives.
+  // The confirmation flow still opens forms only after a slot is chosen, but
+  // it no longer has to wait on their network fetch at that point.
+  useEffect(() => {
+    const attachments = page?.formAttachments;
+    if (!attachments?.length) return;
+    void Promise.allSettled(
+      attachments.map((attachment) => fetchAttachedFormCached(attachment)),
+    );
+  }, [page]);
+
+  // The desktop booking-link design is month-led: the middle panel is a
+  // calendar and the right panel presents the selected day's times. Fetch the
+  // complete visible month so its availability markers are real, not mocked.
+  const monthStart = useMemo(
+    () => selectedDate.startOf("month"),
+    [selectedDate],
+  );
+  const monthEnd = useMemo(() => monthStart.add(1, "month"), [monthStart]);
 
   // Public busy lists (kind 31926) for the host, scoped to the visible week.
   // Slots overlapping any of these ranges are filtered out by getBookableSlots.
@@ -153,8 +195,8 @@ export const BookingPage = () => {
     if (!page) return;
     let cancelled = false;
     const monthKeys = busyListMonthKeysForRange(
-      weekStart.valueOf(),
-      weekEnd.valueOf(),
+      monthStart.valueOf(),
+      monthEnd.valueOf(),
     );
     fetchOtherBusyLists(page.user, monthKeys)
       .then((lists) => {
@@ -167,7 +209,7 @@ export const BookingPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [page, weekStart, weekEnd, fetchOtherBusyLists]);
+  }, [page, monthStart, monthEnd, fetchOtherBusyLists]);
 
   const slots = useMemo(() => {
     if (!page) return [];
@@ -175,18 +217,18 @@ export const BookingPage = () => {
       page.durationMode === "fixed" ? (selectedDuration ?? 30) : 30;
     const busyRanges = collectBusyRanges(
       hostBusyLists,
-      weekStart.valueOf(),
-      weekEnd.valueOf(),
+      monthStart.valueOf(),
+      monthEnd.valueOf(),
     );
     return getDisplaySlots(
       page,
-      weekStart.toDate(),
-      weekEnd.toDate(),
+      monthStart.toDate(),
+      monthEnd.toDate(),
       durationMin,
       new Date(),
       busyRanges,
     );
-  }, [page, weekStart, weekEnd, selectedDuration, hostBusyLists]);
+  }, [page, monthStart, monthEnd, selectedDuration, hostBusyLists]);
 
   // Group slots by date
   const slotsByDate = useMemo(() => {
@@ -199,28 +241,55 @@ export const BookingPage = () => {
     return grouped;
   }, [slots]);
 
-  // Days to display (the 7 days of the selected week)
-  const weekDays = useMemo(() => {
+  const calendarDays = useMemo(() => {
     const days: Dayjs[] = [];
-    for (let i = 0; i < 7; i++) {
-      days.push(weekStart.add(i, "day"));
+    const start = monthStart.startOf("week");
+    const end = monthEnd.subtract(1, "day").endOf("week");
+    for (
+      let day = start;
+      day.isBefore(end, "day") || day.isSame(end, "day");
+      day = day.add(1, "day")
+    ) {
+      days.push(day);
     }
     return days;
-  }, [weekStart]);
+  }, [monthStart, monthEnd]);
 
-  const navigateWeek = useCallback((direction: -1 | 1) => {
-    setSelectedDate((d) => d.add(direction * 7, "day"));
+  const mobileWeekDays = useMemo(() => {
+    const start = selectedDate.startOf("week");
+    return Array.from({ length: 7 }, (_, index) => start.add(index, "day"));
+  }, [selectedDate]);
+
+  const selectedDaySlots = slotsByDate[selectedDate.format("YYYY-MM-DD")] ?? [];
+
+  const navigateMonth = useCallback((direction: -1 | 1) => {
+    setSelectedDate((d) => d.add(direction, "month").startOf("month"));
+    setSelectedSlot(null);
+  }, []);
+
+  const selectDate = useCallback((date: Dayjs) => {
+    if (date.isBefore(dayjs(), "day")) return;
+    setSelectedDate(date);
     setSelectedSlot(null);
   }, []);
 
   const handleSlotClick = (slot: ITimeSlot) => {
+    // Keep the public booking flow mounted across login and return the
+    // visitor to the exact time they chose.
+    setSelectedSlot(slot);
     if (!user) {
+      setContinueAfterLogin(true);
       updateLoginModal(true);
       return;
     }
-    setSelectedSlot(slot);
     setBookingDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (!user || !continueAfterLogin || !selectedSlot) return;
+    setContinueAfterLogin(false);
+    setBookingDialogOpen(true);
+  }, [continueAfterLogin, selectedSlot, user]);
 
   const handleBookingSubmit = async () => {
     if (!selectedSlot || !page || !naddr) return;
@@ -285,14 +354,9 @@ export const BookingPage = () => {
       useBookingRequests.getState().addOutgoingBooking(outgoing);
 
       setBookingDialogOpen(false);
-      setSelectedSlot(null);
       setBookingTitle("");
       setBookingNote("");
-      setSnackbar({
-        open: true,
-        message: intl.formatMessage({ id: "scheduling.bookingRequestSent" }),
-        severity: "success",
-      });
+      navigate(ROUTES.Bookings);
     } catch (e) {
       console.error(e);
       setSnackbar({
@@ -306,6 +370,31 @@ export const BookingPage = () => {
     }
   };
 
+  /**
+   * A booking request must not be sent until every intake form attached to
+   * the scheduling page has been submitted. Keeping the confirmation dialog
+   * mounted underneath the form dialog also preserves the entered title,
+   * note, calendar and slot while the guest answers the questions.
+   */
+  const handleBookingConfirm = () => {
+    if (page?.formAttachments?.length) {
+      setActiveFormIndex(0);
+      return;
+    }
+    void handleBookingSubmit();
+  };
+
+  const handleFormSubmitted = () => {
+    const nextIndex = (activeFormIndex ?? 0) + 1;
+    const attachments = page?.formAttachments ?? [];
+    if (nextIndex < attachments.length) {
+      setActiveFormIndex(nextIndex);
+      return;
+    }
+    setActiveFormIndex(null);
+    void handleBookingSubmit();
+  };
+
   const formatTime = (value: number | Date) => {
     if (!page) return "";
     // No `timeZone` option => the browser renders in the viewer's local tz,
@@ -316,6 +405,12 @@ export const BookingPage = () => {
       minute: "2-digit",
     }).format(value);
   };
+
+  const timezoneFooter = useMemo(() => {
+    const now = new Date();
+    const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return `Shown in your timezone (${formatUtcOffset(now, viewerTimeZone)}) · ${formatHostTime(now, page?.timezone || "UTC")} for the host.`;
+  }, [page?.timezone]);
 
   if (fetchState === "loading") {
     return (
@@ -348,199 +443,452 @@ export const BookingPage = () => {
     <>
       <Box
         sx={{
-          maxWidth: 900,
+          minHeight: { md: "100%" },
+          display: "flex",
+          flexDirection: "column",
+          alignItems: { md: "center" },
+          maxWidth: 1160,
           mx: "auto",
-          px: isMobile ? 2 : 3,
-          pt: 0.5,
-          pb: isMobile ? 2 : 3,
+          px: { xs: 0, sm: 3 },
+          py: { xs: 0, md: 6 },
         }}
       >
-        {/* Creator Profile & Page Info */}
-        <CreatorInfo pubkey={page.user} />
-
-        <Typography variant="h5" sx={{ mt: 1, mb: 1 }}>
-          {page.title}
-        </Typography>
-
-        {page.description && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {page.description}
-          </Typography>
-        )}
-
-        {page.location && (
-          <Box sx={{ display: "flex", gap: 2, mb: 1, flexWrap: "wrap" }}>
-            <Chip
-              icon={<LocationOnIcon />}
-              label={page.location}
-              size="small"
-              variant="outlined"
-            />
-          </Box>
-        )}
-
-        {/* Duration selector (for fixed-duration mode) */}
-        {page.durationMode === "fixed" && page.slotDurations.length > 1 && (
-          <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              {intl.formatMessage({ id: "scheduling.selectDuration" })}
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {page.slotDurations.map((mins) => (
-                <Chip
-                  key={mins}
-                  label={mins >= 60 ? `${mins / 60} hr` : `${mins} min`}
-                  color={selectedDuration === mins ? "primary" : "default"}
-                  variant={selectedDuration === mins ? "filled" : "outlined"}
-                  onClick={() => {
-                    setSelectedDuration(mins);
-                    setSelectedSlot(null);
-                  }}
-                />
-              ))}
-            </Box>
-          </Paper>
-        )}
-
-        {/* Week navigation */}
-        <Box
+        <Paper
+          variant={isMobile ? "elevation" : "outlined"}
+          elevation={0}
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 2,
-          }}
-        >
-          <IconButton
-            onClick={() => navigateWeek(-1)}
-            size="small"
-            aria-label="previous week"
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="subtitle1">
-            {weekStart.format("MMM D")} –{" "}
-            {weekEnd.subtract(1, "day").format("MMM D, YYYY")}
-          </Typography>
-          <IconButton
-            onClick={() => navigateWeek(1)}
-            size="small"
-            aria-label="next week"
-          >
-            <ArrowForwardIcon />
-          </IconButton>
-        </Box>
-
-        {/* Slots grid */}
-        <Box
-          sx={{
-            overflowX: { xs: "auto", md: "visible" },
-            mx: { xs: -2, md: 0 },
+            width: "100%",
+            overflow: "hidden",
+            borderRadius: { xs: 0, md: 5 },
+            boxShadow: { md: "0 20px 60px rgba(11, 11, 12, 0.12)" },
           }}
         >
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: {
-                xs: "repeat(7, minmax(130px, 1fr))",
-                md: "repeat(7, minmax(0, 1fr))",
-              },
-              gap: 1.5,
-              minWidth: { xs: "min-content", md: "auto" },
-              px: { xs: 2, md: 0 },
-              pb: { xs: 0.5, md: 0 },
+              gridTemplateColumns: { xs: "1fr", md: "310px minmax(0, 1fr)" },
             }}
           >
-            {weekDays.map((day) => {
-              const dateKey = day.format("YYYY-MM-DD");
-              const daySlots = slotsByDate[dateKey] || [];
-              const isToday = day.isSame(dayjs(), "day");
-              const isPast = day.isBefore(dayjs(), "day");
-
-              return (
-                <Paper
-                  key={dateKey}
-                  data-testid="booking-day-column"
-                  data-date={dateKey}
-                  variant="outlined"
-                  sx={{
-                    p: 1.5,
-                    minHeight: 120,
-                    opacity: isPast ? 0.5 : 1,
-                    backgroundColor: isToday
-                      ? "action.hover"
-                      : "background.paper",
-                  }}
+            <Box
+              sx={{
+                p: { xs: 2.5, md: 4 },
+                borderRight: { md: "1px solid" },
+                borderBottom: { xs: "1px solid", md: 0 },
+                borderColor: "divider",
+                bgcolor: { xs: "background.paper", md: "action.hover" },
+                textAlign: { xs: "center", md: "left" },
+              }}
+            >
+              <CreatorInfo pubkey={page.user} />
+              <Typography
+                variant="h4"
+                sx={{
+                  mt: { xs: 2, md: 3 },
+                  mb: 1.25,
+                  fontWeight: 800,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {page.title}
+              </Typography>
+              {page.description && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ lineHeight: 1.65, mb: 2 }}
                 >
-                  <Typography
-                    variant="caption"
-                    fontWeight={isToday ? 700 : 400}
-                    sx={{ display: "block", mb: 1, textAlign: "center" }}
-                  >
-                    {day.format("ddd")}
-                    <br />
-                    {day.format("MMM D")}
-                  </Typography>
-                  {daySlots.length === 0 ? (
+                  {page.description}
+                </Typography>
+              )}
+              {page.location && (
+                <Chip
+                  icon={<LocationOnIcon />}
+                  label={page.location}
+                  size="small"
+                  variant="outlined"
+                  sx={{ maxWidth: "100%" }}
+                />
+              )}
+
+              {page.durationMode === "fixed" &&
+                page.slotDurations.length > 1 && (
+                  <Box sx={{ mt: { xs: 2.5, md: 3.5 } }}>
                     <Typography
-                      variant="caption"
+                      variant="overline"
                       color="text.secondary"
-                      sx={{ display: "block", textAlign: "center" }}
+                      sx={{ fontWeight: 800, letterSpacing: 1.2 }}
                     >
-                      —
+                      DURATION
                     </Typography>
-                  ) : (
                     <Box
                       sx={{
                         display: "flex",
-                        flexDirection: "column",
-                        gap: 0.5,
+                        gap: 1,
+                        mt: 0.75,
+                        justifyContent: { xs: "center", md: "flex-start" },
+                        flexWrap: "wrap",
                       }}
                     >
-                      {daySlots.map((slot, i) => {
-                        const disabled = !!slot.unavailable;
-                        return (
-                          <Button
-                            key={i}
-                            size="small"
-                            disabled={disabled}
-                            variant={
-                              selectedSlot === slot ? "contained" : "outlined"
-                            }
-                            onClick={() =>
-                              disabled ? undefined : handleSlotClick(slot)
-                            }
-                            sx={{
-                              fontSize: "0.7rem",
-                              py: 0.25,
-                              px: 0.5,
-                              minWidth: 0,
-                              textTransform: "none",
-                              ...(disabled && {
-                                opacity: 0.45,
-                                textDecoration: "line-through",
-                              }),
-                            }}
-                          >
-                            {formatTime(slot.start)}
-                          </Button>
-                        );
-                      })}
+                      {page.slotDurations.map((mins) => (
+                        <Button
+                          key={mins}
+                          size="small"
+                          variant={
+                            selectedDuration === mins ? "contained" : "outlined"
+                          }
+                          onClick={() => {
+                            setSelectedDuration(mins);
+                            setSelectedSlot(null);
+                          }}
+                          sx={{
+                            minWidth: 76,
+                            borderRadius: 99,
+                            textTransform: "none",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {mins >= 60 ? `${mins / 60} hr` : `${mins} min`}
+                        </Button>
+                      ))}
                     </Box>
-                  )}
-                </Paper>
-              );
-            })}
-          </Box>
-        </Box>
+                  </Box>
+                )}
+            </Box>
 
-        {slots.length === 0 && (
-          <Box sx={{ textAlign: "center", py: 4 }}>
-            <Typography color="text.secondary">
-              {intl.formatMessage({ id: "scheduling.noSlotsThisWeek" })}
-            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "320px minmax(250px, 1fr)",
+                },
+                minWidth: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2.5, md: 4 },
+                  borderBottom: { xs: "1px solid", md: 0 },
+                  borderRight: { md: "1px solid" },
+                  borderColor: "divider",
+                }}
+              >
+                <Box sx={{ display: { xs: "block", md: "none" }, mb: 2.5 }}>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ fontWeight: 800, letterSpacing: 1.2 }}
+                  >
+                    BOOK A TIME
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}
+                  >
+                    Pick a time that works
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 1.5,
+                  }}
+                >
+                  <IconButton
+                    onClick={() => navigateMonth(-1)}
+                    size="small"
+                    aria-label="previous month"
+                  >
+                    <ArrowBackIcon />
+                  </IconButton>
+                  <Typography variant="subtitle1" fontWeight={800}>
+                    {selectedDate.format("MMMM YYYY")}
+                  </Typography>
+                  <IconButton
+                    onClick={() => navigateMonth(1)}
+                    size="small"
+                    aria-label="next month"
+                  >
+                    <ArrowForwardIcon />
+                  </IconButton>
+                </Box>
+
+                <Box sx={{ display: { xs: "none", md: "block" } }}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      mb: 0.5,
+                    }}
+                  >
+                    {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
+                      <Typography
+                        key={`${label}-${index}`}
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          textAlign: "center",
+                          fontWeight: 700,
+                          fontSize: "0.65rem",
+                        }}
+                      >
+                        {label}
+                      </Typography>
+                    ))}
+                  </Box>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      gap: 0.5,
+                    }}
+                  >
+                    {calendarDays.map((day) => {
+                      const dateKey = day.format("YYYY-MM-DD");
+                      const hasOpenSlot = (slotsByDate[dateKey] ?? []).some(
+                        (slot) => !slot.unavailable,
+                      );
+                      const isSelected = day.isSame(selectedDate, "day");
+                      const outsideMonth = !day.isSame(monthStart, "month");
+                      const isPast = day.isBefore(dayjs(), "day");
+                      return (
+                        <Button
+                          key={dateKey}
+                          data-testid="booking-day-column"
+                          data-date={dateKey}
+                          onClick={() => selectDate(day)}
+                          disabled={isPast || !hasOpenSlot}
+                          aria-label={day.format("dddd, MMMM D")}
+                          sx={{
+                            minWidth: 0,
+                            height: 34,
+                            p: 0,
+                            borderRadius: 2,
+                            color: isSelected
+                              ? "primary.contrastText"
+                              : outsideMonth
+                                ? "text.disabled"
+                                : "text.primary",
+                            bgcolor: isSelected
+                              ? "primary.main"
+                              : "transparent",
+                            fontSize: "0.75rem",
+                            fontWeight: isSelected ? 800 : 600,
+                            position: "relative",
+                            ...(!hasOpenSlot && {
+                              opacity: 0.4,
+                              textDecoration: "line-through",
+                            }),
+                            "&:hover": {
+                              bgcolor: isSelected
+                                ? "primary.main"
+                                : "action.hover",
+                            },
+                            "&::after":
+                              hasOpenSlot && !isSelected
+                                ? {
+                                    content: '""',
+                                    position: "absolute",
+                                    bottom: 3,
+                                    width: 3,
+                                    height: 3,
+                                    borderRadius: "50%",
+                                    bgcolor: "text.primary",
+                                  }
+                                : undefined,
+                          }}
+                        >
+                          {day.date()}
+                        </Button>
+                      );
+                    })}
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 2, lineHeight: 1.5 }}
+                  >
+                    Dates with a dot have open times.
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: { xs: "grid", md: "none" },
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    gap: 0.75,
+                  }}
+                >
+                  {mobileWeekDays.map((day) => {
+                    const dateKey = day.format("YYYY-MM-DD");
+                    const hasOpenSlot = (slotsByDate[dateKey] ?? []).some(
+                      (slot) => !slot.unavailable,
+                    );
+                    const isSelected = day.isSame(selectedDate, "day");
+                    const isPast = day.isBefore(dayjs(), "day");
+                    return (
+                      <Button
+                        key={dateKey}
+                        data-testid="booking-day-column"
+                        data-date={dateKey}
+                        onClick={() => selectDate(day)}
+                        disabled={isPast || !hasOpenSlot}
+                        sx={{
+                          minWidth: 0,
+                          p: 0.5,
+                          minHeight: 58,
+                          borderRadius: 3,
+                          border: "1px solid",
+                          borderColor: isSelected ? "primary.main" : "divider",
+                          bgcolor: isSelected
+                            ? "primary.main"
+                            : "background.paper",
+                          color: isSelected
+                            ? "primary.contrastText"
+                            : "text.primary",
+                          flexDirection: "column",
+                          position: "relative",
+                          ...(!hasOpenSlot && {
+                            opacity: 0.4,
+                            textDecoration: "line-through",
+                          }),
+                        }}
+                      >
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: "0.62rem",
+                            opacity: isSelected ? 0.8 : 0.65,
+                          }}
+                        >
+                          {day.format("ddd")}
+                        </Typography>
+                        <Typography
+                          component="span"
+                          sx={{ fontSize: "0.82rem", fontWeight: 800 }}
+                        >
+                          {day.date()}
+                        </Typography>
+                        {hasOpenSlot && (
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 3,
+                              height: 3,
+                              borderRadius: "50%",
+                              bgcolor: "currentColor",
+                              mt: 0.25,
+                            }}
+                          />
+                        )}
+                      </Button>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box sx={{ p: { xs: 2.5, md: 4 }, minWidth: 0 }}>
+                <Box sx={{ display: { xs: "none", md: "block" }, mb: 2.5 }}>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ fontWeight: 800, letterSpacing: 1.2 }}
+                  >
+                    BOOK A TIME
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}
+                  >
+                    Pick a time that works
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="subtitle1" fontWeight={800}>
+                    {selectedDate.format("dddd, MMMM D")}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {
+                      selectedDaySlots.filter((slot) => !slot.unavailable)
+                        .length
+                    }{" "}
+                    open
+                  </Typography>
+                </Box>
+                {selectedDaySlots.length ? (
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "repeat(2, minmax(0, 1fr))",
+                        md: "1fr",
+                      },
+                      gap: 1.25,
+                    }}
+                  >
+                    {selectedDaySlots.map((slot, index) => {
+                      const disabled = !!slot.unavailable;
+                      return (
+                        <Button
+                          key={index}
+                          disabled={disabled}
+                          variant={
+                            selectedSlot === slot ? "contained" : "outlined"
+                          }
+                          onClick={() => !disabled && handleSlotClick(slot)}
+                          sx={{
+                            minHeight: 44,
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            ...(disabled && {
+                              opacity: 0.45,
+                              textDecoration: "line-through",
+                            }),
+                          }}
+                        >
+                          {formatTime(slot.start)}
+                        </Button>
+                      );
+                    })}
+                  </Box>
+                ) : (
+                  <Box
+                    sx={{
+                      border: "1px dashed",
+                      borderColor: "divider",
+                      borderRadius: 3,
+                      p: 3,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      No available times on this day.
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
           </Box>
-        )}
+        </Paper>
+        <Typography
+          component="footer"
+          data-testid="booking-timezone-footer"
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", pt: 2, textAlign: "center" }}
+        >
+          {timezoneFooter}
+        </Typography>
       </Box>
 
       {/* Booking Confirmation Dialog */}
@@ -613,15 +961,31 @@ export const BookingPage = () => {
           </Button>
           <Button
             variant="contained"
-            onClick={handleBookingSubmit}
+            onClick={handleBookingConfirm}
             disabled={submitting || !selectedCalendarId}
           >
             {submitting
               ? intl.formatMessage({ id: "scheduling.sending" })
-              : intl.formatMessage({ id: "scheduling.requestBooking" })}
+              : page?.formAttachments?.length
+                ? "Answer some questions and confirm"
+                : intl.formatMessage({ id: "scheduling.requestBooking" })}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <FormFillerDialog
+        open={activeFormIndex !== null}
+        attachment={
+          activeFormIndex === null
+            ? null
+            : (page?.formAttachments?.[activeFormIndex] ?? null)
+        }
+        index={activeFormIndex === null ? undefined : activeFormIndex + 1}
+        total={page?.formAttachments?.length}
+        onClose={() => setActiveFormIndex(null)}
+        onSubmitted={handleFormSubmitted}
+        onUseExistingSubmission={handleFormSubmitted}
+      />
 
       <Snackbar
         open={snackbar.open}
@@ -653,7 +1017,14 @@ function CreatorInfo({ pubkey }: { pubkey: string }) {
   }
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        justifyContent: { xs: "center", md: "flex-start" },
+      }}
+    >
       <Avatar src={participant.picture} sx={{ width: 44, height: 44 }}>
         {participant.name?.charAt(0)?.toUpperCase() || "?"}
       </Avatar>
