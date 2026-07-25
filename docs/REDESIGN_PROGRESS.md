@@ -15,14 +15,106 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 | F-SET                         | done                         | 2026-07-24 | General, Calendars placeholder, and Relays & Sync shipped as routed responsive sections; general preferences sync through self-encrypted NIP-78 kind 30078 and are applied throughout calendar views/editor defaults                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | F-NOTIF                       | done                         | 2026-07-25 | New calendar invitations publish as NIP-59 kind 1059 with `k=1052`; legacy 1052 is dual-read. Android worker updated; NIP-09 gift-wrap tombstones and warning report action retained.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | F-CAL-MGMT                    | done                         | 2026-07-25 | Settings → Calendars now provides create/edit/delete and calendar color management; sidebar visibility controls and existing kind-32123 behavior retained; async save/delete feedback added                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| F-BOOK-EDIT                   | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| F-BOOK-INBOX                  | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| F-BOOK-PUBLIC                 | unblocked (0–3 done)         |            | nostr inputs: not provided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK Foundation (protocol)  | done                         | 2026-07-25 | Booking gift wraps migrated to NIP-59 kind 1059 (`k=1057`/`k=1058`); legacy 1057/1058 dual-read. Added anonymous booking identity, `signing_nsec`/dismiss, and scheduling-page `formAttachments`. Zero UI touched — see session log below                                                                                                                                                                                                                                                                                                                                                                                                          |
+| F-BOOK-EDIT                   | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-INBOX                  | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F-BOOK-PUBLIC                 | unblocked (0–3 done)         |            | nostr inputs: provided by F-BOOK Foundation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | F-EVENT-LINK                  | mostly done via F-EVENT-VIEW | 2026-07-21 | `ViewEventPage` shares `CalendarEventView`, so the 2026-07-21 design-fidelity pass carried its banner/chips/sections styling here too (user's explicit choice). Still open: guest/unauthenticated RSVP nostr-layer decision, "Message host", any F-EVENT-LINK-specific polish beyond what F-EVENT-VIEW needed                                                                                                                                                                                                                                                                                                                                          |
 
 ## Session log
 
 <!-- newest first: date — phase — what was done — e2e status -->
+
+- 2026-07-25 — F-BOOK Foundation (protocol layer, no UI) — Unblocks
+  F-BOOK-EDIT/F-BOOK-INBOX/F-BOOK-PUBLIC per the master plan's "land the
+  shared wire change once" deviation. Migrated booking gift wraps to the same
+  NIP-59/NIP-17 pattern F-NOTIF built for calendar invitations, plus new
+  two-mode booking identity and a scheduling-page form attachment.
+  - **`src/nostr/kinds.ts`**: `BookingRequestGiftWrap`/`BookingResponseGiftWrap`
+    now both `1059` (outer kind shared with `CalendarEventGiftWrap`, three
+    enum members intentionally duplicate-valued —
+    `eslint-disable`d per member); `LegacyBookingRequestGiftWrap` (`1057`) and
+    `LegacyBookingResponseGiftWrap` (`1058`) added as read-only migration
+    kinds.
+  - **`src/nostr/crypto.ts`**: `createRumor`/`createSeal` now take an explicit
+    `ActiveSigner` instead of always reaching for
+    `signerManager.getSigner()` internally. New `wrapEventAs`/`unwrapEventAs`
+    take the signer as a parameter; `wrapEvent`/`unwrapEvent` become thin
+    wrappers resolving the logged-in user's signer and delegating — confirmed
+    zero behavior change for every existing (calendar-invitation) caller,
+    including the `signerDecrypt` permission-popup concurrency gate, which
+    now lives in a signer-parameterized `signerDecryptAs` that both the
+    default and explicit-signer paths share.
+  - **`src/nostr/booking.ts`**: `sendBookingRequest` gains an `identity:
+    {mode:"self"} | {mode:"anonymous"; secretKey}` param (default `"self"`
+    preserves prior behavior); anonymous mode seals and signs the gift wrap
+    with a one-time `LocalSigner` instead of the logged-in signer, which is
+    what makes the request unlinkable (NIP-59's seal is normally signed by
+    the real sender). New `createAnonymousBookerIdentity()` generates the
+    one-time keypair. Both request and response rumors now embed
+    `signing_nsec` (builder-fn form, matching F-NOTIF) and the wraps carry
+    `["k", "1057"]`/`["k", "1058"]`. `createBookingRequestsSubscription`
+    dual-reads `{1059,#k:1057}` + legacy `{1057}` (single host pubkey, hosts
+    are always authenticated); `createBookingResponsesSubscription`'s
+    signature changed from a single `pubkey` to `pubkeys: string[]` and
+    dual-reads `{1059,#k:1058}` + legacy `{1058}`. New
+    `dismissBookingRequestWrap`/`dismissBookingResponseWrap` reuse
+    `deleteGiftWrapAsRecipient`/`publishDeletionEvent` unchanged, mirroring
+    `dismissInvitation`'s ephemeral-key-else-signer-tombstone branch exactly.
+  - **`src/utils/types.ts`/`parser.ts`**: `ISchedulingPage.formAttachments?:
+    IFormAttachment[]` round-trips through the same `["form", naddr,
+    viewKey?]` tag shape the event editor already uses.
+    `IBookingRequest`/`IOutgoingBooking` gain `signingNsec?`.
+    `IOutgoingBooking` also gains `responseGiftWrapId?` (a new field beyond
+    the plan's literal list — needed so `dismissOutgoingBooking` has a
+    concrete wrap id to target; it dismisses the **response** wrap the
+    booker received, not the request wrap they sent, since that's the wrap
+    this client actually holds a `signing_nsec` for) and `bookerMode?:
+    "self" | "anonymous"`.
+  - **`src/utils/anonBookingIdentity.ts`** (new): `cal:anon_booking_keys`
+    lookup table (`saveAnonBookingKey`/`getAnonBookingKey`/
+    `getAllAnonBookingPubkeys`) — the only new local state anonymous booking
+    needs, since `cal:booking_requests_outgoing` already persists via plain
+    `localStorage` and survives a logged-out session as-is.
+  - **`src/stores/bookingRequests.ts`**: `fetchOutgoingBookings` now runs
+    regardless of login state — it reads
+    `signerManager.getUser()?.pubkey` (synchronous, non-triggering) rather
+    than `getUserPublicKey()` (which opens the login modal) specifically so
+    a logged-out anonymous visitor never gets prompted to log in just by
+    this store loading. Subscribes on the union of the logged-in pubkey (if
+    any) and every stored anonymous pubkey. Its response handler reads the
+    wrap's plaintext outer `p` tag to pick the right identity before
+    decrypting: real-pubkey responses use the default signer,
+    anon-addressed ones scan pending outgoing bookings' `dTag`s via
+    `getAnonBookingKey` for a matching pubkey and build a `LocalSigner`
+    from its stored secret key. New `dismissIncomingRequest`/
+    `dismissOutgoingBooking` actions mirror `dismissInvitation`.
+  - **Android `BookingWorker.java`**: mirrors `InvitationWorker.java`'s
+    dual-read `queryRelay` shape (new kind-1059+`#k` filter, plus a legacy
+    kind filter) for both requests and responses; deliberately **no**
+    kind-84 tombstone query added, since there's no pre-1059 kind-84
+    history for booking to stay compatible with (unlike invitations).
+  - **Docs**: `nips/NIP-Appointment-Scheduling.md` rewritten to the
+    three-layer NIP-59 structure (mirroring `NIP-52E.md` §3) for both the
+    request and response gift wraps, including a new "Anonymous Booking
+    Identity" subsection, dual-read filters, recipient-deletion pattern, the
+    new scheduling-page `form` inner tag, and refreshed example JSON/flow
+    diagram/directives (also opportunistically fixed the doc's already-stale
+    kind-`1052`-only calendar-invitation references to match NIP-52E's
+    actual current `1059`/`k=1052` shape, since the example flow interleaves
+    both protocols). `SCHEDULING_PROTOCOL.md` got the equivalent updates
+    plus the plan-flagged doc/code drift fix: the doc claimed unset
+    `expiry` defaults to a 48h fallback; `bookingRequests.ts`'s `checkExpiry`
+    has only ever treated unset/`0` as never-expire, so the doc was corrected
+    to match the code (not the other way around). Also refreshed
+    `SCHEDULING_PROTOCOL.md`'s "Source Files" list, which still pointed at
+    files Phase 3 deleted in 2026-07-20.
+  - `tsc --noEmit -p tsconfig.app.json` and `eslint . --quiet` clean.
+    `pnpm test:e2e` (`CI=true`, per the standing sandbox-port note — no
+    stray process was actually found this run): **53 passed, 1 skipped**
+    (the pre-existing `event-participants` fixme), matching the established
+    baseline exactly — the wire migration is confirmed compatible with
+    itself (sender and receiver moved together) with zero UI files touched.
 
 - 2026-07-25 — F-CAL-MGMT — Replaced the empty Settings → Calendars
   placeholder with the calendar-management surface from redesign `07`:

@@ -40,9 +40,28 @@ export enum EventKinds {
 
   // Appointment Scheduling
   SchedulingPage = 31927,
-  BookingRequestGiftWrap = 1057,
+  /**
+   * NIP-59/NIP-17 outer gift wrap for newly published booking requests.
+   * Deliberately the same wire value as `CalendarEventGiftWrap` — every
+   * NIP-59 wrap this app writes now shares one outer kind, differentiated by
+   * the public `k` classifier tag (see `sendBookingRequest`).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  BookingRequestGiftWrap = 1059,
+  /**
+   * Pre-NIP-17 booking-request wraps. Read-only migration support for
+   * requests sent by older Calendar versions.
+   */
+  LegacyBookingRequestGiftWrap = 1057,
   BookingRequestRumor = 57,
-  BookingResponseGiftWrap = 1058,
+  /** NIP-59/NIP-17 outer gift wrap for newly published booking responses. */
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  BookingResponseGiftWrap = 1059,
+  /**
+   * Pre-NIP-17 booking-response wraps. Read-only migration support for
+   * responses sent by older Calendar versions.
+   */
+  LegacyBookingResponseGiftWrap = 1058,
   BookingResponseRumor = 58,
 
   // Public Busy List (free/busy "I'm unavailable here" entries; one event per

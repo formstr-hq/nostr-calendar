@@ -11,6 +11,7 @@ import {
 import { getConversationKey, encrypt, decrypt } from "nostr-tools/nip44";
 import { Seal } from "nostr-tools/kinds";
 import { signerManager } from "../common/signer";
+import type { ActiveSigner } from "@formstr/signer";
 import { EventKinds } from "./kinds";
 
 type Rumor = UnsignedEvent & { id: string };
@@ -74,11 +75,11 @@ export async function signerEncrypt(
   return signer.nip44Encrypt(pubkey, JSON.stringify(data));
 }
 
-export async function signerDecrypt<T>(
+async function signerDecryptAs<T>(
+  signer: ActiveSigner,
   pubkey: string,
   content: string,
 ): Promise<T> {
-  const signer = await signerManager.getSigner();
   if (!signer?.nip44Decrypt) {
     throw new Error("CANNOT_DECRYPT_EVENT");
   }
@@ -106,9 +107,20 @@ export async function signerDecrypt<T>(
   return runDecrypt();
 }
 
+export async function signerDecrypt<T>(
+  pubkey: string,
+  content: string,
+): Promise<T> {
+  const signer = await signerManager.getSigner();
+  return signerDecryptAs<T>(signer, pubkey, content);
+}
+
 // --- NIP-59 gift wrap ------------------------------------------------------
 
-async function createRumor(event: Partial<UnsignedEvent>): Promise<Rumor> {
+async function createRumor(
+  event: Partial<UnsignedEvent>,
+  signer: ActiveSigner,
+): Promise<Rumor> {
   const rumor: Rumor = {
     created_at: now(),
     content: "",
@@ -116,7 +128,7 @@ async function createRumor(event: Partial<UnsignedEvent>): Promise<Rumor> {
     tags: [],
     ...event,
     id: "",
-    pubkey: await getUserPublicKey(),
+    pubkey: await signer.getPublicKey(),
   };
   rumor.id = getEventHash(rumor);
   return rumor;
@@ -125,8 +137,8 @@ async function createRumor(event: Partial<UnsignedEvent>): Promise<Rumor> {
 async function createSeal(
   rumor: Rumor,
   recipientPublicKey: string,
+  signer: ActiveSigner,
 ): Promise<NostrEvent> {
-  const signer = await signerManager.getSigner();
   if (!signer?.nip44Encrypt) {
     throw new Error("CANNOT_ENCRYPT");
   }
@@ -167,7 +179,29 @@ function createWrap(
  * ephemeral key the wrap will be signed with — callers that want the
  * recipient to be able to self-sign a NIP-09 deletion of the wrap (they
  * otherwise never see this key) embed it in the rumor via the builder form.
+ *
+ * Seals with the given `signer` rather than the logged-in user's own —
+ * lets a caller seal as a one-time anonymous identity (`LocalSigner`) so the
+ * seal layer cannot be linked back to the real sender, which NIP-59's normal
+ * "seal signed by the real sender" semantics otherwise guarantee.
  */
+export async function wrapEventAs(
+  event:
+    | Partial<UnsignedEvent>
+    | ((signingNsec: string) => Partial<UnsignedEvent>),
+  recipientPublicKey: string,
+  kind: number,
+  extraTags: string[][] = [],
+  signer: ActiveSigner,
+): Promise<NostrEvent> {
+  const randomKey = generateSecretKey();
+  const resolvedEvent =
+    typeof event === "function" ? event(nip19.nsecEncode(randomKey)) : event;
+  const rumor = await createRumor(resolvedEvent, signer);
+  const seal = await createSeal(rumor, recipientPublicKey, signer);
+  return createWrap(seal, recipientPublicKey, kind, extraTags, randomKey);
+}
+
 export async function wrapEvent(
   event:
     | Partial<UnsignedEvent>
@@ -176,24 +210,33 @@ export async function wrapEvent(
   kind: number,
   extraTags: string[][] = [],
 ): Promise<NostrEvent> {
-  const randomKey = generateSecretKey();
-  const resolvedEvent =
-    typeof event === "function" ? event(nip19.nsecEncode(randomKey)) : event;
-  const rumor = await createRumor(resolvedEvent);
-  const seal = await createSeal(rumor, recipientPublicKey);
-  return createWrap(seal, recipientPublicKey, kind, extraTags, randomKey);
+  const signer = await signerManager.getSigner();
+  return wrapEventAs(event, recipientPublicKey, kind, extraTags, signer);
 }
 
 /**
- * Unwraps both NIP-59 layers (seal, then rumor) via the current user's own
- * signer. This works for the outer wrap layer too even though it was
- * *encrypted* with a random ephemeral key (see `createWrap`) because NIP-44
- * conversation keys are symmetric (ECDH): given the wrap's ephemeral
- * `pubkey` field, the receiver's signer derives the same key the sender used.
+ * Unwraps both NIP-59 layers (seal, then rumor) via the given `signer`. This
+ * works for the outer wrap layer too even though it was *encrypted* with a
+ * random ephemeral key (see `createWrap`) because NIP-44 conversation keys
+ * are symmetric (ECDH): given the wrap's ephemeral `pubkey` field, the
+ * receiver's signer derives the same key the sender used.
  */
+export async function unwrapEventAs(
+  wrap: NostrEvent,
+  signer: ActiveSigner,
+): Promise<Rumor> {
+  const seal = await signerDecryptAs<NostrEvent>(
+    signer,
+    wrap.pubkey,
+    wrap.content,
+  );
+  return signerDecryptAs<Rumor>(signer, seal.pubkey, seal.content);
+}
+
+/** Unwraps via the current user's own signer. See `unwrapEventAs`. */
 export async function unwrapEvent(wrap: NostrEvent): Promise<Rumor> {
-  const seal = await signerDecrypt<NostrEvent>(wrap.pubkey, wrap.content);
-  return signerDecrypt<Rumor>(seal.pubkey, seal.content);
+  const signer = await signerManager.getSigner();
+  return unwrapEventAs(wrap, signer);
 }
 
 /**

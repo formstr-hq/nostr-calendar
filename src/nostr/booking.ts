@@ -1,14 +1,19 @@
-import { Event, generateSecretKey, nip19 } from "nostr-tools";
+import { Event, generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils.js";
+import { LocalSigner, type ActiveSigner } from "@formstr/signer";
+import { signerManager } from "../common/signer";
 import { EventKinds } from "./kinds";
 import {
   getUserPublicKey,
   selfDecrypt,
   getTagValue,
   wrapEvent,
+  wrapEventAs,
   unwrapEvent,
+  unwrapEventAs,
 } from "./crypto";
 import { publishSignedEvent, addGossipRelays, makeDTag } from "./core";
+import { deleteGiftWrapAsRecipient, publishDeletionEvent } from "./events";
 import { createSubscription, type StandingSubscription } from "./subscribe";
 import { nostrEventToSchedulingPage } from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
@@ -29,7 +34,21 @@ export function createBookingIdentity(
   return { dTag, viewKey };
 }
 
-// --- Booking requests (kind 1057 gift wrap over a 57 rumor) ---------------
+/**
+ * Generates a fresh one-time keypair for an anonymous booker identity — never
+ * derived from the real logged-in identity. Used to seal the NIP-59 seal
+ * layer of an anonymous booking request so it cannot be linked back to the
+ * booker's real pubkey, per the two-mode booking identity design.
+ */
+export function createAnonymousBookerIdentity(): {
+  secretKey: Uint8Array;
+  pubkey: string;
+} {
+  const secretKey = generateSecretKey();
+  return { secretKey, pubkey: getPublicKey(secretKey) };
+}
+
+// --- Booking requests (NIP-59/NIP-17 kind 1059 gift wrap, k=1057; legacy 1057 read) ---
 
 export async function sendBookingRequest({
   schedulingPageRef,
@@ -41,6 +60,7 @@ export async function sendBookingRequest({
   dTag,
   viewKey,
   relayHints,
+  identity = { mode: "self" },
 }: {
   schedulingPageRef: string;
   creatorPubkey: string;
@@ -51,11 +71,24 @@ export async function sendBookingRequest({
   dTag: string;
   viewKey: string;
   relayHints?: string[];
+  /**
+   * `"self"` (default) seals with the logged-in user's own signer, matching
+   * pre-existing behavior. `"anonymous"` seals with a one-time `LocalSigner`
+   * built from a fresh keypair (see `createAnonymousBookerIdentity`) so the
+   * seal cannot be linked to the booker's real identity — required for
+   * genuine unlinkability, since NIP-59 normally has the seal signed by the
+   * real sender.
+   */
+  identity?: { mode: "self" } | { mode: "anonymous"; secretKey: Uint8Array };
 }): Promise<Event> {
-  const userPublicKey = await getUserPublicKey();
-  const giftWrap = await wrapEvent(
-    {
-      pubkey: userPublicKey,
+  const signer: ActiveSigner =
+    identity.mode === "anonymous"
+      ? new LocalSigner(identity.secretKey)
+      : await signerManager.getSigner();
+  const bookerPubkey = await signer.getPublicKey();
+  const giftWrap = await wrapEventAs(
+    (signingNsec) => ({
+      pubkey: bookerPubkey,
       created_at: Math.floor(Date.now() / 1000),
       kind: EventKinds.BookingRequestRumor,
       content: "",
@@ -67,10 +100,13 @@ export async function sendBookingRequest({
         ["note", note],
         ["d", dTag],
         ["viewKey", viewKey],
+        ["signing_nsec", signingNsec],
       ],
-    },
+    }),
     creatorPubkey,
     EventKinds.BookingRequestGiftWrap,
+    [["k", "1057"]],
+    signer,
   );
   // The gift wrap p-tags its recipient; the worker routes delivery to their
   // relays. Hints from the scheduling page's naddr aid later reads.
@@ -88,6 +124,7 @@ export async function unwrapBookingRequest(giftWrap: Event): Promise<{
   note: string;
   dTag: string;
   viewKey?: string;
+  signingNsec?: string;
 }> {
   const rumor = await unwrapEvent(giftWrap);
   const getTag = (name: string) => getTagValue(rumor.tags, name);
@@ -100,9 +137,15 @@ export async function unwrapBookingRequest(giftWrap: Event): Promise<{
     note: getTag("note"),
     dTag: getTag("d"),
     viewKey: getTag("viewKey") || undefined,
+    signingNsec: getTag("signing_nsec") || undefined,
   };
 }
 
+/**
+ * Hosts are always authenticated, so this dual-reads with a single pubkey —
+ * unlike `createBookingResponsesSubscription`, which must also cover
+ * locally-stored anonymous booker identities.
+ */
 export function createBookingRequestsSubscription(
   pubkey: string,
   onEvent: (giftWrap: Event) => void,
@@ -113,6 +156,14 @@ export function createBookingRequestsSubscription(
       {
         kinds: [EventKinds.BookingRequestGiftWrap],
         "#p": [pubkey],
+        // New kind-1059 gift wraps can carry unrelated NIP-17 traffic. The
+        // public classifier tag makes this subscription booking-specific.
+        "#k": [EventKinds.LegacyBookingRequestGiftWrap.toString()],
+        limit: 50,
+      },
+      {
+        kinds: [EventKinds.LegacyBookingRequestGiftWrap],
+        "#p": [pubkey],
         limit: 50,
       },
     ],
@@ -121,9 +172,18 @@ export function createBookingRequestsSubscription(
   );
 }
 
-// --- Booking responses (kind 1058 gift wrap over a 58 rumor) --------------
+// --- Booking responses (NIP-59/NIP-17 kind 1059 gift wrap, k=1058; legacy 1058 read) ---
 
-export async function unwrapBookingResponse(giftWrap: Event): Promise<{
+/**
+ * `signer` defaults to the logged-in user's own signer. Pass a `LocalSigner`
+ * built from a stored anonymous booking key when the response's `p` tag
+ * addresses an anonymous booker identity rather than the real logged-in
+ * pubkey (see `stores/bookingRequests.ts`'s per-wrap decrypt routing).
+ */
+export async function unwrapBookingResponse(
+  giftWrap: Event,
+  signer?: ActiveSigner,
+): Promise<{
   schedulingPageRef: string;
   creatorPubkey: string;
   start: number;
@@ -132,8 +192,11 @@ export async function unwrapBookingResponse(giftWrap: Event): Promise<{
   eventRef?: string;
   viewKey?: string;
   reason?: string;
+  signingNsec?: string;
 }> {
-  const rumor = await unwrapEvent(giftWrap);
+  const rumor = signer
+    ? await unwrapEventAs(giftWrap, signer)
+    : await unwrapEvent(giftWrap);
   const getTag = (name: string) => getTagValue(rumor.tags, name);
   return {
     schedulingPageRef: getTag("a"),
@@ -144,6 +207,7 @@ export async function unwrapBookingResponse(giftWrap: Event): Promise<{
     eventRef: getTag("event_ref") || undefined,
     viewKey: getTag("viewKey") || undefined,
     reason: getTag("reason") || undefined,
+    signingNsec: getTag("signing_nsec") || undefined,
   };
 }
 
@@ -178,23 +242,32 @@ export async function sendBookingResponse({
 
   const userPublicKey = await getUserPublicKey();
   const giftWrap = await wrapEvent(
-    {
+    (signingNsec) => ({
       pubkey: userPublicKey,
       created_at: Math.floor(Date.now() / 1000),
       kind: EventKinds.BookingResponseRumor,
       content: "",
-      tags,
-    },
+      tags: [...tags, ["signing_nsec", signingNsec]],
+    }),
     bookerPubkey,
     EventKinds.BookingResponseGiftWrap,
-    [["status", status]],
+    [
+      ["status", status],
+      ["k", "1058"],
+    ],
   );
   await publishSignedEvent(giftWrap);
   return giftWrap;
 }
 
+/**
+ * `pubkeys` unions the logged-in user's pubkey (if any) with every locally-
+ * stored anonymous booking pubkey, so a booker who booked anonymously still
+ * receives the host's response — unlike `createBookingRequestsSubscription`,
+ * which only ever needs the authenticated host's pubkey.
+ */
 export function createBookingResponsesSubscription(
-  pubkey: string,
+  pubkeys: string[],
   onEvent: (giftWrap: Event) => void,
   onEose?: () => void,
 ): StandingSubscription {
@@ -202,13 +275,62 @@ export function createBookingResponsesSubscription(
     () => [
       {
         kinds: [EventKinds.BookingResponseGiftWrap],
-        "#p": [pubkey],
+        "#p": pubkeys,
+        "#k": [EventKinds.LegacyBookingResponseGiftWrap.toString()],
+        limit: 50,
+      },
+      {
+        kinds: [EventKinds.LegacyBookingResponseGiftWrap],
+        "#p": pubkeys,
         limit: 50,
       },
     ],
     { onEvent, onEose },
     { dedupeById: true },
   );
+}
+
+// --- Dismiss (NIP-09), mirroring F-NOTIF's dismissInvitation pattern -------
+
+/**
+ * Deletes a booking-request gift wrap on behalf of its recipient (the host).
+ * Uses the ephemeral signing key embedded in the rumor when available
+ * (`signingNsec`); falls back to a signer-authored NIP-09 deletion request
+ * for legacy wraps sent before that tag existed.
+ */
+export async function dismissBookingRequestWrap(
+  giftWrapId: string,
+  signingNsec?: string,
+): Promise<void> {
+  if (signingNsec) {
+    await deleteGiftWrapAsRecipient(giftWrapId, signingNsec);
+  } else {
+    await publishDeletionEvent({
+      kinds: [
+        EventKinds.BookingRequestGiftWrap,
+        EventKinds.LegacyBookingRequestGiftWrap,
+      ],
+      eventIds: [giftWrapId],
+    });
+  }
+}
+
+/** Same as `dismissBookingRequestWrap`, for booking-response gift wraps. */
+export async function dismissBookingResponseWrap(
+  giftWrapId: string,
+  signingNsec?: string,
+): Promise<void> {
+  if (signingNsec) {
+    await deleteGiftWrapAsRecipient(giftWrapId, signingNsec);
+  } else {
+    await publishDeletionEvent({
+      kinds: [
+        EventKinds.BookingResponseGiftWrap,
+        EventKinds.LegacyBookingResponseGiftWrap,
+      ],
+      eventIds: [giftWrapId],
+    });
+  }
 }
 
 // --- Scheduling page (kind 31927), self-encrypted with a raw hex viewKey --

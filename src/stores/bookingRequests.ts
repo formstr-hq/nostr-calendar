@@ -6,14 +6,21 @@
  * outgoing bookings (as the person requesting an appointment).
  *
  * Key behaviors:
- * - Subscribes to booking request gift wraps (kind 1057) for incoming requests
- * - Subscribes to booking response gift wraps (kind 1058) for outgoing responses
+ * - Subscribes to booking request gift wraps (kind 1059, k=1057; legacy 1057
+ *   dual-read) for incoming requests
+ * - Subscribes to booking response gift wraps (kind 1059, k=1058; legacy 1058
+ *   dual-read) for outgoing responses — across the logged-in pubkey and any
+ *   locally-stored anonymous booking identities
  * - Handles approval: creates private event + sends invitation gift wrap + response
  * - Handles decline: sends decline response gift wrap
  * - Periodically checks for expired requests
+ * - Dismisses resolved requests/bookings via NIP-09, mirroring invitations
  */
 
 import { create } from "zustand";
+import { nip19 } from "nostr-tools";
+import { LocalSigner, type ActiveSigner } from "@formstr/signer";
+import { signerManager } from "../common/signer";
 import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import { getUserPublicKey } from "../nostr/crypto";
 import { publishPrivateCalendarEvent } from "../nostr/events";
@@ -23,6 +30,8 @@ import {
   unwrapBookingRequest,
   unwrapBookingResponse,
   sendBookingResponse,
+  dismissBookingRequestWrap,
+  dismissBookingResponseWrap,
 } from "../nostr/booking";
 import type { StandingSubscription } from "../nostr/subscribe";
 import type {
@@ -37,6 +46,10 @@ import { useBusyList } from "./busyList";
 import { useTimeBasedEvents } from "./events";
 import { parseEventRef } from "../utils/calendarListTypes";
 import { Event } from "nostr-tools";
+import {
+  getAnonBookingKey,
+  getAllAnonBookingPubkeys,
+} from "../utils/anonBookingIdentity";
 import {
   BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
   BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
@@ -72,6 +85,8 @@ interface BookingRequestsState {
   declineRequest: (requestId: string, reason?: string) => Promise<void>;
   markOutgoingApprovedByDTag: (dTag: string, viewKey: string) => void;
   checkExpiry: () => void;
+  dismissIncomingRequest: (requestId: string) => void;
+  dismissOutgoingBooking: (bookingId: string) => void;
   stopSubscriptions: () => void;
   clearCached: () => Promise<void>;
 }
@@ -131,6 +146,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             viewKey: details.viewKey,
             receivedAt: giftWrap.created_at * 1000,
             status: "pending",
+            signingNsec: details.signingNsec,
           };
 
           set((state) => {
@@ -175,18 +191,51 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     });
   },
 
+  /**
+   * Runs regardless of login state — an anonymous booker (never logged in)
+   * still needs to receive responses to bookings they sent. The subscription
+   * pubkeys union the logged-in user (if any) with every locally-stored
+   * anonymous booking identity; `signerManager.getUser()` is read
+   * synchronously here (not `getUserPublicKey()`) specifically so a
+   * logged-out visitor never triggers the login modal just by loading this
+   * store.
+   */
   fetchOutgoingBookings: async () => {
     if (outgoingSub) return;
     if (!get().isLoaded) await get().loadCached();
 
-    const userPubkey = await getUserPublicKey();
-    if (!userPubkey) return;
+    const userPubkey = signerManager.getUser()?.pubkey ?? "";
+    const anonPubkeys = getAllAnonBookingPubkeys();
+    const pubkeys = [...new Set([userPubkey, ...anonPubkeys])].filter(Boolean);
+    if (pubkeys.length === 0) return;
 
     outgoingSub = createBookingResponsesSubscription(
-      userPubkey,
+      pubkeys,
       async (giftWrap: Event) => {
         try {
-          const details = await unwrapBookingResponse(giftWrap);
+          // The outer `p` tag is plaintext — read it before decrypting to
+          // decide which identity's signer can actually open this wrap.
+          // Real-identity responses use the default signer; anon-addressed
+          // responses look up the matching one-time key by the recipient
+          // pubkey, scanning only pending outgoing bookings' stored dTags
+          // (the same set `anonPubkeys` above was built from).
+          const recipientPubkey = giftWrap.tags.find((t) => t[0] === "p")?.[1];
+          let signer: ActiveSigner | undefined;
+          if (recipientPubkey && recipientPubkey !== userPubkey) {
+            for (const booking of get().outgoingBookings) {
+              if (!booking.dTag) continue;
+              const anonKey = getAnonBookingKey(booking.dTag);
+              if (anonKey?.pubkey !== recipientPubkey) continue;
+              const secretKey = nip19.decode(
+                anonKey.secretKeyNsec as `nsec1${string}`,
+              ).data as Uint8Array;
+              signer = new LocalSigner(secretKey);
+              break;
+            }
+            if (!signer) return; // No matching local identity — not ours.
+          }
+
+          const details = await unwrapBookingResponse(giftWrap, signer);
 
           // Find matching outgoing booking by scheduling page ref + time
           set((state) => {
@@ -204,6 +253,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
                   eventRef: details.eventRef,
                   viewKey: details.viewKey,
                   declineReason: details.reason,
+                  responseGiftWrapId: giftWrap.id,
+                  signingNsec: details.signingNsec,
                 };
               }
               return booking;
@@ -413,6 +464,55 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       ).length;
       saveIncomingToStorage(incomingRequests);
       return { incomingRequests, incomingUnreadCount };
+    });
+  },
+
+  /**
+   * Dismisses a resolved incoming request, mirroring
+   * `stores/invitations.ts`'s `dismissInvitation`: NIP-09 is the only
+   * dismissal publish, using the ephemeral wrap key when available and
+   * falling back to a signer-authored deletion request otherwise.
+   */
+  dismissIncomingRequest: (requestId) => {
+    set((state) => {
+      const request = state.incomingRequests.find((r) => r.id === requestId);
+      const incomingRequests = state.incomingRequests.filter(
+        (r) => r.id !== requestId,
+      );
+      if (request) {
+        void dismissBookingRequestWrap(request.giftWrapId, request.signingNsec);
+      }
+      const incomingUnreadCount = incomingRequests.filter(
+        (r) => r.status === "pending",
+      ).length;
+      saveIncomingToStorage(incomingRequests);
+      return { incomingRequests, incomingUnreadCount };
+    });
+  },
+
+  /**
+   * Dismisses a resolved outgoing booking. Targets the response gift wrap
+   * (the one this client actually received) — absent for bookings that
+   * expired without ever getting a response, in which case dismiss is
+   * local-only.
+   */
+  dismissOutgoingBooking: (bookingId) => {
+    set((state) => {
+      const booking = state.outgoingBookings.find((b) => b.id === bookingId);
+      const outgoingBookings = state.outgoingBookings.filter(
+        (b) => b.id !== bookingId,
+      );
+      if (booking?.responseGiftWrapId) {
+        void dismissBookingResponseWrap(
+          booking.responseGiftWrapId,
+          booking.signingNsec,
+        );
+      }
+      const outgoingUnreadCount = outgoingBookings.filter(
+        (b) => b.status === "pending",
+      ).length;
+      saveOutgoingToStorage(outgoingBookings);
+      return { outgoingBookings, outgoingUnreadCount };
     });
   },
 
