@@ -199,6 +199,7 @@ export function TopBar({
             px: 1.5,
             borderTop: "1px solid",
             borderColor: "divider",
+            justifyContent: "space-between",
           }}
         >
           {viewSwitcher}
