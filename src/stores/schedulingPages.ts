@@ -30,7 +30,7 @@ import {
 } from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
 import { getRelays } from "../common/relayConfig";
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { getAppBaseUrl, isNative } from "../utils/platform";
 import type { Event, Filter } from "nostr-tools";
 import { generateSecretKey, getPublicKey, nip44 } from "nostr-tools";
@@ -90,11 +90,14 @@ async function publishSchedulingPage(
   const pubKey = await getUserPublicKey();
   const tags = schedulingPageToTags(page);
 
-  // All scheduling pages are encrypted as of vNEXT. Public scheduling
-  // pages are no longer supported by this client; the page body is always
-  // wrapped in a NIP-44 envelope keyed by an ephemeral viewKey shared
-  // through the page's URL (?viewKey=...).
-  const viewSecretKey = generateSecretKey();
+  // All scheduling pages are encrypted as of vNEXT. A page's view key is
+  // its share-link capability, so it must remain stable across edits: a new
+  // event version is encrypted with the existing key when one is present.
+  // Only creating a page (or recovering a legacy page with no key) creates a
+  // fresh key.
+  const viewSecretKey = page.viewKey
+    ? hexToBytes(page.viewKey)
+    : generateSecretKey();
   const viewPublicKey = getPublicKey(viewSecretKey);
   const viewKeyHex = bytesToHex(viewSecretKey);
   const conversationKey = nip44.getConversationKey(

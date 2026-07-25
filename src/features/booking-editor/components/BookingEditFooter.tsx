@@ -33,25 +33,23 @@ export function BookingEditFooter({
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      {isPublishing && (
-        <Box sx={{ mb: 1.5 }}>
-          <RelayDots
-            relays={publishingRelays}
-            relayStatus={relayStatus}
-            label={relayDotsLabel}
-          />
-        </Box>
-      )}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           alignItems: "center",
           gap: 1,
           pb: 4,
           flexWrap: "wrap",
         }}
       >
+        {isPublishing && (
+          <RelayDots
+            relays={publishingRelays}
+            relayStatus={relayStatus}
+            label={relayDotsLabel}
+          />
+        )}
         <Button color="inherit" onClick={onCancel}>
           Cancel
         </Button>
