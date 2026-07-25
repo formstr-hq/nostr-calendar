@@ -19,14 +19,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useCalendarLists } from "../../../stores/calendarLists";
 import { useTimeBasedEvents } from "../../../stores/events";
 import { useUser } from "../../../stores/user";
-import {
-  publishDeletionEvent,
-  publishParticipantRemovalEvent,
-} from "../../../nostr/events";
+import { publishDeletionEvent } from "../../../nostr/events";
 import { useInvitations } from "../../../stores/invitations";
 import { useBusyList } from "../../../stores/busyList";
 import type { ICalendarEvent } from "../../../utils/types";
-import { EventKinds } from "../../../nostr/kinds";
 import { TimeRenderer } from "../../../components/TimeRenderer";
 import { getEventDisplayRange } from "../../../utils/eventOccurrence";
 import { useIntl } from "react-intl";
@@ -123,11 +119,6 @@ export function DeleteEventDialog({
           break;
         }
         case "ignore": {
-          await publishParticipantRemovalEvent({
-            coordinates: [eventCoordinate],
-            eventIds: event.eventId ? [event.eventId] : [],
-            kinds: [event.kind, EventKinds.CalendarEventGiftWrap],
-          });
           dismissInvitation(event.id);
           removeEvent(event.id);
           break;

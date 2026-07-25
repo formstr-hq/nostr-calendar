@@ -274,7 +274,7 @@ Template for the inputs (copy into the session prompt):
   item 4 — read before scoping this phase):
   - The invitation rumor is now kind `14` (NIP-17 chat message)
   - The gift wrap gained a `["signing_nsec", ...]` rumor tag (the ephemeral key it's signed with)
-    and a `["k", "1052"]` wrap tag. `dismissInvitation` now also publish a NIP-09 kind-5 deletion signed with that key when present (see `deleteGiftWrapAsRecipient` in `nostr/events.ts`) — this is a replacement for, the kind-84 notice. the `InvitationWorker.java` (Android background worker) will need to adopt this change as well.
+    and a `["k", "1052"]` wrap tag. `dismissInvitation` publishes exactly one NIP-09 kind-5 deletion: signed with that key when present, otherwise as an active-signer deletion request (see `deleteGiftWrapAsRecipient` in `nostr/events.ts`). Kind-84 is legacy-read-only; neither app nor worker may publish it.
   - make sure the gift wrap published is of the correct timestamp as then the notifications will ont be delivered correctly
   - if the signing nsec is not present, then nevertheless publish a nip 09 deletion event signed by the author. Also treat this as a tombstone event. So fetch all nip 09 deletions on app init and filter out those events as well. before doing that, check if local relay is already handling that. the code is in common-packages.
   - Also fetch the old kind i.e. 1052 to maintain backwards compatibilities
@@ -293,7 +293,11 @@ Template for the inputs (copy into the session prompt):
   page; mobile variants). Treat as three separately schedulable sub-flows.
 - **E2E:** `booking`, `scheduling-builder` (`booking-request-card`).
 - **Nostr layer inputs:** _(fill in per sub-flow — booking kinds stay custom per the NIP proposal?
-  same 1052→1059 gift-wrap question applies to 1057/1058)_
+  same 1052→1059 gift-wrap question applies to 1057/1058. When this is scoped, follow F-NOTIF's
+  deletion pattern: embed the outer wrap signing nsec inside the encrypted rumor, delete dismissed
+  wraps with an ephemeral-key NIP-09 kind-5 deletion, publish a signer-owned tombstone fallback
+  when the key is unavailable, and rely on local-relay tombstone filtering. Do not implement this
+  booking work as part of F-NOTIF.)_
 
 ### F-EVENT-LINK — Public event landing page
 

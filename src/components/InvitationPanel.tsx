@@ -5,8 +5,8 @@
  * - Desktop: shown as a page (navigated to via /notifications route)
  * - Mobile: shown full-page with back navigation
  *
- * Each invitation card shows the event details with grey background
- * and dashed border styling. Users can accept (add to calendar) or dismiss.
+ * Each invitation card shows the event details and lets users accept, dismiss,
+ * or report it. Report is deliberately warning-coloured.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -151,9 +151,10 @@ export function InvitationPanel() {
           sx={{
             mb: 2,
             p: 2,
-            backgroundColor: "#e0e0e0",
-            border: "2px dashed #999",
-            borderRadius: 2,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: "var(--cal-radius-lg)",
           }}
         >
           {invitation.event ? (

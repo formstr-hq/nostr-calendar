@@ -8,9 +8,9 @@ This NIP extends [NIP-52](https://github.com/nostr-protocol/nips/blob/master/52.
 
 - **Private time-based events** visible only to invited participants (kind `32678`)
 - **Private day events** visible only to invited participants (kind `32681`)
-- **Calendar event gift wraps** that deliver decryption keys to participants (kind `1052`)
+- **Calendar event gift wraps** that deliver decryption keys to participants (NIP-59 kind `1059`; legacy kind `1052` is read)
 - **Private calendar lists** — self-encrypted personal collections of event references (kind `32123`)
-- **Participant removal** events to opt out of a private event (kind `84`)
+- **Legacy participant-removal tombstones** read for migration only (kind `84`)
 - **Public busy lists** for declaring unavailability without leaking event details (kind `31926`)
 
 ---
@@ -29,10 +29,11 @@ NIP-52E uses a **view key** pattern: event content is encrypted with a randomly 
 |-------|------|------|
 | 32678 | Private Time-Based Calendar Event | Parameterized replaceable |
 | 32681 | Private Day Event | Parameterized replaceable |
-| 1052  | Calendar Event Gift Wrap | Regular (NIP-59) |
+| 1059  | Calendar Event Gift Wrap | Regular (NIP-59 / NIP-17) |
+| 1052  | Legacy Calendar Event Gift Wrap | Read-only migration support |
 | 14    | Calendar Event Invitation Rumor | Unsigned (inside gift wrap; [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) "chat message" kind, reused) |
 | 32123 | Private Calendar List | Parameterized replaceable |
-| 84    | Participant Removal | Regular |
+| 84    | Legacy Participant Removal | Read-only tombstone migration support |
 | 31926 | Public Busy List | Parameterized replaceable |
 
 ---
@@ -220,7 +221,7 @@ Decrypted inner tags (after applying the view key):
 
 ---
 
-## 3. Calendar Event Gift Wrap (kind `1052`)
+## 3. Calendar Event Gift Wrap (kind `1059`; legacy `1052` read support)
 
 When a private event is created, the author sends a [NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md) gift wrap to each participant (including themselves). The gift wrap carries the `viewKey` so participants can decrypt the event.
 
@@ -255,7 +256,7 @@ The `signing_nsec` tag is the nsec-encoding of the *same* ephemeral secret key t
 **Layer 2 — Seal** (kind `13`, signed by sender):
 - `content`: `nip44Encrypt(recipientPubkey, JSON.stringify(rumor))`
 
-**Layer 3 — Gift Wrap** (kind `1052`, signed by the same random ephemeral key referenced by `signing_nsec`):
+**Layer 3 — Gift Wrap** (NIP-59 kind `1059`, signed by the same random ephemeral key referenced by `signing_nsec`):
 - `content`: `nip44Encrypt(ephemeralKey, recipientPubkey, JSON.stringify(seal))`
 - `tags`: `[["p", "<recipient hex pubkey>"], ["k", "1052"]]`
 
@@ -263,10 +264,11 @@ The `k` tag exists so this app can pick calendar-invitation wraps out from other
 
 ### Fetching Gift Wraps
 
-Clients subscribe with:
+Clients dual-read during migration:
 
 ```
-{ "kinds": [1052], "#p": ["<user hex pubkey>"] }
+{ "kinds": [1059], "#p": ["<user hex pubkey>"], "#k": ["1052"] }
+{ "kinds": [1052], "#p": ["<user hex pubkey>"] } // legacy
 ```
 
 Unwrap: gift wrap → seal → rumor → extract the `a` tag coordinate and `viewKey`. Rumor kind and content are not otherwise validated — readers should tolerate both the current kind-`14` rumor and legacy kind-`52`, empty-content rumors from before this change.
@@ -275,7 +277,7 @@ Unwrap: gift wrap → seal → rumor → extract the `a` tag coordinate and `vie
 
 Gift wraps are signed by a random ephemeral key that the recipient doesn't otherwise hold, so relays enforcing [NIP-09](./NIP-09.md) (deletion only accepted from the target event's own author) would normally never let the recipient delete an unwanted invitation. The `signing_nsec` rumor tag closes that gap: once decrypted, the recipient can sign a kind `5` deletion event (`["e", "<gift wrap id>"]`) with that same key and publish it, which NIP-09-compliant relays accept as coming from the wrap's own author.
 
-This is in addition to, not a replacement for, the existing kind `84` participant-removal notice — the Android background worker (`InvitationWorker.java`) suppresses future notifications for a gift wrap by checking for a matching kind-84 event, and never decrypts anything, so that mechanism keeps working unchanged regardless of relay-side deletion support.
+No new kind `84` event is published. The Android background worker and local relay still fetch/filter legacy kind-84 tombstones so a dismissal made by an older client remains effective. If a legacy rumor lacks `signing_nsec`, the app publishes a signer-authored kind-5 NIP-09 deletion request as its fallback. The local relay filters observed NIP-09 `e`-tag tombstones before it delivers invitations.
 
 ### Invitation Acceptance
 
@@ -285,7 +287,7 @@ When the user accepts an invitation:
 2. Add the reference to the user's chosen calendar list (kind `32123`)
 3. Re-publish the updated calendar list
 
-When the user dismisses an invitation, it is hidden locally, a kind `84` notice is published, and — when a `signing_nsec` is available — the gift wrap is also deleted per "Recipient Deletion" above.
+When the user dismisses an invitation, it is hidden locally and exactly one NIP-09 tombstone is published: it uses the gift-wrap key when `signing_nsec` is available, otherwise the active signer publishes the deletion request.
 
 ### Deduplication
 
@@ -517,25 +519,11 @@ Note: this filter will not return the recurring event, so always fetch it separa
 
 ---
 
-## 6. Participant Removal (kind `84`)
+## 6. Legacy Participant Removal (kind `84`)
 
-Published by a participant who opts out of a private event. This notifies the event author and other participants that this person is no longer attending.
-
-```json
-{
-  "kind": 84,
-  "pubkey": "<departing participant hex pubkey>",
-  "created_at": <unix timestamp>,
-  "tags": [
-    ["a", "<32678|32681>:<author-pubkey>:<event-d-tag>"],
-    ["e", "<private event id>"],
-    ["k", "<32678|32681>"]
-  ],
-  "content": "<optional reason>",
-  "id": "<event id>",
-  "sig": "<signature>"
-}
-```
+Kind `84` is no longer part of the active protocol and is never newly
+published. Clients may fetch it only as a legacy tombstone filter, preserving
+dismissals made by older Calendar clients.
 
 ---
 
@@ -555,7 +543,7 @@ The **relay hint** stored in the gift wrap rumor and in the calendar list MUST b
 
 ### Sending Gift Wraps
 
-Each gift wrap (kind `1052`) is addressed to a single recipient and MUST be published to that recipient's inbox relays (from their NIP-65 kind `10002` relay list). Do not publish gift wraps to the author's own relays — the recipient may never see them.
+Each new gift wrap (kind `1059`) is addressed to a single recipient and MUST be published to that recipient's inbox relays. The app continues to read legacy kind-`1052` wraps during migration. Do not publish gift wraps only to the author's own relays — the recipient may never see them.
 
 The rumor inside the gift wrap carries a relay hint in its `a` tag. This hint MUST point to a relay that currently hosts the private event, so the recipient can fetch it immediately after unwrapping.
 
@@ -599,14 +587,14 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
              ["signing_nsec", "{nsec(ephemeralKey)}"]]
       content: "{senderDisplayName} has invited you to the {title} on {formattedDate}"
    b. Seal (kind 13): encrypt rumor for recipient using sender's key
-   c. Gift Wrap (kind 1052): encrypt seal using ephemeralKey, tags: [["p", recipientPubkey], ["k", "1052"]]
+   c. Gift Wrap (kind 1059): encrypt seal using ephemeralKey, tags: [["p", recipientPubkey], ["k", "1052"]]
    d. Fetch recipient's NIP-65 inbox relays → publish gift wrap there
 ```
 
 ### Receiving and Accepting an Invitation
 
 ```
-1. Subscribe: { kinds: [1052], "#p": [myPubkey] }
+1. Subscribe to new and legacy formats: `{ kinds: [1059], "#p": [myPubkey], "#k": ["1052"] }` and `{ kinds: [1052], "#p": [myPubkey] }`.
 2. For each gift wrap received:
    a. Unwrap: gift wrap → seal → rumor
    b. Extract event coordinate, relayHint, viewKey, and (if present) signingNsec from rumor tags
@@ -618,8 +606,11 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
    a. Build event ref: [coordinate, relayHint, nsecViewKey]
       (relayHint comes from the rumor's a tag — the author's chosen fetch relay)
    b. Add to chosen calendar list (kind 32123), re-publish
-4. User dismisses: hide locally, publish kind-84 participant-removal notice, and — if
-   signingNsec is present — sign+publish a kind-5 NIP-09 deletion of the gift wrap with it
+4. User dismisses: hide locally and publish exactly one kind-5 NIP-09 tombstone. If
+   `signingNsec` is present, sign it with that ephemeral key so relays can remove the gift wrap;
+   otherwise publish the deletion request with the active signer. The local relay enforces
+   observed NIP-09 `e`-tag tombstones before delivering an invitation; it still reads legacy
+   kind-84 tombstones but never publishes them.
 ```
 
 ### Loading Calendar Events at Startup
@@ -644,7 +635,7 @@ Use kind `32678` for time-based events (`start`/`end` as Unix timestamps) and ki
 
 ## Security Considerations
 
-- **Relay metadata**: Even with encrypted content, relay operators can observe that a user publishes kind `32123` events and receives kind `1052` gift wraps. Event frequency and timing are not hidden.
+- **Relay metadata**: Even with encrypted content, relay operators can observe that a user publishes kind `32123` events and receives kind `1059` gift wraps (or legacy `1052` wraps). Event frequency and timing are not hidden.
 - **View key distribution**: Once a `viewKey` is shared via gift wrap, the recipient can share it further. There is no technical enforcement of access control beyond key distribution.
 - **Calendar list privacy**: Self-encryption (encrypted to own pubkey) means no one else can read the list — but it also means losing the private key means losing all calendar data.
 - **Gift wrap sender privacy**: NIP-59 gift wraps use ephemeral keys for the outer wrap, obscuring the sender's identity from relay operators. The seal layer uses the sender's actual key to authenticate to the recipient.

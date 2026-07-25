@@ -2,9 +2,9 @@
  * Invitations Store
  *
  * Manages gift-wrap invitations that haven't been accepted into a calendar yet.
- * Gift wraps (kind 1052) are treated as invitations/notifications rather than
- * direct event sources. Users must explicitly accept them to add events
- * to their calendars.
+ * NIP-59 gift wraps (kind 1059; legacy kind 1052 is still read) are treated
+ * as invitations/notifications rather than direct event sources. Users must
+ * explicitly accept them to add events to their calendars.
  *
  * Key behaviors:
  * - Fetches last 50 gift wraps from relays
@@ -24,12 +24,12 @@ import {
   deleteGiftWrapAsRecipient,
   fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
+  publishDeletionEvent,
   viewPrivateEvent,
 } from "../nostr/events";
 import { fetchUserReports, publishReportEvent } from "../nostr/reports";
 import type { ReportType } from "../nostr/reports";
 import { getUserPublicKey } from "../nostr/crypto";
-import { publishParticipantRemovalEvent } from "../nostr/events";
 import { getDTag, nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
@@ -350,18 +350,21 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         (inv) => inv.giftWrapId === giftWrapId,
       );
       if (dismissedInvitation) {
-        // Kind-84 notice: the Android background worker suppresses future
-        // notifications for this gift wrap by checking for this event — keep
-        // publishing it regardless of whether a real deletion also succeeds.
-        publishParticipantRemovalEvent({
-          kinds: [EventKinds.CalendarEventGiftWrap],
-          eventIds: [dismissedInvitation?.originalInvitationId],
-        });
+        // NIP-09 is the only dismissal publish. New invitations carry the
+        // ephemeral wrap key; old invitations use the active signer request.
         if (dismissedInvitation.signingNsec) {
           void deleteGiftWrapAsRecipient(
             dismissedInvitation.originalInvitationId,
             dismissedInvitation.signingNsec,
           );
+        } else {
+          void publishDeletionEvent({
+            kinds: [
+              EventKinds.CalendarEventGiftWrap,
+              EventKinds.LegacyCalendarEventGiftWrap,
+            ],
+            eventIds: [dismissedInvitation.originalInvitationId],
+          });
         }
       }
 
@@ -396,6 +399,14 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         invitation.originalInvitationId,
         invitation.signingNsec,
       );
+    } else {
+      void publishDeletionEvent({
+        kinds: [
+          EventKinds.CalendarEventGiftWrap,
+          EventKinds.LegacyCalendarEventGiftWrap,
+        ],
+        eventIds: [invitation.originalInvitationId],
+      });
     }
 
     set((state) => {

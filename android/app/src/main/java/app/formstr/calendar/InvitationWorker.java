@@ -23,8 +23,8 @@ import java.util.Set;
 import okhttp3.OkHttpClient;
 
 /**
- * Background worker that periodically queries Nostr relays for new kind 1052
- * invitation events (gift wraps) addressed to the logged-in user.
+ * Background worker that periodically queries Nostr relays for NIP-59 kind
+ * 1059 calendar invitations, plus legacy kind 1052 invitation events.
  * It only counts events — no decryption is performed.
  */
 public class InvitationWorker extends Worker {
@@ -86,7 +86,8 @@ public class InvitationWorker extends Worker {
             Set<String> seenInvitationIds = loadSeenInvitationIds(prefs);
             Log.d(TAG, "Loaded " + seenInvitationIds.size() + " seen invitation id(s)");
 
-            // Fetch kind 84 (ParticipantRemoval) event IDs that the user has dismissed
+            // Fetch legacy kind-84 tombstones. New app versions never publish
+            // these, but old-client dismissals must remain suppressed.
             Set<String> dismissedInvitationIds = new HashSet<>();
             OkHttpClient client = RelayQueryUtils.createClient(RELAY_TIMEOUT_SECONDS);
 
@@ -145,9 +146,8 @@ public class InvitationWorker extends Worker {
     }
 
     /**
-     * Queries kind 84 (ParticipantRemoval) events authored by the user.
-     * Each such event has ["e", giftWrapId] tags that identify invitations
-     * the user has explicitly dismissed. Adds those IDs to dismissedIds.
+     * Queries legacy kind-84 tombstones authored by the user. Each may carry
+     * an ["e", giftWrapId] tag identifying an old-client dismissal.
      */
     private void queryDismissals(OkHttpClient client, String relayUrl, String pubkey,
                                  Set<String> dismissedIds) {
@@ -187,8 +187,12 @@ public class InvitationWorker extends Worker {
 
         try {
             JSONObject filterObj = new JSONObject();
-            filterObj.put("kinds", new JSONArray().put(1052));
+            // New invitations are standard NIP-59 wraps and carry k=1052 as
+            // the public calendar-invitation classifier. The app also reads
+            // pre-migration kind-1052 wraps below for backwards compatibility.
+            filterObj.put("kinds", new JSONArray().put(1059));
             filterObj.put("#p", new JSONArray().put(pubkey));
+            filterObj.put("#k", new JSONArray().put("1052"));
             if (since > 0) {
                 filterObj.put("since", since);
             }
@@ -200,32 +204,54 @@ public class InvitationWorker extends Worker {
                     filterObj,
                     RELAY_TIMEOUT_SECONDS,
                     TAG,
-                    event -> {
-                        JSONArray tags = event.optJSONArray("tags");
-                        if (tags != null) {
-                            for (int i = 0; i < tags.length(); i++) {
-                                JSONArray tag = tags.optJSONArray(i);
-                                if (tag == null || tag.length() < 2) continue;
-                                if ("booking".equals(tag.optString(0))
-                                        && "true".equals(tag.optString(1))) {
-                                    Log.d(TAG, "Skipping booking-origin invitation " + event.getString("id"));
-                                    return;
-                                }
-                            }
-                        }
-                        String id = event.getString("id");
-                        if (seenInvitationIds.contains(id) || dismissedInvitationIds.contains(id)) {
-                            Log.d(TAG, "Skipping already-handled invitation " + id);
-                            return;
-                        }
-                        Log.d(TAG, "New invitation received " + id);
-                        synchronized (eventIds) {
-                            eventIds.add(id);
-                        }
-                    }
+                    event -> handleInvitationEvent(event, eventIds, seenInvitationIds, dismissedInvitationIds)
+            );
+
+            JSONObject legacyFilter = new JSONObject();
+            legacyFilter.put("kinds", new JSONArray().put(1052));
+            legacyFilter.put("#p", new JSONArray().put(pubkey));
+            if (since > 0) {
+                legacyFilter.put("since", since);
+            }
+            RelayQueryUtils.queryEvents(
+                    client,
+                    relayUrl,
+                    "legacy-inv",
+                    legacyFilter,
+                    RELAY_TIMEOUT_SECONDS,
+                    TAG,
+                    event -> handleInvitationEvent(event, eventIds, seenInvitationIds, dismissedInvitationIds)
             );
         } catch (Exception e) {
             Log.w(TAG, "Failed to query relay: " + relayUrl, e);
+        }
+    }
+
+    private void handleInvitationEvent(JSONObject event, Set<String> eventIds,
+                                       Set<String> seenInvitationIds, Set<String> dismissedInvitationIds) {
+        try {
+            JSONArray tags = event.optJSONArray("tags");
+            if (tags != null) {
+                for (int i = 0; i < tags.length(); i++) {
+                    JSONArray tag = tags.optJSONArray(i);
+                    if (tag == null || tag.length() < 2) continue;
+                    if ("booking".equals(tag.optString(0)) && "true".equals(tag.optString(1))) {
+                        Log.d(TAG, "Skipping booking-origin invitation " + event.getString("id"));
+                        return;
+                    }
+                }
+            }
+            String id = event.getString("id");
+            if (seenInvitationIds.contains(id) || dismissedInvitationIds.contains(id)) {
+                Log.d(TAG, "Skipping already-handled invitation " + id);
+                return;
+            }
+            Log.d(TAG, "New invitation received " + id);
+            synchronized (eventIds) {
+                eventIds.add(id);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to handle invitation event", e);
         }
     }
 

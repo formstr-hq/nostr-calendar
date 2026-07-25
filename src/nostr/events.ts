@@ -387,9 +387,8 @@ export async function getDetailsFromGiftWrap(giftWrapEvent: Event) {
  * Deletes a gift wrap on behalf of its recipient via NIP-09, using the
  * ephemeral signing key the sender embedded in the (encrypted) rumor —
  * see the `signing_nsec` tag added in `getDetailsFromGiftWrap`. Older
- * invitations sent before that change have no `signingNsec` and can't be
- * deleted this way; callers should fall back to the existing kind-84
- * participant-removal notice for those.
+ * invitations sent before that change have no `signingNsec`; callers publish
+ * a signer-authored NIP-09 deletion request as a local tombstone fallback.
  */
 export async function deleteGiftWrapAsRecipient(
   giftWrapId: string,
@@ -429,12 +428,25 @@ export const fetchCalendarGiftWraps = (
   const filter: Filter = {
     kinds: [EventKinds.CalendarEventGiftWrap],
     "#p": participants,
+    // New kind-1059 gift wraps can carry unrelated NIP-17 traffic. The
+    // public classifier tag makes this subscription calendar-specific.
+    "#k": [EventKinds.LegacyCalendarEventGiftWrap.toString()],
+    ...(since && { since }),
+    ...(until && { until }),
+    ...(limit && { limit }),
+  };
+  const legacyFilter: Filter = {
+    kinds: [EventKinds.LegacyCalendarEventGiftWrap],
+    "#p": participants,
     ...(since && { since }),
     ...(until && { until }),
     ...(limit && { limit }),
   };
 
-  return dataLayer.observe([filter], {
+  // Keep receiving the old custom wraps while all new writes use NIP-59's
+  // standard outer kind. The two filters deliberately cannot be merged: old
+  // wraps do not have the classifier tag.
+  return dataLayer.observe([filter, legacyFilter], {
     onEvent: async (event: Event) => {
       try {
         const unWrappedEvent = await getDetailsFromGiftWrap(event);
@@ -597,48 +609,6 @@ export async function publishDeletionEvent({
     pubkey: userPublicKey,
     created_at: Math.floor(Date.now() / 1000),
     kind: EventKinds.DeletionEvent,
-    content: reason,
-    tags,
-  });
-
-  await publishSignedEvent(signedEvent);
-
-  return signedEvent;
-}
-
-/**
- * Publishes a kind 84 participant removal event to signal the user
- * wants to opt out of an event they were invited to.
- * Same tag structure as a deletion event.
- */
-export async function publishParticipantRemovalEvent({
-  kinds,
-  coordinates = [],
-  eventIds = [],
-  reason = "",
-}: {
-  kinds: number[];
-  coordinates?: string[];
-  eventIds?: string[];
-  reason?: string;
-}) {
-  const userPublicKey = await getUserPublicKey();
-  const tags: string[][] = [];
-
-  for (const id of eventIds) {
-    tags.push(["e", id]);
-  }
-  for (const coord of coordinates) {
-    tags.push(["a", coord]);
-  }
-  for (const kind of kinds) {
-    tags.push(["k", kind.toString()]);
-  }
-
-  const signedEvent = await buildAndSign({
-    pubkey: userPublicKey,
-    created_at: Math.floor(Date.now() / 1000),
-    kind: EventKinds.ParticipantRemoval,
     content: reason,
     tags,
   });

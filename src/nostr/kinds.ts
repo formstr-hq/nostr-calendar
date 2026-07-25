@@ -1,6 +1,12 @@
 export enum EventKinds {
   PrivateCalendarEvent = 32678,
-  CalendarEventGiftWrap = 1052,
+  /** NIP-59/NIP-17 outer gift wrap for newly published invitations. */
+  CalendarEventGiftWrap = 1059,
+  /**
+   * Pre-NIP-17 calendar invitation wraps. Read-only migration support for
+   * invitations sent by older Calendar versions.
+   */
+  LegacyCalendarEventGiftWrap = 1052,
   /** @deprecated superseded by CalendarEventInvitationRumor (kind 14) — no longer written, kept for historical reference */
   CalendarEventRumor = 52,
   /** NIP-17 kind 14 ("chat message") reused as the invitation rumor kind so
@@ -23,7 +29,7 @@ export enum EventKinds {
   // Deletion (NIP-09)
   DeletionEvent = 5,
 
-  // Participant Removal (kind 84 - participant opts out of an event)
+  // Legacy tombstone read support only. Never publish new kind-84 events.
   ParticipantRemoval = 84,
 
   // Relay List (NIP-65)
