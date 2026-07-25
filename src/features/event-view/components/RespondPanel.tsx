@@ -12,10 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useIntl } from "react-intl";
-import { generateSecretKey } from "nostr-tools";
-import { bytesToHex } from "nostr-tools/utils";
 import { useAcceptWithFormsFlow } from "../../../hooks/useAcceptWithFormsFlow";
-import { signerManager } from "../../../common/signer";
 import { buildEventRef } from "../../../utils/calendarListTypes";
 import type { ICalendarEvent } from "../../../utils/types";
 import { useCalendarLists } from "../../../stores/calendarLists";
@@ -47,7 +44,6 @@ export function RespondPanel({ event }: { event: ICalendarEvent }) {
     calendars[0]?.id || "",
   );
   const [accepting, setAccepting] = useState(false);
-  const [creatingGuest, setCreatingGuest] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [publishBusy, setPublishBusy] = useState<boolean>(() =>
     getBusyListDefaultOptIn(),
@@ -152,17 +148,6 @@ export function RespondPanel({ event }: { event: ICalendarEvent }) {
       setErrorOpen(true);
     } finally {
       setAccepting(false);
-    }
-  };
-
-  const handleContinueAsGuest = async () => {
-    setCreatingGuest(true);
-    try {
-      await signerManager.createAccount(bytesToHex(generateSecretKey()), {});
-    } catch {
-      setErrorOpen(true);
-    } finally {
-      setCreatingGuest(false);
     }
   };
 
