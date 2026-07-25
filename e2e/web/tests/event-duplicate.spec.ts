@@ -1,4 +1,4 @@
-import { test, expect, navigate } from "../fixtures/index.js";
+import { test, expect } from "../fixtures/index.js";
 import { createEventViaDialog, openEventModal } from "../helpers.js";
 
 const TEST_DATE = "2027-05-20";
@@ -27,7 +27,6 @@ test("user duplicates an event and saves the copy", async ({
   await expect(titleInput).not.toBeVisible({ timeout: 20_000 });
 
   // Both the original and the copy are on the calendar.
-  await navigate(page, `/d/${TEST_DATE.replaceAll("-", "/")}`);
   await expect(page.getByText("Origin Event").first()).toBeVisible();
   await expect(page.getByText("Cloned Event").first()).toBeVisible();
 });

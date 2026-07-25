@@ -81,8 +81,16 @@ test("public booking page offers the configured durations", async ({
   await expect(bob.getByRole("button", { name: "30 min" })).toBeVisible();
   await bob.getByRole("button", { name: "45 min" }).click();
 
-  // Next month always has slots (this month may be partially in the past).
+  // Advancing the month preserves the selected day-of-month, which can be a
+  // weekend. Pick an enabled weekday before asserting the time grid.
   await bob.getByRole("button", { name: "next month" }).click();
+  await bob
+    .getByRole("button", {
+      name: /^(Monday|Tuesday|Wednesday|Thursday|Friday),/,
+    })
+    .and(bob.locator(":enabled"))
+    .first()
+    .click();
   const slots = bob
     .getByRole("button", { name: /\d{1,2}:\d{2}/ })
     .and(bob.locator(":enabled"));
@@ -130,7 +138,7 @@ test("blocked dates remove that day's slots from the public page", async ({
   const nextWeekMonday = new Date(now);
   nextWeekMonday.setDate(now.getDate() + (7 - now.getDay()) + 1);
   const availableDay = bob.locator(
-    `[data-testid="booking-day-column"][data-date="${dateKey(nextWeekMonday)}"]`,
+    `[data-testid="booking-day-column"][data-date="${dateKey(nextWeekMonday)}"]:visible`,
   );
 
   // Availability must cover the whole mobile week, including the days that
@@ -147,7 +155,7 @@ test("blocked dates remove that day's slots from the public page", async ({
   // …but the blocked date remains unavailable.
   const blockedDateKey = dateKey(blocked);
   const blockedColumn = bob.locator(
-    `[data-testid="booking-day-column"][data-date="${blockedDateKey}"]`,
+    `[data-testid="booking-day-column"][data-date="${blockedDateKey}"]:visible`,
   );
   await expect(blockedColumn).toBeVisible();
   await expect(blockedColumn).toBeDisabled();
@@ -166,7 +174,7 @@ test("an attached intake form persists across edit", async ({
   });
 
   await page
-    .getByPlaceholder("Paste form naddr or Formstr URL")
+    .getByPlaceholder("Paste form URL")
     .fill(formNaddr);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText(formNaddr)).toBeVisible();

@@ -62,6 +62,11 @@ export async function signIn(
   ]).catch(() => {});
   if (await avatar.isVisible()) return;
 
+  // Public booking and shared-event pages deliberately omit both the app
+  // chrome and login modal. The injected key is still available to the page
+  // when a booking is submitted, so there is no sign-in UI to handle here.
+  if (!(await dialog.isVisible())) return;
+
   await expect(dialog).toBeVisible();
   const ncryptsecField = dialog.getByTestId("login-input-ncryptsec");
   if (!(await ncryptsecField.isVisible())) {

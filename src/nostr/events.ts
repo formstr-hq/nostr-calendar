@@ -209,7 +209,7 @@ export async function publishPrivateCalendarEvent(
         (signingNsec) => ({
           pubkey: userPublicKey,
           created_at: Math.floor(Date.now() / 1000),
-          kind: EventKinds.CalendarEventInvitationRumor,
+          kind: EventKinds.Rumor,
           content: invitationMessage,
           tags: [
             ["p", participant],
@@ -224,7 +224,10 @@ export async function publishPrivateCalendarEvent(
         }),
         participant,
         EventKinds.CalendarEventGiftWrap,
-        [...invitationGiftWrapTags, ["k", "1052"]],
+        [
+          ...invitationGiftWrapTags,
+          ["k", EventKinds.CalendarEventOuterGiftWrap.toString()],
+        ],
       );
       return { giftWrap: giftWrapEvent, participant };
     }),
@@ -312,7 +315,7 @@ export async function editPrivateCalendarEvent(
           (signingNsec) => ({
             pubkey: userPublicKey,
             created_at: Math.floor(Date.now() / 1000),
-            kind: EventKinds.CalendarEventInvitationRumor,
+            kind: EventKinds.Rumor,
             content: invitationMessage,
             tags: [
               ["p", participant],
@@ -327,7 +330,7 @@ export async function editPrivateCalendarEvent(
           }),
           participant,
           EventKinds.CalendarEventGiftWrap,
-          [["k", "1052"]],
+          [["k", EventKinds.CalendarEventOuterGiftWrap.toString()]],
         );
         return { giftWrap: giftWrapEvent, participant };
       }),
@@ -445,13 +448,13 @@ export const fetchCalendarGiftWraps = (
     "#p": participants,
     // New kind-1059 gift wraps can carry unrelated NIP-17 traffic. The
     // public classifier tag makes this subscription calendar-specific.
-    "#k": [EventKinds.LegacyCalendarEventGiftWrap.toString()],
+    "#k": [EventKinds.CalendarEventOuterGiftWrap.toString()],
     ...(since && { since }),
     ...(until && { until }),
     ...(limit && { limit }),
   };
   const legacyFilter: Filter = {
-    kinds: [EventKinds.LegacyCalendarEventGiftWrap],
+    kinds: [EventKinds.CalendarEventOuterGiftWrap],
     "#p": participants,
     ...(since && { since }),
     ...(until && { until }),

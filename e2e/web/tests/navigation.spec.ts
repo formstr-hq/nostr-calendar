@@ -38,9 +38,16 @@ test("today uses Monday as the week route start", async ({
   const now = new Date();
   const monday = new Date(now);
   monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  const startOfYear = new Date(monday.getFullYear(), 0, 1);
+  // Calculate calendar days in UTC so a daylight-saving transition cannot
+  // turn a July date into an apparent 23-hour day and shift the route by one.
+  const mondayUtc = Date.UTC(
+    monday.getFullYear(),
+    monday.getMonth(),
+    monday.getDate(),
+  );
+  const startOfYear = Date.UTC(monday.getFullYear(), 0, 1);
   const dayOfYear =
-    Math.floor((monday.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
+    Math.floor((mondayUtc - startOfYear) / 86_400_000) + 1;
 
   await setWeekStart(page, "Monday");
   await navigate(page, "/w/2026/5");

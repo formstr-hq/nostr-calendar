@@ -90,7 +90,7 @@ export async function sendBookingRequest({
     (signingNsec) => ({
       pubkey: bookerPubkey,
       created_at: Math.floor(Date.now() / 1000),
-      kind: EventKinds.BookingRequestRumor,
+      kind: EventKinds.Rumor,
       content: "",
       tags: [
         ["a", schedulingPageRef],
@@ -105,7 +105,7 @@ export async function sendBookingRequest({
     }),
     creatorPubkey,
     EventKinds.BookingRequestGiftWrap,
-    [["k", "1057"]],
+    [["k", EventKinds.BookingRequestOuterGiftWrap.toString()]],
     signer,
   );
   // The gift wrap p-tags its recipient; the worker routes delivery to their
@@ -158,11 +158,11 @@ export function createBookingRequestsSubscription(
         "#p": [pubkey],
         // New kind-1059 gift wraps can carry unrelated NIP-17 traffic. The
         // public classifier tag makes this subscription booking-specific.
-        "#k": [EventKinds.LegacyBookingRequestGiftWrap.toString()],
+        "#k": [EventKinds.BookingRequestOuterGiftWrap.toString()],
         limit: 50,
       },
       {
-        kinds: [EventKinds.LegacyBookingRequestGiftWrap],
+        kinds: [EventKinds.BookingRequestOuterGiftWrap],
         "#p": [pubkey],
         limit: 50,
       },
@@ -247,7 +247,7 @@ export async function sendBookingResponse({
     (signingNsec) => ({
       pubkey: userPublicKey,
       created_at: Math.floor(Date.now() / 1000),
-      kind: EventKinds.BookingResponseRumor,
+      kind: EventKinds.Rumor,
       content: "",
       tags: [...tags, ["signing_nsec", signingNsec]],
     }),
@@ -255,7 +255,7 @@ export async function sendBookingResponse({
     EventKinds.BookingResponseGiftWrap,
     [
       ["status", status],
-      ["k", "1058"],
+      ["k", EventKinds.BookingResponseOuterGiftWrap.toString()],
     ],
   );
   await publishSignedEvent(giftWrap, { onRelayComplete });
@@ -278,11 +278,11 @@ export function createBookingResponsesSubscription(
       {
         kinds: [EventKinds.BookingResponseGiftWrap],
         "#p": pubkeys,
-        "#k": [EventKinds.LegacyBookingResponseGiftWrap.toString()],
+        "#k": [EventKinds.BookingResponseOuterGiftWrap.toString()],
         limit: 50,
       },
       {
-        kinds: [EventKinds.LegacyBookingResponseGiftWrap],
+        kinds: [EventKinds.BookingResponseOuterGiftWrap],
         "#p": pubkeys,
         limit: 50,
       },
@@ -308,10 +308,7 @@ export async function dismissBookingRequestWrap(
     await deleteGiftWrapAsRecipient(giftWrapId, signingNsec);
   } else {
     await publishDeletionEvent({
-      kinds: [
-        EventKinds.BookingRequestGiftWrap,
-        EventKinds.LegacyBookingRequestGiftWrap,
-      ],
+      kinds: [EventKinds.BookingRequestGiftWrap],
       eventIds: [giftWrapId],
     });
   }
@@ -326,10 +323,7 @@ export async function dismissBookingResponseWrap(
     await deleteGiftWrapAsRecipient(giftWrapId, signingNsec);
   } else {
     await publishDeletionEvent({
-      kinds: [
-        EventKinds.BookingResponseGiftWrap,
-        EventKinds.LegacyBookingResponseGiftWrap,
-      ],
+      kinds: [EventKinds.BookingResponseGiftWrap],
       eventIds: [giftWrapId],
     });
   }

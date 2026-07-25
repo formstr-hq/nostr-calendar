@@ -124,7 +124,7 @@ async function createRumor(
   const rumor: Rumor = {
     created_at: now(),
     content: "",
-    kind: 52,
+    kind: EventKinds.CalendarEventRumor,
     tags: [],
     ...event,
     id: "",

@@ -7,7 +7,7 @@ const TEST_DATE = "2027-06-15";
 // Seeded kind-0 profiles give Bob and Carol readable names in the UI.
 // fixme: already failing before the local-relay migration (baseline 2026-07-16,
 // "Bob" list item never appears) — to be fixed separately.
-test.fixme("user adds and removes event participants", async ({
+test("user adds and removes event participants", async ({
   authedPage: page,
 }) => {
   await createEventViaDialog(page, {

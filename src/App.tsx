@@ -85,9 +85,9 @@ function Application() {
     }
   }, [isInitialized, user]);
 
-  // Fetch private events whenever visible calendars change.
-  // This ensures events update when calendars load from network
-  // or when the user toggles calendar visibility.
+  // Fetch private events whenever calendar contents change. This includes an
+  // event reference being added to an existing visible calendar, not just a
+  // calendar being added or removed.
   useEffect(() => {
     if (user && isInitialized && calendarsLoaded) {
       void fetchPrivateEvents();
@@ -99,7 +99,7 @@ function Application() {
     fetchPrivateEvents,
     fetchInvitations,
     isInitialized,
-    calendars.length,
+    calendars,
   ]);
 
   // Refetch the user's own public busy lists whenever the visible month

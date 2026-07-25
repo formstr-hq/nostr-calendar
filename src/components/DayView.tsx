@@ -17,6 +17,7 @@ import { ViewProps } from "./SwipeableView";
 import { useIntl } from "react-intl";
 import { useSettings } from "../stores/settings";
 import { hourLabel, parseHour } from "../utils/calendarSettings";
+import { getOccurrencesInRange } from "../utils/repeatingEventsHelper";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -31,10 +32,21 @@ export function DayView({ events, date }: ViewProps) {
   const workEndHour = parseHour(workingHours.end);
   const dayStart = date.startOf("day").valueOf();
   const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-  const allDayEvents = events.filter(
+  const eventsForDay = events.flatMap((event) => {
+    if (!event.repeat?.rrule) return [event];
+    const duration = event.end - event.begin;
+    return getOccurrencesInRange(event, dayStart, dayEnd).map((begin) => ({
+      ...event,
+      begin,
+      end: begin + duration,
+      occurrenceBegin: begin,
+      occurrenceEnd: begin + duration,
+    }));
+  });
+  const allDayEvents = eventsForDay.filter(
     (e) => e.allDay && e.begin < dayEnd && e.end > dayStart,
   );
-  const timedEvents = events.filter((e) => !e.allDay);
+  const timedEvents = eventsForDay.filter((e) => !e.allDay);
   const dayEvents = layoutDayEvents(
     getEventSegmentsForDay(timedEvents, dayStart),
   );

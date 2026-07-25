@@ -1,4 +1,5 @@
 import type { DataLayer, Event, ObserveHandle } from "@formstr/local-relay";
+import { EventKinds } from "../nostr/kinds";
 
 /**
  * Legacy tombstone enforcement — the secluded backward-compat corner.
@@ -88,7 +89,10 @@ export function withLegacyTombstones(base: DataLayer): DataLayer {
         changed = true;
       } else if (tag[0] === "a" && tag[1] && !deletedCoords.has(tag[1])) {
         // A deletion may only tombstone the author's own coordinates.
-        if (tombstone.kind === 5 && tag[1].split(":")[1] !== tombstone.pubkey) {
+        if (
+          tombstone.kind === EventKinds.DeletionEvent &&
+          tag[1].split(":")[1] !== tombstone.pubkey
+        ) {
           continue;
         }
         deletedCoords.add(tag[1]);
@@ -107,9 +111,17 @@ export function withLegacyTombstones(base: DataLayer): DataLayer {
     deletedCoords = new Set();
     if (!pubkey) return;
     load();
-    sub = base.observe([{ kinds: [5, 84], authors: [pubkey] }], {
-      onEvent: ingest,
-    });
+    sub = base.observe(
+      [
+        {
+          kinds: [EventKinds.DeletionEvent, EventKinds.ParticipantRemoval],
+          authors: [pubkey],
+        },
+      ],
+      {
+        onEvent: ingest,
+      },
+    );
   };
 
   const observe: DataLayer["observe"] = (filters, handlers, options) =>
@@ -129,14 +141,17 @@ export function withLegacyTombstones(base: DataLayer): DataLayer {
     retarget(pubkey);
   };
 
+  const isTombstoneKind = (kind: number) =>
+    kind === EventKinds.DeletionEvent || kind === EventKinds.ParticipantRemoval;
+
   const publishEvent: DataLayer["publishEvent"] = (event) => {
-    if (event.kind === 5 || event.kind === 84) ingest(event);
+    if (isTombstoneKind(event.kind)) ingest(event);
     return base.publishEvent(event);
   };
 
   const publish: DataLayer["publish"] = async (template) => {
     const out = await base.publish(template);
-    if (out.event.kind === 5 || out.event.kind === 84) ingest(out.event);
+    if (isTombstoneKind(out.event.kind)) ingest(out.event);
     return out;
   };
 

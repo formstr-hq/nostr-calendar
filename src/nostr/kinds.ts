@@ -6,15 +6,15 @@ export enum EventKinds {
    * Pre-NIP-17 calendar invitation wraps. Read-only migration support for
    * invitations sent by older Calendar versions.
    */
-  LegacyCalendarEventGiftWrap = 1052,
-  /** @deprecated superseded by CalendarEventInvitationRumor (kind 14) — no longer written, kept for historical reference */
+  CalendarEventOuterGiftWrap = 1052,
+  /** @deprecated superseded by Rumor (kind 14) — no longer written, kept for historical reference */
   CalendarEventRumor = 52,
   /** NIP-17 kind 14 ("chat message") reused as the invitation rumor kind so
    * the invite reads as a real DM in any NIP-17 client. The gift wrap that
    * carries it is additionally tagged `["k", "1052"]` so this app can pick
    * invitation wraps out from other NIP-59-wrapped content sharing the same
    * outer kind. */
-  CalendarEventInvitationRumor = 14,
+  Rumor = 14,
   PrivateRSVPEvent = 32069,
   // Public Events
   PublicCalendarEvent = 31923,
@@ -52,7 +52,8 @@ export enum EventKinds {
    * Pre-NIP-17 booking-request wraps. Read-only migration support for
    * requests sent by older Calendar versions.
    */
-  LegacyBookingRequestGiftWrap = 1057,
+  BookingRequestOuterGiftWrap = 1057,
+  /** @deprecated superseded by Rumor (kind 14) — no longer written, kept for historical reference */
   BookingRequestRumor = 57,
   /** NIP-59/NIP-17 outer gift wrap for newly published booking responses. */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
@@ -61,7 +62,8 @@ export enum EventKinds {
    * Pre-NIP-17 booking-response wraps. Read-only migration support for
    * responses sent by older Calendar versions.
    */
-  LegacyBookingResponseGiftWrap = 1058,
+  BookingResponseOuterGiftWrap = 1058,
+  /** @deprecated superseded by Rumor (kind 14) — no longer written, kept for historical reference */
   BookingResponseRumor = 58,
 
   // Public Busy List (free/busy "I'm unavailable here" entries; one event per

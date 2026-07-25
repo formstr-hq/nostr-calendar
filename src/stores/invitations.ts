@@ -359,10 +359,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           );
         } else {
           void publishDeletionEvent({
-            kinds: [
-              EventKinds.CalendarEventGiftWrap,
-              EventKinds.LegacyCalendarEventGiftWrap,
-            ],
+            kinds: [EventKinds.CalendarEventGiftWrap],
             eventIds: [dismissedInvitation.originalInvitationId],
           });
         }
@@ -401,10 +398,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       );
     } else {
       void publishDeletionEvent({
-        kinds: [
-          EventKinds.CalendarEventGiftWrap,
-          EventKinds.LegacyCalendarEventGiftWrap,
-        ],
+        kinds: [EventKinds.CalendarEventGiftWrap],
         eventIds: [invitation.originalInvitationId],
       });
     }

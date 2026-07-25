@@ -236,11 +236,14 @@ export async function createBookingPage(
   // name via role instead of getByLabel.
   await page.getByRole("textbox", { name: "Title", exact: true }).fill(title);
   await page.getByRole("button", { name: "Create page" }).click();
-  await expect(page.getByText("Scheduling page created!")).toBeVisible({
+
+  // Saving now moves straight to the editor. The success snackbar is
+  // transient, so wait for the durable share link instead.
+  const pageUrlField = page.getByLabel("booking page link");
+  await expect(pageUrlField).toHaveValue(/\/schedule\/naddr.*viewKey=/, {
     timeout: 20_000,
   });
-
-  const pageUrl = await page.getByLabel("booking page link").inputValue();
+  const pageUrl = await pageUrlField.inputValue();
   expect(pageUrl).toContain("/schedule/naddr");
   return pageUrl;
 }
@@ -264,6 +267,15 @@ export async function bookFirstSlot(
   ).toHaveCount(0);
   await page.getByRole("button", { name: "next month" }).click();
 
+  // Advancing the month preserves the selected day-of-month. It can now land
+  // on a weekend (with no default availability), so explicitly choose an
+  // enabled weekday before looking for time slots.
+  const availableDay = page
+    .getByRole("button", { name: /^(Monday|Tuesday|Wednesday|Thursday|Friday),/ })
+    .and(page.locator(":enabled"))
+    .first();
+  await availableDay.click();
+
   // Slot buttons are labelled with their start time, e.g. "09:00 AM".
   const slots = page
     .getByRole("button", { name: /\d{1,2}:\d{2}/ })
@@ -276,8 +288,7 @@ export async function bookFirstSlot(
   await dialog.getByLabel("Meeting title").fill(meetingTitle);
   await createCalendarViaSelect(page, dialog, calendarName);
   await dialog.getByRole("button", { name: "Request Booking" }).click();
-
-  await expect(page.getByText("Booking request sent!")).toBeVisible({
-    timeout: 20_000,
-  });
+  // Submitting redirects directly to the inbox; there is no longer a
+  // success snackbar on the public booking page.
+  await page.waitForURL("**/bookings", { timeout: 20_000 });
 }
