@@ -246,7 +246,7 @@ export async function createBookingPage(
 }
 
 /**
- * As Bob, opens a booking link, picks the first available slot of next week
+ * As Bob, opens a booking link, picks the first available slot of next month
  * (always fully in the future) and submits a booking request.
  */
 export async function bookFirstSlot(
@@ -262,7 +262,7 @@ export async function bookFirstSlot(
   await expect(
     page.getByText("Times are shown in your local timezone"),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "next week" }).click();
+  await page.getByRole("button", { name: "next month" }).click();
 
   // Slot buttons are labelled with their start time, e.g. "09:00 AM".
   const slots = page

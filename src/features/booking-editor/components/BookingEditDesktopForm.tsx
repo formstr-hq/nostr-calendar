@@ -33,7 +33,14 @@ export function BookingEditDesktopForm({
   const intl = useIntl();
 
   return (
-    <Box sx={{ maxWidth: 1240, mx: "auto", p: { md: 3, lg: 4 } }}>
+    <Box
+      sx={{
+        maxWidth: 1240,
+        minHeight: "calc(100dvh - 64px)",
+        mx: "auto",
+        p: { md: 3, lg: 4 },
+      }}
+    >
       <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 1 }}>
         <IconButton onClick={onBack} size="small">
           <ArrowBackIcon />
@@ -55,9 +62,12 @@ export function BookingEditDesktopForm({
           gridTemplateColumns: "minmax(0, 1fr) 380px",
           gap: 3,
           alignItems: "start",
+          minHeight: "calc(100dvh - 185px)",
         }}
       >
-        <Box>
+        <Box
+          sx={{ display: "flex", flexDirection: "column", minHeight: "100%" }}
+        >
           <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 2 }}>
               {intl.formatMessage({ id: "scheduling.basicInformation" })}

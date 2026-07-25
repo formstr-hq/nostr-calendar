@@ -121,7 +121,7 @@ export function InvitationPanel() {
   };
 
   return (
-    <Box p={2} maxWidth={isMobile ? "100%" : 600} mx="auto">
+    <Box p={2} maxWidth={isMobile ? "100%" : 600}>
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <IconButton onClick={() => navigate(-1)}>
           <ArrowBackIcon />

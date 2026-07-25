@@ -57,12 +57,26 @@ export function BookingWeeklyAvailabilitySection({
             display: "flex",
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
-            gap: isMobile ? 0.5 : 2,
+            gap: isMobile ? 1.5 : 2,
             flexWrap: "wrap",
+            minWidth: 0,
+            ...(isMobile && {
+              p: 1.5,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+              bgcolor: "background.paper",
+            }),
           }}
         >
           <FormControlLabel
-            sx={{ minWidth: isMobile ? 100 : 130 }}
+            sx={{
+              minWidth: isMobile ? 0 : 130,
+              m: 0,
+              "& .MuiFormControlLabel-label": {
+                fontWeight: isMobile ? 600 : 400,
+              },
+            }}
             control={
               <Switch
                 checked={weekly[dayIndex].enabled}
@@ -93,7 +107,16 @@ export function BookingWeeklyAvailabilitySection({
               {weekly[dayIndex].ranges.map((range, rangeIndex) => (
                 <Box
                   key={rangeIndex}
-                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  sx={{
+                    display: isMobile ? "grid" : "flex",
+                    gridTemplateColumns: isMobile
+                      ? "minmax(0, 1fr) auto minmax(0, 1fr) auto"
+                      : undefined,
+                    alignItems: "center",
+                    gap: 1,
+                    width: isMobile ? "100%" : undefined,
+                    minWidth: 0,
+                  }}
                 >
                   <TimePicker
                     value={timeStringToDayjs(range.startTime)}
@@ -105,7 +128,7 @@ export function BookingWeeklyAvailabilitySection({
                     slotProps={{
                       textField: {
                         size: "small",
-                        sx: { minWidth: 110, flex: 1 },
+                        sx: { minWidth: isMobile ? 0 : 110, width: "100%" },
                       },
                     }}
                   />
@@ -120,7 +143,7 @@ export function BookingWeeklyAvailabilitySection({
                     slotProps={{
                       textField: {
                         size: "small",
-                        sx: { minWidth: 110, flex: 1 },
+                        sx: { minWidth: isMobile ? 0 : 110, width: "100%" },
                       },
                     }}
                   />

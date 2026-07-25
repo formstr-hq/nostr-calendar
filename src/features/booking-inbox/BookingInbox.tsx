@@ -443,10 +443,20 @@ function BookingDetailPanel({
     <Paper
       variant={embedded ? "elevation" : "outlined"}
       elevation={0}
-      sx={{ p: 3, minHeight: embedded ? 0 : 460 }}
+      sx={{
+        p: embedded ? { xs: 1.5, sm: 3 } : 3,
+        minWidth: 0,
+        overflow: "hidden",
+        minHeight: embedded ? 0 : 460,
+      }}
     >
-      <Stack direction="row" justifyContent="space-between" gap={2}>
-        <Box display="flex" gap={1.5}>
+      <Stack
+        direction={embedded ? { xs: "column", sm: "row" } : "row"}
+        justifyContent="space-between"
+        alignItems={embedded ? { xs: "flex-start", sm: "center" } : "center"}
+        gap={2}
+      >
+        <Box display="flex" gap={1.5} minWidth={0}>
           {loading ? (
             <Skeleton variant="circular" width={48} height={48} />
           ) : (
@@ -454,7 +464,7 @@ function BookingDetailPanel({
               {participant.name?.[0] ?? "?"}
             </Avatar>
           )}
-          <Box>
+          <Box minWidth={0}>
             <Stack direction="row" alignItems="center" gap={0.5}>
               <Typography variant="h6">
                 {participant.name || requester(item).slice(0, 16) + "…"}
@@ -467,7 +477,11 @@ function BookingDetailPanel({
                 />
               )}
             </Stack>
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ overflowWrap: "anywhere" }}
+            >
               {requester(item).slice(0, 16)}…{requester(item).slice(-8)}
             </Typography>
             {verified && (
@@ -540,7 +554,7 @@ function BookingDetailPanel({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <Button
               variant="contained"
               disabled={working || !calendarId}

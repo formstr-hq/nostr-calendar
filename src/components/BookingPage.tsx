@@ -178,16 +178,31 @@ export const BookingPage = () => {
     );
   }, [page]);
 
-  // The desktop booking-link design is month-led: the middle panel is a
-  // calendar and the right panel presents the selected day's times. Fetch the
-  // complete visible month so its availability markers are real, not mocked.
+  // Desktop renders a month, while mobile renders a Sunday–Saturday week.
+  // Fetch the range that is actually visible; a mobile week can cross a month
+  // boundary, so using only selectedDate's month would mark its adjacent-month
+  // days unavailable even when they have open slots.
   const monthStart = useMemo(
     () => selectedDate.startOf("month"),
     [selectedDate],
   );
   const monthEnd = useMemo(() => monthStart.add(1, "month"), [monthStart]);
+  const mobileWeekDays = useMemo(() => {
+    const start = selectedDate.startOf("week");
+    return Array.from({ length: 7 }, (_, index) => start.add(index, "day"));
+  }, [selectedDate]);
+  const { availabilityStart, availabilityEnd } = useMemo(
+    () =>
+      isMobile
+        ? {
+            availabilityStart: mobileWeekDays[0],
+            availabilityEnd: mobileWeekDays[0].add(1, "week"),
+          }
+        : { availabilityStart: monthStart, availabilityEnd: monthEnd },
+    [isMobile, mobileWeekDays, monthStart, monthEnd],
+  );
 
-  // Public busy lists (kind 31926) for the host, scoped to the visible week.
+  // Public busy lists (kind 31926) for the host, scoped to the visible range.
   // Slots overlapping any of these ranges are filtered out by getBookableSlots.
   const fetchOtherBusyLists = useBusyList((s) => s.fetchBusyListsForUser);
   const [hostBusyLists, setHostBusyLists] = useState<IBusyList[]>([]);
@@ -195,8 +210,8 @@ export const BookingPage = () => {
     if (!page) return;
     let cancelled = false;
     const monthKeys = busyListMonthKeysForRange(
-      monthStart.valueOf(),
-      monthEnd.valueOf(),
+      availabilityStart.valueOf(),
+      availabilityEnd.valueOf(),
     );
     fetchOtherBusyLists(page.user, monthKeys)
       .then((lists) => {
@@ -209,7 +224,7 @@ export const BookingPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [page, monthStart, monthEnd, fetchOtherBusyLists]);
+  }, [page, availabilityStart, availabilityEnd, fetchOtherBusyLists]);
 
   const slots = useMemo(() => {
     if (!page) return [];
@@ -217,18 +232,24 @@ export const BookingPage = () => {
       page.durationMode === "fixed" ? (selectedDuration ?? 30) : 30;
     const busyRanges = collectBusyRanges(
       hostBusyLists,
-      monthStart.valueOf(),
-      monthEnd.valueOf(),
+      availabilityStart.valueOf(),
+      availabilityEnd.valueOf(),
     );
     return getDisplaySlots(
       page,
-      monthStart.toDate(),
-      monthEnd.toDate(),
+      availabilityStart.toDate(),
+      availabilityEnd.toDate(),
       durationMin,
       new Date(),
       busyRanges,
     );
-  }, [page, monthStart, monthEnd, selectedDuration, hostBusyLists]);
+  }, [
+    page,
+    availabilityStart,
+    availabilityEnd,
+    selectedDuration,
+    hostBusyLists,
+  ]);
 
   // Group slots by date
   const slotsByDate = useMemo(() => {
@@ -255,15 +276,15 @@ export const BookingPage = () => {
     return days;
   }, [monthStart, monthEnd]);
 
-  const mobileWeekDays = useMemo(() => {
-    const start = selectedDate.startOf("week");
-    return Array.from({ length: 7 }, (_, index) => start.add(index, "day"));
-  }, [selectedDate]);
-
   const selectedDaySlots = slotsByDate[selectedDate.format("YYYY-MM-DD")] ?? [];
 
   const navigateMonth = useCallback((direction: -1 | 1) => {
     setSelectedDate((d) => d.add(direction, "month").startOf("month"));
+    setSelectedSlot(null);
+  }, []);
+
+  const navigateWeek = useCallback((direction: -1 | 1) => {
+    setSelectedDate((d) => d.add(direction, "week"));
     setSelectedSlot(null);
   }, []);
 
@@ -597,19 +618,25 @@ export const BookingPage = () => {
                   }}
                 >
                   <IconButton
-                    onClick={() => navigateMonth(-1)}
+                    onClick={() =>
+                      isMobile ? navigateWeek(-1) : navigateMonth(-1)
+                    }
                     size="small"
-                    aria-label="previous month"
+                    aria-label={isMobile ? "previous week" : "previous month"}
                   >
                     <ArrowBackIcon />
                   </IconButton>
                   <Typography variant="subtitle1" fontWeight={800}>
-                    {selectedDate.format("MMMM YYYY")}
+                    {isMobile
+                      ? `${mobileWeekDays[0].format("MMM D")} – ${mobileWeekDays[6].format("MMM D, YYYY")}`
+                      : selectedDate.format("MMMM YYYY")}
                   </Typography>
                   <IconButton
-                    onClick={() => navigateMonth(1)}
+                    onClick={() =>
+                      isMobile ? navigateWeek(1) : navigateMonth(1)
+                    }
                     size="small"
-                    aria-label="next month"
+                    aria-label={isMobile ? "next week" : "next month"}
                   >
                     <ArrowForwardIcon />
                   </IconButton>

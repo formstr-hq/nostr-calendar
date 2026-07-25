@@ -3,7 +3,7 @@ import { Box, useMediaQuery, useTheme } from "@mui/material";
 import { useNavigate } from "react-router";
 import { Sidebar } from "./ui/Sidebar";
 import { TopBar } from "./ui/TopBar";
-import { MobileTabBar } from "./ui/MobileTabBar";
+import { MOBILE_TAB_BAR_HEIGHT, MobileTabBar } from "./ui/MobileTabBar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { SidebarContent } from "./SidebarContent";
 import { UserMenu } from "./UserMenu";
@@ -38,7 +38,7 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
   });
 
   return (
-    <Box sx={{ display: "flex" }}>
+    <Box sx={{ display: "flex", minHeight: "100dvh" }}>
       {!isMobile && (
         <Sidebar onNewEvent={openNewEvent} onImportEvent={onImportEvent} />
       )}
@@ -63,7 +63,18 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
           {...topBar}
         />
 
-        <Box component="main" sx={{ flex: 1 }}>
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            pb: isMobile
+              ? `calc(${MOBILE_TAB_BAR_HEIGHT}px + var(--safe-area-bottom))`
+              : undefined,
+          }}
+        >
           {children}
         </Box>
 

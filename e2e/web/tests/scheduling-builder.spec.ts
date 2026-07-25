@@ -81,8 +81,8 @@ test("public booking page offers the configured durations", async ({
   await expect(bob.getByRole("button", { name: "30 min" })).toBeVisible();
   await bob.getByRole("button", { name: "45 min" }).click();
 
-  // Next week always has slots (this week may be partially in the past).
-  await bob.getByRole("button", { name: "next week" }).click();
+  // Next month always has slots (this month may be partially in the past).
+  await bob.getByRole("button", { name: "next month" }).click();
   const slots = bob
     .getByRole("button", { name: /\d{1,2}:\d{2}/ })
     .and(bob.locator(":enabled"));
@@ -118,9 +118,25 @@ test("blocked dates remove that day's slots from the public page", async ({
 
   const shareUrl = await createAndGetShareUrl(page);
 
+  // The compact booking calendar moves in weekly increments.
+  await bob.setViewportSize({ width: 393, height: 851 });
   await navigate(bob, shareUrl);
   await expect(bob.getByText(title)).toBeVisible({ timeout: 20_000 });
   await bob.getByRole("button", { name: "next week" }).click();
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dateKey = (date: Date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const nextWeekMonday = new Date(now);
+  nextWeekMonday.setDate(now.getDate() + (7 - now.getDay()) + 1);
+  const availableDay = bob.locator(
+    `[data-testid="booking-day-column"][data-date="${dateKey(nextWeekMonday)}"]`,
+  );
+
+  // Availability must cover the whole mobile week, including the days that
+  // fall in the adjacent month.
+  await expect(availableDay).toBeEnabled({ timeout: 15_000 });
+  await availableDay.click();
 
   // Other weekdays have slots…
   const slots = bob
@@ -128,19 +144,13 @@ test("blocked dates remove that day's slots from the public page", async ({
     .and(bob.locator(":enabled"));
   await expect(slots.first()).toBeVisible({ timeout: 15_000 });
 
-  // …but every slot in the blocked day's column renders disabled
-  // (struck-through), so nothing there can be booked.
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const blockedDateKey = `${blocked.getFullYear()}-${pad(blocked.getMonth() + 1)}-${pad(blocked.getDate())}`;
+  // …but the blocked date remains unavailable.
+  const blockedDateKey = dateKey(blocked);
   const blockedColumn = bob.locator(
     `[data-testid="booking-day-column"][data-date="${blockedDateKey}"]`,
   );
   await expect(blockedColumn).toBeVisible();
-  const blockedColumnSlots = blockedColumn.getByRole("button", {
-    name: /\d{1,2}:\d{2}/,
-  });
-  expect(await blockedColumnSlots.count()).toBeGreaterThan(0);
-  await expect(blockedColumnSlots.and(bob.locator(":enabled"))).toHaveCount(0);
+  await expect(blockedColumn).toBeDisabled();
 });
 
 test("an attached intake form persists across edit", async ({

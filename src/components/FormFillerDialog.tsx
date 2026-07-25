@@ -557,6 +557,13 @@ export function FormFillerDialog({
           <Button onClick={onClose} disabled={submitting} color="inherit">
             {intl.formatMessage({ id: "form.cancel" })}
           </Button>
+          <Button
+            onClick={() => onSubmitted(null)}
+            disabled={submitting}
+            color="inherit"
+          >
+            {intl.formatMessage({ id: "form.skip" })}
+          </Button>
           {alreadySubmitted && status.event && onUseExistingSubmission && (
             <Button
               variant="contained"

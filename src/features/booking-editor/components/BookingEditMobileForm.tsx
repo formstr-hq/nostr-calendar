@@ -98,7 +98,17 @@ export function BookingEditMobileForm({
       : intl.formatMessage({ id: "scheduling.detailsEmpty" });
 
   return (
-    <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box
+      sx={{
+        p: 2,
+        display: "flex",
+        flex: 1,
+        flexDirection: "column",
+        gap: 2,
+        minHeight: "100vh",
+        minWidth: 0,
+      }}
+    >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <IconButton onClick={onBack} size="small">
           <ArrowBackIcon />

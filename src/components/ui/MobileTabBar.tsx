@@ -50,8 +50,10 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
     <Box
       component="nav"
       sx={{
-        position: "sticky",
+        position: "fixed",
         bottom: 0,
+        left: 0,
+        right: 0,
         display: "flex",
         minHeight: MOBILE_TAB_BAR_HEIGHT,
         pb: "var(--safe-area-bottom)",

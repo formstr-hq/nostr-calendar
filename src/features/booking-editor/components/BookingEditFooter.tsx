@@ -31,7 +31,7 @@ export function BookingEditFooter({
   const intl = useIntl();
 
   return (
-    <>
+    <Box sx={{ mt: "auto" }}>
       <Divider sx={{ my: 2 }} />
       <Box
         sx={{
@@ -39,7 +39,6 @@ export function BookingEditFooter({
           justifyContent: "space-between",
           alignItems: "center",
           gap: 1,
-          pb: 4,
           flexWrap: "wrap",
         }}
       >
@@ -65,6 +64,6 @@ export function BookingEditFooter({
           </Button>
         )}
       </Box>
-    </>
+    </Box>
   );
 }
