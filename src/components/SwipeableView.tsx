@@ -8,6 +8,8 @@ import { useLayout } from "../hooks/useLayout";
 
 const SWIPE_THRESHOLD = 50;
 
+type TouchStart = { x: number; y: number };
+
 export interface ViewProps {
   events: ICalendarEvent[];
   date: Dayjs;
@@ -35,6 +37,7 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
   const { layout } = useLayout();
   const directionRef = useRef(0);
   const isSwiping = useRef(false);
+  const touchStartRef = useRef<TouchStart | null>(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -56,12 +59,55 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
     }
   };
 
+  // Some mobile browsers let a native button own the pointer sequence before
+  // Framer Motion receives a drag end. The day view uses buttons for its hour
+  // cells, whereas the week view uses plain elements. Keep the drag handler
+  // for the normal path and provide an equivalent touch fallback for controls
+  // nested inside a view.
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    touchStartRef.current = touch
+      ? { x: touch.clientX, y: touch.clientY }
+      : null;
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || isSwiping.current) return;
+
+    const offsetX = touch.clientX - start.x;
+    const offsetY = touch.clientY - start.y;
+    if (
+      Math.abs(offsetX) < SWIPE_THRESHOLD ||
+      Math.abs(offsetX) < Math.abs(offsetY)
+    ) {
+      return;
+    }
+
+    isSwiping.current = true;
+    if (offsetX < 0) {
+      directionRef.current = 1;
+      setDate(date.add(1, layout), layout);
+    } else {
+      directionRef.current = -1;
+      setDate(date.subtract(1, layout), layout);
+    }
+  };
+
   const dateKey = date.format("YYYY-MM-DD");
   const direction = directionRef.current;
   isSwiping.current = false;
 
   return (
-    <Box overflow="hidden" width="100%" position="relative">
+    <Box
+      overflow="hidden"
+      width="100%"
+      position="relative"
+      onTouchStartCapture={handleTouchStart}
+      onTouchEndCapture={handleTouchEnd}
+    >
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={dateKey}
@@ -79,7 +125,14 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
             duration: 0.25,
             ease: "easeOut",
           }}
-          style={{ width: "100%" }}
+          style={{
+            width: "100%",
+            // Let the page continue to scroll vertically while reserving
+            // horizontal gestures for Framer Motion. This is especially
+            // important for the day grid, whose time slots are buttons and
+            // would otherwise keep the browser's default touch handling.
+            touchAction: "pan-y",
+          }}
         >
           <View events={events} date={date} />
         </motion.div>

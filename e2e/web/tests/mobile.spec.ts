@@ -25,6 +25,40 @@ test("mobile day view hides desktop navigation arrows", async ({
   await expect(page).toHaveURL(/\/m\/2026\/7$/);
 });
 
+test("mobile day view navigates to the next day on a left swipe", async ({
+  authedPage: page,
+}) => {
+  await navigate(page, "/d/2026/7/20");
+
+  await page
+    .getByTestId("day-hour-cell")
+    .first()
+    .evaluate((cell) => {
+      const touch = (x: number) =>
+        new Touch({
+          identifier: 1,
+          target: cell,
+          clientX: x,
+          clientY: 200,
+        });
+      cell.dispatchEvent(
+        new TouchEvent("touchstart", {
+          bubbles: true,
+          touches: [touch(300)],
+          changedTouches: [touch(300)],
+        }),
+      );
+      cell.dispatchEvent(
+        new TouchEvent("touchend", {
+          bubbles: true,
+          changedTouches: [touch(100)],
+        }),
+      );
+    });
+
+  await expect(page).toHaveURL(/\/d\/2026\/7\/21$/);
+});
+
 test("mobile calendars bottom sheet opens and closes", async ({
   authedPage: page,
 }) => {

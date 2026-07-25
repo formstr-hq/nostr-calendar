@@ -281,7 +281,7 @@ Template for the inputs (copy into the session prompt):
   - Old pending invitations (rumor kind `52`, no `signing_nsec`) still decode fine — nothing
     validates rumor kind, and `signingNsec`/`message` are optional — but they can't use the new
     NIP-09 deletion path; the tombstone fallback still covers them.
-  - add this pattern to booking links flow in the master plan as nostr notes.
+  - add this pattern to booking links flow in the master plan as nostr notes. do not implement it there. just add it in the master plan nostr notes
 
 ### F-BOOK-EDIT — Booking page editor | F-BOOK-INBOX — Bookings inbox | F-BOOK-PUBLIC — Public booking link
 
