@@ -266,31 +266,22 @@ Template for the inputs (copy into the session prompt):
 ### F-NOTIF — Notifications / invitations
 
 - **Current:** `InvitationPanel.tsx`, `NotificationEventPage.tsx`, `stores/invitations.ts`,
-  `stores/notifications.ts`, gift-wrap flow (kind 1052, rumor kind 14 as of F-EVENT-EDIT — see
-  below), participant-removal kind 84.
-- **Design:** no dedicated screen; bell in TopBar + Alerts tab in MobileTabBar.
+  `stores/notifications.ts`, gift-wrap flow (kind 1059, rumor kind 14 as of F-EVENT-EDIT — see below)
+- **Design:** no dedicated screen; nothing much required. The report event should be warning color.
 - **E2E:** `invitations` (`invitation-card`).
-- **Nostr layer inputs:** _(fill in — **the big one: gift-wrap kind 1052 → NIP-59-standard 1059?**
-  Needs dual-read (accept both) + decide write cutoff, since old app versions won't see 1059
-  wraps. Kind 84 removal stays per NIP-52E?)_
-- **Notes carried over from F-EVENT-EDIT's invitation-flow rework** (per its nostr layer inputs
+- **Nostr layer inputs:**
+  Notes carried over from F-EVENT-EDIT's invitation-flow rework\*\* (per its nostr layer inputs
   item 4 — read before scoping this phase):
-  - The invitation rumor is now kind `14` (NIP-17 chat message) with real content (`"{sender} has
-invited you to the {title} on {date}"`), not empty-content kind `52`. `getDetailsFromGiftWrap`
-    returns this as `message`; `IInvitation`/`InvitationPanel` don't surface it yet — F-NOTIF should
-    decide whether to show it (mockups have no invitation-card spec either way).
+  - The invitation rumor is now kind `14` (NIP-17 chat message)
   - The gift wrap gained a `["signing_nsec", ...]` rumor tag (the ephemeral key it's signed with)
-    and a `["k", "1052"]` wrap tag. `dismissInvitation`/`reportInvitation` now also publish a NIP-09
-    kind-5 deletion signed with that key when present (see `deleteGiftWrapAsRecipient` in
-    `nostr/events.ts`) — this is additive to, not a replacement for, the kind-84 notice, since
-    `InvitationWorker.java` (Android background worker) keys its own-notification suppression off
-    kind 84 and never decrypts anything, so it needed no changes and must keep receiving kind 84.
-  - If this phase moves the wrap kind to 1059, keep the `k=1052` tag semantics (it identifies the
-    _invitation_ content, independent of the wrap's own kind) so old and new wraps stay
-    distinguishable from booking/DM traffic sharing the same outer kind.
+    and a `["k", "1052"]` wrap tag. `dismissInvitation` now also publish a NIP-09 kind-5 deletion signed with that key when present (see `deleteGiftWrapAsRecipient` in `nostr/events.ts`) — this is a replacement for, the kind-84 notice. the `InvitationWorker.java` (Android background worker) will need to adopt this change as well.
+  - make sure the gift wrap published is of the correct timestamp as then the notifications will ont be delivered correctly
+  - if the signing nsec is not present, then nevertheless publish a nip 09 deletion event signed by the author. Also treat this as a tombstone event. So fetch all nip 09 deletions on app init and filter out those events as well. before doing that, check if local relay is already handling that. the code is in common-packages.
+  - Also fetch the old kind i.e. 1052 to maintain backwards compatibilities
   - Old pending invitations (rumor kind `52`, no `signing_nsec`) still decode fine — nothing
     validates rumor kind, and `signingNsec`/`message` are optional — but they can't use the new
-    NIP-09 deletion path; the kind-84 fallback still covers them.
+    NIP-09 deletion path; the tombstone fallback still covers them.
+  - add this pattern to booking links flow in the master plan as nostr notes.
 
 ### F-BOOK-EDIT — Booking page editor | F-BOOK-INBOX — Bookings inbox | F-BOOK-PUBLIC — Public booking link
 

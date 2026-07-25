@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AndroidSignerAppInfo } from "@formstr/signer";
 import {
   Alert,
   Box,
@@ -14,12 +15,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import PhonelinkLockOutlinedIcon from "@mui/icons-material/PhonelinkLockOutlined";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { signerManager } from "../common/signer";
 import { useUser } from "../stores/user";
 import { useIntl } from "react-intl";
-import { isNative } from "../utils/platform";
+import { isAndroidNative, isNative } from "../utils/platform";
 import { AuthOption } from "../features/auth/components/AuthOption";
 import { CreateAccountFlow } from "../features/auth/components/CreateAccountFlow";
 import { NativeNsecPanel } from "../features/auth/components/NativeNsecPanel";
@@ -40,6 +42,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const [screen, setScreen] = useState<"list" | "create">("list");
   const [error, setError] = useState("");
   const [nip07Loading, setNip07Loading] = useState(false);
+  const [nip55Apps, setNip55Apps] = useState<AndroidSignerAppInfo[]>([]);
+  const [nip55LoadingPackage, setNip55LoadingPackage] = useState<string>();
 
   useEffect(() => {
     if (!open) {
@@ -49,6 +53,24 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       return;
     }
     if (signerManager.getStoredNcryptsec()) setPanel("ncryptsec");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isAndroidNative()) return;
+
+    let cancelled = false;
+    void signerManager.listNip55SignerApps().then(
+      (apps) => {
+        if (!cancelled) setNip55Apps(apps);
+      },
+      () => {
+        if (!cancelled) setNip55Apps([]);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   const toggle = (next: Panel) => {
@@ -67,6 +89,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       setError(intl.formatMessage({ id: "login.loginFailed" }));
     } finally {
       setNip07Loading(false);
+    }
+  };
+  const loginNip55 = async (packageName: string) => {
+    setNip55LoadingPackage(packageName);
+    setError("");
+    try {
+      await signerManager.loginWithNip55(packageName);
+      success();
+    } catch {
+      setError(intl.formatMessage({ id: "login.couldNotLogin" }));
+    } finally {
+      setNip55LoadingPackage(undefined);
     }
   };
   const success = () => {
@@ -163,6 +197,35 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
                 disabled={nip07Loading}
               />
             )}
+            {isAndroidNative() &&
+              nip55Apps.map((app) => (
+                <AuthOption
+                  key={app.packageName}
+                  icon={
+                    app.iconUrl ? (
+                      <Box
+                        component="img"
+                        src={app.iconUrl}
+                        alt=""
+                        sx={{ width: 24, height: 24, borderRadius: 0.5 }}
+                      />
+                    ) : (
+                      <PhonelinkLockOutlinedIcon />
+                    )
+                  }
+                  title={intl.formatMessage(
+                    { id: "login.signInWithApp" },
+                    { name: app.name },
+                  )}
+                  description={intl.formatMessage({
+                    id: "login.nip55AppDescription",
+                  })}
+                  onClick={() => void loginNip55(app.packageName)}
+                  loading={nip55LoadingPackage === app.packageName}
+                  disabled={nip55LoadingPackage !== undefined}
+                  testId={`login-btn-nip55-${app.packageName}`}
+                />
+              ))}
             {isNative && (
               <Box>
                 <AuthOption

@@ -323,6 +323,8 @@ const dictionary: NestedObject = {
       chooseLoginMethod: "Choose your preferred login method",
       signInWithExtension: "Sign in with Nostr Extension (NIP-07)",
       signInWithNsec: "Sign in with nsec",
+      signInWithApp: "Sign in with {name}",
+      nip55AppDescription: "Sign with an external Android signer (NIP-55)",
       connectRemoteSigner: "Connect with Remote Signer (NIP-46)",
       connectedToRemoteSigner: "Connected to Remote Signer",
       enterNsec: "Please enter an nsec.",
@@ -825,6 +827,9 @@ const dictionary: NestedObject = {
       chooseLoginMethod: "Wählen Sie Ihre bevorzugte Anmeldemethode",
       signInWithExtension: "Mit Nostr-Erweiterung anmelden (NIP-07)",
       signInWithNsec: "Mit nsec anmelden",
+      signInWithApp: "Mit {name} anmelden",
+      nip55AppDescription:
+        "Mit einer externen Android-Signer-App anmelden (NIP-55)",
       connectRemoteSigner: "Mit Remote-Signer verbinden (NIP-46)",
       connectedToRemoteSigner: "Mit Remote-Signer verbunden",
       enterNsec: "Bitte geben Sie ein nsec ein.",

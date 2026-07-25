@@ -3,6 +3,7 @@ import {
   LocalSigner,
   hexToBytes,
   type ActiveSigner,
+  type AndroidSignerAppInfo,
 } from "@formstr/signer";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
 import { nip19, SimplePool } from "nostr-tools";
@@ -337,6 +338,10 @@ class SignerManager {
     const account = await packageSigner.loginWithAndroidSigner({ packageName });
     await this.fetchAndCacheUser(account.pubkey);
     this.notify();
+  }
+
+  async listNip55SignerApps(): Promise<AndroidSignerAppInfo[]> {
+    return packageSigner.listAndroidSignerApps();
   }
 
   async loginWithNsec(nsec: string): Promise<void> {
