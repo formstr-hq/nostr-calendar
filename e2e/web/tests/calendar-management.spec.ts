@@ -16,7 +16,9 @@ test("user creates, renames and deletes a calendar from the sidebar", async ({
 
   await openSidebar(page);
   // The add button next to the "Calendars" heading.
-  await page.getByRole("button", { name: "create calendar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "create calendar", exact: true })
+    .click();
 
   const createDialog = page.getByRole("dialog", { name: "New Calendar" });
   await createDialog.getByLabel("Calendar Name").fill(name);
@@ -37,13 +39,56 @@ test("user creates, renames and deletes a calendar from the sidebar", async ({
   ).toBeVisible();
 
   // Delete it — confirmation is inline in the same dialog.
-  await page.getByTestId("calendar-row").filter({ hasText: renamed }).getByText(renamed).click();
+  await page
+    .getByTestId("calendar-row")
+    .filter({ hasText: renamed })
+    .getByText(renamed)
+    .click();
   await editDialog.getByRole("button", { name: "Delete", exact: true }).click();
   await editDialog.getByRole("button", { name: "Really Delete?" }).click();
   await expect(editDialog).not.toBeVisible();
   await expect(
     page.getByTestId("calendar-row").filter({ hasText: renamed }),
   ).not.toBeVisible();
+});
+
+test("user manages calendar colors from settings", async ({
+  authedPage: page,
+}) => {
+  const name = uniqueName("Settings cal");
+  const renamed = `${name} updated`;
+
+  await page.goto("/settings/calendars");
+  await page.getByRole("button", { name: "New Calendar" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "New Calendar" });
+  await createDialog.getByLabel("Calendar Name").fill(name);
+  await createDialog.locator('[data-color="#0b8043"]').click();
+  await createDialog.getByRole("button", { name: "Create" }).click();
+
+  const row = page
+    .getByTestId("calendar-settings-row")
+    .filter({ hasText: name });
+  await expect(row).toContainText("#0B8043");
+
+  await row.getByRole("button", { name: `Edit Calendar: ${name}` }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit Calendar" });
+  await editDialog.getByLabel("Calendar Name").fill(renamed);
+  await editDialog.locator('[data-color="#8e24aa"]').click();
+  await editDialog.getByRole("button", { name: "Save", exact: true }).click();
+
+  const renamedRow = page
+    .getByTestId("calendar-settings-row")
+    .filter({ hasText: renamed });
+  await expect(renamedRow).toContainText("#8E24AA");
+
+  await renamedRow
+    .getByRole("button", { name: `Edit Calendar: ${renamed}` })
+    .click();
+  await editDialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await editDialog.getByRole("button", { name: "Really Delete?" }).click();
+  await expect(editDialog).not.toBeVisible();
+  await expect(renamedRow).not.toBeVisible();
 });
 
 test("toggling calendar visibility hides its events on the grid", async ({
@@ -78,7 +123,11 @@ test("user moves an event to a different calendar", async ({
   const title = uniqueName("Movable event");
   const date = futureDate(15);
 
-  await createEventViaDialog(page, { date, title, calendarName: firstCalendar });
+  await createEventViaDialog(page, {
+    date,
+    title,
+    calendarName: firstCalendar,
+  });
 
   // Create the destination calendar via any calendar select — reuse the event
   // editor's selector, then cancel out of the editor.

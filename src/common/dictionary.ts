@@ -250,6 +250,8 @@ const dictionary: NestedObject = {
       deleteWarning:
         "Deleting this calendar will remove all your events from it and they may be lost forever. Are you sure?",
       reallyDelete: "Really Delete?",
+      actionFailed:
+        "The calendar could not be saved to your relays. Please try again.",
     },
     sidebar: {
       calendars: "Calendars",
@@ -393,7 +395,8 @@ const dictionary: NestedObject = {
       relays: "Relays & sync",
       generalDescription: "Date, time and default behaviours.",
       calendarsDescription:
-        "Calendar-specific settings will be available in a later phase.",
+        "Create calendars and choose the colors used for their events.",
+      calendarColors: "Calendars",
       relaysDescription:
         "Choose where your calendar data is read, synced and published.",
       basics: "Basics",

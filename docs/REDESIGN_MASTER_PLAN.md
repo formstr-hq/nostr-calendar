@@ -292,32 +292,16 @@ Template for the inputs (copy into the session prompt):
 - **Design:** `14`–`19` (editor w/ live preview, Incoming/Outgoing inbox, Calendly-style public
   page; mobile variants). Treat as three separately schedulable sub-flows.
 - **E2E:** `booking`, `scheduling-builder` (`booking-request-card`).
-- **Nostr layer inputs:** _(fill in per sub-flow — booking kinds stay custom per the NIP proposal?
-  same 1052→1059 gift-wrap question applies to 1057/1058. When this is scoped, follow F-NOTIF's
-  deletion pattern: embed the outer wrap signing nsec inside the encrypted rumor, delete dismissed
-  wraps with an ephemeral-key NIP-09 kind-5 deletion, publish a signer-owned tombstone fallback
-  when the key is unavailable, and rely on local-relay tombstone filtering. Do not implement this
-  booking work as part of F-NOTIF.)_
-
-### F-EVENT-LINK — Public event landing page
-
-- **Current:** `ViewEventPage.tsx` (public naddr view). Design shows banner, going/maybe counts,
-  guest RSVP, add-to-calendar (Formstr/.ics/Google), "Message host" — **most of this is
-  in the not-yet bucket; scope strictly per session instructions.**
-- **Design:** `20` `21`.
-- **E2E:** `ics`, parts of `rsvp`.
-- **Nostr layer inputs:** _(fill in — guest/unauthenticated RSVP? banner image tag (fixes the
-  image tag properly)? counts require fetching all RSVPs)_
+- **Nostr layer inputs:** _same 1052→1059 gift-wrap question applies to 1057/1058 with outer k tags as 1057 and 1058. When this is scoped, follow F-NOTIF's deletion pattern: embed the outer wrap signing nsec inside the encrypted rumor, delete dismissed wraps with an ephemeral-key NIP-09 kind-5 deletion, publish a signer-owned tombstone fallback when the key is unavailable, and rely on local-relay tombstone filtering. The notification layer will also need to support it_
 
 ### F-CAL-MGMT — Calendar list management
 
 - **Current:** `stores/calendarLists.ts`, `common/calendarList.ts` (kind 32123 self-encrypted),
   sidebar calendar toggles.
-- **Design:** sidebar in `01`+, calendar color editors in `07`.
+- **Design:** sidebar in `01`+, calendar color editors in `07`. the calendar color editors go into the calendar settings section. The delete button in the modal is a bit non responsive. while the deletion is ongoing, the delete button should show a loader.
 - **E2E:** `calendar-management` (`calendar-row`, `calendar-list-select`,
   `calendar-visibility-checkbox`).
-- **Nostr layer inputs:** _(fill in — stay on 32123 per NIP-52E vs also publish public NIP-52
-  31924 calendars for interop? calendar color as a tag?)_
+- **Nostr layer inputs:** _no change required_
 
 ---
 
