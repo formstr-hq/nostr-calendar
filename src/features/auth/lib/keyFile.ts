@@ -1,6 +1,13 @@
+import { saveKeyBackup } from "../../../plugins/keyBackup";
+import { isAndroidNative } from "../../../utils/platform";
+
 const KEY_FILE_NAME = "key.txt";
 
-export function downloadNcryptsec(ncryptsec: string) {
+export function downloadNcryptsec(ncryptsec: string): Promise<void> {
+  if (isAndroidNative()) {
+    return saveKeyBackup(ncryptsec).then(() => undefined);
+  }
+
   const url = URL.createObjectURL(
     new Blob([ncryptsec], { type: "text/plain" }),
   );
@@ -9,6 +16,7 @@ export function downloadNcryptsec(ncryptsec: string) {
   link.download = KEY_FILE_NAME;
   link.click();
   URL.revokeObjectURL(url);
+  return Promise.resolve();
 }
 
 export async function readNcryptsecFile(file: File): Promise<string> {

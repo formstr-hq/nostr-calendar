@@ -33,6 +33,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppReadyPlugin.class);
         registerPlugin(DeviceCalendarPlugin.class);
+        registerPlugin(KeyBackupPlugin.class);
         registerPlugin(NotificationSchedulerPlugin.class);
         super.onCreate(savedInstanceState);
 

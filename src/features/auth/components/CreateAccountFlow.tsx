@@ -17,6 +17,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { signerManager } from "../../../common/signer";
 import { downloadNcryptsec } from "../lib/keyFile";
+import { copyKeyBackup } from "../../../plugins/keyBackup";
 import { useIntl } from "react-intl";
 
 export function CreateAccountFlow({
@@ -68,12 +69,28 @@ export function CreateAccountFlow({
     }
   };
   const copy = async () => {
-    await navigator.clipboard.writeText(ncryptsec);
-    setCopied(true);
+    try {
+      await copyKeyBackup(ncryptsec);
+      setCopied(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : intl.formatMessage({ id: "login.createAccountFailed" }),
+      );
+    }
   };
-  const download = () => {
-    downloadNcryptsec(ncryptsec);
-    setDownloaded(true);
+  const download = async () => {
+    try {
+      await downloadNcryptsec(ncryptsec);
+      setDownloaded(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : intl.formatMessage({ id: "login.createAccountFailed" }),
+      );
+    }
   };
 
   if (step === "backup")
@@ -87,6 +104,7 @@ export function CreateAccountFlow({
             <Alert severity="warning">
               {intl.formatMessage({ id: "login.backupKeyWarning" })}
             </Alert>
+            {error && <Alert severity="error">{error}</Alert>}
             <Box
               sx={{
                 bgcolor: "action.hover",
@@ -116,7 +134,7 @@ export function CreateAccountFlow({
           <Button
             variant="outlined"
             startIcon={<DownloadOutlinedIcon />}
-            onClick={download}
+            onClick={() => void download()}
             data-testid="login-download-key"
           >
             {intl.formatMessage({ id: "login.downloadKey" })}
