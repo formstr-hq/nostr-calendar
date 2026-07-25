@@ -72,6 +72,7 @@ export function BookingWeeklyAvailabilitySection({
           <FormControlLabel
             sx={{
               minWidth: isMobile ? 0 : 130,
+              gap: 1,
               m: 0,
               "& .MuiFormControlLabel-label": {
                 fontWeight: isMobile ? 600 : 400,

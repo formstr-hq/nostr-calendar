@@ -184,19 +184,6 @@ export function RespondPanel({ event }: { event: ICalendarEvent }) {
             >
               {intl.formatMessage({ id: "message.modeSelection_loginButton" })}
             </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={creatingGuest}
-              onClick={handleContinueAsGuest}
-              startIcon={
-                creatingGuest ? (
-                  <CircularProgress size={14} color="inherit" />
-                ) : undefined
-              }
-            >
-              {intl.formatMessage({ id: "message.modeSelection_guestButton" })}
-            </Button>
           </Box>
         </Stack>
         <Snackbar

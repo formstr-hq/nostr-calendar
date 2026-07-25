@@ -69,9 +69,6 @@ test("logged-out visitor sees a login/guest prompt on a shared event link", asyn
   await expect(
     page.getByRole("button", { name: "Login with Nostr" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Continue as Guest" }),
-  ).toBeVisible();
 
   await context.close();
 });

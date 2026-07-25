@@ -1,7 +1,7 @@
 import { Box, Button, Divider } from "@mui/material";
 import { useIntl } from "react-intl";
-import { RelayDots } from "../../../components/RelayDots";
-import type { RelayStatusMap } from "../../../utils/types";
+import { PublishActivityPanel } from "../../../components/PublishActivityPanel";
+import type { PublishStepState } from "../../../stores/publishActivity";
 
 interface BookingEditFooterProps {
   isEditMode: boolean;
@@ -10,10 +10,9 @@ interface BookingEditFooterProps {
   canSave: boolean;
   onCancel: () => void;
   onSave: () => void;
-  relayDotsLabel: string;
-  publishingRelays: string[];
-  relayStatus: RelayStatusMap;
-  isPublishing: boolean;
+  steps: PublishStepState[];
+  hasRelayErrors: boolean;
+  onDetailsClick: () => void;
 }
 
 export function BookingEditFooter({
@@ -23,10 +22,9 @@ export function BookingEditFooter({
   canSave,
   onCancel,
   onSave,
-  relayDotsLabel,
-  publishingRelays,
-  relayStatus,
-  isPublishing,
+  steps,
+  hasRelayErrors,
+  onDetailsClick,
 }: BookingEditFooterProps) {
   const intl = useIntl();
 
@@ -42,11 +40,16 @@ export function BookingEditFooter({
           flexWrap: "wrap",
         }}
       >
-        {isPublishing && (
-          <RelayDots
-            relays={publishingRelays}
-            relayStatus={relayStatus}
-            label={relayDotsLabel}
+        {steps.length > 0 && (
+          <PublishActivityPanel
+            steps={steps}
+            showCompleted
+            onDetailsClick={hasRelayErrors ? onDetailsClick : undefined}
+            detailsLabel={
+              hasRelayErrors
+                ? intl.formatMessage({ id: "event.relayDetails" })
+                : undefined
+            }
           />
         )}
         <Button color="inherit" onClick={onCancel}>

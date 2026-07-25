@@ -210,10 +210,9 @@ export function BookingEditMobileForm({
         canSave={canSave}
         onCancel={onBack}
         onSave={save.handleSave}
-        relayDotsLabel={save.relayDotsLabel}
-        publishingRelays={save.publishingRelays}
-        relayStatus={save.relayStatus}
-        isPublishing={save.isPublishing}
+        steps={save.steps}
+        hasRelayErrors={save.hasRelayErrors}
+        onDetailsClick={() => save.setRelayDetailsOpen(true)}
       />
 
       <BottomSheet open={openSheet === "basics"} onClose={closeSheet}>

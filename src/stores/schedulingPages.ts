@@ -82,7 +82,12 @@ function getOwnSchedulingPageKeyIndex(): Map<string, string> {
 
 async function publishSchedulingPage(
   page: ISchedulingPage,
-  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  callbacks?: {
+    onRelayComplete?: (url: string, success: boolean) => void;
+    onKeyRelayComplete?: (url: string, success: boolean) => void;
+    onKeyEventReady?: (event: Event) => void;
+    deferKeyPublish?: boolean;
+  },
 ): Promise<{
   event: Event;
   viewKey: string;
@@ -134,6 +139,9 @@ async function publishSchedulingPage(
     await publishSchedulingPageKey({
       dTag: page.id,
       viewKeyNsec,
+      onRelayComplete: callbacks?.onKeyRelayComplete,
+      onEventReady: callbacks?.onKeyEventReady,
+      deferPublish: callbacks?.deferKeyPublish,
     });
     setOwnSchedulingPageKey(page.id, viewKeyNsec);
   } catch (err) {
@@ -189,11 +197,21 @@ interface SchedulingPagesState {
   fetchPages: () => Promise<void>;
   createPage: (
     page: Omit<ISchedulingPage, "id" | "eventId" | "user" | "createdAt">,
-    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+    callbacks?: {
+      onRelayComplete?: (url: string, success: boolean) => void;
+      onKeyRelayComplete?: (url: string, success: boolean) => void;
+      onKeyEventReady?: (event: Event) => void;
+      deferKeyPublish?: boolean;
+    },
   ) => Promise<ISchedulingPage>;
   updatePage: (
     page: ISchedulingPage,
-    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+    callbacks?: {
+      onRelayComplete?: (url: string, success: boolean) => void;
+      onKeyRelayComplete?: (url: string, success: boolean) => void;
+      onKeyEventReady?: (event: Event) => void;
+      deferKeyPublish?: boolean;
+    },
   ) => Promise<ISchedulingPage>;
   deletePage: (pageId: string) => Promise<void>;
   getPageById: (pageId: string) => ISchedulingPage | undefined;

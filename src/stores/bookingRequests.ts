@@ -70,6 +70,13 @@ let incomingSub: StandingSubscription | undefined;
 let outgoingSub: StandingSubscription | undefined;
 let expiryTimer: ReturnType<typeof setInterval> | undefined;
 
+export interface BookingApprovalPublishResult {
+  calendarEvent: Event;
+  invitationGiftWraps: Event[];
+  responseGiftWrap: Event;
+  calendarId: string;
+}
+
 interface BookingRequestsState {
   incomingRequests: IBookingRequest[];
   outgoingBookings: IOutgoingBooking[];
@@ -81,7 +88,16 @@ interface BookingRequestsState {
   fetchIncomingRequests: () => Promise<void>;
   fetchOutgoingBookings: () => Promise<void>;
   addOutgoingBooking: (booking: IOutgoingBooking) => void;
-  approveRequest: (requestId: string, calendarId: string) => Promise<void>;
+  approveRequest: (
+    requestId: string,
+    calendarId: string,
+    callbacks?: {
+      onEventRelayComplete?: (url: string, success: boolean) => void;
+      onInvitationRelayComplete?: (url: string, success: boolean) => void;
+      onCalendarRelayComplete?: (url: string, success: boolean) => void;
+      onResponseRelayComplete?: (url: string, success: boolean) => void;
+    },
+  ) => Promise<BookingApprovalPublishResult | undefined>;
   declineRequest: (requestId: string, reason?: string) => Promise<void>;
   markOutgoingApprovedByDTag: (dTag: string, viewKey: string) => void;
   checkExpiry: () => void;
@@ -278,7 +294,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     outgoingSub.start();
   },
 
-  approveRequest: async (requestId, calendarId) => {
+  approveRequest: async (requestId, calendarId, callbacks) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
     const pubkey = await getUserPublicKey();
@@ -310,18 +326,22 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
 
     // Use the booker's pre-generated d-tag and view key so the published
     // event matches exactly what the booker already added to their calendar.
-    const { eventRef, authorPubkey, viewKey } =
+    const { eventRef, authorPubkey, viewKey, calendarEvent, giftWraps } =
       await publishPrivateCalendarEvent(event, {
         existingDTag: request.dTag,
         existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
+        onRelayComplete: callbacks?.onEventRelayComplete,
+        onInviteRelayComplete: callbacks?.onInvitationRelayComplete,
       });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
     // approved booking shows up on the host's calendar without waiting
     // for a relay round-trip.
-    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
+    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef, {
+      onRelayComplete: callbacks?.onCalendarRelayComplete,
+    });
     const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
@@ -353,7 +373,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       return { incomingRequests, incomingUnreadCount };
     });
 
-    sendBookingResponse({
+    const responseGiftWrap = await sendBookingResponse({
       schedulingPageRef: request.schedulingPageRef,
       bookerPubkey: request.bookerPubkey,
       start: request.start,
@@ -361,9 +381,15 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       status: "approved",
       eventRef,
       viewKey,
-    }).catch((err) => {
-      console.error("Failed to send booking approval response:", err);
+      onRelayComplete: callbacks?.onResponseRelayComplete,
     });
+
+    return {
+      calendarEvent: calendarEvent,
+      invitationGiftWraps: giftWraps,
+      responseGiftWrap,
+      calendarId,
+    };
   },
 
   declineRequest: async (requestId, reason) => {

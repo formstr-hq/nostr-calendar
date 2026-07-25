@@ -2,16 +2,24 @@ import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { useSchedulingPages } from "../../../stores/schedulingPages";
 import { getRelays } from "../../../common/relayConfig";
+import { publishSignedEvent } from "../../../nostr/core";
+import type { Event } from "nostr-tools";
 import type {
   ISchedulingPage,
   IAvailabilityWindow,
 } from "../../../utils/types";
-import { useRelayPublishStatus } from "../../event-editor/hooks/useRelayPublishStatus";
 import { serializeBlockedWindow } from "./useSchedulingPageForm";
 import type {
   BlockedWindow,
   UseSchedulingPageFormReturn,
 } from "./useSchedulingPageForm";
+import {
+  usePublishActivity,
+  usePublishActivityStore,
+  type PublishStepDefinition,
+} from "../../../stores/publishActivity";
+
+const BOOKING_PAGE_SAVE_FLOW_ID = "booking-page-save";
 
 interface UseSchedulingPageSaveOptions {
   isEditMode: boolean;
@@ -36,13 +44,10 @@ export function useSchedulingPageSave({
   }>({ open: false, message: "", severity: "success" });
   const [savedNAddr, setSavedNAddr] = useState<string | null>(null);
   const [savedPageUrl, setSavedPageUrl] = useState<string | null>(null);
-  const {
-    relayStatus,
-    publishingRelays,
-    initRelays,
-    onRelayComplete,
-    reset: resetRelayStatus,
-  } = useRelayPublishStatus();
+  const [relayDetailsOpen, setRelayDetailsOpen] = useState(false);
+  const [retryingStepId, setRetryingStepId] = useState<string | null>(null);
+  const flow = usePublishActivity(BOOKING_PAGE_SAVE_FLOW_ID);
+  const steps = flow?.steps ?? [];
 
   // The link is not merely a post-save success message: an existing page
   // should always expose its working, view-key-bearing URL while editing.
@@ -54,7 +59,7 @@ export function useSchedulingPageSave({
 
   const handleSave = async () => {
     const relaysToPublish = getRelays();
-    initRelays(relaysToPublish);
+    setRelayDetailsOpen(false);
     setProcessing(true);
     try {
       // Auto-detect the host's timezone from the browser. The host enters
@@ -96,15 +101,65 @@ export function useSchedulingPageSave({
             : undefined,
       };
 
-      let saved: ISchedulingPage;
-      if (isEditMode && existingPage) {
-        saved = await updatePage(
-          { ...existingPage, ...pageData },
-          { onRelayComplete },
-        );
-      } else {
-        saved = await createPage(pageData, { onRelayComplete });
-      }
+      let saved: ISchedulingPage | null = null;
+      let viewKeyEvent: Event | null = null;
+      const stepDefs: PublishStepDefinition[] = [
+        {
+          id: "publish-booking-page",
+          labelId: "scheduling.step.publishPage",
+          relays: relaysToPublish,
+          blocking: true,
+          run: async (callbacks) => {
+            saved =
+              isEditMode && existingPage
+                ? await updatePage(
+                    { ...existingPage, ...pageData },
+                    {
+                      onRelayComplete: callbacks.onRelayComplete,
+                      onKeyRelayComplete: (url, success) =>
+                        callbacks.reportRelayOutcome(
+                          "publish-view-key",
+                          url,
+                          success,
+                        ),
+                      onKeyEventReady: (event) => {
+                        viewKeyEvent = event;
+                      },
+                      deferKeyPublish: true,
+                    },
+                  )
+                : await createPage(pageData, {
+                    onRelayComplete: callbacks.onRelayComplete,
+                    onKeyRelayComplete: (url, success) =>
+                      callbacks.reportRelayOutcome(
+                        "publish-view-key",
+                        url,
+                        success,
+                      ),
+                    onKeyEventReady: (event) => {
+                      viewKeyEvent = event;
+                    },
+                    deferKeyPublish: true,
+                  });
+          },
+        },
+        {
+          id: "publish-view-key",
+          labelId: "scheduling.step.publishViewKey",
+          relays: relaysToPublish,
+          blocking: true,
+          run: async (callbacks) => {
+            if (!viewKeyEvent) return;
+            await publishSignedEvent(viewKeyEvent, {
+              onRelayComplete: callbacks.onRelayComplete,
+            });
+          },
+        },
+      ];
+      await usePublishActivityStore
+        .getState()
+        .runFlow(BOOKING_PAGE_SAVE_FLOW_ID, stepDefs);
+      if (!saved) throw new Error("Scheduling page was not saved.");
 
       const addr = getNAddr(saved);
       setSavedNAddr(addr);
@@ -119,7 +174,6 @@ export function useSchedulingPageSave({
           : intl.formatMessage({ id: "scheduling.pageCreated" }),
         severity: "success",
       });
-      resetRelayStatus();
     } catch (e) {
       console.error(e);
       setSnackbar({
@@ -133,6 +187,19 @@ export function useSchedulingPageSave({
     }
   };
 
+  const handleRetryStep = async (stepId: string) => {
+    setRetryingStepId(stepId);
+    try {
+      await usePublishActivityStore
+        .getState()
+        .retryStep(BOOKING_PAGE_SAVE_FLOW_ID, stepId);
+    } catch {
+      // Per-relay outcomes are rendered by the activity UI.
+    } finally {
+      setRetryingStepId(null);
+    }
+  };
+
   const handleCopyLink = () => {
     if (!savedPageUrl) return;
     navigator.clipboard.writeText(savedPageUrl);
@@ -143,11 +210,7 @@ export function useSchedulingPageSave({
     });
   };
 
-  const isPublishing = publishingRelays.length > 0;
-  const relayDotsLabel = intl.formatMessage(
-    { id: "scheduling.publishingToRelays" },
-    { count: getRelays().length },
-  );
+  const hasRelayErrors = steps.some((step) => step.status === "error");
 
   return {
     processing,
@@ -157,9 +220,11 @@ export function useSchedulingPageSave({
     savedPageUrl,
     handleSave,
     handleCopyLink,
-    relayStatus,
-    publishingRelays,
-    relayDotsLabel,
-    isPublishing,
+    steps,
+    relayDetailsOpen,
+    setRelayDetailsOpen,
+    retryingStepId,
+    handleRetryStep,
+    hasRelayErrors,
   };
 }

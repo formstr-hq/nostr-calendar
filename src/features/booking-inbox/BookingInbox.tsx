@@ -35,6 +35,18 @@ import { CalendarListSelect } from "../../components/CalendarListSelect";
 import { FormAttachmentRow } from "../../components/FormAttachmentRow";
 import { verifyNip05 } from "../../nostr/nip05";
 import { ROUTES } from "../../utils/routingHelper";
+import { getRelays } from "../../common/relayConfig";
+import { publishSignedEvent } from "../../nostr/core";
+import { publishCalendarList } from "../../nostr/calendars";
+import {
+  usePublishActivity,
+  usePublishActivityStore,
+  type PublishStepDefinition,
+} from "../../stores/publishActivity";
+import { PublishActivityPanel } from "../../components/PublishActivityPanel";
+import { PublishActivityDialog } from "../../components/PublishActivityDialog";
+import { useIntl } from "react-intl";
+import type { BookingApprovalPublishResult } from "../../stores/bookingRequests";
 import type {
   IBookingRequest,
   IOutgoingBooking,
@@ -380,6 +392,7 @@ function BookingDetailPanel({
   pages: ISchedulingPage[];
   embedded?: boolean;
 }) {
+  const intl = useIntl();
   const { participant, loading } = useGetParticipant({
     pubKey: item ? requester(item) : "",
   });
@@ -395,6 +408,13 @@ function BookingDetailPanel({
   const [calendarId, setCalendarId] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [retryingStepId, setRetryingStepId] = useState<string | null>(null);
+  const approvalFlowId = item
+    ? `booking-approve:${item.value.id}`
+    : "booking-approve";
+  const approvalFlow = usePublishActivity(approvalFlowId);
+  const approvalSteps = approvalFlow?.steps ?? [];
   const page = item
     ? pages.find((p) => p.id === item.value.schedulingPageRef.split(":")[2])
     : undefined;
@@ -431,12 +451,107 @@ function BookingDetailPanel({
     try {
       if (action === "approve") {
         if (!calendarId) throw new Error("Choose a calendar first.");
-        await approveRequest(item.value.id, calendarId);
+        const relays = getRelays();
+        let approvalResult: BookingApprovalPublishResult | undefined;
+        let invitationStepStarted = false;
+        let calendarStepStarted = false;
+        let responseStepStarted = false;
+        const steps: PublishStepDefinition[] = [
+          {
+            id: "publish-appointment",
+            labelId: "booking.step.publishAppointment",
+            relays,
+            blocking: true,
+            run: async (callbacks) => {
+              if (approvalResult) {
+                await publishSignedEvent(approvalResult.calendarEvent, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                });
+                return;
+              }
+              approvalResult = await approveRequest(item.value.id, calendarId, {
+                onEventRelayComplete: callbacks.onRelayComplete,
+                onInvitationRelayComplete: (url, success) =>
+                  callbacks.reportRelayOutcome("send-invitation", url, success),
+                onCalendarRelayComplete: (url, success) =>
+                  callbacks.reportRelayOutcome("add-to-calendar", url, success),
+                onResponseRelayComplete: (url, success) =>
+                  callbacks.reportRelayOutcome("send-approval", url, success),
+              });
+            },
+          },
+          {
+            id: "send-invitation",
+            labelId: "booking.step.sendInvitation",
+            relays,
+            blocking: true,
+            run: async (callbacks) => {
+              if (!invitationStepStarted) {
+                invitationStepStarted = true;
+                return;
+              }
+              if (!approvalResult) return;
+              await Promise.all(
+                approvalResult.invitationGiftWraps.map((giftWrap) =>
+                  publishSignedEvent(giftWrap, {
+                    onRelayComplete: callbacks.onRelayComplete,
+                  }),
+                ),
+              );
+            },
+          },
+          {
+            id: "add-to-calendar",
+            labelId: "booking.step.addToCalendar",
+            relays,
+            blocking: true,
+            run: async (callbacks) => {
+              if (!calendarStepStarted) {
+                calendarStepStarted = true;
+                return;
+              }
+              const calendar = useCalendarLists
+                .getState()
+                .calendars.find((entry) => entry.id === calendarId);
+              if (calendar)
+                await publishCalendarList(calendar, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                });
+            },
+          },
+          {
+            id: "send-approval",
+            labelId: "booking.step.sendApproval",
+            relays,
+            blocking: true,
+            run: async (callbacks) => {
+              if (!responseStepStarted) {
+                responseStepStarted = true;
+                return;
+              }
+              if (approvalResult)
+                await publishSignedEvent(approvalResult.responseGiftWrap, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                });
+            },
+          },
+        ];
+        await usePublishActivityStore.getState().runFlow(approvalFlowId, steps);
       } else await declineRequest(item.value.id, reason || undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update booking.");
     } finally {
       setWorking(false);
+    }
+  };
+  const retryApprovalStep = async (stepId: string) => {
+    setRetryingStepId(stepId);
+    try {
+      await usePublishActivityStore
+        .getState()
+        .retryStep(approvalFlowId, stepId);
+    } finally {
+      setRetryingStepId(null);
     }
   };
   return (
@@ -587,6 +702,26 @@ function BookingDetailPanel({
           >
             Archive
           </Button>
+        </Box>
+      )}
+      {approvalSteps.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <PublishActivityPanel
+            steps={approvalSteps}
+            onDetailsClick={
+              approvalSteps.some((step) => step.status === "error")
+                ? () => setDetailsOpen(true)
+                : undefined
+            }
+            detailsLabel={intl.formatMessage({ id: "event.relayDetails" })}
+          />
+          <PublishActivityDialog
+            open={detailsOpen}
+            steps={approvalSteps}
+            onClose={() => setDetailsOpen(false)}
+            onRetryStep={retryApprovalStep}
+            retryingStepId={retryingStepId}
+          />
         </Box>
       )}
       {error && (

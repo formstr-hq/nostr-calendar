@@ -15,6 +15,7 @@ import { useSchedulingPageForm } from "./hooks/useSchedulingPageForm";
 import { useSchedulingPageSave } from "./hooks/useSchedulingPageSave";
 import { BookingEditDesktopForm } from "./components/BookingEditDesktopForm";
 import { BookingEditMobileForm } from "./components/BookingEditMobileForm";
+import { PublishActivityDialog } from "../../components/PublishActivityDialog";
 
 export function BookingEditor() {
   const { naddr } = useParams<{ naddr: string }>();
@@ -112,6 +113,13 @@ export function BookingEditor() {
           {save.snackbar.message}
         </Alert>
       </Snackbar>
+      <PublishActivityDialog
+        open={save.relayDetailsOpen}
+        steps={save.steps}
+        onClose={() => save.setRelayDetailsOpen(false)}
+        onRetryStep={save.handleRetryStep}
+        retryingStepId={save.retryingStepId}
+      />
     </>
   );
 }

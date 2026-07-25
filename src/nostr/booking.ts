@@ -220,6 +220,7 @@ export async function sendBookingResponse({
   eventRef,
   viewKey,
   reason,
+  onRelayComplete,
 }: {
   schedulingPageRef: string;
   bookerPubkey: string;
@@ -229,6 +230,7 @@ export async function sendBookingResponse({
   eventRef?: string[];
   viewKey?: string;
   reason?: string;
+  onRelayComplete?: (url: string, success: boolean) => void;
 }): Promise<Event> {
   const tags: string[][] = [
     ["a", schedulingPageRef],
@@ -256,7 +258,7 @@ export async function sendBookingResponse({
       ["k", "1058"],
     ],
   );
-  await publishSignedEvent(giftWrap);
+  await publishSignedEvent(giftWrap, { onRelayComplete });
   return giftWrap;
 }
 

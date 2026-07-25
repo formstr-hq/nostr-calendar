@@ -7,6 +7,8 @@ interface PublishActivityPanelProps {
   steps: PublishStepState[];
   /** True when no flow is in flight (e.g. before Save is pressed). */
   idle?: boolean;
+  /** Keep the final successful step visible after a completed flow. */
+  showCompleted?: boolean;
   onDetailsClick?: () => void;
   detailsLabel?: string;
 }
@@ -14,6 +16,7 @@ interface PublishActivityPanelProps {
 export function PublishActivityPanel({
   steps,
   idle,
+  showCompleted = false,
   onDetailsClick,
   detailsLabel,
 }: PublishActivityPanelProps) {
@@ -21,9 +24,11 @@ export function PublishActivityPanel({
 
   // Show only the first step that hasn't finished successfully — completed
   // steps drop out of view as the flow progresses, so at most one row is
-  // visible at a time. Once everything succeeds there's nothing left to show
-  // (the editor closes at that point anyway).
-  const currentStep = steps.find((step) => step.status !== "ok");
+  // visible at a time. Some save screens remain open after a successful flow;
+  // those can opt into retaining the final confirmation row.
+  const currentStep =
+    steps.find((step) => step.status !== "ok") ??
+    (showCompleted ? steps.at(-1) : undefined);
 
   if (!currentStep) {
     return null;

@@ -29,6 +29,11 @@ export interface SchedulingPageKeyPayload {
 export async function publishSchedulingPageKey(params: {
   dTag: string;
   viewKeyNsec: string;
+  onRelayComplete?: (url: string, success: boolean) => void;
+  /** Gives callers the signed event before its initial publish for retry use. */
+  onEventReady?: (event: Event) => void;
+  /** Build the self-encrypted record without publishing it. */
+  deferPublish?: boolean;
 }): Promise<Event> {
   const userPubkey = await getUserPublicKey();
   const payload: SchedulingPageKeyPayload = {
@@ -46,7 +51,11 @@ export async function publishSchedulingPageKey(params: {
     created_at: payload.createdAt,
   };
   const signedEvent = await buildAndSign(unsigned);
-  await publishSignedEvent(signedEvent);
+  params.onEventReady?.(signedEvent);
+  if (params.deferPublish) return signedEvent;
+  await publishSignedEvent(signedEvent, {
+    onRelayComplete: params.onRelayComplete,
+  });
   return signedEvent;
 }
 

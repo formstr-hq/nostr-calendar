@@ -937,3 +937,101 @@ Defined in `src/common/EventConfigs.ts:1-24`:
 | 32123 | PrivateCalendarList | Encrypted calendar collection (self-encrypted) |
 | 32678 | PrivateCalendarEvent | Encrypted one-time calendar event |
 | 32679 | PrivateCalendarRecurringEvent | Encrypted recurring calendar event |
+
+---
+
+## 18. Publish Activity Tracking (Multi-Step Publish Feedback)
+
+Several user actions are really a *sequence* of independent Nostr publishes
+(e.g. saving an event = publish the event + gift-wrap invitations + update the
+calendar list + update the public busy list). Before this pattern existed, the
+UI only tracked the relay status of one of those publishes — the rest were
+either silently awaited or genuinely fire-and-forget, so a partial failure
+(say, an invitation that never reached a relay) was invisible to the user.
+
+### The engine (`src/stores/publishActivity.ts`)
+
+A small zustand store — not a hook — so it can be driven from anywhere:
+component code, another store's action, etc. It has no knowledge of events,
+calendars, or any specific feature; it only knows about **steps**.
+
+```tsx
+export interface PublishStepDefinition {
+  id: string;
+  labelId: string;           // intl message id shown in the UI
+  relays: string[];          // relays this step is expected to touch
+  blocking: boolean;         // true = runFlow awaits it before the next step
+  run: (callbacks: PublishStepCallbacks) => Promise<void>;
+}
+```
+
+A caller assembles an ordered `PublishStepDefinition[]` for whatever it's
+about to do, then calls:
+
+```tsx
+await usePublishActivityStore.getState().runFlow(flowId, steps);
+```
+
+- `flowId` is a caller-chosen string key (e.g. `"event-save"`, or
+  `` `booking-approve:${requestId}` `` for something that can run more than
+  once concurrently) — `flows[flowId]` in the store holds that one flow's
+  step states.
+- Steps marked `blocking: true` run **sequentially**, each `await`ed before
+  the next starts — later steps read data an earlier step assigned to a
+  shared closure variable (see `useEventSave.ts` for the pattern: `eventRef`
+  is set inside `publish-event`'s `run` and read inside `add-to-calendar`'s).
+- Steps marked `blocking: false` are kicked off without being awaited by
+  `runFlow` itself, but still report into the same flow's state as they
+  resolve in the background (used for the busy-list step, which stays
+  best-effort the way it always was).
+- Per-relay outcomes feed in through `callbacks.onRelayComplete(url, ok)`
+  (reports to *this* step) or `callbacks.reportRelayOutcome(stepId, url, ok)`
+  (reports to a *different* step in the same flow — needed when one
+  underlying call does the work of two visible steps, e.g.
+  `publishPrivateCalendarEvent` publishes the main event **and** sends the
+  gift-wrap invitations in one call; the main-event outcomes go to
+  `"publish-event"` via `onRelayComplete`, the invitation outcomes go to
+  `"invite-participants"` via `reportRelayOutcome`).
+- A step's status (`"pending" | "ok" | "error"`) is derived purely from its
+  relay outcomes (`deriveStepStatus`), not from whether `run()` has resolved —
+  this correctly handles steps whose underlying operation turns out to be a
+  no-op (e.g. moving an event to a calendar it's already in publishes
+  nothing), which `finalizeStep` closes out as `"ok"` once `run()` returns
+  without ever having reported a single relay.
+- `retryStep(flowId, stepId)` re-invokes that one step's original `run`
+  closure (the engine retains the `PublishStepDefinition[]` per flow for
+  this) — retrying never re-derives keys, tags, or gift wraps from scratch;
+  callers structure `run` to cache whatever it built on the first pass and
+  just re-publish that same signed payload on a later call.
+
+### Reference implementation: event save (`src/features/event-editor/hooks/useEventSave.ts`)
+
+`handleSave` builds the step list conditionally based on create/edit,
+private/public, whether there are new participants, and the existing
+busy-list opt-in/range-changed guards — steps that don't apply are simply
+left out of the array (there's no "skipped" status to manage). Steps used
+today: `publish-event`, `invite-participants`, `add-to-calendar` (all
+blocking, matching pre-existing behavior), `update-availability`
+(non-blocking, matching the pre-existing best-effort busy-list behavior).
+
+### UI (`src/components/PublishActivityPanel.tsx`, `PublishActivityDialog.tsx`)
+
+- `PublishActivityPanel` — the compact footer indicator. Shows **only the
+  first step that hasn't finished successfully** (`steps.find(s => s.status
+  !== "ok")`) — completed steps drop out of view as the flow progresses, so
+  at most one row is visible at a time; once everything succeeds there's
+  nothing left to show.
+- `PublishActivityDialog` — the detail view (opened via a "Details" link when
+  a step has failed). Lists every step with its own per-relay breakdown and a
+  scoped retry button, reusing `getRelayPublishCounts`
+  (`src/utils/relayPublishStatus.ts`).
+
+### Older, single-batch predecessor
+
+`useRelayPublishStatus` (`src/features/event-editor/hooks/useRelayPublishStatus.ts`)
++ `RelayDots`/`RelayPublishDialog` (`src/components/`) track exactly one flat
+relay-status map for one publish batch. They're still used by
+`useSchedulingPageSave` (booking-page save) — that flow, plus booking
+acceptance and event deletion, are candidates to migrate onto
+`usePublishActivityStore` the same way `useEventSave` was, so this becomes
+the one general mechanism for surfacing multi-step publish status app-wide.

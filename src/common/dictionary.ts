@@ -112,6 +112,8 @@ const dictionary: NestedObject = {
         inviteParticipants: "Inviting participants",
         addToCalendar: "Adding to calendar",
         updateAvailability: "Updating availability",
+        publishDeletion: "Publishing deletion",
+        removeFromCalendar: "Removing from calendar",
       },
       relaysPublishStatus: "Relays{complete}",
       eventSaved: "Your event has been saved",
@@ -244,6 +246,14 @@ const dictionary: NestedObject = {
         "Publish a removal event to opt out as a participant",
       confirm: "Confirm",
       deleting: "Deleting...",
+    },
+    booking: {
+      step: {
+        publishAppointment: "Publishing appointment",
+        sendInvitation: "Sending invitation",
+        addToCalendar: "Adding to calendar",
+        sendApproval: "Sending approval",
+      },
     },
     calendarManage: {
       editCalendar: "Edit Calendar",
@@ -531,6 +541,10 @@ const dictionary: NestedObject = {
       updatePage: "Update Page",
       pageCreated: "Scheduling page created!",
       pageUpdated: "Scheduling page updated!",
+      step: {
+        publishPage: "Publishing booking page",
+        publishViewKey: "Saving page access key",
+      },
       shareLinkMessage:
         "Your scheduling page is live! Share the link for others to book appointments.",
       linkCopied: "Link copied to clipboard!",
@@ -669,6 +683,8 @@ const dictionary: NestedObject = {
         inviteParticipants: "Teilnehmer werden eingeladen",
         addToCalendar: "Wird zum Kalender hinzugefügt",
         updateAvailability: "Verfügbarkeit wird aktualisiert",
+        publishDeletion: "Löschung wird veröffentlicht",
+        removeFromCalendar: "Wird aus dem Kalender entfernt",
       },
       relaysPublishStatus: "Relays{complete}",
       eventSaved: "Ihr Termin wurde gespeichert",
@@ -776,6 +792,14 @@ const dictionary: NestedObject = {
         "Ein Entfernungs-Event veröffentlichen, um als Teilnehmer auszutreten",
       confirm: "Bestätigen",
       deleting: "Löschen...",
+    },
+    booking: {
+      step: {
+        publishAppointment: "Termin wird veröffentlicht",
+        sendInvitation: "Einladung wird gesendet",
+        addToCalendar: "Wird zum Kalender hinzugefügt",
+        sendApproval: "Genehmigung wird gesendet",
+      },
     },
     calendarManage: {
       editCalendar: "Kalender bearbeiten",
@@ -1036,6 +1060,10 @@ const dictionary: NestedObject = {
       updatePage: "Seite aktualisieren",
       pageCreated: "Terminseite erstellt!",
       pageUpdated: "Terminseite aktualisiert!",
+      step: {
+        publishPage: "Buchungsseite wird veröffentlicht",
+        publishViewKey: "Seitenzugriffsschlüssel wird gespeichert",
+      },
       shareLinkMessage:
         "Ihre Terminseite ist live! Teilen Sie den Link, damit andere Termine buchen können.",
       linkCopied: "Link in die Zwischenablage kopiert!",

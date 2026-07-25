@@ -198,10 +198,9 @@ export function BookingEditDesktopForm({
             canSave={canSave}
             onCancel={onBack}
             onSave={save.handleSave}
-            relayDotsLabel={save.relayDotsLabel}
-            publishingRelays={save.publishingRelays}
-            relayStatus={save.relayStatus}
-            isPublishing={save.isPublishing}
+            steps={save.steps}
+            hasRelayErrors={save.hasRelayErrors}
+            onDetailsClick={() => save.setRelayDetailsOpen(true)}
           />
         </Box>
         <Box

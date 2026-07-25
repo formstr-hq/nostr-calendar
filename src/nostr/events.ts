@@ -601,11 +601,13 @@ export async function publishDeletionEvent({
   coordinates = [],
   eventIds = [],
   reason = "",
+  onRelayComplete,
 }: {
   kinds: number[];
   coordinates?: string[];
   eventIds?: string[];
   reason?: string;
+  onRelayComplete?: (url: string, success: boolean) => void;
 }) {
   const userPublicKey = await getUserPublicKey();
   const tags: string[][] = [];
@@ -628,7 +630,7 @@ export async function publishDeletionEvent({
     tags,
   });
 
-  await publishSignedEvent(signedEvent);
+  await publishSignedEvent(signedEvent, { onRelayComplete });
 
   return signedEvent;
 }

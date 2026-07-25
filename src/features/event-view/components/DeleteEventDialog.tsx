@@ -30,6 +30,14 @@ import {
   findCalendarForEvent,
   getCalendarEventCoordinate,
 } from "../../../utils/calendarListTypes";
+import { getRelays } from "../../../common/relayConfig";
+import {
+  usePublishActivity,
+  usePublishActivityStore,
+  type PublishStepDefinition,
+} from "../../../stores/publishActivity";
+import { PublishActivityPanel } from "../../../components/PublishActivityPanel";
+import { PublishActivityDialog } from "../../../components/PublishActivityDialog";
 
 type DeleteOption = "deleteForEveryone" | "removeFromCalendar" | "ignore";
 
@@ -52,11 +60,16 @@ export function DeleteEventDialog({
   const { removeEvent } = useTimeBasedEvents();
   const { dismissInvitation } = useInvitations();
   const [loading, setLoading] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [retryingStepId, setRetryingStepId] = useState<string | null>(null);
 
   const isAuthor = event.user === user?.pubkey;
   const calendar = findCalendarForEvent(calendars, event);
   const isInCalendar = !!calendar;
   const eventCoordinate = getCalendarEventCoordinate(event);
+  const flowId = `event-delete:${event.id}`;
+  const flow = usePublishActivity(flowId);
+  const steps = flow?.steps ?? [];
 
   const getDefaultOption = (): DeleteOption => {
     if (isAuthor) return "deleteForEveryone";
@@ -82,17 +95,34 @@ export function DeleteEventDialog({
   const handleConfirm = async () => {
     setLoading(true);
     try {
+      const relays = getRelays();
+      const stepDefs: PublishStepDefinition[] = [];
       switch (selectedOption) {
         case "deleteForEveryone": {
-          await publishDeletionEvent({
-            coordinates: [eventCoordinate],
-            eventIds: event.eventId ? [event.eventId] : [],
-            kinds: [event.kind],
+          stepDefs.push({
+            id: "publish-deletion",
+            labelId: "event.step.publishDeletion",
+            relays,
+            blocking: true,
+            run: async (callbacks) => {
+              await publishDeletionEvent({
+                coordinates: [eventCoordinate],
+                eventIds: event.eventId ? [event.eventId] : [],
+                kinds: [event.kind],
+                onRelayComplete: callbacks.onRelayComplete,
+              });
+            },
           });
           if (calendar) {
             const eventRef = findEventRef();
             if (eventRef) {
-              await removeEventFromCalendar(calendar.id, eventRef);
+              stepDefs.push({
+                id: "remove-from-calendar",
+                labelId: "event.step.removeFromCalendar",
+                relays,
+                blocking: true,
+                run: () => removeEventFromCalendar(calendar.id, eventRef),
+              });
             }
           }
           // The author is rescinding the commitment — drop the matching
@@ -100,35 +130,49 @@ export function DeleteEventDialog({
           void useBusyList
             .getState()
             .removeBusyRange({ start: event.begin, end: event.end });
-          removeEvent(event.id);
           break;
         }
         case "removeFromCalendar": {
           if (calendar) {
             const eventRef = findEventRef();
             if (eventRef) {
-              await removeEventFromCalendar(calendar.id, eventRef);
+              stepDefs.push({
+                id: "remove-from-calendar",
+                labelId: "event.step.removeFromCalendar",
+                relays,
+                blocking: true,
+                run: () => removeEventFromCalendar(calendar.id, eventRef),
+              });
             }
             // Whether or not the user is the author, this slot is no longer
             // a personal commitment from this client — remove busy entry.
             void useBusyList
               .getState()
               .removeBusyRange({ start: event.begin, end: event.end });
-            removeEvent(event.id);
           }
           break;
         }
         case "ignore": {
-          dismissInvitation(event.id);
-          removeEvent(event.id);
           break;
         }
       }
+      await usePublishActivityStore.getState().runFlow(flowId, stepDefs);
+      if (selectedOption === "ignore") dismissInvitation(event.id);
+      removeEvent(event.id);
       onClose();
     } catch (error) {
       console.error("Failed to delete event:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetryStep = async (stepId: string) => {
+    setRetryingStepId(stepId);
+    try {
+      await usePublishActivityStore.getState().retryStep(flowId, stepId);
+    } finally {
+      setRetryingStepId(null);
     }
   };
 
@@ -248,6 +292,17 @@ export function DeleteEventDialog({
       </DialogContent>
 
       <DialogActions sx={{ padding: 2 }}>
+        {steps.length > 0 && (
+          <PublishActivityPanel
+            steps={steps}
+            onDetailsClick={
+              steps.some((step) => step.status === "error")
+                ? () => setDetailsOpen(true)
+                : undefined
+            }
+            detailsLabel={intl.formatMessage({ id: "event.relayDetails" })}
+          />
+        )}
         <Button onClick={onClose} color="inherit" disabled={loading}>
           {intl.formatMessage({ id: "navigation.cancel" })}
         </Button>
@@ -263,6 +318,13 @@ export function DeleteEventDialog({
             : intl.formatMessage({ id: "deleteEvent.confirm" })}
         </Button>
       </DialogActions>
+      <PublishActivityDialog
+        open={detailsOpen}
+        steps={steps}
+        onClose={() => setDetailsOpen(false)}
+        onRetryStep={handleRetryStep}
+        retryingStepId={retryingStepId}
+      />
     </Dialog>
   );
 }
