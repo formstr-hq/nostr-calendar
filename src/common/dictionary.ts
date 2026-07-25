@@ -315,6 +315,7 @@ const dictionary: NestedObject = {
     },
     invitation: {
       invitations: "Invitations",
+      back: "Back",
       noPendingInvitations: "No pending invitations",
       loadingEventDetails: "Loading event details...",
       dismiss: "Dismiss",
@@ -833,6 +834,7 @@ const dictionary: NestedObject = {
     },
     invitation: {
       invitations: "Einladungen",
+      back: "Zurück",
       noPendingInvitations: "Keine ausstehenden Einladungen",
       loadingEventDetails: "Termindetails werden geladen...",
       dismiss: "Verwerfen",

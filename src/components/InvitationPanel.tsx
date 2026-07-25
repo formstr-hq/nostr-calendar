@@ -121,19 +121,36 @@ export function InvitationPanel() {
   };
 
   return (
-    <Box p={2} maxWidth={isMobile ? "100%" : 600}>
-      <Box display="flex" alignItems="center" gap={1} mb={3}>
-        <IconButton onClick={() => navigate(-1)}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h5" fontWeight={600}>
-          {intl.formatMessage({ id: "invitation.invitations" })}
-        </Typography>
-        {pendingInvitations.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            ({pendingInvitations.length})
-          </Typography>
+    <Box sx={{ width: "100%", maxWidth: 600, mx: "auto", p: 2 }}>
+      <Box
+        sx={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          mb: 3,
+          minHeight: 40,
+        }}
+      >
+        {isMobile && (
+          <IconButton
+            aria-label={intl.formatMessage({ id: "invitation.back" })}
+            onClick={() => navigate(-1)}
+            sx={{ position: "absolute", left: 0 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
         )}
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="h5" fontWeight={600}>
+            {intl.formatMessage({ id: "invitation.invitations" })}
+          </Typography>
+          {pendingInvitations.length > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              ({pendingInvitations.length})
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       {pendingInvitations.length === 0 && (
