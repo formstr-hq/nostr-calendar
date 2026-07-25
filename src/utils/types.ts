@@ -190,6 +190,8 @@ export interface IBookingRequest {
   end: number;
   /** Appointment title from booker */
   title: string;
+  /** Scheduling page title at the time the request was sent */
+  pageName?: string;
   /** Optional note from booker */
   note: string;
   /** Pre-generated d-tag for the calendar event */

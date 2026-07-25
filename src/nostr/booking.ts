@@ -17,6 +17,20 @@ import { deleteGiftWrapAsRecipient, publishDeletionEvent } from "./events";
 import { createSubscription, type StandingSubscription } from "./subscribe";
 import { nostrEventToSchedulingPage } from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
+import { fetchUserProfile } from "./profiles";
+
+function getSenderDisplayName(profileEvent: Event | null, pubkey: string) {
+  if (profileEvent) {
+    try {
+      const profile = JSON.parse(profileEvent.content);
+      const name = profile.display_name || profile.name;
+      if (name) return name as string;
+    } catch {
+      // Fall through to the public-key fallback for malformed profiles.
+    }
+  }
+  return nip19.npubEncode(pubkey).slice(0, 12);
+}
 
 /**
  * Generates a fresh d-tag + nsec-encoded viewKey for a new booking request's
@@ -56,6 +70,7 @@ export async function sendBookingRequest({
   start,
   end,
   title,
+  pageName,
   note,
   dTag,
   viewKey,
@@ -67,6 +82,7 @@ export async function sendBookingRequest({
   start: number;
   end: number;
   title: string;
+  pageName: string;
   note: string;
   dTag: string;
   viewKey: string;
@@ -86,17 +102,20 @@ export async function sendBookingRequest({
       ? new LocalSigner(identity.secretKey)
       : await signerManager.getSigner();
   const bookerPubkey = await signer.getPublicKey();
+  const [bookerProfile] = await Promise.all([fetchUserProfile(bookerPubkey)]);
+  const bookingRequestMessage = `${getSenderDisplayName(bookerProfile, bookerPubkey)} wants to book a slot with you for "${pageName}"`;
   const giftWrap = await wrapEventAs(
     (signingNsec) => ({
       pubkey: bookerPubkey,
       created_at: Math.floor(Date.now() / 1000),
       kind: EventKinds.Rumor,
-      content: "",
+      content: bookingRequestMessage,
       tags: [
         ["a", schedulingPageRef],
         ["start", String(Math.floor(start / 1000))],
         ["end", String(Math.floor(end / 1000))],
         ["title", title],
+        ["page_name", pageName],
         ["note", note],
         ["d", dTag],
         ["viewKey", viewKey],
@@ -121,6 +140,7 @@ export async function unwrapBookingRequest(giftWrap: Event): Promise<{
   start: number;
   end: number;
   title: string;
+  pageName?: string;
   note: string;
   dTag: string;
   viewKey?: string;
@@ -134,6 +154,7 @@ export async function unwrapBookingRequest(giftWrap: Event): Promise<{
     start: Number(getTag("start")) * 1000,
     end: Number(getTag("end")) * 1000,
     title: getTag("title"),
+    pageName: getTag("page_name") || undefined,
     note: getTag("note"),
     dTag: getTag("d"),
     viewKey: getTag("viewKey") || undefined,
@@ -220,6 +241,8 @@ export async function sendBookingResponse({
   eventRef,
   viewKey,
   reason,
+  pageName,
+  calendarEventUrl,
   onRelayComplete,
 }: {
   schedulingPageRef: string;
@@ -230,6 +253,8 @@ export async function sendBookingResponse({
   eventRef?: string[];
   viewKey?: string;
   reason?: string;
+  pageName: string;
+  calendarEventUrl?: string;
   onRelayComplete?: (url: string, success: boolean) => void;
 }): Promise<Event> {
   const tags: string[][] = [
@@ -243,12 +268,18 @@ export async function sendBookingResponse({
   if (status === "declined" && reason) tags.push(["reason", reason]);
 
   const userPublicKey = await getUserPublicKey();
+  const [creatorProfile] = await Promise.all([fetchUserProfile(userPublicKey)]);
+  const creatorName = getSenderDisplayName(creatorProfile, userPublicKey);
+  const bookingResponseMessage =
+    status === "approved"
+      ? `${creatorName} has accepted your booking request for "${pageName}". View the event in your calendar: ${calendarEventUrl}`
+      : `${reason ? `${reason}. ` : ""}${creatorName} has denied your booking request for "${pageName}"`;
   const giftWrap = await wrapEvent(
     (signingNsec) => ({
       pubkey: userPublicKey,
       created_at: Math.floor(Date.now() / 1000),
       kind: EventKinds.Rumor,
-      content: "",
+      content: bookingResponseMessage,
       tags: [...tags, ["signing_nsec", signingNsec]],
     }),
     bookerPubkey,

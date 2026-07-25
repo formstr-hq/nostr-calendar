@@ -338,6 +338,7 @@ export const BookingPage = () => {
         start: selectedSlot.start.getTime(),
         end: selectedSlot.end.getTime(),
         title: titleText,
+        pageName: page.title,
         note: bookingNote,
         dTag,
         viewKey,

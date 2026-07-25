@@ -6,7 +6,6 @@ import {
   Filter,
 } from "nostr-tools";
 import { v4 as uuid } from "uuid";
-import dayjs from "dayjs";
 import { dataLayer, type ObserveHandle } from "@formstr/local-relay";
 import type { ICalendarEvent } from "../stores/events";
 import { getPersistedCalendarEventId } from "../utils/calendarEventIdentity";
@@ -29,6 +28,7 @@ import {
 } from "nostr-tools/nip19";
 import { EventKinds } from "./kinds";
 import { defaultRelays } from "../common/relayConfig";
+import { PUBLIC_APP_BASE_URL } from "../utils/platform";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
 import { createLogger } from "../utils/logger";
@@ -60,9 +60,29 @@ function getSenderDisplayName(profileEvent: Event | null, pubkey: string) {
 function buildInvitationMessage(
   senderName: string,
   title: string,
-  beginMs: number,
+  calendarEventUrl: string,
 ) {
-  return `${senderName} has invited you to the ${title} on ${dayjs(beginMs).format("MMM D, YYYY")}`;
+  return `${senderName} has invited you to an event: ${title}. View more details and add it to your calendar here: ${calendarEventUrl}`;
+}
+
+export function buildPrivateCalendarEventUrl({
+  kind,
+  pubkey,
+  dTag,
+  viewKey,
+  relayHint,
+}: {
+  kind: number;
+  pubkey: string;
+  dTag: string;
+  viewKey: string;
+  relayHint: string;
+}) {
+  const naddr = encodeNAddr(
+    { kind, pubkey, identifier: dTag },
+    relayHint ? [relayHint] : undefined,
+  );
+  return `${PUBLIC_APP_BASE_URL}/event/${naddr}?viewKey=${encodeURIComponent(viewKey)}`;
 }
 
 /**
@@ -201,7 +221,13 @@ export async function publishPrivateCalendarEvent(
   const invitationMessage = buildInvitationMessage(
     senderName,
     event.title,
-    event.begin,
+    buildPrivateCalendarEventUrl({
+      kind: eventKind,
+      pubkey: signedEvent.pubkey,
+      dTag,
+      viewKey: nip19.nsecEncode(viewSecretKey),
+      relayHint: publishedRelayHint,
+    }),
   );
   const giftWraps = await Promise.all(
     targetPubKeys.map(async (participant) => {
@@ -307,7 +333,13 @@ export async function editPrivateCalendarEvent(
     const invitationMessage = buildInvitationMessage(
       senderName,
       event.title,
-      event.begin,
+      buildPrivateCalendarEventUrl({
+        kind: eventKind,
+        pubkey: signedEvent.pubkey,
+        dTag,
+        viewKey: nip19.nsecEncode(viewSecretKey),
+        relayHint: publishedRelayHint,
+      }),
     );
     const giftWraps = await Promise.all(
       newParticipants.map(async (participant) => {

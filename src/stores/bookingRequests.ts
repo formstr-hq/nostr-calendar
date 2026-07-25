@@ -23,7 +23,11 @@ import { LocalSigner, type ActiveSigner } from "@formstr/signer";
 import { signerManager } from "../common/signer";
 import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import { getUserPublicKey } from "../nostr/crypto";
-import { publishPrivateCalendarEvent } from "../nostr/events";
+import {
+  buildPrivateCalendarEventUrl,
+  publishPrivateCalendarEvent,
+} from "../nostr/events";
+import { EventKinds } from "../nostr/kinds";
 import {
   createBookingRequestsSubscription,
   createBookingResponsesSubscription,
@@ -157,6 +161,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             start: details.start,
             end: details.end,
             title: details.title,
+            pageName: details.pageName,
             note: details.note,
             dTag: details.dTag,
             viewKey: details.viewKey,
@@ -342,7 +347,11 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef, {
       onRelayComplete: callbacks?.onCalendarRelayComplete,
     });
-    const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
+    const {
+      eventDTag,
+      relayUrl: eventRelayHint,
+      viewKey: parsedViewKey,
+    } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
       id: eventDTag,
@@ -381,6 +390,14 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       status: "approved",
       eventRef,
       viewKey,
+      pageName: request.pageName ?? request.schedulingPageRef.split(":")[2],
+      calendarEventUrl: buildPrivateCalendarEventUrl({
+        kind: EventKinds.PrivateCalendarEvent,
+        pubkey: authorPubkey,
+        dTag: request.dTag,
+        viewKey,
+        relayHint: eventRelayHint,
+      }),
       onRelayComplete: callbacks?.onResponseRelayComplete,
     });
 
@@ -423,6 +440,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       end: request.end,
       status: "declined",
       reason,
+      pageName: request.pageName ?? request.schedulingPageRef.split(":")[2],
     }).catch((err) => {
       console.error("Failed to send booking decline response:", err);
     });
