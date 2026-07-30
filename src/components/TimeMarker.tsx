@@ -46,6 +46,8 @@ export const TimeMarker = ({
         "--mui-palette-divider": "var(--fc-time-marker-color)",
         width: "100%",
         position: "absolute",
+        zIndex: 1,
+        pointerEvents: "none",
         height: "4px",
         display: "flex",
         alignItems: "center",

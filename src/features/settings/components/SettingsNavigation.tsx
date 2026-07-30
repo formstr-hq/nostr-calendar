@@ -72,7 +72,7 @@ export function SettingsNavigation() {
             }}
           />
         }
-        sx={{ justifyContent: "space-between" }}
+        sx={{ justifyContent: "space-between", color: "text.primary" }}
       >
         {intl.formatMessage({ id: active.messageId })}
       </Button>
@@ -82,6 +82,7 @@ export function SettingsNavigation() {
             mt: 1,
             p: 1,
             bgcolor: "background.paper",
+            color: "text.primary",
             border: "1px solid",
             borderColor: "divider",
             borderRadius: 1.5,

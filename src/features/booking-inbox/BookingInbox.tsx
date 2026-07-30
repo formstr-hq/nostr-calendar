@@ -166,7 +166,17 @@ export function BookingInbox() {
         mb={2}
         alignItems={mobile ? "stretch" : "center"}
       >
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 44 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{
+            minHeight: 44,
+            "& .MuiTab-root.Mui-selected": {
+              backgroundColor: "primary.main",
+              color: "primary.contrastText",
+            },
+          }}
+        >
           <Tab
             value="incoming"
             label={`Incoming${incomingRequests.filter((r) => r.status === "pending").length ? ` (${incomingRequests.filter((r) => r.status === "pending").length})` : ""}`}
