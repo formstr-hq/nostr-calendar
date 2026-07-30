@@ -9,7 +9,7 @@ test("mobile day view hides desktop navigation arrows", async ({
 }) => {
   await navigate(page, "/d/2026/7/20");
   await expect(page.getByTestId("topbar-date-label")).toHaveText(
-    "Jul 20, 2026",
+    "Mon, Jul 20, 2026",
   );
 
   // Prev/next arrows are desktop-only — mobile navigates by swiping.

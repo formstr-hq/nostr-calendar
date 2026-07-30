@@ -25,6 +25,7 @@ interface TopBarProps {
   mode: "calendar" | "title";
   title?: string;
   dateLabel?: string;
+  dateLabelMobile?: string;
   view?: Layout;
   onViewChange?: (view: Layout) => void;
   onPrev?: () => void;
@@ -42,6 +43,7 @@ export function TopBar({
   mode,
   title,
   dateLabel,
+  dateLabelMobile,
   view,
   onViewChange,
   onPrev,
@@ -158,7 +160,7 @@ export function TopBar({
               data-testid="topbar-date-label"
               sx={{ fontWeight: 800, fontSize: isMobile ? 15 : 20 }}
             >
-              {dateLabel}
+              {isMobile ? (dateLabelMobile ?? dateLabel) : dateLabel}
             </Typography>
           </Box>
         ) : (

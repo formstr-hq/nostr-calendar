@@ -17,7 +17,7 @@ function formatDateLabel(
   weekStart: WeekStart,
 ): string {
   if (layout === "month") return date.format("MMMM YYYY");
-  if (layout === "day") return date.format("MMM D, YYYY");
+  if (layout === "day") return date.format("dddd, MMM D, YYYY");
   const start = startOfConfiguredWeek(date, weekStart);
   return `${start.format("DD")}-${start
     .add(6, "day")
@@ -41,6 +41,7 @@ export interface CalendarTopBarProps {
   mode: "calendar" | "title";
   title?: string;
   dateLabel?: string;
+  dateLabelMobile?: string;
   view?: Layout;
   onViewChange?: (view: Layout) => void;
   onPrev?: () => void;
@@ -85,6 +86,8 @@ export function useCalendarTopBarProps(): CalendarTopBarProps {
   return {
     mode: "calendar",
     dateLabel: formatDateLabel(date, layout, weekStart),
+    dateLabelMobile:
+      layout === "day" ? date.format("ddd, MMM D, YYYY") : undefined,
     view: layout,
     onViewChange: (newLayout) =>
       navigate(getRouteFromDate(date, newLayout, weekStart)),

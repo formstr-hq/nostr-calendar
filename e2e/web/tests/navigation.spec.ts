@@ -121,7 +121,7 @@ test("deep links open the right view and date", async ({
   const dateLabel = page.getByTestId("topbar-date-label");
 
   await navigate(page, "/d/2026/7/20");
-  await expect(dateLabel).toHaveText("Jul 20, 2026");
+  await expect(dateLabel).toHaveText("Monday, Jul 20, 2026");
 
   await navigate(page, "/m/2026/12");
   await expect(dateLabel).toHaveText("December 2026");
@@ -133,10 +133,10 @@ test("sidebar mini calendar navigates to the picked date", async ({
   const dateLabel = page.getByTestId("topbar-date-label");
 
   await navigate(page, "/d/2026/7/10");
-  await expect(dateLabel).toHaveText("Jul 10, 2026");
+  await expect(dateLabel).toHaveText("Friday, Jul 10, 2026");
 
   // The desktop Sidebar is always present — no drawer to open.
   await page.getByRole("gridcell", { name: "20", exact: true }).first().click();
 
-  await expect(dateLabel).toHaveText("Jul 20, 2026");
+  await expect(dateLabel).toHaveText("Monday, Jul 20, 2026");
 });
