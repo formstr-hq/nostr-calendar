@@ -220,6 +220,8 @@ type Props = {
   total?: number;
   onClose: () => void;
   onSubmitted: (response: NostrEvent | null) => void;
+  /** Lets a surrounding flow accept an already-published response. */
+  onUseExistingSubmission?: (response: NostrEvent) => void;
 };
 
 export function FormFillerDialog({
@@ -229,6 +231,7 @@ export function FormFillerDialog({
   total,
   onClose,
   onSubmitted,
+  onUseExistingSubmission,
 }: Props) {
   const intl = useIntl();
   const theme = useTheme();
@@ -554,6 +557,22 @@ export function FormFillerDialog({
           <Button onClick={onClose} disabled={submitting} color="inherit">
             {intl.formatMessage({ id: "form.cancel" })}
           </Button>
+          <Button
+            onClick={() => onSubmitted(null)}
+            disabled={submitting}
+            color="inherit"
+          >
+            {intl.formatMessage({ id: "form.skip" })}
+          </Button>
+          {alreadySubmitted && status.event && onUseExistingSubmission && (
+            <Button
+              variant="contained"
+              disabled={submitting}
+              onClick={() => onUseExistingSubmission(status.event!)}
+            >
+              Continue
+            </Button>
+          )}
           {showForm && (
             <Button
               variant="contained"

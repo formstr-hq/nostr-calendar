@@ -3,10 +3,11 @@ import {
   LocalSigner,
   hexToBytes,
   type ActiveSigner,
+  type AndroidSignerAppInfo,
 } from "@formstr/signer";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
-import { nip19 } from "nostr-tools";
-import { fetchUserProfile } from "../nostr";
+import { nip19, SimplePool } from "nostr-tools";
+import { fetchUserProfile } from "../../nostr/profiles";
 import { ANONYMOUS_USER_NAME, DEFAULT_IMAGE_URL } from "../../utils/constants";
 import type { IUser } from "../../stores/user";
 import { isNative } from "../../utils/platform";
@@ -17,7 +18,13 @@ import {
   removeNsec,
   saveNsec,
 } from "../../utils/secureKeyStorage";
-import { pool } from "../nostrRuntime";
+
+/**
+ * Dedicated relay pool for NIP-46 (bunker) remote-signer transport only.
+ * The signer's RPC channel is not app data — it deliberately bypasses the
+ * local-relay worker, which owns every other socket in the app.
+ */
+const signerTransportPool = new SimplePool();
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
 
@@ -95,7 +102,9 @@ class SignerManager {
           case "nip46": {
             // unlock() reuses the stored clientSecretKey to reconnect without
             // re-sending a connect request, so the bunker won't prompt again.
-            const unlocked = await packageSigner.unlock({ pool });
+            const unlocked = await packageSigner.unlock({
+              pool: signerTransportPool,
+            });
             if (unlocked) this.refreshUserProfile(active.pubkey);
             break;
           }
@@ -329,6 +338,10 @@ class SignerManager {
     const account = await packageSigner.loginWithAndroidSigner({ packageName });
     await this.fetchAndCacheUser(account.pubkey);
     this.notify();
+  }
+
+  async listNip55SignerApps(): Promise<AndroidSignerAppInfo[]> {
+    return packageSigner.listAndroidSignerApps();
   }
 
   async loginWithNsec(nsec: string): Promise<void> {

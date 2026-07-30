@@ -14,6 +14,9 @@ interface RelayDotsProps {
   label: string;
   onDetailsClick?: () => void;
   detailsLabel?: string;
+  /** True when no publish is in flight (e.g. before Save is pressed) — dots
+   * render as flat grey placeholders instead of pending/ok/error status. */
+  idle?: boolean;
 }
 
 export function RelayDots({
@@ -22,6 +25,7 @@ export function RelayDots({
   label,
   onDetailsClick,
   detailsLabel,
+  idle,
 }: RelayDotsProps) {
   const normalizedRelays = Array.from(new Set(relays.map(normalizeURL)));
 
@@ -61,10 +65,20 @@ export function RelayDots({
           }}
         >
           {normalizedRelays.map((relayUrl) => {
-            const status = relayStatus[relayUrl] ?? "pending";
+            const status = idle ? "idle" : (relayStatus[relayUrl] ?? "pending");
             return (
               <Tooltip key={relayUrl} title={relayUrl} arrow>
                 <span>
+                  {status === "idle" && (
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "action.disabled",
+                      }}
+                    />
+                  )}
                   {status === "pending" && (
                     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
                       <CircularProgress

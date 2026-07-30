@@ -6,9 +6,13 @@ import { ICalendarEvent } from "../utils/types";
 
 interface ICSUploadProps {
   onImportEvent?: (event: ICalendarEvent) => void;
+  size?: "small" | "medium" | "large";
 }
 
-export const ICSUpload = ({ onImportEvent }: ICSUploadProps) => {
+export const ICSUpload = ({
+  onImportEvent,
+  size = "small",
+}: ICSUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,8 +37,9 @@ export const ICSUpload = ({ onImportEvent }: ICSUploadProps) => {
     <>
       <IconButton
         onClick={() => fileInputRef.current?.click()}
-        size="small"
+        size={size}
         title="Import .ics file"
+        aria-label="Import .ics file"
       >
         <UploadFileIcon />
       </IconButton>

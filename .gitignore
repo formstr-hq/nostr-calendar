@@ -150,5 +150,7 @@ keystore.properties
 # Editor
 .vscode/*
 
-test-results/*
-playwright-report/*
+# E2E test artifacts
+playwright-report/
+test-results/
+.e2e-tsbuild/

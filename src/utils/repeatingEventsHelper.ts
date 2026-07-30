@@ -40,11 +40,45 @@ const EMPTY_RECURRENCE_RULE: ParsedRecurrenceRule = {
   untilDate: null,
 };
 
-function normalizeRule(rule: string): string {
+export function normalizeRule(rule: string): string {
   return rule.replace(RRULE_PREFIX, "").trim();
 }
 
-function parseRuleParts(rule: string): ParsedRuleParts {
+/** Human-readable summary of an RRULE string, e.g. "Every 2 weeks on Monday". */
+export function summarizeRecurrenceRule(rule: string): string {
+  const normalizedRule = normalizeRule(rule);
+  if (!normalizedRule) {
+    return rule;
+  }
+
+  try {
+    const semanticLabel = RRule.fromString(`RRULE:${normalizedRule}`).toText();
+    if (!semanticLabel) {
+      return normalizedRule;
+    }
+
+    return semanticLabel.charAt(0).toUpperCase() + semanticLabel.slice(1);
+  } catch {
+    return normalizedRule;
+  }
+}
+
+export function parseRuleParts(rule: string): Record<string, string> {
+  const parsed: Record<string, string> = {};
+
+  for (const part of normalizeRule(rule).split(";")) {
+    const [rawKey, rawValue] = part.split("=", 2);
+    if (!rawKey || !rawValue) {
+      continue;
+    }
+
+    parsed[rawKey.toUpperCase()] = rawValue.toUpperCase();
+  }
+
+  return parsed;
+}
+
+function parseRuleTokens(rule: string): ParsedRuleParts {
   const parts = normalizeRule(rule).split(";").filter(Boolean);
   const parsed: ParsedRuleParts = {
     hasUnsupportedParts: false,
@@ -198,7 +232,7 @@ export function parseRecurrenceRule(
     return EMPTY_RECURRENCE_RULE;
   }
 
-  const parts = parseRuleParts(rule);
+  const parts = parseRuleTokens(rule);
   const frequency = getFrequencyFromParts(parts);
   if (!frequency) {
     return EMPTY_RECURRENCE_RULE;

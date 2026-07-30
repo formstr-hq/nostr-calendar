@@ -12,36 +12,28 @@
  */
 
 import { create } from "zustand";
+import { dataLayer, type ObserveHandle } from "@formstr/local-relay";
 import { getSecureItem, setSecureItem } from "../common/localStorage";
+import { getUserPublicKey } from "../nostr/crypto";
+import { publishSignedEvent, buildAndSign, makeDTag } from "../nostr/core";
+import { publishDeletionEvent } from "../nostr/events";
 import {
-  getUserPublicKey,
-  getRelays,
-  publishToRelays,
-  publishDeletionEvent,
   publishSchedulingPageKey,
   publishEmptySchedulingPageKey,
   fetchOwnSchedulingPageKeys,
-} from "../common/nostr";
-import { EventKinds } from "../common/EventConfigs";
+} from "../nostr/schedulingKeys";
+import { EventKinds } from "../nostr/kinds";
 import { naddrEncode, nsecEncode, decode } from "nostr-tools/nip19";
 import {
   nostrEventToSchedulingPage,
   schedulingPageToTags,
 } from "../utils/parser";
 import type { ISchedulingPage } from "../utils/types";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
-import { nostrRuntime } from "../common/nostrRuntime";
-import { signerManager } from "../common/signer";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { getRelays } from "../common/relayConfig";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { getAppBaseUrl, isNative } from "../utils/platform";
-import type { Event, UnsignedEvent, Filter } from "nostr-tools";
-import {
-  generateSecretKey,
-  getEventHash,
-  getPublicKey,
-  nip44,
-} from "nostr-tools";
+import type { Event, Filter } from "nostr-tools";
+import { generateSecretKey, getPublicKey, nip44 } from "nostr-tools";
 
 /**
  * Cached map of `dTag -> nsec-encoded viewKey` for the current user's own
@@ -88,18 +80,29 @@ function getOwnSchedulingPageKeyIndex(): Map<string, string> {
   return ownSchedulingPageKeyIndex ?? new Map();
 }
 
-async function publishSchedulingPage(page: ISchedulingPage): Promise<{
+async function publishSchedulingPage(
+  page: ISchedulingPage,
+  callbacks?: {
+    onRelayComplete?: (url: string, success: boolean) => void;
+    onKeyRelayComplete?: (url: string, success: boolean) => void;
+    onKeyEventReady?: (event: Event) => void;
+    deferKeyPublish?: boolean;
+  },
+): Promise<{
   event: Event;
   viewKey: string;
 }> {
   const pubKey = await getUserPublicKey();
   const tags = schedulingPageToTags(page);
 
-  // All scheduling pages are encrypted as of vNEXT. Public scheduling
-  // pages are no longer supported by this client; the page body is always
-  // wrapped in a NIP-44 envelope keyed by an ephemeral viewKey shared
-  // through the page's URL (?viewKey=...).
-  const viewSecretKey = generateSecretKey();
+  // All scheduling pages are encrypted as of vNEXT. A page's view key is
+  // its share-link capability, so it must remain stable across edits: a new
+  // event version is encrypted with the existing key when one is present.
+  // Only creating a page (or recovering a legacy page with no key) creates a
+  // fresh key.
+  const viewSecretKey = page.viewKey
+    ? hexToBytes(page.viewKey)
+    : generateSecretKey();
   const viewPublicKey = getPublicKey(viewSecretKey);
   const viewKeyHex = bytesToHex(viewSecretKey);
   const conversationKey = nip44.getConversationKey(
@@ -109,20 +112,23 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
   const content = nip44.encrypt(JSON.stringify(tags), conversationKey);
   const publishTags = [["d", page.id]];
 
-  const baseEvent: UnsignedEvent = {
+  const signedEvent = await buildAndSign({
     kind: EventKinds.SchedulingPage,
     pubkey: pubKey,
     tags: publishTags,
     content,
-    created_at: Math.floor(Date.now() / 1000),
-  };
+    // Replaceable events with equal created_at are tie-broken by lowest id
+    // (NIP-01), so an update published in the same second as the previous
+    // version could silently lose. Stay strictly after the version we replace.
+    created_at: Math.max(
+      Math.floor(Date.now() / 1000),
+      (page.createdAt ?? 0) + 1,
+    ),
+  });
 
-  const signer = await signerManager.getSigner();
-  const signedEvent = await signer.signEvent(baseEvent);
-  signedEvent.id = getEventHash(baseEvent);
-
-  await publishToRelays(signedEvent);
-  nostrRuntime.addEvent(signedEvent);
+  await publishSignedEvent(signedEvent, {
+    onRelayComplete: callbacks?.onRelayComplete,
+  });
 
   // Publish a self-encrypted kind-32680 record so the page is recoverable
   // on a fresh device or after a refresh on web (where secure storage is
@@ -133,6 +139,9 @@ async function publishSchedulingPage(page: ISchedulingPage): Promise<{
     await publishSchedulingPageKey({
       dTag: page.id,
       viewKeyNsec,
+      onRelayComplete: callbacks?.onKeyRelayComplete,
+      onEventReady: callbacks?.onKeyEventReady,
+      deferPublish: callbacks?.deferKeyPublish,
     });
     setOwnSchedulingPageKey(page.id, viewKeyNsec);
   } catch (err) {
@@ -149,14 +158,13 @@ function fetchUserSchedulingPages(
   pubkey: string,
   onEvent: (event: Event) => void,
   onEose?: () => void,
-) {
-  const relayList = getRelays();
+): ObserveHandle {
   const filter: Filter = {
     kinds: [EventKinds.SchedulingPage],
     authors: [pubkey],
   };
 
-  return nostrRuntime.subscribe(relayList, filter, {
+  return dataLayer.observe([filter], {
     onEvent,
     onEose,
   });
@@ -179,7 +187,7 @@ const saveToStorage = (pages: ISchedulingPage[]) => {
   setSecureItem(STORAGE_KEY, pages);
 };
 
-let subscriptionHandle: SubscriptionHandle | undefined;
+let subscriptionHandle: ObserveHandle | undefined;
 
 interface SchedulingPagesState {
   pages: ISchedulingPage[];
@@ -189,8 +197,22 @@ interface SchedulingPagesState {
   fetchPages: () => Promise<void>;
   createPage: (
     page: Omit<ISchedulingPage, "id" | "eventId" | "user" | "createdAt">,
+    callbacks?: {
+      onRelayComplete?: (url: string, success: boolean) => void;
+      onKeyRelayComplete?: (url: string, success: boolean) => void;
+      onKeyEventReady?: (event: Event) => void;
+      deferKeyPublish?: boolean;
+    },
   ) => Promise<ISchedulingPage>;
-  updatePage: (page: ISchedulingPage) => Promise<ISchedulingPage>;
+  updatePage: (
+    page: ISchedulingPage,
+    callbacks?: {
+      onRelayComplete?: (url: string, success: boolean) => void;
+      onKeyRelayComplete?: (url: string, success: boolean) => void;
+      onKeyEventReady?: (event: Event) => void;
+      deferKeyPublish?: boolean;
+    },
+  ) => Promise<ISchedulingPage>;
   deletePage: (pageId: string) => Promise<void>;
   getPageById: (pageId: string) => ISchedulingPage | undefined;
   getNAddr: (page: ISchedulingPage) => string;
@@ -283,25 +305,34 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     );
   },
 
-  createPage: async (pageData) => {
+  createPage: async (pageData, callbacks) => {
     const userPubkey = await getUserPublicKey();
-    const dTagRoot = `${JSON.stringify(pageData)}-${Date.now()}`;
-    const id = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
+    const id = makeDTag(`${JSON.stringify(pageData)}-${Date.now()}`);
 
     const page: ISchedulingPage = {
       ...pageData,
       id,
       eventId: "",
       user: userPubkey,
-      createdAt: Math.floor(Date.now() / 1000),
+      createdAt: 0,
     };
 
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      callbacks,
+    );
     page.eventId = signedEvent.id;
     page.viewKey = viewKey;
+    page.createdAt = signedEvent.created_at;
 
     set((state) => {
-      const pages = [...state.pages, page];
+      // Upsert: the local relay fans the published event out to the standing
+      // pages observe before this resolves, so it may already be here — and
+      // this local copy is the authoritative one (it carries the viewKey).
+      const exists = state.pages.some((p) => p.id === page.id);
+      const pages = exists
+        ? state.pages.map((p) => (p.id === page.id ? page : p))
+        : [...state.pages, page];
       saveToStorage(pages);
       return { pages };
     });
@@ -309,13 +340,16 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
     return page;
   },
 
-  updatePage: async (page) => {
-    const { event: signedEvent, viewKey } = await publishSchedulingPage(page);
+  updatePage: async (page, callbacks) => {
+    const { event: signedEvent, viewKey } = await publishSchedulingPage(
+      page,
+      callbacks,
+    );
     const updated = {
       ...page,
       eventId: signedEvent.id,
       viewKey,
-      createdAt: Math.floor(Date.now() / 1000),
+      createdAt: signedEvent.created_at,
     };
 
     set((state) => {
@@ -378,7 +412,7 @@ export const useSchedulingPages = create<SchedulingPagesState>((set, get) => ({
 
   clearCachedPages: async () => {
     if (subscriptionHandle) {
-      subscriptionHandle.unsubscribe();
+      subscriptionHandle.unobserve();
       subscriptionHandle = undefined;
     }
     set({ pages: [], isLoaded: false });

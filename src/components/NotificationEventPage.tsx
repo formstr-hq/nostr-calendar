@@ -3,7 +3,6 @@ import { useTimeBasedEvents } from "../stores/events";
 import { CalendarEvent } from "./CalendarEvent";
 import { Box, IconButton, Typography } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
-import { Header, HeaderSpacer } from "./Header";
 import { useIntl } from "react-intl";
 
 export const NotificationEventPage = () => {
@@ -14,26 +13,22 @@ export const NotificationEventPage = () => {
   const event = events.find((e) => e.id === eventId);
 
   return (
-    <>
-      <Header />
-      <HeaderSpacer />
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-          <IconButton onClick={() => navigate(-1)}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h5">
-            {event?.title ?? intl.formatMessage({ id: "event.event" })}
-          </Typography>
-        </Box>
-        {event ? (
-          <CalendarEvent event={event} />
-        ) : (
-          <Typography>
-            {intl.formatMessage({ id: "event.eventNotFound" })}
-          </Typography>
-        )}
+    <Box sx={{ p: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+        <IconButton onClick={() => navigate(-1)}>
+          <ArrowBack />
+        </IconButton>
+        <Typography variant="h5">
+          {event?.title ?? intl.formatMessage({ id: "event.event" })}
+        </Typography>
       </Box>
-    </>
+      {event ? (
+        <CalendarEvent event={event} />
+      ) : (
+        <Typography>
+          {intl.formatMessage({ id: "event.eventNotFound" })}
+        </Typography>
+      )}
+    </Box>
   );
 };

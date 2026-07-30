@@ -6,31 +6,44 @@
  * outgoing bookings (as the person requesting an appointment).
  *
  * Key behaviors:
- * - Subscribes to booking request gift wraps (kind 1057) for incoming requests
- * - Subscribes to booking response gift wraps (kind 1058) for outgoing responses
+ * - Subscribes to booking request gift wraps (kind 1059, k=1057; legacy 1057
+ *   dual-read) for incoming requests
+ * - Subscribes to booking response gift wraps (kind 1059, k=1058; legacy 1058
+ *   dual-read) for outgoing responses — across the logged-in pubkey and any
+ *   locally-stored anonymous booking identities
  * - Handles approval: creates private event + sends invitation gift wrap + response
  * - Handles decline: sends decline response gift wrap
  * - Periodically checks for expired requests
+ * - Dismisses resolved requests/bookings via NIP-09, mirroring invitations
  */
 
 import { create } from "zustand";
+import { nip19 } from "nostr-tools";
+import { LocalSigner, type ActiveSigner } from "@formstr/signer";
+import { signerManager } from "../common/signer";
 import { getItem, setItem, setSecureItem } from "../common/localStorage";
+import { getUserPublicKey } from "../nostr/crypto";
 import {
-  getUserPublicKey,
+  buildPrivateCalendarEventUrl,
   publishPrivateCalendarEvent,
-  getRelays,
-  publishToRelays,
-} from "../common/nostr";
-import * as nip59 from "../common/nip59";
-import { EventKinds } from "../common/EventConfigs";
-import { nostrRuntime } from "../common/nostrRuntime";
+} from "../nostr/events";
+import { EventKinds } from "../nostr/kinds";
+import {
+  createBookingRequestsSubscription,
+  createBookingResponsesSubscription,
+  unwrapBookingRequest,
+  unwrapBookingResponse,
+  sendBookingResponse,
+  dismissBookingRequestWrap,
+  dismissBookingResponseWrap,
+} from "../nostr/booking";
+import type { StandingSubscription } from "../nostr/subscribe";
 import type {
   IBookingRequest,
   IOutgoingBooking,
   ICalendarEvent,
 } from "../utils/types";
 import { TEMP_CALENDAR_ID } from "./eventDetails";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
 import { useSchedulingPages } from "./schedulingPages";
 import { useCalendarLists } from "./calendarLists";
 import { useBusyList } from "./busyList";
@@ -38,133 +51,13 @@ import { useTimeBasedEvents } from "./events";
 import { parseEventRef } from "../utils/calendarListTypes";
 import { Event } from "nostr-tools";
 import {
+  getAnonBookingKey,
+  getAllAnonBookingPubkeys,
+} from "../utils/anonBookingIdentity";
+import {
   BG_KEY_LAST_BOOKING_REQUEST_FETCH_TIME,
   BG_KEY_LAST_BOOKING_RESPONSE_FETCH_TIME,
 } from "../utils/constants";
-
-function subscribeBookingRequests(
-  pubkey: string,
-  onEvent: (event: Event) => void,
-  onEose?: () => void,
-) {
-  const relayList = getRelays();
-  const filter = {
-    kinds: [EventKinds.BookingRequestGiftWrap],
-    "#p": [pubkey],
-    limit: 50,
-  };
-  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
-}
-
-function subscribeBookingResponses(
-  pubkey: string,
-  onEvent: (event: Event) => void,
-  onEose?: () => void,
-) {
-  const relayList = getRelays();
-  const filter = {
-    kinds: [EventKinds.BookingResponseGiftWrap],
-    "#p": [pubkey],
-    limit: 50,
-  };
-  return nostrRuntime.subscribe(relayList, filter, { onEvent, onEose });
-}
-
-async function unwrapBookingRequest(giftWrap: Event): Promise<{
-  schedulingPageRef: string;
-  bookerPubkey: string;
-  start: number;
-  end: number;
-  title: string;
-  note: string;
-  dTag: string;
-  viewKey?: string;
-}> {
-  const rumor = await nip59.unwrapEvent(giftWrap);
-  const getTag = (name: string) =>
-    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
-  return {
-    schedulingPageRef: getTag("a"),
-    bookerPubkey: rumor.pubkey,
-    start: Number(getTag("start")) * 1000,
-    end: Number(getTag("end")) * 1000,
-    title: getTag("title"),
-    note: getTag("note"),
-    dTag: getTag("d"),
-    viewKey: getTag("viewKey") || undefined,
-  };
-}
-
-async function unwrapBookingResponse(giftWrap: Event): Promise<{
-  schedulingPageRef: string;
-  creatorPubkey: string;
-  start: number;
-  end: number;
-  status: "approved" | "declined";
-  eventRef?: string;
-  viewKey?: string;
-  reason?: string;
-}> {
-  const rumor = await nip59.unwrapEvent(giftWrap);
-  const getTag = (name: string) =>
-    rumor.tags.find((t) => t[0] === name)?.[1] ?? "";
-  return {
-    schedulingPageRef: getTag("a"),
-    creatorPubkey: rumor.pubkey,
-    start: Number(getTag("start")) * 1000,
-    end: Number(getTag("end")) * 1000,
-    status: getTag("status") as "approved" | "declined",
-    eventRef: getTag("event_ref") || undefined,
-    viewKey: getTag("viewKey") || undefined,
-    reason: getTag("reason") || undefined,
-  };
-}
-
-async function sendBookingResponse({
-  schedulingPageRef,
-  bookerPubkey,
-  start,
-  end,
-  status,
-  eventRef,
-  viewKey,
-  reason,
-}: {
-  schedulingPageRef: string;
-  bookerPubkey: string;
-  start: number;
-  end: number;
-  status: "approved" | "declined";
-  eventRef?: string[];
-  viewKey?: string;
-  reason?: string;
-}): Promise<Event> {
-  const userPublicKey = await getUserPublicKey();
-  const tags: string[][] = [
-    ["a", schedulingPageRef],
-    ["start", String(Math.floor(start / 1000))],
-    ["end", String(Math.floor(end / 1000))],
-    ["status", status],
-  ];
-  if (status === "approved" && eventRef) tags.push(["event_ref", ...eventRef]);
-  if (status === "approved" && viewKey) tags.push(["viewKey", viewKey]);
-  if (status === "declined" && reason) tags.push(["reason", reason]);
-
-  const giftWrap = await nip59.wrapEvent(
-    {
-      pubkey: userPublicKey,
-      created_at: Math.floor(Date.now() / 1000),
-      kind: EventKinds.BookingResponseRumor,
-      content: "",
-      tags,
-    },
-    bookerPubkey,
-    EventKinds.BookingResponseGiftWrap,
-    [["status", status]],
-  );
-  await publishToRelays(giftWrap);
-  return giftWrap;
-}
 
 const INCOMING_STORAGE_KEY = "cal:booking_requests_incoming";
 const OUTGOING_STORAGE_KEY = "cal:booking_requests_outgoing";
@@ -177,11 +70,16 @@ const saveOutgoingToStorage = (bookings: IOutgoingBooking[]) => {
   setItem(OUTGOING_STORAGE_KEY, bookings);
 };
 
-let incomingSubHandle: SubscriptionHandle | undefined;
-let outgoingSubHandle: SubscriptionHandle | undefined;
+let incomingSub: StandingSubscription | undefined;
+let outgoingSub: StandingSubscription | undefined;
 let expiryTimer: ReturnType<typeof setInterval> | undefined;
-const processedIncomingIds = new Set<string>();
-const processedOutgoingIds = new Set<string>();
+
+export interface BookingApprovalPublishResult {
+  calendarEvent: Event;
+  invitationGiftWraps: Event[];
+  responseGiftWrap: Event;
+  calendarId: string;
+}
 
 interface BookingRequestsState {
   incomingRequests: IBookingRequest[];
@@ -194,10 +92,21 @@ interface BookingRequestsState {
   fetchIncomingRequests: () => Promise<void>;
   fetchOutgoingBookings: () => Promise<void>;
   addOutgoingBooking: (booking: IOutgoingBooking) => void;
-  approveRequest: (requestId: string, calendarId: string) => Promise<void>;
+  approveRequest: (
+    requestId: string,
+    calendarId: string,
+    callbacks?: {
+      onEventRelayComplete?: (url: string, success: boolean) => void;
+      onInvitationRelayComplete?: (url: string, success: boolean) => void;
+      onCalendarRelayComplete?: (url: string, success: boolean) => void;
+      onResponseRelayComplete?: (url: string, success: boolean) => void;
+    },
+  ) => Promise<BookingApprovalPublishResult | undefined>;
   declineRequest: (requestId: string, reason?: string) => Promise<void>;
   markOutgoingApprovedByDTag: (dTag: string, viewKey: string) => void;
   checkExpiry: () => void;
+  dismissIncomingRequest: (requestId: string) => void;
+  dismissOutgoingBooking: (bookingId: string) => void;
   stopSubscriptions: () => void;
   clearCached: () => Promise<void>;
 }
@@ -226,18 +135,15 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
   },
 
   fetchIncomingRequests: async () => {
-    if (incomingSubHandle) return;
+    if (incomingSub) return;
     if (!get().isLoaded) await get().loadCached();
 
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
 
-    incomingSubHandle = subscribeBookingRequests(
+    incomingSub = createBookingRequestsSubscription(
       userPubkey,
       async (giftWrap: Event) => {
-        if (processedIncomingIds.has(giftWrap.id)) return;
-        processedIncomingIds.add(giftWrap.id);
-
         try {
           const details = await unwrapBookingRequest(giftWrap);
 
@@ -255,11 +161,13 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
             start: details.start,
             end: details.end,
             title: details.title,
+            pageName: details.pageName,
             note: details.note,
             dTag: details.dTag,
             viewKey: details.viewKey,
             receivedAt: giftWrap.created_at * 1000,
             status: "pending",
+            signingNsec: details.signingNsec,
           };
 
           set((state) => {
@@ -279,6 +187,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
         }
       },
     );
+    incomingSub.start();
 
     // Start expiry check timer
     if (!expiryTimer) {
@@ -303,21 +212,51 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     });
   },
 
+  /**
+   * Runs regardless of login state — an anonymous booker (never logged in)
+   * still needs to receive responses to bookings they sent. The subscription
+   * pubkeys union the logged-in user (if any) with every locally-stored
+   * anonymous booking identity; `signerManager.getUser()` is read
+   * synchronously here (not `getUserPublicKey()`) specifically so a
+   * logged-out visitor never triggers the login modal just by loading this
+   * store.
+   */
   fetchOutgoingBookings: async () => {
-    if (outgoingSubHandle) return;
+    if (outgoingSub) return;
     if (!get().isLoaded) await get().loadCached();
 
-    const userPubkey = await getUserPublicKey();
-    if (!userPubkey) return;
+    const userPubkey = signerManager.getUser()?.pubkey ?? "";
+    const anonPubkeys = getAllAnonBookingPubkeys();
+    const pubkeys = [...new Set([userPubkey, ...anonPubkeys])].filter(Boolean);
+    if (pubkeys.length === 0) return;
 
-    outgoingSubHandle = subscribeBookingResponses(
-      userPubkey,
+    outgoingSub = createBookingResponsesSubscription(
+      pubkeys,
       async (giftWrap: Event) => {
-        if (processedOutgoingIds.has(giftWrap.id)) return;
-        processedOutgoingIds.add(giftWrap.id);
-
         try {
-          const details = await unwrapBookingResponse(giftWrap);
+          // The outer `p` tag is plaintext — read it before decrypting to
+          // decide which identity's signer can actually open this wrap.
+          // Real-identity responses use the default signer; anon-addressed
+          // responses look up the matching one-time key by the recipient
+          // pubkey, scanning only pending outgoing bookings' stored dTags
+          // (the same set `anonPubkeys` above was built from).
+          const recipientPubkey = giftWrap.tags.find((t) => t[0] === "p")?.[1];
+          let signer: ActiveSigner | undefined;
+          if (recipientPubkey && recipientPubkey !== userPubkey) {
+            for (const booking of get().outgoingBookings) {
+              if (!booking.dTag) continue;
+              const anonKey = getAnonBookingKey(booking.dTag);
+              if (anonKey?.pubkey !== recipientPubkey) continue;
+              const secretKey = nip19.decode(
+                anonKey.secretKeyNsec as `nsec1${string}`,
+              ).data as Uint8Array;
+              signer = new LocalSigner(secretKey);
+              break;
+            }
+            if (!signer) return; // No matching local identity — not ours.
+          }
+
+          const details = await unwrapBookingResponse(giftWrap, signer);
 
           // Find matching outgoing booking by scheduling page ref + time
           set((state) => {
@@ -335,6 +274,8 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
                   eventRef: details.eventRef,
                   viewKey: details.viewKey,
                   declineReason: details.reason,
+                  responseGiftWrapId: giftWrap.id,
+                  signingNsec: details.signingNsec,
                 };
               }
               return booking;
@@ -355,9 +296,10 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
         }
       },
     );
+    outgoingSub.start();
   },
 
-  approveRequest: async (requestId, calendarId) => {
+  approveRequest: async (requestId, calendarId, callbacks) => {
     const request = get().incomingRequests.find((r) => r.id === requestId);
     if (!request || request.status !== "pending") return;
     const pubkey = await getUserPublicKey();
@@ -389,20 +331,27 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
 
     // Use the booker's pre-generated d-tag and view key so the published
     // event matches exactly what the booker already added to their calendar.
-    const { eventRef, authorPubkey, viewKey } =
+    const { eventRef, authorPubkey, viewKey, calendarEvent, giftWraps } =
       await publishPrivateCalendarEvent(event, {
         existingDTag: request.dTag,
         existingViewKey: request.viewKey,
         invitationGiftWrapTags: [["booking", "true"]],
-        waitForAll: false,
+        onRelayComplete: callbacks?.onEventRelayComplete,
+        onInviteRelayComplete: callbacks?.onInvitationRelayComplete,
       });
 
     // After PR #116 publishPrivateCalendarEvent no longer auto-adds the
     // event to the host's calendar list. Add it explicitly here so the
     // approved booking shows up on the host's calendar without waiting
     // for a relay round-trip.
-    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef);
-    const { eventDTag, viewKey: parsedViewKey } = parseEventRef(eventRef);
+    await useCalendarLists.getState().addEventToCalendar(calendarId, eventRef, {
+      onRelayComplete: callbacks?.onCalendarRelayComplete,
+    });
+    const {
+      eventDTag,
+      relayUrl: eventRelayHint,
+      viewKey: parsedViewKey,
+    } = parseEventRef(eventRef);
     useTimeBasedEvents.getState().addEvent({
       ...event,
       id: eventDTag,
@@ -433,7 +382,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       return { incomingRequests, incomingUnreadCount };
     });
 
-    sendBookingResponse({
+    const responseGiftWrap = await sendBookingResponse({
       schedulingPageRef: request.schedulingPageRef,
       bookerPubkey: request.bookerPubkey,
       start: request.start,
@@ -441,9 +390,23 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       status: "approved",
       eventRef,
       viewKey,
-    }).catch((err) => {
-      console.error("Failed to send booking approval response:", err);
+      pageName: request.pageName ?? request.schedulingPageRef.split(":")[2],
+      calendarEventUrl: buildPrivateCalendarEventUrl({
+        kind: EventKinds.PrivateCalendarEvent,
+        pubkey: authorPubkey,
+        dTag: request.dTag,
+        viewKey,
+        relayHint: eventRelayHint,
+      }),
+      onRelayComplete: callbacks?.onResponseRelayComplete,
     });
+
+    return {
+      calendarEvent: calendarEvent,
+      invitationGiftWraps: giftWraps,
+      responseGiftWrap,
+      calendarId,
+    };
   },
 
   declineRequest: async (requestId, reason) => {
@@ -477,6 +440,7 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
       end: request.end,
       status: "declined",
       reason,
+      pageName: request.pageName ?? request.schedulingPageRef.split(":")[2],
     }).catch((err) => {
       console.error("Failed to send booking decline response:", err);
     });
@@ -547,21 +511,64 @@ export const useBookingRequests = create<BookingRequestsState>((set, get) => ({
     });
   },
 
+  /**
+   * Dismisses a resolved incoming request, mirroring
+   * `stores/invitations.ts`'s `dismissInvitation`: NIP-09 is the only
+   * dismissal publish, using the ephemeral wrap key when available and
+   * falling back to a signer-authored deletion request otherwise.
+   */
+  dismissIncomingRequest: (requestId) => {
+    set((state) => {
+      const request = state.incomingRequests.find((r) => r.id === requestId);
+      const incomingRequests = state.incomingRequests.filter(
+        (r) => r.id !== requestId,
+      );
+      if (request) {
+        void dismissBookingRequestWrap(request.giftWrapId, request.signingNsec);
+      }
+      const incomingUnreadCount = incomingRequests.filter(
+        (r) => r.status === "pending",
+      ).length;
+      saveIncomingToStorage(incomingRequests);
+      return { incomingRequests, incomingUnreadCount };
+    });
+  },
+
+  /**
+   * Dismisses a resolved outgoing booking. Targets the response gift wrap
+   * (the one this client actually received) — absent for bookings that
+   * expired without ever getting a response, in which case dismiss is
+   * local-only.
+   */
+  dismissOutgoingBooking: (bookingId) => {
+    set((state) => {
+      const booking = state.outgoingBookings.find((b) => b.id === bookingId);
+      const outgoingBookings = state.outgoingBookings.filter(
+        (b) => b.id !== bookingId,
+      );
+      if (booking?.responseGiftWrapId) {
+        void dismissBookingResponseWrap(
+          booking.responseGiftWrapId,
+          booking.signingNsec,
+        );
+      }
+      const outgoingUnreadCount = outgoingBookings.filter(
+        (b) => b.status === "pending",
+      ).length;
+      saveOutgoingToStorage(outgoingBookings);
+      return { outgoingBookings, outgoingUnreadCount };
+    });
+  },
+
   stopSubscriptions: () => {
-    if (incomingSubHandle) {
-      incomingSubHandle.unsubscribe();
-      incomingSubHandle = undefined;
-    }
-    if (outgoingSubHandle) {
-      outgoingSubHandle.unsubscribe();
-      outgoingSubHandle = undefined;
-    }
+    incomingSub?.stop();
+    incomingSub = undefined;
+    outgoingSub?.stop();
+    outgoingSub = undefined;
     if (expiryTimer) {
       clearInterval(expiryTimer);
       expiryTimer = undefined;
     }
-    processedIncomingIds.clear();
-    processedOutgoingIds.clear();
   },
 
   clearCached: async () => {

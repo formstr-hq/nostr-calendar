@@ -8,7 +8,7 @@ export enum ROUTES {
   EventPage = "/event/:naddr",
   EditEventPage = "/event/edit/:naddr",
   DuplicateEventPage = "/event/duplicate/:naddr",
-  WeekCalendar = "/w/:year/:weekNumber",
+  WeekCalendar = "/w/:year/:startDayOfWeek",
   DayCalendar = "/d/:year/:month/:day",
   MonthCalendar = "/m/:year/:monthNumber",
   Notifications = "/notifications",
@@ -17,6 +17,7 @@ export enum ROUTES {
   SchedulingPageEdit = "/schedule/edit/:naddr",
   SchedulingPagePublic = "/schedule/:naddr",
   Bookings = "/bookings",
+  Settings = "/settings",
 }
 
 export function getEventPage(

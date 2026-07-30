@@ -1,0 +1,585 @@
+<title>nostr-calendar — Nostr Layer Reference</title>
+<style>
+  :root{
+    --bg:#eef1ef;
+    --bg-raised:#ffffff;
+    --ink:#111c19;
+    --ink-dim:#4b5b56;
+    --ink-faint:#7c8b86;
+    --line:#d3dbd7;
+    --accent:#0f7a7a;
+    --accent-ink:#08504f;
+    --accent-bg:#e2f2f1;
+    --amber:#a3641f;
+    --amber-bg:#faf1e3;
+    --code-bg:#e7ece9;
+    --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0b1412;
+      --bg-raised:#101c19;
+      --ink:#dfe9e5;
+      --ink-dim:#a3b3ad;
+      --ink-faint:#71847d;
+      --line:#24352f;
+      --accent:#3fc6bf;
+      --accent-ink:#8fe6e0;
+      --accent-bg:#122824;
+      --amber:#e3a45c;
+      --amber-bg:#241c10;
+      --code-bg:#132420;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1412; --bg-raised:#101c19; --ink:#dfe9e5; --ink-dim:#a3b3ad; --ink-faint:#71847d;
+    --line:#24352f; --accent:#3fc6bf; --accent-ink:#8fe6e0; --accent-bg:#122824; --amber:#e3a45c; --amber-bg:#241c10; --code-bg:#132420;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1ef; --bg-raised:#ffffff; --ink:#111c19; --ink-dim:#4b5b56; --ink-faint:#7c8b86;
+    --line:#d3dbd7; --accent:#0f7a7a; --accent-ink:#08504f; --accent-bg:#e2f2f1; --amber:#a3641f; --amber-bg:#faf1e3; --code-bg:#e7ece9;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:var(--font-body);
+    font-size:16px; line-height:1.6;
+  }
+  a{color:var(--accent-ink);}
+  a:focus-visible, button:focus-visible, summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .shell{
+    display:grid;
+    grid-template-columns: 260px minmax(0,1fr);
+    gap:0;
+    max-width:1200px;
+    margin:0 auto;
+  }
+  @media (max-width: 900px){
+    .shell{grid-template-columns:1fr;}
+    nav.toc{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);}
+  }
+
+  nav.toc{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:28px 18px 40px 24px;
+    border-right:1px solid var(--line);
+    font-size:13.5px;
+  }
+  nav.toc .brand{
+    font-family:var(--font-display); font-size:17px; font-weight:600;
+    margin-bottom:2px; letter-spacing:.2px;
+  }
+  nav.toc .brand-sub{ color:var(--ink-faint); font-size:12px; margin-bottom:22px; }
+  nav.toc h4{
+    text-transform:uppercase; letter-spacing:.08em; font-size:11px; color:var(--ink-faint);
+    margin:20px 0 6px; font-weight:600;
+  }
+  nav.toc ul{list-style:none; margin:0; padding:0;}
+  nav.toc li{margin:0;}
+  nav.toc a{
+    display:block; color:var(--ink-dim); text-decoration:none; padding:4px 8px; margin:1px -8px;
+    border-radius:5px;
+  }
+  nav.toc a:hover{background:var(--accent-bg); color:var(--accent-ink);}
+
+  main{padding:44px 40px 90px; min-width:0;}
+  .masthead{max-width:700px; margin-bottom:48px;}
+  .masthead .kicker{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--accent-ink);
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  h1{
+    font-family:var(--font-display); font-weight:600; font-size:2.3rem; line-height:1.15;
+    margin:0 0 14px; text-wrap:balance;
+  }
+  .masthead p{color:var(--ink-dim); font-size:1.02rem; max-width:60ch; margin:0 0 8px;}
+  .masthead .meta{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-faint); margin-top:16px;}
+
+  section.category{margin:56px 0; max-width:760px;}
+  section.category > h2{
+    font-family:var(--font-display); font-size:1.55rem; font-weight:600;
+    border-bottom:2px solid var(--ink); padding-bottom:10px; margin:0 0 8px;
+    text-wrap:balance;
+  }
+  section.category > .category-note{color:var(--ink-dim); font-size:.95rem; margin:0 0 28px;}
+
+  article.flow{
+    margin:36px 0; padding-top:8px; border-top:1px solid var(--line);
+    scroll-margin-top:20px;
+  }
+  article.flow:first-of-type{border-top:none;}
+  article.flow h3{
+    font-family:var(--font-display); font-size:1.18rem; font-weight:600; margin:18px 0 4px;
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  }
+  .trigger{color:var(--ink-dim); font-size:.92rem; margin:0 0 14px;}
+  .trigger strong{color:var(--ink); font-weight:600;}
+
+  .kind-badge{
+    font-family:var(--font-mono); font-size:12.5px; font-weight:600;
+    color:var(--accent-ink); background:var(--accent-bg);
+    border:1px solid var(--accent); border-radius:20px;
+    padding:1px 10px; white-space:nowrap;
+  }
+  .kind-badge.legacy{ color:var(--ink-faint); background:var(--code-bg); border-color:var(--line); font-weight:500;}
+
+  .field{ margin:14px 0; }
+  .field > .label{
+    font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint);
+    font-weight:600; margin-bottom:6px;
+  }
+  .field > p{margin:0 0 6px; font-size:.96rem;}
+  .field ul{margin:4px 0 0; padding-left:1.2em; font-size:.96rem;}
+  .field li{margin:3px 0;}
+  code, .tag, .kv{
+    font-family:var(--font-mono); font-size:.87em; background:var(--code-bg);
+    padding:1px 5px; border-radius:4px; color:var(--ink);
+  }
+
+  table.tagtable{ width:100%; border-collapse:collapse; margin:6px 0 4px; font-size:.88rem; }
+  table.tagtable th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-faint); font-weight:600; padding:4px 10px 6px 0; border-bottom:1px solid var(--line);
+  }
+  table.tagtable td{ padding:6px 10px 6px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.tagtable tr:last-child td{border-bottom:none;}
+  table.tagtable td.tagname{font-family:var(--font-mono); white-space:nowrap; color:var(--accent-ink);}
+  .req{ font-size:10.5px; font-family:var(--font-mono); padding:1px 6px; border-radius:3px; }
+  .req.yes{ background:var(--accent-bg); color:var(--accent-ink); }
+  .req.no{ background:var(--code-bg); color:var(--ink-faint); }
+
+  .callout{
+    margin:16px 0; padding:12px 16px; border-left:3px solid var(--amber);
+    background:var(--amber-bg); border-radius:0 6px 6px 0; font-size:.92rem;
+  }
+  .callout .label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; font-weight:700;
+    color:var(--amber); margin-bottom:4px; display:block;
+  }
+  .callout p{margin:0;}
+  .callout p + p{margin-top:6px;}
+
+  .kindtable{ width:100%; border-collapse:collapse; font-size:.87rem; margin:10px 0 0;}
+  .kindtable th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint);
+    padding:5px 12px 7px 0; border-bottom:1px solid var(--line); font-weight:600;
+  }
+  .kindtable td{padding:6px 12px 6px 0; border-bottom:1px solid var(--line);}
+  .kindtable tr:hover td{background:var(--accent-bg);}
+  .kindtable td.k{font-family:var(--font-mono); font-weight:600; color:var(--accent-ink);}
+  .kindtable td.spec{color:var(--ink-faint); font-size:.85em;}
+
+  footer{max-width:760px; margin:70px 0 20px; padding-top:20px; border-top:1px solid var(--line); color:var(--ink-faint); font-size:.85rem;}
+</style>
+
+<div class="shell">
+  <nav class="toc">
+    <div class="brand">nostr-calendar</div>
+    <div class="brand-sub">Nostr layer reference</div>
+
+    <h4>Reference</h4>
+    <ul><li><a href="#kind-index">Kind index</a></li></ul>
+
+    <h4>Calendar &amp; events</h4>
+    <ul>
+      <li><a href="#f-priv-create">Private event: create</a></li>
+      <li><a href="#f-pub-create">Public event: create</a></li>
+      <li><a href="#f-priv-edit">Private event: edit</a></li>
+      <li><a href="#f-pub-edit">Public event: edit</a></li>
+      <li><a href="#f-duplicate">Event duplication</a></li>
+      <li><a href="#f-delete">Event deletion</a></li>
+      <li><a href="#f-rsvp-priv">RSVP: private</a></li>
+      <li><a href="#f-rsvp-pub">RSVP: public</a></li>
+      <li><a href="#f-invite">Invitations (gift wrap)</a></li>
+      <li><a href="#f-report">Reporting</a></li>
+      <li><a href="#f-callist">Calendar lists</a></li>
+      <li><a href="#f-forms">Attached forms</a></li>
+    </ul>
+
+    <h4>Identity &amp; sessions</h4>
+    <ul>
+      <li><a href="#f-auth">Login methods</a></li>
+      <li><a href="#f-account">Create account</a></li>
+      <li><a href="#f-restore">Session restore</a></li>
+      <li><a href="#f-logout">Logout</a></li>
+    </ul>
+
+    <h4>Scheduling &amp; booking</h4>
+    <ul>
+      <li><a href="#f-schedpage">Scheduling page CRUD</a></li>
+      <li><a href="#f-bookreq">Booking request</a></li>
+      <li><a href="#f-bookresp">Booking response</a></li>
+      <li><a href="#f-busy">Free/busy publishing</a></li>
+    </ul>
+
+    <h4>Infra &amp; account data</h4>
+    <ul>
+      <li><a href="#f-settings">Settings sync</a></li>
+      <li><a href="#f-relays">Relay management</a></li>
+      <li><a href="#f-profile">Profile &amp; NIP-05</a></li>
+    </ul>
+
+    <h4>Cross-cutting</h4>
+    <ul>
+      <li><a href="#notes-encryption">Encryption idioms</a></li>
+      <li><a href="#notes-giftwrap">Gift-wrap design</a></li>
+      <li><a href="#notes-deviation">NIP-52 deviations</a></li>
+      <li><a href="#notes-gaps">Known gaps</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <div class="masthead">
+      <div class="kicker">Protocol reference — read from source, not from docs/</div>
+      <h1>What actually happens on the wire</h1>
+      <p>Every flow in nostr-calendar that touches Nostr, traced from <code>src/nostr/</code>, <code>src/features/</code>, <code>src/stores/</code>, and <code>src/common/signer/</code> — kinds, tags, content shape, encryption, and relay routing, exactly as implemented today.</p>
+      <p>Existing docs/README were not consulted; this reflects current code only.</p>
+      <div class="meta">nostr-calendar · compiled 2026-07-25</div>
+    </div>
+
+    <section class="category" id="kind-index">
+      <h2>Kind index</h2>
+      <p class="category-note">Every event kind this app reads or writes, in one place. Kinds marked "legacy" in the domain column are read for migration only — the app never publishes them anymore.</p>
+      <table class="kindtable">
+        <tr><th>Kind</th><th>Name</th><th>Spec</th><th>Domain</th></tr>
+        <tr><td class="k">0</td><td>User Profile</td><td class="spec">NIP-01</td><td>read-only in this app</td></tr>
+        <tr><td class="k">5</td><td>Deletion</td><td class="spec">NIP-09</td><td>shared across all flows</td></tr>
+        <tr><td class="k">1059</td><td>Gift Wrap (outer)</td><td class="spec">NIP-59</td><td>shared transport — every wrap of this kind carries a public <code>k</code> tag whose value is one of the three "outer" constants below</td></tr>
+        <tr><td class="k">14</td><td>Rumor</td><td class="spec">NIP-17 kind, reused</td><td>one shared rumor kind for calendar invitations, booking requests, <em>and</em> booking responses — differentiated only by the parent wrap's <code>k</code> tag, not by rumor kind</td></tr>
+        <tr><td class="k">57</td><td>Booking request rumor</td><td class="spec">deprecated</td><td>booking — superseded by kind 14, no longer written</td></tr>
+        <tr><td class="k">58</td><td>Booking response rumor</td><td class="spec">deprecated</td><td>booking — superseded by kind 14, no longer written</td></tr>
+        <tr><td class="k">52</td><td>Calendar event rumor</td><td class="spec">deprecated</td><td>calendar — superseded by kind 14, no longer written</td></tr>
+        <tr><td class="k">1052</td><td>Calendar event outer gift wrap</td><td class="spec">pre-NIP-17</td><td>dual role: pre-NIP-17 outer wrap kind (read-only) <em>and</em> the current <code>k</code> classifier value on every calendar-invite wrap of kind 1059</td></tr>
+        <tr><td class="k">1057</td><td>Booking request outer gift wrap</td><td class="spec">pre-NIP-17</td><td>same dual role as 1052, for booking requests</td></tr>
+        <tr><td class="k">1058</td><td>Booking response outer gift wrap</td><td class="spec">pre-NIP-17</td><td>same dual role as 1052, for booking responses</td></tr>
+        <tr><td class="k">84</td><td>Participant removal</td><td class="spec">legacy tombstone</td><td>read-only, never published</td></tr>
+        <tr><td class="k">10002</td><td>Relay list</td><td class="spec">NIP-65</td><td>identity / routing</td></tr>
+        <tr><td class="k">30078</td><td>Application data</td><td class="spec">NIP-78</td><td>settings sync</td></tr>
+        <tr><td class="k">1984</td><td>Report</td><td class="spec">NIP-56</td><td>shared</td></tr>
+        <tr><td class="k">32678</td><td>Private calendar event</td><td class="spec">custom</td><td>calendar</td></tr>
+        <tr><td class="k">31923</td><td>Public calendar event</td><td class="spec">NIP-52 kind, simplified tags</td><td>calendar</td></tr>
+        <tr><td class="k">32069</td><td>Private RSVP</td><td class="spec">custom</td><td>calendar</td></tr>
+        <tr><td class="k">31925</td><td>Public RSVP</td><td class="spec">NIP-52</td><td>calendar</td></tr>
+        <tr><td class="k">32123</td><td>Private calendar list</td><td class="spec">custom</td><td>calendar</td></tr>
+        <tr><td class="k">31926</td><td>Public busy list</td><td class="spec">custom</td><td>availability, one per user per month</td></tr>
+        <tr><td class="k">31927</td><td>Scheduling page</td><td class="spec">custom</td><td>booking</td></tr>
+        <tr><td class="k">32680</td><td>Scheduling page key record</td><td class="spec">custom</td><td>booking — key-recovery sidecar</td></tr>
+        <tr><td class="k">30168 / 1069</td><td>Form template / response</td><td class="spec">Formstr</td><td>forms, via <code>@formstr/sdk</code></td></tr>
+      </table>
+    </section>
+
+    <!-- ================= CALENDAR & EVENTS ================= -->
+    <section class="category" id="cat-calendar">
+      <h2>Calendar &amp; events</h2>
+      <p class="category-note">Two parallel universes exist side by side: a custom encrypted kind (32678) for private events, and a simplified take on NIP-52 (31923) for public ones. They share no fields at the protocol level.</p>
+
+      <article class="flow" id="f-priv-create">
+        <h3>Private event — create <span class="kind-badge">kind 32678</span></h3>
+        <p class="trigger">Triggered by: saving a new event in the editor with the <strong>private</strong> toggle on.</p>
+        <div class="field"><span class="label">Identity</span><p>Parameterized-replaceable. <code>d</code> = random/derived hash. Coordinate = <code>32678:&lt;author&gt;:&lt;d&gt;</code>.</p></div>
+        <div class="field"><span class="label">Outer tags (public)</span><p>Only <code>["d", dTag]</code> — everything else lives inside encrypted content.</p></div>
+        <div class="field"><span class="label">Content (NIP-44 self-encrypted, per-event view key)</span>
+          <table class="tagtable">
+            <tr><th>tag</th><th>meaning</th><th></th></tr>
+            <tr><td class="tagname">title, description</td><td>plain strings</td><td><span class="req yes">required</span></td></tr>
+            <tr><td class="tagname">start, end</td><td>unix seconds</td><td><span class="req yes">required</span></td></tr>
+            <tr><td class="tagname">image</td><td>string, "" if none</td><td><span class="req no">optional</span></td></tr>
+            <tr><td class="tagname">L / l</td><td><code>"rrule"</code> label / rrule string, if recurring</td><td><span class="req no">optional</span></td></tr>
+            <tr><td class="tagname">notification</td><td>reminder preference</td><td><span class="req no">optional</span></td></tr>
+            <tr><td class="tagname">form</td><td><code>naddr</code>, plus form's read-only view key (never the edit key) — one per attached form</td><td><span class="req no">optional, repeats</span></td></tr>
+            <tr><td class="tagname">location</td><td>free text, repeats</td><td><span class="req no">optional</span></td></tr>
+            <tr><td class="tagname">p</td><td>creator first, then one per invited participant</td><td><span class="req yes">required</span></td></tr>
+          </table>
+        </div>
+        <div class="field"><span class="label">Encryption</span><p><code>selfEncrypt</code>: NIP-44 to a freshly generated per-event view keypair (encrypt-to-self with a throwaway key, not the user's real identity). Only holders of the nsec-encoded view key can read the event.</p></div>
+        <div class="field"><span class="label">Participants</span><p>Each participant (creator included) gets a NIP-59 gift wrap invitation — see <a href="#f-invite">Invitations</a>.</p></div>
+        <div class="field"><span class="label">Relays</span><p><code>publishSignedEvent</code> → worker routing (user relays ∪ author outbox ∪ recipient inbox). NIP-65 lists for invited pubkeys are fetched first to warm outbox routing before the gift wraps go out.</p></div>
+      </article>
+
+      <article class="flow" id="f-pub-create">
+        <h3>Public event — create <span class="kind-badge">kind 31923</span></h3>
+        <p class="trigger">Triggered by: saving a new event with the private toggle off.</p>
+        <div class="field"><span class="label">Identity</span><p><code>d</code> = persisted id or a fresh UUID. All-day and timed events both use 31923 — the NIP-52 date-only kind (31922) is never used.</p></div>
+        <table class="tagtable">
+          <tr><th>tag</th><th>meaning</th><th></th></tr>
+          <tr><td class="tagname">title, d</td><td>—</td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">start, end</td><td>unix seconds, as strings</td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">image</td><td>—</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">location</td><td>repeats</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">p</td><td>participant, no role/relation qualifier, repeats</td><td><span class="req no">optional</span></td></tr>
+        </table>
+        <div class="field"><span class="label">Content</span><p>Plaintext description string (not JSON). No encryption.</p></div>
+        <div class="field"><span class="label">Participants</span><p>Listed only as public <code>p</code> tags — <strong>no</strong> gift-wrap invitation is sent for public events; that mechanism is private-event-only.</p></div>
+      </article>
+
+      <article class="flow" id="f-priv-edit">
+        <h3>Private event — edit</h3>
+        <p class="trigger">Triggered by: author edits an existing private event.</p>
+        <p>Re-runs the create builder with the <strong>same <code>d</code> tag</strong> and the <strong>same view key</strong>, republishing 32678 as a replacement. <code>created_at</code> is forced strictly greater than the prior version to beat NIP-01's same-second tie-break.</p>
+        <p>Only participants <em>not</em> in the previous participant list get a new invitation. Removed participants receive no revocation — the app has no un-invite mechanism (kind 84 exists only for reading legacy tombstones).</p>
+        <p>Host-applying a participant's suggested new time (from an RSVP) is just this flow with <code>start</code>/<code>end</code> overwritten — private events only.</p>
+      </article>
+
+      <article class="flow" id="f-pub-edit">
+        <h3>Public event — edit</h3>
+        <p>Same publish function as creation, replacing on the same <code>d</code> tag with a newer <code>created_at</code>. No participant-notification step exists for public events, same as on create.</p>
+      </article>
+
+      <article class="flow" id="f-duplicate">
+        <h3>Event duplication</h3>
+        <p>UI convenience only — pre-fills the editor with the source event's data but no <code>d</code>/id, so saving runs through ordinary create (32678 or 31923). No distinct wire behavior.</p>
+      </article>
+
+      <article class="flow" id="f-delete">
+        <h3>Event deletion / removal <span class="kind-badge">kind 5</span></h3>
+        <p class="trigger">Triggered by: the delete dialog, three mutually exclusive options.</p>
+        <div class="field"><span class="label">Delete for everyone (author only)</span>
+          <p>NIP-09 kind 5 with <code>["e", eventId]</code>, <code>["a", "&lt;kind&gt;:&lt;author&gt;:&lt;d&gt;"]</code>, and <code>["k", kind]</code> per targeted kind. <code>content</code> is an optional free-text reason. Also removed from the owning calendar list and its busy-list range retracted.</p>
+        </div>
+        <div class="field"><span class="label">Remove from calendar (non-author, or author opting out)</span>
+          <p>Only drops the event's <code>a</code>-tag reference from the calendar list (32123) and clears the busy range. No deletion event, other copies untouched.</p>
+        </div>
+        <div class="field"><span class="label">Ignore (invitation not yet accepted)</span>
+          <p>Deletes the invitation gift wrap itself — see <a href="#f-invite">Invitations → Dismiss</a>.</p>
+        </div>
+        <div class="callout"><span class="label">Client-side enforcement layer</span><p>Local-relay only natively enforces NIP-09 by <code>e</code> tag. This app layers its own client-side tombstone tracking (localStorage, per-account) for <code>a</code>-tag deletions of addressable events and legacy kind-84 removals.</p></div>
+      </article>
+
+      <article class="flow" id="f-rsvp-priv">
+        <h3>RSVP — private event <span class="kind-badge">kind 32069</span></h3>
+        <div class="field"><span class="label">Identity</span><p><code>d</code> = deterministic hash of <code>responder:author:eventDTag</code> — one current RSVP per responder per event, later publishes replace it.</p></div>
+        <table class="tagtable">
+          <tr><th>tag</th><th>meaning</th><th></th></tr>
+          <tr><td class="tagname">a</td><td>points at the 32678 event coordinate, with relay hint</td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">d</td><td>deterministic RSVP id</td><td><span class="req yes">required</span></td></tr>
+        </table>
+        <div class="field"><span class="label">Content (self-encrypted with the event's own view key)</span><p><code>{ status, suggestedStart?, suggestedEnd?, comment? }</code> — <code>status</code> ∈ <code>accepted | declined | tentative</code>. Anyone who can decrypt the event can decrypt its RSVPs (shared secret).</p></div>
+      </article>
+
+      <article class="flow" id="f-rsvp-pub">
+        <h3>RSVP — public event <span class="kind-badge">kind 31925</span></h3>
+        <p>Matches NIP-52's RSVP kind. Same deterministic <code>d</code> scheme as the private case.</p>
+        <table class="tagtable">
+          <tr><th>tag</th><th>meaning</th><th></th></tr>
+          <tr><td class="tagname">a</td><td>coordinate of the 31923 event, with relay hint</td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">status</td><td><code>accepted | declined | tentative</code></td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">start, end</td><td>suggested new time</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">d</td><td>—</td><td><span class="req yes">required</span></td></tr>
+        </table>
+        <div class="field"><span class="label">Content</span><p>Plaintext free-text comment, no encryption.</p></div>
+      </article>
+
+      <article class="flow" id="f-invite">
+        <h3>Invitations — discover, accept, dismiss, report <span class="kind-badge">kind 1059</span> <span class="kind-badge legacy">legacy 1052</span></h3>
+        <div class="field"><span class="label">Discovery</span><p>Two parallel subscriptions — <code>{kinds:[1059], #p:[you], #k:["1052"]}</code> and <code>{kinds:[1052], #p:[you]}</code> for legacy wraps (which lack a <code>k</code> classifier, so can't be merged into one filter).</p></div>
+        <div class="field"><span class="label">Unwrap (NIP-59)</span><p>Outer wrap decrypted with your signer → seal → rumor. Rumor is kind 14 (NIP-17's chat-message kind, reused so generic NIP-17 clients render it as a DM), tags: <code>a</code> (event coordinate), <code>viewKey</code>, optional <code>signing_nsec</code>; <code>content</code> is a human-readable invite line, e.g. "X has invited you to Y on Z".</p></div>
+        <div class="field"><span class="label">signing_nsec — the self-deletion trick</span><p>The wrap's own one-time signing key is embedded, encrypted, inside the rumor. Relays require a deletion to be signed by the target event's own pubkey — since the wrap is signed by a random ephemeral key the recipient doesn't hold, the app hands them that key <em>after</em> decryption so they can self-sign a NIP-09 deletion of the wrap later.</p></div>
+        <div class="field"><span class="label">Accept</span><p>Adds an <code>a</code>-tag ref to the chosen calendar list (32123). Nothing is published back to the sender — acceptance is local only.</p></div>
+        <div class="field"><span class="label">Dismiss</span><p>New-style invites: self-signed kind-5 deletion under the embedded ephemeral key. Legacy invites (no <code>signing_nsec</code>): the user's own signer publishes a kind-5 tagging <code>k:1059/1052</code> — this can't actually delete someone else's signed event, so it only suppresses it client-side.</p></div>
+        <div class="field"><span class="label">Report</span><p>Runs <a href="#f-report">Reporting</a> against the resolved event coordinate, then dismisses the same way.</p></div>
+      </article>
+
+      <article class="flow" id="f-report">
+        <h3>Reporting / flagging <span class="kind-badge">kind 1984 · NIP-56</span></h3>
+        <p class="trigger">Triggered by: "Report" on a pending invitation (no report entry point once an event is already in a calendar).</p>
+        <table class="tagtable">
+          <tr><th>tag</th><th>meaning</th></tr>
+          <tr><td class="tagname">p</td><td><code>[authorPubkey, reportType]</code></td></tr>
+          <tr><td class="tagname">a</td><td><code>[coordinate, relayHint?, reportType]</code></td></tr>
+        </table>
+        <p><code>reportType</code> ∈ <code>nudity, malware, profanity, illegal, spam, impersonation, other</code>. <code>content</code> is optional free text. Fully public, unencrypted. Own past reports are fetched back to filter out already-reported items.</p>
+      </article>
+
+      <article class="flow" id="f-callist">
+        <h3>Private calendar lists <span class="kind-badge">kind 32123</span></h3>
+        <div class="field"><span class="label">Identity</span><p>One per calendar a user creates. <code>d</code> = random hash. Outer tags: <code>["d", id]</code> only.</p></div>
+        <div class="field"><span class="label">Content — different encryption idiom from events/RSVPs</span><p>NIP-44, but encrypted <em>via the live signer</em> to the user's own real pubkey (<code>signerEncrypt</code>) rather than a raw held key — works through NIP-07/bunker round trips too. JSON tag array: <code>title</code>, <code>content</code> (description), <code>color</code>, optional <code>notifications:"disabled"</code>, and one <code>["a", coordinate, relayUrl, viewKey]</code> per member event.</p></div>
+        <div class="field"><span class="label">Mutations</span><p>Add/remove/move-between-lists all read-modify-republish the whole list event — no partial updates. A move publishes the destination addition before removing the source reference, so a failed source update leaves the event in a calendar.</p></div>
+        <div class="field"><span class="label">Deletion</span><p>NIP-09 kind 5 with <code>a</code> (list coordinate) and <code>e</code> (last known id).</p></div>
+        <div class="callout"><span class="label">No public/followable calendars</span><p>There is no NIP-51-style public list, and no mechanism to subscribe to someone else's calendar — 32123 lists are private and single-owner only.</p></div>
+      </article>
+
+      <article class="flow" id="f-forms">
+        <h3>Forms attached to an event <span class="kind-badge">kind 30168 / 1069</span></h3>
+        <p>Not authored by this app's nostr layer — read-only integration with Formstr. Attachment is a <code>["form", naddr, viewKey?]</code> tag <em>inside the encrypted content</em> of a private event, so attachment itself is invisible to non-participants. Only the form's read-only key is stored, never the admin/response key. Submission (kind 1069 signing) happens inside <code>@formstr/sdk</code>, outside this repo's direct control.</p>
+      </article>
+    </section>
+
+    <!-- ================= IDENTITY ================= -->
+    <section class="category" id="cat-identity">
+      <h2>Identity &amp; sessions</h2>
+      <p class="category-note">Pure key-management — no calendar events published here. Every other flow signs through whatever <code>SignerManager.getSigner()</code> returns.</p>
+
+      <article class="flow" id="f-auth">
+        <h3>Login methods</h3>
+        <div class="field"><span class="label">Browser extension (NIP-07)</span><p>Waits up to 2s for <code>window.nostr</code>, then all signing routes through it directly. No event published by login itself.</p></div>
+        <div class="field"><span class="label">Remote signer (NIP-46 bunker / NostrConnect QR)</span><p>Uses a <strong>dedicated relay pool</strong>, separate from the app's local-relay worker — "the signer's RPC channel is not app data." Requested perms: <code>sign_event, nip44_encrypt, nip44_decrypt, get_public_key</code>. Bunker's own relay list is later fed into gossip routing as discovery hints, never as a publish target.</p></div>
+        <div class="field"><span class="label">Native nsec (mobile only)</span><p>Decodes the nsec, wraps it in an in-process signer, persists to native secure storage. Blocked entirely on web.</p></div>
+        <div class="field"><span class="label">ncryptsec (NIP-49)</span><p>Paste or upload a <code>.txt</code> file plus a passphrase; decryption of the NIP-49 payload happens inside <code>@formstr/signer</code>, not this repo.</p></div>
+        <div class="field"><span class="label">Android native signer (NIP-55)</span><p>Discovered via a Capacitor bridge, native-only — deliberately never initialized on web.</p></div>
+      </article>
+
+      <article class="flow" id="f-account">
+        <h3>Create account</h3>
+        <p>Key generation, NIP-49 encryption, and any kind-0 profile publish for name/picture/about all happen inside <code>@formstr/signer</code> — not traceable in this repo. The app only receives the resulting <code>ncryptsec</code> string and forces the user to copy or download it before continuing.</p>
+      </article>
+
+      <article class="flow" id="f-restore">
+        <h3>Session restore</h3>
+        <p>Branches per stored method: extension re-injects, Android reconstructs from stored pubkey/npub without reopening the signer app, NIP-46 reuses a stored client secret so the bunker doesn't re-prompt, ncryptsec can't auto-unlock (needs the passphrase, always falls through to the login modal).</p>
+        <p>A legacy-migration path reads pre-<code>@formstr/signer</code> localStorage keys and native-stored nsecs, migrates them into the new signer, then deletes the old keys — except guest raw-keypair sessions, kept alive deliberately.</p>
+      </article>
+
+      <article class="flow" id="f-logout">
+        <h3>Logout</h3>
+        <p>Clears the active signer/local key and cached user data. No Nostr event published. A separate caller-triggered step tears down the relay worker and wipes its IndexedDB cache — a data-layer action, not a protocol one.</p>
+      </article>
+    </section>
+
+    <!-- ================= BOOKING ================= -->
+    <section class="category" id="cat-booking">
+      <h2>Scheduling &amp; booking</h2>
+      <p class="category-note">A Calendly-style layer bolted onto the calendar. Reuses the calendar's gift-wrap machinery (same outer kind 1059) but with entirely custom rumor kinds and its own two-tier key hierarchy.</p>
+
+      <article class="flow" id="f-schedpage">
+        <h3>Scheduling page — create / update / delete <span class="kind-badge">kind 31927</span> <span class="kind-badge">kind 32680</span></h3>
+        <div class="field"><span class="label">Identity</span><p>Parameterized-replaceable per <code>(pubkey, d)</code>. Outer tags: <code>["d", id]</code> only. <code>created_at</code> forced strictly increasing on every edit.</p></div>
+        <div class="field"><span class="label">Content — fully encrypted, own view keypair</span><p>A fresh secp256k1 keypair is minted at creation and <strong>reused on every edit</strong> — "a page's view key is its share-link capability." Every field is NIP-44 self-encrypted (inline, hand-rolled — not via the shared <code>selfEncrypt</code> helper) as a tag array:</p>
+          <table class="tagtable">
+            <tr><th>tag</th><th>meaning</th></tr>
+            <tr><td class="tagname">title, timezone, duration_mode</td><td>—</td></tr>
+            <tr><td class="tagname">min_notice</td><td>hard-coded <code>"0"</code> — field is disabled in the UI</td></tr>
+            <tr><td class="tagname">max_advance, buffer, expiry</td><td>expiry <code>0</code> = never</td></tr>
+            <tr><td class="tagname">slot_duration</td><td>repeats, one per configured duration</td></tr>
+            <tr><td class="tagname">avail</td><td><code>["avail","recurring",day,start,end]</code> or <code>["avail","date",dateStr,start,end]</code>, repeats</td></tr>
+            <tr><td class="tagname">blocked</td><td>date string, repeats</td></tr>
+            <tr><td class="tagname">location, image, event_title, description</td><td>optional</td></tr>
+            <tr><td class="tagname">form</td><td><code>[naddr, viewKey?]</code>, repeats</td></tr>
+            <tr><td class="tagname">relay</td><td>one per currently configured relay — app-specific hint, not NIP-65</td></tr>
+          </table>
+        </div>
+        <div class="field"><span class="label">Key recovery sidecar — kind 32680</span><p>Every publish also republishes a 32680 record, <code>d</code> = the page's own <code>d</code>, content = <code>{v, viewKey, dTag, createdAt}</code> — this time self-encrypted with the <strong>real</strong> identity key via the signer, not the page's own view key. Its only job is letting the owner recover the view key on a new device. Deletion sets <code>content:""</code> as a tombstone.</p></div>
+        <div class="field"><span class="label">Sharing</span><p><code>/schedule/&lt;naddr&gt;?viewKey=&lt;nsec-encoded&gt;</code> — the view key travels in the URL query string, nsec-encoded as a convenient bech32 container (not a real identity key). Public/browsable pages are explicitly unsupported — a page without a <code>viewKey</code> query param hard-fails to load.</p></div>
+        <div class="field"><span class="label">Deletion</span><p>NIP-09 on the page event, followed by a best-effort tombstone of the 32680 key record.</p></div>
+      </article>
+
+      <article class="flow" id="f-bookreq">
+        <h3>Booking request — guest → host <span class="kind-badge">kind 1059 · k=1057</span></h3>
+        <p class="trigger">Triggered by: a visitor on a scheduling-page link picks a slot and submits (login required).</p>
+        <div class="field"><span class="label">Pre-generated future event identity</span><p>Before the host ever approves, the booker mints the <code>d</code> tag and view key for what will become the eventual private calendar event (32678) — so booker and host land on the exact same event identity once approved. The booker adds this ref to their own calendar immediately, as a forward-looking placeholder.</p></div>
+        <div class="field"><span class="label">Rumor <span class="kind-badge">kind 14</span> <span class="kind-badge legacy">deprecated 57</span></span>
+          <table class="tagtable">
+            <tr><th>tag</th><th>meaning</th></tr>
+            <tr><td class="tagname">a</td><td>scheduling page coordinate <code>31927:host:pageD</code></td></tr>
+            <tr><td class="tagname">start, end</td><td>unix seconds</td></tr>
+            <tr><td class="tagname">title, note</td><td>may be empty</td></tr>
+            <tr><td class="tagname">d</td><td>pre-generated future-event id</td></tr>
+            <tr><td class="tagname">viewKey</td><td>pre-generated future-event NIP-44 key</td></tr>
+            <tr><td class="tagname">signing_nsec</td><td>ephemeral wrap key, for host-side self-deletion later</td></tr>
+          </table>
+          <p>Rumor content is empty — everything lives in tags. Recipient is the host's real pubkey, on the outer wrap's <code>p</code> tag. The dedicated <code>BookingRequestRumor</code> kind (57) is now deprecated in favor of the same shared <code>Rumor</code> kind (14) calendar invitations use — request vs. response vs. invite is told apart entirely by the outer wrap's <code>k</code> tag, not by rumor kind.</p>
+        </div>
+        <div class="field"><span class="label">Booker identity — two modes, one unwired</span><p><code>self</code> (default): sealed with the booker's real signer, so the rumor is technically linkable to their real pubkey. <code>anonymous</code>: seals with a freshly generated one-time keypair for true unlinkability — fully implemented at the protocol layer, but no UI path ever passes this mode, and the matching key-save function is never called anywhere. Dead code today.</p></div>
+      </article>
+
+      <article class="flow" id="f-bookresp">
+        <h3>Booking response — host → guest <span class="kind-badge">kind 1059 · k=1058</span></h3>
+        <div class="field"><span class="label">Approve — a composite, multi-event publish</span>
+          <ul>
+            <li>Publishes the private calendar event (32678), reusing the booker's pre-generated <code>d</code>/view key so both sides share identical event identity.</li>
+            <li>Adds it to the host's own calendar list (32123).</li>
+            <li>Publishes a busy-list entry for the slot, best-effort (see <a href="#f-busy">Free/busy</a>).</li>
+            <li>Publishes the response gift wrap — rumor <span class="kind-badge">kind 14</span> <span class="kind-badge legacy">deprecated 58</span>, <code>status:"approved"</code>, plus <code>event_ref</code> (the new event's coordinate) and <code>viewKey</code> (same key as the event, so the booker can decrypt it) and <code>signing_nsec</code>.</li>
+          </ul>
+        </div>
+        <div class="field"><span class="label">Decline</span><p>Same wrap shape, <code>status:"declined"</code>, optional <code>reason</code> tag, no <code>event_ref</code>/<code>viewKey</code>.</p></div>
+        <div class="field"><span class="label">Booker-side matching</span><p>Incoming responses are matched to a locally-tracked outgoing booking by <strong>content</strong> — page ref + start + end + pending status — there's no protocol-level thread/reply id linking request to response.</p></div>
+      </article>
+
+      <article class="flow" id="f-busy">
+        <h3>Free/busy publishing <span class="kind-badge">kind 31926</span></h3>
+        <p>One event per user per calendar month, <code>d = "YYYY-MM"</code>. Tags: <code>["d","YYYY-MM"]</code>, <code>["t","YYYY-MM"]</code>, <code>["t","busy"]</code> (NIP-12 discovery hashtags), and one <code>["block", startUnix, endUnix]</code> per busy range. <code>content</code> is always empty — "no titles/descriptions leaked," by design. The one booking-adjacent event that's fully public and unencrypted, so even anonymous visitors on a booking page can compute availability with no key. Fired automatically on booking approval, and optionally when creating/editing/RSVPing to a calendar event via an opt-in checkbox — meaning a private (32678) event's time range can leak publicly through this side channel if the user opts in.</p>
+      </article>
+    </section>
+
+    <!-- ================= INFRA ================= -->
+    <section class="category" id="cat-infra">
+      <h2>Infra &amp; account data</h2>
+
+      <article class="flow" id="f-settings">
+        <h3>General settings sync <span class="kind-badge">kind 30078 · NIP-78</span></h3>
+        <div class="field"><span class="label">Identity</span><p><code>d = "calendar/general_settings"</code>, one event total per user (not per device).</p></div>
+        <div class="field"><span class="label">Content</span><p><code>{weekStart, timeFormat, defaultCalendarId, defaultDuration, defaultReminderMinutes, workingHours}</code>, NIP-44 self-encrypted via the live signer to the user's own pubkey.</p></div>
+        <div class="field"><span class="label">Sync semantics</span><p>Last-write-wins via strictly-increasing <code>created_at</code>. A local-edit-during-fetch race guard means any local change made while a remote fetch is in flight always wins over the value that fetch returns. Publishes are serialized through a queue so concurrent edits don't race each other.</p></div>
+        <div class="callout"><span class="label">Not everything syncs</span><p>Theme mode, accent color, layout, and filters live only in <code>localStorage</code> — only the nested "general" settings object round-trips through Nostr. Theme/accent/layout do not follow the user across devices.</p></div>
+      </article>
+
+      <article class="flow" id="f-relays">
+        <h3>Relay list management <span class="kind-badge">kind 10002 · NIP-65</span></h3>
+        <p>One <code>["r", url]</code> tag per relay, empty content. <strong>No read/write markers are ever written</strong> — every tag is bare, so the app doesn't distinguish read relays from write relays; it treats the list as one undifferentiated set.</p>
+        <div class="field"><span class="label">The user's own list and the app's connection policy are the same list</span>
+          <p>On login, <code>syncUserNetworkState(pubkey)</code> fetches the logged-in user's <em>own</em> kind-10002 event via <code>fetchRelayList</code> and writes it straight into <code>useRelayStore</code> (falling back to the seven hard-coded defaults if the user has no NIP-65 event yet) — and <code>getRelays()</code>, what actually gets fed to the local-relay worker as its connection set, reads from that same store. Saving on the Relay Settings page runs the sync in reverse: it writes the edited list to <code>useRelayStore</code> <em>and</em> publishes it as a fresh kind-10002 event in the same action. So this is one bidirectionally-synced list, not two separate mechanisms.</p>
+        </div>
+        <div class="field"><span class="label">Other users' NIP-65 lists — routing hints only</span>
+          <p>Fetching <em>other</em> pubkeys' kind-10002 lists (<code>fetchRelayList</code>/<code>fetchRelayLists</code> for gift-wrap recipients, naddr relay-hint resolution) is purely a gossip/outbox-routing input — those never get written into <code>useRelayStore</code> or folded into the app's own connection set. Only the logged-in user's own list round-trips into local config.</p>
+        </div>
+        <p>Per-event publish fan-out (inside the worker, outside this repo): user relays ∪ author's own outbox ∪ each p-tagged recipient's inbox. Delivery is durable — "zero acceptance means queued for retry, not failed."</p>
+      </article>
+
+      <article class="flow" id="f-profile">
+        <h3>Profile fetch &amp; NIP-05 verification</h3>
+        <p><strong>Profile:</strong> plain kind-0 read, <code>content</code> parsed ad hoc as JSON. <strong>No profile-publish path exists anywhere in <code>src/nostr/</code></strong> — the only kind-0 write is buried inside <code>@formstr/signer</code>'s account creation; there's no visible "edit profile" flow.</p>
+        <p><strong>NIP-05:</strong> fetches <code>/.well-known/nostr.json</code> with <code>redirect:"error"</code> — explicitly refuses to follow redirects as anti-spoofing hardening beyond the bare spec. A profile's self-reported <code>nip05</code> field is never trusted at face value; this resolver is the only trusted verification path, used to show a verified badge on booking requesters.</p>
+      </article>
+    </section>
+
+    <!-- ================= CROSS-CUTTING ================= -->
+    <section class="category" id="cat-notes">
+      <h2>Cross-cutting design notes</h2>
+
+      <article class="flow" id="notes-encryption">
+        <h3>Three encryption idioms, used inconsistently</h3>
+        <ul>
+          <li><strong>Raw self-encrypt</strong> — caller holds a bare secret key (a view key), NIP-44 to itself. Used for private events, private RSVPs, scheduling pages (though scheduling pages hand-roll this rather than calling the shared helper).</li>
+          <li><strong>Signer self-encrypt</strong> — NIP-44 via the live signer to the user's own real pubkey. Used for calendar lists, general settings, and the scheduling-page key-recovery sidecar. Works with NIP-07/bunker, has a concurrency gate to avoid firing multiple simultaneous signer permission popups.</li>
+          <li><strong>NIP-59 gift wrap</strong> (rumor → seal → wrap) — used for calendar invitations and both booking request/response directions.</li>
+        </ul>
+      </article>
+
+      <article class="flow" id="notes-giftwrap">
+        <h3>One outer kind, three products, one deletion trick</h3>
+        <p>All three gift-wrap products — calendar invites, booking requests, booking responses — now share the literal outer kind <strong>1059</strong> <em>and</em> the literal rumor kind <strong>14</strong>. The dedicated rumor kinds each product used to have (57 for requests, 58 for responses) are now deprecated in favor of that one shared kind 14 — the same move already made for calendar invites. That leaves the wrap's own <code>k</code> tag (<code>1052 / 1057 / 1058</code>) as the <em>only</em> signal that tells the three apart; decrypting all the way down to the rumor no longer helps, since it's the same kind in every case. A generic NIP-17 client subscribed to kind 1059 would receive all three intermixed with no standard way to distinguish them at all. Legacy dedicated outer wrap kinds are still read for back-compat but never written.</p>
+        <p>Every wrap type leaks its own one-time signing key (<code>signing_nsec</code>) to the recipient, post-decryption only, purely so the recipient can self-sign a NIP-09 deletion later — otherwise gift wraps are effectively undeletable by anyone but the sender, since relays require same-pubkey-as-target on deletions.</p>
+      </article>
+
+      <article class="flow" id="notes-deviation">
+        <h3>Where this diverges from NIP-52</h3>
+        <ul>
+          <li>No date-only calendar kind (31922) — every public event is 31923, timed or not.</li>
+          <li>No standard calendar-container kind (31924) — the "calendar" concept here (32123) is private, self-encrypted, and unrelated to NIP-52's public grouping model.</li>
+          <li>No <code>t</code>/hashtag reference tags anywhere on events, private or public.</li>
+          <li>Public RSVPs drop NIP-52's optional label/freebusy tags down to <code>a, status, start, end, d</code>.</li>
+          <li>No comments/notes protocol object (e.g. NIP-22) — the "notes" UI is just the event's own <code>description</code> field.</li>
+        </ul>
+      </article>
+
+      <article class="flow" id="notes-gaps">
+        <h3>Known gaps &amp; dead code</h3>
+        <ul>
+          <li><strong>No participant revocation</strong> — removing someone from a private event's participant list on edit sends no notification; kind 84 is read-only-legacy, never published fresh.</li>
+          <li><strong>Anonymous booking is unreachable</strong> — fully built at the protocol layer, but no UI path ever selects it and its key-save function is never called.</li>
+          <li><strong>No profile-publish or edit-profile flow</strong> is visible anywhere in this repo's own source.</li>
+          <li><strong>Theme/accent/layout settings don't sync</strong> across devices — only the "general" settings sub-object does.</li>
+          <li><strong>Legacy NIP-09 fallback deletions are best-effort no-ops</strong> — a signer-authored deletion of someone else's gift wrap is architecturally expected to be rejected by conformant relays; it only suppresses the item client-side.</li>
+        </ul>
+      </article>
+    </section>
+
+    <footer>Compiled by reading <code>src/nostr/</code>, <code>src/dataLayer/</code>, <code>src/features/</code>, <code>src/stores/</code>, and <code>src/common/signer/</code> directly. Existing repo docs were treated as unreliable and not used as a source.</footer>
+  </main>
+</div>

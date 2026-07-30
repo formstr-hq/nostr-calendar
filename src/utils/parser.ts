@@ -7,7 +7,13 @@ import type {
   IBusyList,
   IBusyRange,
 } from "./types";
-import { getRelays } from "../common/nostr";
+import { getRelays } from "../common/relayConfig";
+import { isAllDayEvent } from "./dateHelper";
+
+export const getDTag = (event: Event): string | null => {
+  const tag = event.tags.find((tag) => tag[0] === "d");
+  return tag && tag[1] ? tag[1] : null;
+};
 
 export const nostrEventToCalendar = (
   event: Event,
@@ -109,6 +115,7 @@ export const nostrEventToCalendar = (
         break;
     }
   });
+  parsedEvent.allDay = isAllDayEvent(parsedEvent.begin, parsedEvent.end);
   return parsedEvent;
 };
 
@@ -202,6 +209,15 @@ export const nostrEventToSchedulingPage = (event: Event): ISchedulingPage => {
       case "relay":
         page.relayHints!.push(values[0]);
         break;
+      case "form":
+        if (values[0]) {
+          if (!page.formAttachments) page.formAttachments = [];
+          page.formAttachments.push({
+            naddr: values[0],
+            ...(values[1] ? { viewKey: values[1] } : {}),
+          });
+        }
+        break;
     }
   });
 
@@ -266,6 +282,18 @@ export const schedulingPageToTags = (page: ISchedulingPage): string[][] => {
   if (page.eventTitle) {
     tags.push(["event_title", page.eventTitle]);
   }
+
+  page.formAttachments?.forEach((form) => {
+    if (!form?.naddr) return;
+    // viewKey is the form's read-only NIP-44 decryption key — see the
+    // matching caveat on ICalendarEvent.forms in events.ts. Never persist a
+    // Formstr responseKey (admin/edit secret) here.
+    if (form.viewKey) {
+      tags.push(["form", form.naddr, form.viewKey]);
+    } else {
+      tags.push(["form", form.naddr]);
+    }
+  });
 
   // Add relay hints so consumers know where to find this event
   // and where to publish booking requests

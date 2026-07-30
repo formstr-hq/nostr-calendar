@@ -1,0 +1,13 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//formstr//nostr-calendar e2e//EN
+BEGIN:VEVENT
+UID:e2e-ics-import-01@formstr.app
+DTSTAMP:20260701T000000Z
+DTSTART:20270310T100000Z
+DTEND:20270310T110000Z
+SUMMARY:ICS Imported Meeting
+DESCRIPTION:Imported from a fixture file during e2e tests
+LOCATION:Conference Room 4
+END:VEVENT
+END:VCALENDAR

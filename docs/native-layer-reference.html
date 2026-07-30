@@ -1,0 +1,637 @@
+<title>nostr-calendar — Native Layer Reference</title>
+<style>
+  :root{
+    --bg:#f4f1ea;
+    --bg-raised:#ffffff;
+    --ink:#221d15;
+    --ink-dim:#5b5344;
+    --ink-faint:#8d8271;
+    --line:#ddd5c4;
+    --accent:#b3651b;
+    --accent-ink:#7a4310;
+    --accent-bg:#f6e8d4;
+    --code-bg:#eae3d3;
+    --android:#4a7f45;
+    --android-bg:#e7f0e3;
+    --android-ink:#2f5a2b;
+    --ios:#3f6ea5;
+    --ios-bg:#e6edf6;
+    --ios-ink:#294a72;
+    --shared-bg:#efeadd;
+    --shared-ink:#5b5344;
+    --gap:#a13d3d;
+    --gap-bg:#f7e6e3;
+    --font-display: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#161209; --bg-raised:#1e1810; --ink:#ece4d4; --ink-dim:#b6ab95; --ink-faint:#877c68;
+      --line:#332c1f; --accent:#e0973f; --accent-ink:#f4c383; --accent-bg:#2c2013; --code-bg:#211c13;
+      --android:#7fbd76; --android-bg:#1e2b19; --android-ink:#a8d89e;
+      --ios:#7ea6d6; --ios-bg:#1a2532; --ios-ink:#a9c7e8;
+      --shared-bg:#241f15; --shared-ink:#b6ab95;
+      --gap:#d97a6e; --gap-bg:#2e1a15;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#161209; --bg-raised:#1e1810; --ink:#ece4d4; --ink-dim:#b6ab95; --ink-faint:#877c68;
+    --line:#332c1f; --accent:#e0973f; --accent-ink:#f4c383; --accent-bg:#2c2013; --code-bg:#211c13;
+    --android:#7fbd76; --android-bg:#1e2b19; --android-ink:#a8d89e;
+    --ios:#7ea6d6; --ios-bg:#1a2532; --ios-ink:#a9c7e8;
+    --shared-bg:#241f15; --shared-ink:#b6ab95;
+    --gap:#d97a6e; --gap-bg:#2e1a15;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f1ea; --bg-raised:#ffffff; --ink:#221d15; --ink-dim:#5b5344; --ink-faint:#8d8271;
+    --line:#ddd5c4; --accent:#b3651b; --accent-ink:#7a4310; --accent-bg:#f6e8d4; --code-bg:#eae3d3;
+    --android:#4a7f45; --android-bg:#e7f0e3; --android-ink:#2f5a2b;
+    --ios:#3f6ea5; --ios-bg:#e6edf6; --ios-ink:#294a72;
+    --shared-bg:#efeadd; --shared-ink:#5b5344;
+    --gap:#a13d3d; --gap-bg:#f7e6e3;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:var(--font-body);
+    font-size:16px; line-height:1.6;
+  }
+  a{color:var(--accent-ink);}
+  a:focus-visible, button:focus-visible, summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .shell{
+    display:grid;
+    grid-template-columns: 264px minmax(0,1fr);
+    gap:0;
+    max-width:1220px;
+    margin:0 auto;
+  }
+  @media (max-width: 900px){
+    .shell{grid-template-columns:1fr;}
+    nav.toc{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);}
+  }
+
+  nav.toc{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:28px 18px 40px 24px;
+    border-right:1px solid var(--line);
+    font-size:13.5px;
+  }
+  nav.toc .brand{
+    font-family:var(--font-display); font-size:15px; font-weight:700;
+    margin-bottom:2px; letter-spacing:.01em;
+  }
+  nav.toc .brand-sub{ color:var(--ink-faint); font-size:12px; margin-bottom:22px; }
+  nav.toc h4{
+    text-transform:uppercase; letter-spacing:.08em; font-size:11px; color:var(--ink-faint);
+    margin:20px 0 6px; font-weight:600;
+  }
+  nav.toc ul{list-style:none; margin:0; padding:0;}
+  nav.toc li{margin:0;}
+  nav.toc a{
+    display:block; color:var(--ink-dim); text-decoration:none; padding:4px 8px; margin:1px -8px;
+    border-radius:5px;
+  }
+  nav.toc a:hover{background:var(--accent-bg); color:var(--accent-ink);}
+
+  main{padding:44px 40px 90px; min-width:0;}
+  .masthead{max-width:720px; margin-bottom:44px;}
+  .masthead .kicker{
+    font-family:var(--font-display); font-size:12px; letter-spacing:.04em; color:var(--accent-ink);
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  h1{
+    font-family:var(--font-display); font-weight:700; font-size:2.05rem; line-height:1.2;
+    margin:0 0 14px; letter-spacing:-.01em; text-wrap:balance;
+  }
+  .masthead p{color:var(--ink-dim); font-size:1.02rem; max-width:62ch; margin:0 0 8px;}
+  .masthead .meta{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-faint); margin-top:16px;}
+
+  section.category{margin:56px 0; max-width:800px;}
+  section.category > h2{
+    font-family:var(--font-display); font-size:1.35rem; font-weight:700;
+    border-bottom:2px solid var(--ink); padding-bottom:10px; margin:0 0 8px;
+    text-wrap:balance; letter-spacing:-.005em;
+  }
+  section.category > .category-note{color:var(--ink-dim); font-size:.95rem; margin:0 0 28px;}
+  section.category.wide{max-width:960px;}
+
+  article.flow{
+    margin:36px 0; padding-top:8px; border-top:1px solid var(--line);
+    scroll-margin-top:20px;
+  }
+  article.flow:first-of-type{border-top:none;}
+  article.flow h3{
+    font-family:var(--font-display); font-size:1.05rem; font-weight:700; margin:18px 0 4px;
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  }
+  .trigger{color:var(--ink-dim); font-size:.92rem; margin:0 0 14px;}
+  .trigger strong{color:var(--ink); font-weight:600;}
+
+  .chip{
+    font-family:var(--font-mono); font-size:11.5px; font-weight:600;
+    border-radius:20px; padding:1px 10px; white-space:nowrap; border:1px solid transparent;
+  }
+  .chip.android{ color:var(--android-ink); background:var(--android-bg); border-color:var(--android); }
+  .chip.ios{ color:var(--ios-ink); background:var(--ios-bg); border-color:var(--ios); }
+  .chip.shared{ color:var(--shared-ink); background:var(--shared-bg); border-color:var(--line); }
+  .chip.gap{ color:var(--gap); background:var(--gap-bg); border-color:var(--gap); }
+  .chip.file{ color:var(--ink-dim); background:var(--code-bg); border-color:var(--line); font-weight:500; }
+
+  .field{ margin:14px 0; }
+  .field > .label{
+    font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint);
+    font-weight:600; margin-bottom:6px;
+  }
+  .field > p{margin:0 0 6px; font-size:.96rem;}
+  .field ul{margin:4px 0 0; padding-left:1.2em; font-size:.96rem;}
+  .field li{margin:3px 0;}
+  code, .tag, .kv{
+    font-family:var(--font-mono); font-size:.87em; background:var(--code-bg);
+    padding:1px 5px; border-radius:4px; color:var(--ink);
+  }
+
+  table.tagtable{ width:100%; border-collapse:collapse; margin:6px 0 4px; font-size:.88rem; }
+  table.tagtable th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-faint); font-weight:600; padding:4px 10px 6px 0; border-bottom:1px solid var(--line);
+  }
+  table.tagtable td{ padding:6px 10px 6px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.tagtable tr:last-child td{border-bottom:none;}
+  table.tagtable td.tagname{font-family:var(--font-mono); white-space:nowrap; color:var(--accent-ink);}
+
+  .callout{
+    margin:16px 0; padding:12px 16px; border-left:3px solid var(--accent);
+    background:var(--accent-bg); border-radius:0 6px 6px 0; font-size:.92rem;
+  }
+  .callout .label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; font-weight:700;
+    color:var(--accent-ink); margin-bottom:4px; display:block;
+  }
+  .callout p{margin:0;}
+  .callout p + p{margin-top:6px;}
+
+  .worktable{ width:100%; border-collapse:collapse; font-size:.87rem; margin:10px 0 0; overflow-x:auto; display:block;}
+  .worktable th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint);
+    padding:5px 14px 7px 0; border-bottom:1px solid var(--line); font-weight:600;
+  }
+  .worktable td{padding:7px 14px 7px 0; border-bottom:1px solid var(--line); vertical-align:top;}
+  .worktable tr:hover td{background:var(--accent-bg);}
+  .worktable td.k{font-family:var(--font-mono); font-weight:600; color:var(--accent-ink); white-space:nowrap;}
+
+  .matrix-wrap{overflow-x:auto; margin:16px 0 8px;}
+  table.matrix{ width:100%; border-collapse:collapse; font-size:.89rem; min-width:640px; }
+  table.matrix th{
+    text-align:left; padding:8px 14px; border-bottom:2px solid var(--ink); font-family:var(--font-display);
+    font-size:11.5px; text-transform:uppercase; letter-spacing:.05em;
+  }
+  table.matrix th.plat{text-align:center; width:150px;}
+  table.matrix td{ padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.matrix td.plat{text-align:center; font-size:1.1rem;}
+  table.matrix tr:hover td{background:var(--accent-bg);}
+  .status-yes{color:var(--android-ink);}
+  .status-no{color:var(--gap);}
+  .status-partial{color:var(--accent-ink);}
+  .status-note{display:block; font-size:11px; color:var(--ink-faint); font-family:var(--font-body); margin-top:2px;}
+
+  .substrate{
+    display:grid; grid-template-columns: 1fr; gap:0; margin:24px 0 8px;
+    border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--bg-raised);
+  }
+  .substrate-row{display:grid; grid-template-columns: 190px 1fr; border-top:1px solid var(--line);}
+  .substrate-row:first-child{border-top:none;}
+  .substrate-label{
+    padding:14px 16px; background:var(--code-bg); font-family:var(--font-display); font-size:12px;
+    font-weight:700; color:var(--ink-dim); display:flex; align-items:center; letter-spacing:.02em;
+  }
+  .substrate-body{padding:14px 18px; font-size:.92rem;}
+  .substrate-arrow{
+    display:flex; align-items:center; justify-content:center; padding:6px; color:var(--ink-faint);
+    font-family:var(--font-mono); font-size:13px; background:var(--bg-raised);
+  }
+  .keylist{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+
+  .steps{list-style:none; margin:20px 0 0; padding:0; counter-reset:step;}
+  .steps > li{
+    position:relative; margin:0; padding:4px 0 26px 42px; border-left:1px solid var(--line);
+  }
+  .steps > li:last-child{border-left-color:transparent; padding-bottom:2px;}
+  .steps > li::before{
+    counter-increment:step; content:counter(step);
+    position:absolute; left:-15px; top:2px; width:29px; height:29px; border-radius:50%;
+    background:var(--bg-raised); border:1px solid var(--accent); color:var(--accent-ink);
+    font-family:var(--font-display); font-size:12.5px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .steps h4{ font-family:var(--font-display); font-size:1rem; font-weight:700; margin:0 0 6px; }
+  .steps p{ margin:0 0 8px; font-size:.95rem; }
+  .steps p:last-child{ margin-bottom:0; }
+  .steps ul{ margin:6px 0 0; padding-left:1.2em; font-size:.93rem; }
+  .steps li li{ padding:0; border:none; margin:3px 0; }
+  .steps li li::before{ content:none; }
+
+  .levers{ width:100%; border-collapse:collapse; font-size:.88rem; margin:12px 0 0; }
+  .levers th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); padding:5px 14px 7px 0; border-bottom:1px solid var(--line); font-weight:600; }
+  .levers td{ padding:8px 14px 8px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  .levers tr:hover td{ background:var(--accent-bg); }
+  .levers td.lv{ font-family:var(--font-mono); font-weight:600; color:var(--accent-ink); white-space:nowrap; }
+
+  footer{max-width:800px; margin:70px 0 20px; padding-top:20px; border-top:1px solid var(--line); color:var(--ink-faint); font-size:.85rem;}
+</style>
+
+<div class="shell">
+  <nav class="toc">
+    <div class="brand">nostr-calendar</div>
+    <div class="brand-sub">Native layer reference</div>
+
+    <h4>Overview</h4>
+    <ul>
+      <li><a href="#overview">What this is</a></li>
+      <li><a href="#substrate">The shared substrate</a></li>
+    </ul>
+
+    <h4>JS notification layer <span class="chip shared" style="margin-left:4px;">src/</span></h4>
+    <ul>
+      <li><a href="#js-levers">Preference levers &amp; resolution</a></li>
+      <li><a href="#js-save">Save-flow order</a></li>
+      <li><a href="#js-fork">Platform fork</a></li>
+      <li><a href="#js-rrule">Recurrence engine (rrule)</a></li>
+    </ul>
+
+    <h4>Android <span class="chip android" style="margin-left:4px;">app.formstr.calendar</span></h4>
+    <ul>
+      <li><a href="#a-mainactivity">MainActivity</a></li>
+      <li><a href="#a-workers">Background workers</a></li>
+      <li><a href="#a-notifworker">NotificationWorker</a></li>
+      <li><a href="#a-invworker">InvitationWorker</a></li>
+      <li><a href="#a-bookworker">BookingWorker</a></li>
+      <li><a href="#a-recurrence">RecurrenceUtils</a></li>
+      <li><a href="#a-relay">RelayQueryUtils</a></li>
+      <li><a href="#a-widget">CalendarWidget</a></li>
+      <li><a href="#a-plugins">Capacitor plugins</a></li>
+      <li><a href="#a-permissions">Permissions &amp; manifest</a></li>
+    </ul>
+
+    <h4>iOS <span class="chip ios" style="margin-left:4px;">App</span></h4>
+    <ul>
+      <li><a href="#i-appdelegate">AppDelegate</a></li>
+      <li><a href="#i-scheduler">IOSNotificationScheduler</a></li>
+      <li><a href="#i-gaps">What isn't there</a></li>
+    </ul>
+
+    <h4>Cross-platform</h4>
+    <ul>
+      <li><a href="#matrix">Feature parity matrix</a></li>
+      <li><a href="#lifecycle">Create → deliver, step by step</a></li>
+      <li><a href="#wire">Wire-protocol tie-in</a></li>
+      <li><a href="#notes">Engineering notes</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <div class="masthead">
+      <div class="kicker">Platform reference — read from android/ and ios/ source, not from docs/</div>
+      <h1>What runs when the web view isn't</h1>
+      <p>nostr-calendar's UI is one shared React codebase (<code>src/</code>). But underneath the Capacitor shell, Android and iOS each carry real native logic — background workers, alarm scheduling, a home-screen widget, calendar-file handling — that keeps working while the app is closed. This traces every class in <code>android/app/src/main/java/app/formstr/calendar/</code> and <code>ios/App/App/</code>, plus the <code>src/</code> code that feeds them, exactly as implemented today.</p>
+      <p>Companion to <a href="nostr-layer-reference.html">nostr-layer-reference.html</a>, which covers the wire protocol this native code polls for. Existing docs/README were not consulted for either.</p>
+      <div class="meta">nostr-calendar · compiled 2026-07-26</div>
+    </div>
+
+    <section class="category" id="overview">
+      <h2>What this is</h2>
+      <p class="category-note">A Capacitor app is usually a thin shell: native code that boots a WebView and gets out of the way. This one doesn't — Android alone has twelve native classes (2,700+ lines) doing scheduling, relay polling, and file handling that runs independently of the JS layer. The notification system in particular spans all three: JS decides <em>whether</em> to notify and writes the cache, native code decides <em>when</em> and actually fires the alarm.</p>
+    </section>
+
+    <section class="category" id="substrate">
+      <h2>The shared substrate</h2>
+      <p class="category-note">Native code and the web app never call each other directly for calendar data. They meet through one thing: Capacitor's Preferences plugin, which is <code>localStorage</code> to the JS layer and a plain key/value file to native code — <code>SharedPreferences</code> file <code>CapacitorStorage</code> on Android, <code>UserDefaults</code> keys prefixed <code>CapacitorStorage.</code> on iOS. No ContentProvider, no shared database, no other IPC exists between the two worlds.</p>
+
+      <div class="substrate">
+        <div class="substrate-row">
+          <div class="substrate-label">JS writes</div>
+          <div class="substrate-body">
+            <p>The web app is the only writer. It maintains the local event cache and, separately, a small set of keys that exist purely so native background code has something to read without a JS runtime.</p>
+            <div class="keylist">
+              <span class="chip file">cal:events</span>
+              <span class="chip file">cal:calendar_lists</span>
+              <span class="chip file">cal:notification-preferences</span>
+              <span class="chip file">cal:invitations</span>
+              <span class="chip file">bg:userPubkey</span>
+              <span class="chip file">bg:relays</span>
+              <span class="chip file">bg:lastLoginTime</span>
+            </div>
+          </div>
+        </div>
+        <div class="substrate-arrow">↓ read-only</div>
+        <div class="substrate-row">
+          <div class="substrate-label">Native reads</div>
+          <div class="substrate-body">
+            <p><strong>NotificationWorker</strong> / <strong>IOSNotificationScheduler</strong> read <code>cal:events</code>, <code>cal:calendar_lists</code>, <code>cal:notification-preferences</code> to decide what to schedule. <strong>CalendarWidget</strong> reads <code>cal:events</code> only. <strong>InvitationWorker</strong> and <strong>BookingWorker</strong> <span class="chip android" style="margin:0 2px;">Android-only</span> read <code>bg:userPubkey</code> / <code>bg:relays</code> to know who and where to poll, and <code>cal:invitations</code> to avoid re-notifying about invites the JS layer already surfaced.</p>
+          </div>
+        </div>
+        <div class="substrate-arrow">↓ produces</div>
+        <div class="substrate-row">
+          <div class="substrate-label">Native writes back</div>
+          <div class="substrate-body">
+            <p>Only one thing flows the other way: each worker persists its own scheduling registry (<code>cal:scheduled-event-notifications-v2</code> on Android) or last-fetch timestamps (<code>bg:lastInvitationFetchTime</code>, <code>bg:lastBookingRequestFetchTime</code>, <code>bg:lastBookingResponseFetchTime</code>) so the next run knows where it left off. The JS layer never reads these back.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout"><span class="label">Why this matters</span><p>None of the four Android workers ever run JS or touch the signer. <strong>InvitationWorker</strong> and <strong>BookingWorker</strong> query relays over a raw WebSocket and only ever look at gift-wrap envelope tags (<code>#p</code>, <code>#k</code>) and event ids — they never open a seal or rumor. Decryption requires the live signer, which only exists inside the running WebView.</p></div>
+    </section>
+
+    <!-- ================= JS LAYER ================= -->
+    <section class="category wide" id="cat-js">
+      <h2>JS notification layer <span class="chip shared">src/</span></h2>
+      <p class="category-note">Everything above reads a cache. This is where the cache — and the decision to notify at all — gets written: <code>src/stores/events.ts</code>, <code>src/stores/calendarLists.ts</code>, <code>src/utils/notificationPreferences.ts</code>, <code>src/utils/notifications.ts</code>, and <code>src/plugins/notificationScheduler.ts</code>.</p>
+
+      <article class="flow" id="js-levers">
+        <h3>Three levers, one resolver <span class="chip file">notificationPreferences.ts</span></h3>
+        <p>Whether a given event ever notifies, and how far ahead, is decided by one pure function — <code>resolveNotificationPreference(eventPreference, listPreference)</code>, used via <code>shouldScheduleNotifications()</code> — folding together three independently-stored settings:</p>
+        <table class="levers">
+          <tr><th>Lever</th><th>Stored where</th><th>Set by</th></tr>
+          <tr><td class="lv">Per-event enable/disable</td><td><code>event.notificationPreference</code> — a nostr-published <code>["notification", value]</code> tag</td><td><span class="chip gap">no UI writes this</span> — wins if present, but nothing in the app's editors ever sets it</td></tr>
+          <tr><td class="lv">Per-calendar enable/disable</td><td><code>ICalendarList.notificationPreference</code> — a tag on the calendar-list event (32123), default <code>"enabled"</code></td><td>the calendar's manage dialog (<code>CalendarManageDialog.tsx</code>) — the actual on/off switch users operate</td></tr>
+          <tr><td class="lv">Reminder offsets</td><td><code>cal:notification-preferences[eventId].offsetsMinutes</code> — local-only, <em>never</em> published to nostr</td><td><code>NotificationPreferenceEditor.tsx</code>, in the event editor and the event-view quick-edit dialog</td></tr>
+        </table>
+        <div class="callout"><span class="label">The resolution</span><p><code>eventPreference ?? listPreference ?? "enabled"</code> — matches the native Java/Swift logic exactly. In practice, because no editor control sets the per-event flag, the calendar-level toggle is the only real "off switch"; the only per-event lever a user can actually operate is the offsets list itself — clearing it to empty means no reminders for that one event.</p></div>
+        <p>A fourth number, <code>cal:settings.defaultReminderMinutes</code> (global, nostr-synced, default <code>10</code>), plays no part in this resolution — it only pre-fills a brand-new event's offsets field in the editor and is never consulted again after save.</p>
+        <p>Toggling a calendar's preference doesn't just apply forward: <code>refreshNotificationPreferencesForCalendar(calendarId)</code> (<code>src/stores/events.ts</code>) immediately re-syncs every event already in that calendar, five at a time via <code>Promise.allSettled</code>.</p>
+      </article>
+
+      <article class="flow" id="js-save">
+        <h3>Save-flow order <span class="chip file">useEventSave.ts</span></h3>
+        <p>Saving an event runs relay publishing and notification bookkeeping as two separate phases, in a fixed order: publish the event (32678/31923) → gift-wrap invites to any <em>new</em> participants → add/move it into the selected calendar (32123) → <strong>only then</strong>, outside the publish steps entirely, write or clear the local offsets preference → cancel whatever was previously scheduled for this event → resolve the three levers above → schedule fresh if the result is "enabled".</p>
+        <p>Every one of those cache writes independently calls <code>reconcileNotificationSchedule()</code> (<code>src/plugins/notificationScheduler.ts</code>) — a single save can trigger it four separate times (event write, preference write, cancel, schedule). That's safe by construction: the plugin forwards to Android's native <code>reconcile()</code>, which enqueues a <em>unique</em> one-time <code>WorkManager</code> job with <code>ExistingWorkPolicy.REPLACE</code> — four calls collapse into one real <code>NotificationWorker.doWork()</code> run.</p>
+      </article>
+
+      <article class="flow" id="js-fork">
+        <h3>Platform fork <span class="chip file">notifications.ts</span></h3>
+        <p>Every exported function in <code>src/utils/notifications.ts</code> — <code>scheduleEventNotifications</code>, <code>requestNotificationPermission</code>, <code>cancelEventNotifications</code>, <code>cancelAllNotifications</code>, <code>addNotificationClickListener</code> — opens with <code>if (!isNative) return …</code>. From there it splits again on <code>isAndroidNative()</code>:</p>
+        <table class="tagtable">
+          <tr><th>Platform</th><th>What actually schedules</th></tr>
+          <tr><td class="tagname"><span class="chip android">Android</span></td><td><code>scheduleEventNotifications</code> computes a candidate list purely to show the user a "next reminder" preview, then just calls <code>reconcile()</code> — the real <code>AlarmManager</code> call happens entirely inside <code>NotificationWorker.doWork()</code>, re-reading the cache and re-expanding recurrence a second time with its own engine.</td></tr>
+          <tr><td class="tagname"><span class="chip ios">iOS</span></td><td><code>scheduleEventNotifications</code> calls <code>LocalNotifications.schedule()</code> directly, right here in JS, using the same candidate list and the same <code>v2:eventId:occurrenceStart:mOffset</code> key format <code>IOSNotificationScheduler.swift</code> uses independently on every launch/foreground/background/<code>BGAppRefreshTask</code>. Identical deterministic keys mean the two paths never conflict — they just redundantly agree.</td></tr>
+          <tr><td class="tagname"><span class="chip gap">Web</span></td><td>Nothing schedules. Worse: <code>cal:events</code>/<code>cal:calendar_lists</code> aren't even persisted across a reload on web — <code>getSecureItem</code>/<code>setSecureItem</code> (<code>src/common/localStorage.ts</code>) are <code>isNative</code>-gated no-ops. Desktop web is relay-fetch-only and in-memory; it cannot schedule a single reminder, by design, not by omission.</td></tr>
+        </table>
+        <p>The permission prompt itself can <em>only</em> happen here, in the foreground JS layer (<code>requestNotificationPermission</code>, called from <code>App.tsx</code> once <code>isNative && user && isInitialized</code>) — none of the background workers on either platform are able to prompt for permission.</p>
+      </article>
+
+      <article class="flow" id="js-rrule">
+        <h3>Recurrence engine — the real thing <span class="chip file">repeatingEventsHelper.ts</span></h3>
+        <p>Unlike the two restricted native engines, the JS layer expands recurrence with the actual <code>rrule</code> npm package (<code>"rrule": "^2.8.1"</code>) — full RFC 5545 grammar. <code>getOccurrencesInRange()</code> is what <code>buildCandidates()</code> in <code>notifications.ts</code> calls to compute reminder times, and the same module builds/parses the rule strings the event editor's recurrence UI produces.</p>
+        <p>The app just never <em>generates</em> anything outside FREQ/INTERVAL/BYDAY/COUNT/UNTIL — so the fuller grammar the library supports is never exercised by this app's own data, and the native engines' narrower subset never actually falls short of what a real event contains.</p>
+      </article>
+    </section>
+
+    <!-- ================= ANDROID ================= -->
+    <section class="category wide" id="cat-android">
+      <h2>Android <span class="chip android">app.formstr.calendar</span></h2>
+      <p class="category-note">Twelve classes under <code>android/app/src/main/java/app/formstr/calendar/</code>: one activity, four Capacitor plugins, three WorkManager workers, one broadcast receiver, one app widget, and two utility classes.</p>
+
+      <article class="flow" id="a-mainactivity">
+        <h3>MainActivity <span class="chip file">MainActivity.java · 257 lines</span></h3>
+        <p class="trigger">Extends <code>BridgeActivity</code>. Registers all four custom plugins in <code>onCreate</code>, before <code>super.onCreate</code>, then kicks off every background schedule in one place.</p>
+        <div class="field"><span class="label">Boot sequence</span><p>Every launch: schedules the 6-hour <code>NotificationWorker</code> (kept if one already exists), fires one immediate one-time run of it, schedules the 15-minute <code>InvitationWorker</code>, schedules the 15-minute <code>BookingWorker</code> — the last two are cancelled and re-enqueued fresh on every launch rather than kept, so a relay-list or login change always takes effect immediately.</p></div>
+        <div class="field"><span class="label">Three intent categories, one dispatch mechanism</span>
+          <ul>
+            <li><strong>HTTPS App Link</strong> — <code>calendar.formstr.app/event/&lt;naddr&gt;</code>, validated strictly (scheme, exact host, exactly two path segments, first segment literally <code>event</code>) and rebuilt into an internal <code>/event/&lt;naddr&gt;?query</code> route.</li>
+            <li><strong>.ics file open</strong> — matched by <code>text/calendar</code> mime type or a <code>content://</code>/<code>file://</code> URI ending in <code>.ics</code>; the file is read fully as text via the content resolver, escaped, and pushed in as raw content.</li>
+            <li><strong>Internal <code>openRoute</code> extra</strong> — the string every notification and widget tap uses to jump to a specific screen (<code>/bookings</code>, <code>/notifications</code>, <code>/notification-event/&lt;id&gt;</code>).</li>
+          </ul>
+        </div>
+        <div class="field"><span class="label">The cold-start race</span><p>All three funnel into <code>window.dispatchEvent(new CustomEvent(...))</code> calls injected via <code>evaluateJavascript</code> — but only once the JS layer has called the <code>AppReady</code> plugin's <code>notifyReady()</code>. Until then, routes and ICS content sit in <code>pendingRoute</code>/<code>pendingIcsContent</code> and flush the moment the app signals it's ready. This is the fix for a deep link firing before React has mounted its listeners.</p></div>
+      </article>
+
+      <article class="flow" id="a-workers">
+        <h3>Background workers — schedule at a glance</h3>
+        <table class="worktable">
+          <tr><th>Worker</th><th>Cadence</th><th>Constraints</th><th>Reads network?</th><th>Decrypts?</th></tr>
+          <tr><td class="k">NotificationWorker</td><td>Every 6h, + once immediately on launch</td><td>none</td><td>No — local cache only</td><td>No</td></tr>
+          <tr><td class="k">InvitationWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
+          <tr><td class="k">BookingWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
+        </table>
+        <p class="trigger" style="margin-top:14px;">All three are <code>androidx.work.Worker</code> jobs, so the OS can run them even with the app fully killed, subject to Doze/battery restrictions.</p>
+      </article>
+
+      <article class="flow" id="a-notifworker">
+        <h3>NotificationWorker — the reconciliation engine <span class="chip file">NotificationWorker.java · 416 lines</span></h3>
+        <p>The largest native class, and the only one with genuinely non-trivial logic. It "reconciles the complete desired calendar reminder set for a rolling 48-hour window" — the file's own description — rather than incrementally adding alarms.</p>
+        <div class="field"><span class="label">Each run, for every cached event</span>
+          <ul>
+            <li>Resolves notification preference: per-event override wins, else the owning calendar's preference, else enabled by default.</li>
+            <li>Resolves reminder offsets in minutes — configured per event, or the default <code>[10, 0]</code> (ten minutes before, and at start).</li>
+            <li>Expands recurrence for the window via <a href="#a-recurrence">RecurrenceUtils</a>, extended past the 48h edge by whatever the largest configured offset is.</li>
+          </ul>
+        </div>
+        <div class="field"><span class="label">Diff, don't append</span><p>Builds a map of every alarm that <em>should</em> exist, keyed <code>v2:&lt;eventId&gt;:&lt;occurrenceStart&gt;:m&lt;offsetMinutes&gt;</code>, diffs it against the persisted registry (<code>cal:scheduled-event-notifications-v2</code>) of what's currently scheduled, cancels whatever's no longer desired, <strong>persists the new registry before scheduling a single alarm</strong> — so even an alarm due immediately can validate itself against a registry that already lists it — then calls <code>AlarmManager</code> for the rest.</p></div>
+        <div class="field"><span class="label">Graceful degradation</span><p>Uses <code>setExactAndAllowWhileIdle</code> when exact-alarm scheduling is available, falls back to the inexact <code>setAndAllowWhileIdle</code> if the user revoked <code>SCHEDULE_EXACT_ALARM</code> (Android 12+). If <code>POST_NOTIFICATIONS</code> isn't granted at all, it doesn't retry or error — it clears every scheduled alarm and reports success.</p></div>
+        <p>Every run ends by calling <code>CalendarWidget.refreshAll()</code>, so the home-screen widget is never more than 6 hours stale even if the widget's own update tick hasn't fired.</p>
+        <div class="field"><span class="label">NotificationReceiver — the fire step <span class="chip file">NotificationReceiver.java · 103 lines</span></span><p>The <code>AlarmManager</code> target. Before showing anything, it re-checks the notification key+id it fired with against the worker's live registry (<code>isNotificationRegistered</code>) and silently drops the broadcast if it's stale — the explicit guard against alarms left behind by an older app version or a reconciliation that ran a moment earlier.</p></div>
+      </article>
+
+      <article class="flow" id="a-invworker">
+        <h3>InvitationWorker <span class="chip file">InvitationWorker.java · 318 lines</span> <span class="chip android">Android only</span></h3>
+        <p class="trigger">Every 15 minutes, network-constrained. Polls up to 3 relays for gift-wrapped calendar invitations addressed to the logged-in pubkey.</p>
+        <div class="field"><span class="label">Dual query, for migration compatibility</span><p>Two filters per relay: <code>{kinds:[1059], #p:[you], #k:["1052"]}</code> for current wraps, and <code>{kinds:[1052], #p:[you]}</code> for legacy pre-migration wraps that predate the <code>#k</code> classifier entirely. It also fetches legacy kind-84 tombstones the user authored on an old client, to keep old dismissals suppressed, and cross-checks the local <code>cal:invitations</code> cache so it never re-notifies about something a live session already surfaced. Wraps tagged <code>["booking","true"]</code> are explicitly skipped — those belong to <a href="#a-bookworker">BookingWorker</a>.</p></div>
+        <p>Fires one notification per run if anything new turns up ("You have 3 new invitations"), routing taps to <code>/notifications</code>. It never decrypts — the seal and rumor stay closed; only the outer wrap's public tags and event id are ever read.</p>
+      </article>
+
+      <article class="flow" id="a-bookworker">
+        <h3>BookingWorker <span class="chip file">BookingWorker.java · 315 lines</span> <span class="chip android">Android only</span></h3>
+        <p class="trigger">Same 15-minute, network-constrained shape as InvitationWorker, same relay list, two separate concerns.</p>
+        <div class="field"><span class="label">Requests vs. approvals</span><p>Booking <em>requests</em> — <code>#k:"1057"</code> plus legacy kind 1057 — always notify. Booking <em>responses</em> — <code>#k:"1058"</code> plus legacy kind 1058 — are fetched but filtered down to only those carrying <code>["status","approved"]</code> before notifying; declines are silently dropped. Two distinct channels, "Booking Requests" and "Booking Acceptances", both routing taps to <code>/bookings</code>.</p></div>
+        <div class="callout"><span class="label">No tombstone query here</span><p>Unlike InvitationWorker, this worker never queries kind 84. The source comment is explicit: booking never had a pre-1059 kind-84 dismissal mechanism to stay backward compatible with, so there's nothing to read.</p></div>
+      </article>
+
+      <article class="flow" id="a-recurrence">
+        <h3>RecurrenceUtils <span class="chip file">RecurrenceUtils.java · 309 lines</span></h3>
+        <p>A hand-written RRULE evaluator with no date library underneath it — plain <code>java.util.Calendar</code> arithmetic. Supports exactly what the app itself ever generates: <code>FREQ</code> ∈ {DAILY, WEEKLY, MONTHLY, YEARLY}, <code>INTERVAL</code>, <code>BYDAY</code> (meaningful only with WEEKLY), <code>COUNT</code>, and <code>UNTIL</code> in all three RRULE date shapes. No <code>BYMONTHDAY</code>, <code>BYSETPOS</code>, <code>BYMONTH</code>, <code>BYWEEKNO</code>, <code>EXDATE</code>, or <code>RDATE</code> — this is a deliberate subset, not a partial implementation of the full RFC.</p>
+        <p>Two entry points reused across three call sites: <code>getNextOccurrenceInRange</code> (the single soonest occurrence — used by <a href="#a-widget">CalendarWidget</a>) and <code>getOccurrencesInRange</code> (every occurrence in a window — used by NotificationWorker), the latter built by repeatedly re-invoking the former and advancing a cursor, with a hard 10,000-iteration guard against a malformed rule that never advances.</p>
+      </article>
+
+      <article class="flow" id="a-relay">
+        <h3>RelayQueryUtils <span class="chip file">RelayQueryUtils.java · 113 lines</span></h3>
+        <p>The entire Nostr client the background workers need — and nothing more. Raw OkHttp WebSockets, no signing, no relay pool, no reconnect/backoff. Rewrites <code>wss://</code>/<code>ws://</code> to <code>https://</code>/<code>http://</code> for OkHttp's request builder, sends one <code>["REQ", subId, filter]</code>, streams <code>EVENT</code> frames to a caller callback, sends <code>CLOSE</code> and disconnects the moment <code>EOSE</code> arrives — all bounded by a 15-second <code>CountDownLatch</code> timeout shared by both workers.</p>
+      </article>
+
+      <article class="flow" id="a-widget">
+        <h3>CalendarWidget <span class="chip file">CalendarWidget.java · 214 lines</span> <span class="chip android">Android only</span></h3>
+        <p>A home-screen <code>AppWidgetProvider</code> showing up to 3 upcoming events. Refreshed both by the OS's own <code>APPWIDGET_UPDATE</code> tick and explicitly at the end of every NotificationWorker run. Reads the same <code>cal:events</code> cache, independently re-deriving each recurring event's next occurrence — a third call site for RecurrenceUtils, alongside NotificationWorker and the JS calendar view itself — over a fixed 3-day lookahead. Row times render as a clock time (today), "Tomorrow", or a weekday abbreviation. Tapping anywhere launches MainActivity.</p>
+      </article>
+
+      <article class="flow" id="a-plugins">
+        <h3>Capacitor plugins — custom and third-party</h3>
+        <table class="tagtable">
+          <tr><th>Plugin</th><th>What it does</th><th></th></tr>
+          <tr><td class="tagname">AppReady</td><td>One method, <code>notifyReady()</code> — flips MainActivity's ready flag and flushes any queued route/ICS content.</td><td><span class="chip file">18 lines</span></td></tr>
+          <tr><td class="tagname">DeviceCalendar</td><td>Read-only bridge to <code>CalendarContract</code>. <code>listCalendars()</code> filters to calendars the user has chosen to show and sync (excludes auto-added ones like Classroom); <code>listEvents()</code> queries the <code>Instances</code> table so the OS itself expands recurrence, returning a composite <code>instanceId:eventId</code> key. Needs <code>READ_CALENDAR</code> only — never writes.</td><td><span class="chip file">256 lines</span></td></tr>
+          <tr><td class="tagname">KeyBackup</td><td><code>copyText</code> → clipboard. <code>saveKeyFile</code> → writes <code>key.txt</code> to the public Downloads folder via <code>MediaStore</code> (API 29+ only), using the pending-then-commit pattern so a write failure never leaves a zero-byte file. Backs the app's forced ncryptsec copy/download step during account creation.</td><td><span class="chip file">87 lines</span></td></tr>
+          <tr><td class="tagname">NotificationScheduler</td><td>Three thin methods (<code>reconcile</code>, <code>clear</code>, <code>cancelEvent</code>) that just trigger NotificationWorker — the source comment is explicit that every actual scheduling decision stays in the worker, not here.</td><td><span class="chip file">35 lines</span></td></tr>
+          <tr><td class="tagname">SecureKeyStorage</td><td><code>@khadarvsk/capacitor-secure-storage</code> — third-party. Android Keystore-backed key/value store; this is where the "native nsec" login method actually persists key material on-device.</td><td><span class="chip shared">both platforms</span></td></tr>
+          <tr><td class="tagname">NostrSignerPlugin</td><td><code>nostr-signer-capacitor-plugin</code> — third-party. Implements NIP-55, the Amber-style external-signer-app intent protocol. Linked into the iOS build too, but there's no external-signer-app ecosystem on iOS — it's inert there.</td><td><span class="chip android">Android-only in practice</span></td></tr>
+        </table>
+      </article>
+
+      <article class="flow" id="a-permissions">
+        <h3>Permissions &amp; manifest</h3>
+        <div class="field"><span class="label">Permissions declared</span><p><code>INTERNET</code>, <code>SCHEDULE_EXACT_ALARM</code>, <code>POST_NOTIFICATIONS</code>, <code>RECEIVE_BOOT_COMPLETED</code>, <code>READ_CALENDAR</code>. No write-calendar permission — device calendar access is import-only, everywhere.</p></div>
+        <div class="field"><span class="label">MainActivity intent filters</span><p>Launcher intent; an <code>autoVerify</code> HTTPS App Link for <code>calendar.formstr.app/event/*</code>; a <code>text/calendar</code> mime-type filter; and two more filters specifically for <code>content://</code> and <code>file://</code> URIs ending in <code>.ics</code>. Between them, the app registers as a full system "Open with" target for calendar files. Launch mode <code>singleTask</code>.</p></div>
+        <div class="field"><span class="label">Receivers</span><p><code>NotificationReceiver</code> is not exported — alarm-only, nothing external can trigger it. <code>CalendarWidget</code>'s receiver is exported (required by the widget-host framework) and only responds to <code>APPWIDGET_UPDATE</code>.</p></div>
+      </article>
+    </section>
+
+    <!-- ================= IOS ================= -->
+    <section class="category wide" id="cat-ios">
+      <h2>iOS <span class="chip ios">App</span></h2>
+      <p class="category-note">Two custom files exist under <code>ios/App/App/</code>, against Android's twelve. What's built mirrors Android closely; what's missing is most of it.</p>
+
+      <article class="flow" id="i-appdelegate">
+        <h3>AppDelegate <span class="chip file">AppDelegate.swift · 52 lines</span></h3>
+        <p>Standard Capacitor lifecycle scaffold. On launch it registers and schedules IOSNotificationScheduler's background-refresh task and runs an immediate reconciliation; entering background re-arms the refresh request; becoming active reconciles again.</p>
+        <div class="field"><span class="label">URL and universal-link handling</span><p>Both <code>application(_:open:options:)</code> and <code>application(_:continue:restorationHandler:)</code> just forward straight into <code>ApplicationDelegateProxy.shared</code> — the stock <code>@capacitor/app</code> plugin's default JS-facing event. There is no Swift-side parsing of <code>/event/&lt;naddr&gt;</code> paths and no <code>.ics</code> file handling code anywhere in this file or the project.</p></div>
+        <p><code>App.entitlements</code> <em>does</em> declare <code>applinks:calendar.formstr.app</code>, so the OS layer can intercept those links exactly like Android's <code>autoVerify</code> filter — but nothing native downstream translates the URL into an app route the way MainActivity does; that's left to the shared JS router.</p>
+      </article>
+
+      <article class="flow" id="i-scheduler">
+        <h3>IOSNotificationScheduler <span class="chip file">IOSNotificationScheduler.swift · 514 lines</span></h3>
+        <p>A close Swift port of NotificationWorker's reconciliation algorithm — necessarily reimplemented rather than shared, since Java and Swift can't share a class. Same <code>CapacitorStorage.cal:events</code> / <code>cal:calendar_lists</code> / <code>cal:notification-preferences</code> keys (Capacitor's Preferences plugin prefixes iOS <code>UserDefaults</code> the same way), same 48-hour window, same <code>[10, 0]</code>-minute default offsets, same <code>v2:</code> key prefix and hash-to-int identifier scheme, and its own independent RRULE evaluator covering the identical subset — DAILY/WEEKLY/MONTHLY/YEARLY, <code>INTERVAL</code>, <code>BYDAY</code>, <code>COUNT</code>, <code>UNTIL</code> — as Android's RecurrenceUtils.</p>
+        <div class="field"><span class="label">Where the platforms genuinely diverge</span><p>No <code>AlarmManager</code> equivalent exists on iOS, so scheduling uses <code>UNCalendarNotificationTrigger</code> fired by the system, and refresh runs opportunistically via <code>BGAppRefreshTaskRequest</code> rather than on a guaranteed cadence — iOS decides when it actually gets to run, not the app. The scheduler also caps itself at 64 pending notifications total and explicitly reserves headroom for any non-event notifications already pending — a real, system-enforced iOS ceiling Android's AlarmManager has no analog for.</p></div>
+      </article>
+
+      <article class="flow" id="i-gaps">
+        <h3>What isn't there <span class="chip gap">iOS gap</span></h3>
+        <ul>
+          <li><strong>No InvitationWorker / BookingWorker equivalent</strong> — no relay polling at all when the app isn't foregrounded, so no background notifications for new invitations or bookings on iOS, ever.</li>
+          <li><strong>No DeviceCalendarPlugin equivalent</strong> — no EventKit bridge exists in Swift, so the device-calendar-import feature (<code>src/plugins/deviceCalendar.ts</code>) has nothing to call into on iOS today.</li>
+          <li><strong>No KeyBackupPlugin equivalent</strong> — the ncryptsec clipboard-copy / file-save flow has no native iOS implementation.</li>
+          <li><strong>No CalendarWidget equivalent</strong> — no WidgetKit extension target exists in the Xcode project at all.</li>
+          <li><strong>No .ics "Open with" registration</strong> — <code>Info.plist</code> declares no <code>CFBundleDocumentTypes</code> / <code>UTExportedTypeDeclarations</code> for <code>.ics</code> or <code>text/calendar</code>, so "Open in Calendar by Form*" for a calendar-file attachment isn't offered by iOS at all.</li>
+        </ul>
+      </article>
+    </section>
+
+    <!-- ================= MATRIX ================= -->
+    <section class="category wide" id="matrix">
+      <h2>Feature parity matrix</h2>
+      <p class="category-note">Everything below is read directly off the native source in both trees — not from store listings or release notes.</p>
+      <div class="matrix-wrap">
+        <table class="matrix">
+          <tr><th>Capability</th><th class="plat">Android</th><th class="plat">iOS</th></tr>
+          <tr><td>Local event reminders, app closed</td><td class="plat status-yes">✅<span class="status-note">AlarmManager, exact when permitted</span></td><td class="plat status-yes">✅<span class="status-note">UNCalendarNotificationTrigger, same math</span></td></tr>
+          <tr><td>Invitation background notifications</td><td class="plat status-yes">✅<span class="status-note">InvitationWorker, 15-min poll</span></td><td class="plat status-no">❌<span class="status-note">no equivalent</span></td></tr>
+          <tr><td>Booking background notifications</td><td class="plat status-yes">✅<span class="status-note">BookingWorker, 15-min poll</span></td><td class="plat status-no">❌<span class="status-note">no equivalent</span></td></tr>
+          <tr><td>Home-screen widget</td><td class="plat status-yes">✅<span class="status-note">CalendarWidget, 3 upcoming</span></td><td class="plat status-no">❌<span class="status-note">no WidgetKit target</span></td></tr>
+          <tr><td>Deep link → in-app route</td><td class="plat status-yes">✅<span class="status-note">native parse + JS bridge event</span></td><td class="plat status-partial">⚠️<span class="status-note">OS intercepts; no native route translation</span></td></tr>
+          <tr><td>.ics file "Open with"</td><td class="plat status-yes">✅<span class="status-note">3 manifest filters, native read</span></td><td class="plat status-no">❌<span class="status-note">no document-type registration</span></td></tr>
+          <tr><td>Device calendar import</td><td class="plat status-yes">✅<span class="status-note">DeviceCalendarPlugin, read-only</span></td><td class="plat status-no">❌<span class="status-note">no native plugin</span></td></tr>
+          <tr><td>Key backup export</td><td class="plat status-yes">✅<span class="status-note">clipboard + Downloads file</span></td><td class="plat status-no">❌<span class="status-note">no native plugin</span></td></tr>
+          <tr><td>Secure key storage</td><td class="plat status-yes">✅<span class="status-note">Keystore-backed</span></td><td class="plat status-yes">✅<span class="status-note">same plugin, Keychain-backed</span></td></tr>
+          <tr><td>NIP-55 external signer</td><td class="plat status-yes">✅<span class="status-note">real ecosystem (Amber, etc.)</span></td><td class="plat status-partial">⚠️<span class="status-note">plugin linked, no iOS signer apps exist</span></td></tr>
+          <tr><td>Guaranteed scheduling</td><td class="plat status-partial">⚠️<span class="status-note">degrades if exact-alarm revoked</span></td><td class="plat status-partial">⚠️<span class="status-note">opportunistic — OS decides timing</span></td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= LIFECYCLE ================= -->
+    <section class="category wide" id="lifecycle">
+      <h2>Create → deliver, step by step</h2>
+      <p class="category-note">One reminder, traced from the moment a user saves an event to the moment a notification appears — including what's different for a recurring event.</p>
+      <ol class="steps">
+        <li>
+          <h4>Login populates the background feed</h4>
+          <p><code>onUserChange</code> → <code>syncUserNetworkState(pubkey)</code> (<code>src/stores/user.ts</code>) fetches the user's own NIP-65 relay list, then writes <code>bg:userPubkey</code>, <code>bg:relays</code>, <code>bg:lastLoginTime</code> to Preferences. Without this write, Android's InvitationWorker/BookingWorker find no pubkey and no-op every run — though NotificationWorker doesn't need it; it only ever reads <code>cal:events</code>. <code>App.tsx</code> also calls <code>requestNotificationPermission()</code> here, the only place either OS's permission dialog can appear.</p>
+        </li>
+        <li>
+          <h4>User sets a reminder</h4>
+          <p>Opening the editor (<code>EventEditor.tsx</code>) seeds the offsets field from <code>generalSettings.defaultReminderMinutes</code> for a new event, or the event's own stored preference for an edit. <code>NotificationPreferenceEditor</code> edits a plain list of minutes-before values — there's no separate switch; an empty list <em>is</em> "no reminders."</p>
+        </li>
+        <li>
+          <h4>Recurrence is built in the same editor, if any</h4>
+          <p><code>frequencyToRRule</code>/<code>customRecurrence.ts</code> constructs an RRULE string held as <code>draftRecurrenceRule</code>. The editor never produces anything outside FREQ/INTERVAL/BYDAY/COUNT/UNTIL — the same subset both native recurrence engines understand.</p>
+        </li>
+        <li>
+          <h4>Save runs a fixed sequence</h4>
+          <p><code>useEventSave.ts</code> <code>handleSave</code>: publish the event → gift-wrap invites to new participants → add/move it into the calendar list → <strong>then</strong>, outside the relay-publish steps, write or clear the local offsets preference → cancel anything previously scheduled for this event → resolve the three preference levers → schedule fresh if the result is "enabled."</p>
+        </li>
+        <li>
+          <h4>Three levers, one resolver</h4>
+          <p>Per-event enable/disable (nostr tag, no UI sets it) beats per-calendar enable/disable (the calendar manage dialog, default enabled) beats the hard-coded default "enabled." See <a href="#js-levers">Preference levers &amp; resolution</a> for the full table.</p>
+        </li>
+        <li>
+          <h4>Every cache write triggers reconcile — redundantly, safely</h4>
+          <p>A single save fires <code>reconcileNotificationSchedule()</code> up to four times. Each is a no-op wrapper on Android that enqueues a <em>unique</em> one-time WorkManager job with <code>REPLACE</code> policy, so the four calls collapse into one real <code>NotificationWorker.doWork()</code> run — not four.</p>
+        </li>
+        <li>
+          <h4>The platforms fork completely</h4>
+          <ul>
+            <li><span class="chip android">Android</span> — JS computes a candidate list only for the UI preview; the real <code>AlarmManager</code> alarm comes from <code>NotificationWorker.doWork()</code> independently re-reading the cache and re-expanding recurrence with <code>RecurrenceUtils.java</code>.</li>
+            <li><span class="chip ios">iOS</span> — JS calls <code>LocalNotifications.schedule()</code> directly, right here, and <code>IOSNotificationScheduler.swift</code> separately re-derives and re-schedules the same set on every launch/foreground/background/<code>BGAppRefreshTask</code>. Same deterministic keys, so both paths agree instead of colliding.</li>
+            <li><span class="chip gap">Web</span> — none of this runs; nothing is even cached across a reload.</li>
+          </ul>
+        </li>
+        <li>
+          <h4>Recurring events are never "scheduled once for the future"</h4>
+          <p>Both the JS candidate builder (<code>NOTIFICATION_SCHEDULE_WINDOW_MS = 48h</code>) and the native workers (<code>SCHEDULE_WINDOW_MS</code>, same 48h) only ever expand occurrences inside a rolling 48-hour lookahead. A monthly event's reminder six months out doesn't exist as a scheduled alarm today — it's created only once a periodic run (Android's 6-hour <code>NotificationWorker</code>, or iOS's next opportunistic <code>BGAppRefreshTask</code>) happens to land close enough for it to fall inside the window.</p>
+        </li>
+        <li>
+          <h4>Delivery</h4>
+          <p><span class="chip android">Android</span> — <code>AlarmManager</code> fires → <code>NotificationReceiver</code> re-validates the notification key against the live registry before showing anything, so a stale alarm from a cancelled/edited event silently drops → system notification → tap routes to <code>/notification-event/&lt;eventId&gt;</code>. <span class="chip ios">iOS</span> — the OS fires the <code>UNCalendarNotificationTrigger</code> directly with no app code running until tapped, at which point <code>addNotificationClickListener</code> reads <code>notification.extra.eventId</code> and navigates in-app.</p>
+        </li>
+        <li>
+          <h4>Cleanup</h4>
+          <p>Deleting an event cancels its notifications, clears the UI notification list, and deletes its offsets preference outright. Logging out cancels every pending notification, clears the native Android schedule, and wipes every <code>bg:*</code> key — after which InvitationWorker/BookingWorker have nothing left to poll with.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ================= WIRE ================= -->
+    <section class="category" id="wire">
+      <h2>Wire-protocol tie-in</h2>
+      <p class="category-note">InvitationWorker and BookingWorker aren't a separate protocol — they're a cold-app backstop for flows the JS layer already handles live. See <a href="nostr-layer-reference.html">nostr-layer-reference.html</a> for the full semantics; this is only what the native code specifically touches.</p>
+      <div class="field"><span class="label">What the workers actually filter for</span>
+        <ul>
+          <li>Invitations: <code>{kinds:[1059], #p:[you], #k:["1052"]}</code> — see <a href="nostr-layer-reference.html#f-invite">Invitations (gift wrap)</a>.</li>
+          <li>Booking requests: <code>{kinds:[1059], #p:[you], #k:["1057"]}</code> — see <a href="nostr-layer-reference.html#f-bookreq">Booking request</a>.</li>
+          <li>Booking responses: <code>{kinds:[1059], #p:[you], #k:["1058"]}</code>, filtered client-side to <code>status:"approved"</code> — see <a href="nostr-layer-reference.html#f-bookresp">Booking response</a>.</li>
+        </ul>
+      </div>
+      <p>All three share the literal outer kind 1059 and the same "one outer kind, three products" ambiguity documented in <a href="nostr-layer-reference.html#notes-giftwrap">the protocol doc's gift-wrap notes</a> — the native workers rely on exactly the same <code>#k</code> classifier tag the JS layer does to tell them apart, since decrypting to the rumor would tell them nothing (all three rumors share kind 14 now too). Every legacy dual-query the workers run (raw kind 1052/1057/1058 alongside the 1059+<code>#k</code> form) exists for the same reason the JS layer still reads it: pre-migration gift wraps predate the classifier tag and would otherwise silently stop surfacing.</p>
+    </section>
+
+    <!-- ================= NOTES ================= -->
+    <section class="category" id="notes">
+      <h2>Engineering notes</h2>
+      <article class="flow" id="notes-registry" style="border-top:none;">
+        <h3>Registry-before-alarm, always</h3>
+        <p>NotificationWorker persists its new scheduling registry <em>before</em> calling AlarmManager for a single alarm. Combined with NotificationReceiver's live registry check, this means a stale alarm from a cancelled reconciliation, an app downgrade, or a race between two runs simply no-ops on fire instead of showing a wrong or duplicate notification.</p>
+      </article>
+      <article class="flow">
+        <h3>The recurrence engine exists three times, on purpose</h3>
+        <p>NotificationWorker, CalendarWidget, and IOSNotificationScheduler each carry their own call into a RRULE evaluator (two independent Java/Swift implementations of the identical restricted grammar). None of them attempt the full RFC 5545 grammar — because the app itself never generates rules outside DAILY/WEEKLY/MONTHLY/YEARLY + INTERVAL/BYDAY/COUNT/UNTIL, implementing more would be dead code, not correctness.</p>
+      </article>
+      <article class="flow">
+        <h3>Background workers never decrypt anything</h3>
+        <p>InvitationWorker and BookingWorker's entire value is counting matching gift-wrap ids and firing a system notification — never touching the seal, the rumor, or the signer. That's what lets them run as plain WorkManager jobs with a bare OkHttp WebSocket, with no cryptographic dependency and no risk of leaking key material into a background process.</p>
+      </article>
+      <article class="flow">
+        <h3>Android is the reference platform, not iOS</h3>
+        <p>Every Android-only capability in the parity matrix above is a capability iOS simply doesn't have a native implementation for yet — not a deliberate platform-specific design choice documented anywhere in the source. The <code>nostr-signer-capacitor-plugin</code> being linked into the iOS build despite NIP-55 having no iOS ecosystem is the clearest sign of this: it's wired for platform symmetry at the JS/TS interface, not because it does anything on iOS.</p>
+      </article>
+      <article class="flow">
+        <h3>A schema field with no writer <span class="chip gap">dead path</span></h3>
+        <p>The per-event <code>notificationPreference</code> tag is read on both the JS and native sides, and its "event overrides calendar" precedence is implemented identically in three languages (TypeScript, Java, Swift) — but no editor, dialog, or quick-edit view in <code>src/</code> ever writes it. It's fully wired plumbing with nothing at the other end, the same shape as the already-documented dead <code>anonymous</code> booking mode in the protocol reference.</p>
+      </article>
+      <article class="flow">
+        <h3>Multiple reconcile() calls per save is not a bug</h3>
+        <p>A single event save can trigger <code>reconcileNotificationSchedule()</code> up to four times — once each from the event-cache write, the preference write, the cancel step, and the schedule step. This only stays cheap because Android's <code>enqueueUniqueWork(..., REPLACE, ...)</code> collapses any pending duplicate before it runs; the JS side never tries to be clever about de-duplicating the calls itself.</p>
+      </article>
+    </section>
+
+    <footer>Compiled by reading <code>android/app/src/main/java/app/formstr/calendar/</code>, <code>android/app/src/main/AndroidManifest.xml</code>, <code>ios/App/App/</code>, the Capacitor/SPM plugin manifests, and the JS notification pipeline (<code>src/stores/events.ts</code>, <code>src/stores/user.ts</code>, <code>src/utils/notifications.ts</code>, <code>src/utils/notificationPreferences.ts</code>, <code>src/utils/repeatingEventsHelper.ts</code>, <code>src/plugins/notificationScheduler.ts</code>, <code>src/features/event-editor/</code>) directly. Existing repo docs were treated as unreliable and not used as a source.</footer>
+  </main>
+</div>

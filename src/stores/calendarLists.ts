@@ -27,14 +27,15 @@ import {
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
   createCalendar,
-} from "../common/calendarList";
-import { getUserPublicKey, publishDeletionEvent } from "../common/nostr";
-import { EventKinds } from "../common/EventConfigs";
+} from "../nostr/calendars";
+import { getUserPublicKey } from "../nostr/crypto";
+import { publishDeletionEvent } from "../nostr/events";
+import { EventKinds } from "../nostr/kinds";
 import {
   DEFAULT_NOTIFICATION_PREFERENCE,
   type ICalendarList,
 } from "../utils/calendarListTypes";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
+import type { ObserveHandle } from "@formstr/local-relay";
 import { isNative } from "../utils/platform";
 import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
@@ -57,7 +58,7 @@ const saveVisibilityToStorage = (visibility: Record<string, boolean>) => {
   setItem(CALENDAR_VISIBILITY_KEY, visibility);
 };
 
-let subscriptionHandle: SubscriptionHandle | undefined;
+let subscriptionHandle: ObserveHandle | undefined;
 
 const withNotificationPreference = (
   calendar: ICalendarList,
@@ -88,7 +89,11 @@ interface CalendarListsState {
   updateCalendar: (calendar: ICalendarList) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;
   toggleVisibility: (calendarId: string) => void;
-  addEventToCalendar: (calendarId: string, eventRef: string[]) => Promise<void>;
+  addEventToCalendar: (
+    calendarId: string,
+    eventRef: string[],
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<void>;
   removeEventFromCalendar: (
     calendarId: string,
     eventRef: string[],
@@ -97,6 +102,7 @@ interface CalendarListsState {
     targetCalendarId: string,
     eventCoordinate: string,
     eventRef: string[],
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
   ) => Promise<void>;
   getVisibleEventRefs: () => string[][];
   getAllEventIds: () => string[];
@@ -140,13 +146,15 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   },
 
   /**
-   * Fetches calendar lists from relays via nostrRuntime.
+   * Observes the user's calendar lists through the local relay.
    * Merges fetched calendars with existing state (keeps newer versions).
    * Auto-creates a default calendar if user has no calendars after fetch.
    */
   fetchCalendars: async () => {
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) return;
+
+    subscriptionHandle?.unobserve();
 
     const visibility = getItem<Record<string, boolean>>(
       CALENDAR_VISIBILITY_KEY,
@@ -165,7 +173,6 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
         list.notificationPreference =
           list.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE;
         fetchedCalendars.push(list);
-        console.log("CALENDAR_LIST_UPDATED");
         // Merge with existing: replace if newer, add if new
         set((state) => {
           const existingIndex = state.calendars.findIndex(
@@ -234,7 +241,16 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     const calendarWithDefaults = withNotificationPreference(newCalendar);
 
     set((state) => {
-      const updated = [...state.calendars, calendarWithDefaults];
+      // Upsert: the local relay fans the published event out to the standing
+      // calendar-list observe before this resolves, so it may already be here.
+      const exists = state.calendars.some(
+        (c) => c.id === calendarWithDefaults.id,
+      );
+      const updated = exists
+        ? state.calendars.map((c) =>
+            c.id === calendarWithDefaults.id ? calendarWithDefaults : c,
+          )
+        : [...state.calendars, calendarWithDefaults];
       saveCalendarsToStorage(updated);
       return { calendars: updated };
     });
@@ -251,12 +267,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       notificationPreference: normalizePreferenceForPublish(
         calendar.notificationPreference,
       ),
-      createdAt: Math.floor(Date.now() / 1000),
     };
     const publishedEvent = await publishCalendarList(updatedForPublish);
     const updatedForState = withNotificationPreference({
       ...updatedForPublish,
       eventId: publishedEvent.id,
+      createdAt: publishedEvent.created_at,
     });
 
     set((state) => {
@@ -316,13 +332,13 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   /**
    * Adds an event reference to a specific calendar and republishes.
    */
-  addEventToCalendar: async (calendarId, eventRef) => {
+  addEventToCalendar: async (calendarId, eventRef, callbacks) => {
     const calendar = get().calendars.find((c) => c.id === calendarId);
     if (!calendar) {
       throw new Error(`Calendar not found: ${calendarId}`);
     }
 
-    const updated = await addEventToCalList(calendar, eventRef);
+    const updated = await addEventToCalList(calendar, eventRef, callbacks);
 
     set((state) => {
       const calendars = state.calendars.map((c) =>
@@ -355,7 +371,12 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
    * Moves an event from its current calendar to a different one.
    * If the event is already in the target calendar, this is a no-op.
    */
-  moveEventToCalendar: async (targetCalendarId, eventCoordinate, eventRef) => {
+  moveEventToCalendar: async (
+    targetCalendarId,
+    eventCoordinate,
+    eventRef,
+    callbacks,
+  ) => {
     const { calendars } = get();
 
     const result = await moveEventBetweenCalendarLists(
@@ -363,6 +384,7 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
       targetCalendarId,
       eventCoordinate,
       eventRef,
+      callbacks,
     );
 
     if (result) {
@@ -408,7 +430,7 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
    */
   clearCachedCalendars: async () => {
     if (subscriptionHandle) {
-      subscriptionHandle.unsubscribe();
+      subscriptionHandle.unobserve();
       subscriptionHandle = undefined;
     }
     await removeSecureItem(CALENDAR_LISTS_STORAGE_KEY);

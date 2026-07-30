@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./.e2e-tsbuild",
+    "rootDir": "./e2e",
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts"],
+  "exclude": ["node_modules", ".e2e-tsbuild", "e2e/.auth"]
+}

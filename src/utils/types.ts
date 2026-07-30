@@ -161,6 +161,11 @@ export interface ISchedulingPage {
   viewKey?: string;
   /** Nostr event created_at */
   createdAt: number;
+  /**
+   * Forms bookers are expected to fill when booking (Formstr-form-attach,
+   * same shape as `ICalendarEvent.forms`).
+   */
+  formAttachments?: IFormAttachment[];
 }
 
 export type BookingRequestStatus =
@@ -185,6 +190,8 @@ export interface IBookingRequest {
   end: number;
   /** Appointment title from booker */
   title: string;
+  /** Scheduling page title at the time the request was sent */
+  pageName?: string;
   /** Optional note from booker */
   note: string;
   /** Pre-generated d-tag for the calendar event */
@@ -199,6 +206,12 @@ export interface IBookingRequest {
   respondedAt?: number;
   /** Decline reason from creator */
   declineReason?: string;
+  /**
+   * nsec-encoded ephemeral key the gift wrap was signed with, letting the
+   * host self-sign a NIP-09 deletion of it on dismiss. Absent on legacy
+   * wraps sent before this tag existed.
+   */
+  signingNsec?: string;
 }
 
 export interface IOutgoingBooking {
@@ -232,6 +245,26 @@ export interface IOutgoingBooking {
   dTag?: string;
   /** View key for created private event (on approval) */
   viewKey?: string;
+  /**
+   * Gift wrap event ID of the host's response (set once a response arrives).
+   * Distinct from `giftWrapId` (the request the booker sent) — dismiss
+   * targets this wrap, since it's the one the booker actually received.
+   */
+  responseGiftWrapId?: string;
+  /**
+   * nsec-encoded ephemeral key the response gift wrap was signed with,
+   * letting the booker self-sign a NIP-09 deletion of it on dismiss. Absent
+   * until a response arrives, and on legacy wraps sent before this tag
+   * existed.
+   */
+  signingNsec?: string;
+  /**
+   * Which identity sent this request. `"self"` (default when absent, for
+   * bookings sent before this field existed) reuses the logged-in identity;
+   * `"anonymous"` was sent via a one-time keypair — see
+   * `src/utils/anonBookingIdentity.ts`.
+   */
+  bookerMode?: "self" | "anonymous";
 }
 
 /** A concrete bookable time slot */

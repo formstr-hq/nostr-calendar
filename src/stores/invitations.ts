@@ -2,9 +2,9 @@
  * Invitations Store
  *
  * Manages gift-wrap invitations that haven't been accepted into a calendar yet.
- * Gift wraps (kind 1052) are treated as invitations/notifications rather than
- * direct event sources. Users must explicitly accept them to add events
- * to their calendars.
+ * NIP-59 gift wraps (kind 1059; legacy kind 1052 is still read) are treated
+ * as invitations/notifications rather than direct event sources. Users must
+ * explicitly accept them to add events to their calendars.
  *
  * Key behaviors:
  * - Fetches last 50 gift wraps from relays
@@ -21,24 +21,23 @@ import {
   removeSecureItem,
 } from "../common/localStorage";
 import {
+  deleteGiftWrapAsRecipient,
   fetchCalendarGiftWraps,
   fetchPrivateCalendarEvents,
-  fetchUserReports,
-  getUserPublicKey,
-  publishParticipantRemovalEvent,
-  publishReportEvent,
+  publishDeletionEvent,
   viewPrivateEvent,
-} from "../common/nostr";
-import type { ReportType } from "../common/nostr";
-import { nostrEventToCalendar } from "../utils/parser";
+} from "../nostr/events";
+import { fetchUserReports, publishReportEvent } from "../nostr/reports";
+import type { ReportType } from "../nostr/reports";
+import { getUserPublicKey } from "../nostr/crypto";
+import { getDTag, nostrEventToCalendar } from "../utils/parser";
 import { useCalendarLists } from "./calendarLists";
 import { useTimeBasedEvents } from "./events";
 import { useBookingRequests } from "./bookingRequests";
 import { buildEventRef } from "../utils/calendarListTypes";
 import type { IInvitation } from "../utils/calendarListTypes";
-import { EventKinds } from "../common/EventConfigs";
-import type { SubscriptionHandle } from "../common/nostrRuntime";
-import { getDTag } from "../common/nostrRuntime/utils/helpers";
+import { EventKinds } from "../nostr/kinds";
+import type { ObserveHandle } from "@formstr/local-relay";
 import { BG_KEY_LAST_INVITATION_FETCH_TIME } from "../utils/constants";
 
 const INVITATIONS_STORAGE_KEY = "cal:invitations";
@@ -47,7 +46,7 @@ const saveInvitationsToStorage = (invitations: IInvitation[]) => {
   setSecureItem(INVITATIONS_STORAGE_KEY, invitations);
 };
 
-let invitationSubHandle: SubscriptionHandle | undefined;
+let invitationSubHandle: ObserveHandle | undefined;
 let processingTimer: ReturnType<typeof setInterval> | undefined;
 let pendingBuffer: IInvitation[] = [];
 let processedIds = new Set<string>();
@@ -121,19 +120,23 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
 
       const batch = pendingBuffer.splice(0);
 
+      const mergeBatchIntoStore = () => {
+        set((state) => {
+          const batchEventIds = new Set(batch.map((i) => i.eventId));
+          const updated = [
+            ...state.invitations.filter((i) => !batchEventIds.has(i.eventId)),
+            ...batch,
+          ];
+          const unreadCount = updated.filter(
+            (i) => i.status === "pending",
+          ).length;
+          saveInvitationsToStorage(updated);
+          return { invitations: updated, unreadCount };
+        });
+      };
+
       // Merge raw invitations into store immediately
-      set((state) => {
-        const newEventIds = new Set(batch.map((i) => i.eventId));
-        const updated = [
-          ...state.invitations.filter((i) => !newEventIds.has(i.eventId)),
-          ...batch,
-        ];
-        const unreadCount = updated.filter(
-          (i) => i.status === "pending",
-        ).length;
-        saveInvitationsToStorage(updated);
-        return { invitations: updated, unreadCount };
-      });
+      mergeBatchIntoStore();
 
       // Resolve private event details for the batch
       const kinds = new Set<number>();
@@ -172,22 +175,11 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
             relayHint: invitation.relayHint,
           });
           invitation.event = { ...parsed, isInvitation: true };
+          // Merge per resolved event: the local EOSE below fires after the
+          // cache replay, so network-fetched events land after it.
+          mergeBatchIntoStore();
         },
         async () => {
-          // After private events are fetched, update store with resolved events
-          set((state) => {
-            const resolvedIds = new Set(batch.map((i) => i.eventId));
-            const updated = [
-              ...state.invitations.filter((i) => !resolvedIds.has(i.eventId)),
-              ...batch,
-            ];
-            const unreadCount = updated.filter(
-              (i) => i.status === "pending",
-            ).length;
-            saveInvitationsToStorage(updated);
-            return { invitations: updated, unreadCount };
-          });
-
           // Lazily filter out any invitations the user has previously reported
           try {
             const userPubkey = await getUserPublicKey();
@@ -269,6 +261,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
           status: "pending",
           pubkey: rumor.authorPubkey,
           kind: rumor.kind,
+          signingNsec: rumor.signingNsec,
         });
       },
       () => {}, // EOSE ignored — processing is timer-based
@@ -285,7 +278,7 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       processingTimer = undefined;
     }
     if (invitationSubHandle) {
-      invitationSubHandle.unsubscribe();
+      invitationSubHandle.unobserve();
       invitationSubHandle = undefined;
     }
     pendingBuffer = [];
@@ -357,10 +350,19 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         (inv) => inv.giftWrapId === giftWrapId,
       );
       if (dismissedInvitation) {
-        publishParticipantRemovalEvent({
-          kinds: [EventKinds.CalendarEventGiftWrap],
-          eventIds: [dismissedInvitation?.originalInvitationId],
-        });
+        // NIP-09 is the only dismissal publish. New invitations carry the
+        // ephemeral wrap key; old invitations use the active signer request.
+        if (dismissedInvitation.signingNsec) {
+          void deleteGiftWrapAsRecipient(
+            dismissedInvitation.originalInvitationId,
+            dismissedInvitation.signingNsec,
+          );
+        } else {
+          void publishDeletionEvent({
+            kinds: [EventKinds.CalendarEventGiftWrap],
+            eventIds: [dismissedInvitation.originalInvitationId],
+          });
+        }
       }
 
       const unreadCount = updated.filter((i) => i.status === "pending").length;
@@ -388,6 +390,18 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
       relayHint: invitation.relayHint,
       reportType,
     });
+
+    if (invitation.signingNsec) {
+      void deleteGiftWrapAsRecipient(
+        invitation.originalInvitationId,
+        invitation.signingNsec,
+      );
+    } else {
+      void publishDeletionEvent({
+        kinds: [EventKinds.CalendarEventGiftWrap],
+        eventIds: [invitation.originalInvitationId],
+      });
+    }
 
     set((state) => {
       const updated = state.invitations.filter(

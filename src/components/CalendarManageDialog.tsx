@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -15,6 +15,8 @@ import {
   MenuItem,
   useMediaQuery,
   useTheme,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -48,8 +50,8 @@ interface CalendarManageDialogProps {
     description: string;
     color: string;
     notificationPreference: NotificationPreference;
-  }) => void;
-  onDelete?: () => void;
+  }) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }
 
 export function CalendarManageDialog({
@@ -69,27 +71,68 @@ export function CalendarManageDialog({
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"save" | "delete" | null>(
+    null,
+  );
+  const [actionError, setActionError] = useState(false);
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (!open) return;
+    setTitle(calendar?.title || "");
+    setDescription(calendar?.description || "");
+    setColor(calendar?.color || PRESET_COLORS[0]);
+    setNotificationPreference(
+      calendar?.notificationPreference ?? DEFAULT_NOTIFICATION_PREFERENCE,
+    );
+    setDeleteConfirm(false);
+    setPendingAction(null);
+    setActionError(false);
+  }, [calendar, open]);
+
+  const handleSave = async () => {
     if (!title.trim()) return;
-    onSave({
-      title: title.trim(),
-      description: description.trim(),
-      color,
-      notificationPreference,
-    });
-    onClose();
+    setPendingAction("save");
+    setActionError(false);
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        color,
+        notificationPreference,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to save calendar", error);
+      setActionError(true);
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setPendingAction("delete");
+    setActionError(false);
+    try {
+      await onDelete();
+      onClose();
+    } catch (error) {
+      console.error("Failed to delete calendar", error);
+      setActionError(true);
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   const isEdit = !!calendar;
+  const isPending = pendingAction !== null;
 
   return (
     <Dialog
       fullScreen={isMobile}
       open={open}
-      onClose={onClose}
+      onClose={isPending ? undefined : onClose}
       maxWidth="sm"
       fullWidth
     >
@@ -104,7 +147,7 @@ export function CalendarManageDialog({
               ? intl.formatMessage({ id: "calendarManage.editCalendar" })
               : intl.formatMessage({ id: "calendarManage.newCalendar" })}
           </Typography>
-          <IconButton onClick={onClose} size="small">
+          <IconButton onClick={onClose} size="small" disabled={isPending}>
             <CloseIcon />
           </IconButton>
         </Box>
@@ -145,6 +188,11 @@ export function CalendarManageDialog({
               {PRESET_COLORS.map((presetColor) => (
                 <IconButton
                   key={presetColor}
+                  aria-label={`${intl.formatMessage({
+                    id: "calendarManage.color",
+                  })} ${presetColor}`}
+                  aria-pressed={color === presetColor}
+                  data-color={presetColor}
                   onClick={() => setColor(presetColor)}
                   sx={{
                     p: 0.5,
@@ -183,6 +231,11 @@ export function CalendarManageDialog({
               </MenuItem>
             </Select>
           </FormControl>
+          {actionError ? (
+            <Alert severity="error">
+              {intl.formatMessage({ id: "calendarManage.actionFailed" })}
+            </Alert>
+          ) : null}
         </Box>
       </DialogContent>
 
@@ -200,11 +253,27 @@ export function CalendarManageDialog({
               {intl.formatMessage({ id: "calendarManage.deleteWarning" })}
             </Typography>
             <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-              <Button onClick={() => setDeleteConfirm(false)} color="inherit">
+              <Button
+                onClick={() => setDeleteConfirm(false)}
+                color="inherit"
+                disabled={isPending}
+              >
                 {intl.formatMessage({ id: "navigation.cancel" })}
               </Button>
-              <Button color="error" variant="contained" onClick={onDelete}>
-                {intl.formatMessage({ id: "calendarManage.reallyDelete" })}
+              <Button
+                color="error"
+                variant="contained"
+                onClick={handleDelete}
+                disabled={isPending}
+                startIcon={
+                  pendingAction === "delete" ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+                }
+              >
+                {pendingAction === "delete"
+                  ? intl.formatMessage({ id: "deleteEvent.deleting" })
+                  : intl.formatMessage({ id: "calendarManage.reallyDelete" })}
               </Button>
             </Box>
           </Box>
@@ -219,13 +288,18 @@ export function CalendarManageDialog({
                 {intl.formatMessage({ id: "navigation.delete" })}
               </Button>
             )}
-            <Button onClick={onClose} color="inherit">
+            <Button onClick={onClose} color="inherit" disabled={isPending}>
               {intl.formatMessage({ id: "navigation.cancel" })}
             </Button>
             <Button
               onClick={handleSave}
               variant="contained"
-              disabled={!title.trim()}
+              disabled={!title.trim() || isPending}
+              startIcon={
+                pendingAction === "save" ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : undefined
+              }
             >
               {isEdit
                 ? intl.formatMessage({ id: "navigation.save" })

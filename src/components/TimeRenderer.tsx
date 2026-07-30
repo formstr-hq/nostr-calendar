@@ -5,6 +5,8 @@ import { ICalendarEvent } from "../stores/events";
 import dayjs from "dayjs";
 import { RRule } from "rrule";
 import { useIntl } from "react-intl";
+import { useSettings } from "../stores/settings";
+import { formatCalendarTime } from "../utils/calendarSettings";
 
 const Repeat = ({ repeat }: { repeat: ICalendarEvent["repeat"] }) => {
   const intl = useIntl();
@@ -39,6 +41,7 @@ export const TimeRenderer = ({
   allDay?: boolean;
 }) => {
   const intl = useIntl();
+  const timeFormat = useSettings((state) => state.settings.general.timeFormat);
   // For all-day events, `end` is the exclusive midnight of the day after the
   // last full day, so subtract 1ms before formatting to get the inclusive
   // "last day" label users expect.
@@ -68,9 +71,10 @@ export const TimeRenderer = ({
                     label: allDayLabel,
                   },
                 )
-            : `${dayjs(begin).format(
-                "ddd, DD MMMM YYYY ⋅ HH:mm -",
-              )} ${dayjs(end).format("HH:mm")}`}
+            : `${dayjs(begin).format("ddd, DD MMMM YYYY")} ⋅ ${formatCalendarTime(
+                dayjs(begin),
+                timeFormat,
+              )} - ${formatCalendarTime(dayjs(end), timeFormat)}`}
         </Typography>
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>

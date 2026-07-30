@@ -26,22 +26,6 @@ Private events use **NIP-59 Gift Wrap encryption** — a three-layer envelope sc
 - **Guest mode** — browse public events without logging in
 - **i18n** — English and German(Partial)
 
-## How Private Events Work
-
-Private events are the standout feature. Here's the flow:
-
-1. A **one-time view key pair** is generated for the event
-2. Event data (title, time, location, participants, description) is **encrypted with the view key** using NIP-44 and published as a kind `32678` event — the relay sees only an opaque blob
-3. For each participant (including the creator), a **Gift Wrap** is created:
-   - A **Rumor** (unsigned, kind 52) containing the event reference and the view key
-   - A **Seal** (kind 13) encrypting the rumor with the recipient's public key, with a randomized timestamp to prevent timing analysis
-   - A **Wrap** (kind 1052) encrypting the seal with an ephemeral key, tagged to the recipient for retrieval
-4. Recipients fetch their gift wraps, decrypt through both layers to recover the view key, then decrypt the event content
-
-Private RSVPs follow the same three-layer pattern (kinds 55 → 13 → 1055).
-
-The view key can also be embedded in a shareable URL (`/event/{naddr}?viewKey={nsec}`), allowing anyone with the link to view the event without being a participant.
-
 ## Tech Stack
 
 | Layer      | Technology            |
@@ -85,23 +69,6 @@ pnpm simulate-android    # build + run in emulator
 pnpm release-android     # signed APK + GitHub release
 ```
 
-## Nostr Event Kinds
-
-| Kind  | Purpose                           |
-| ----- | --------------------------------- |
-| 31923 | Public calendar event             |
-| 31925 | Public RSVP                       |
-| 32678 | Encrypted private calendar event  |
-| 32679 | Encrypted private recurring event |
-| 32069 | Encrypted private RSVP            |
-| 1052  | Gift wrap for private events      |
-| 1055  | Gift wrap for private RSVPs       |
-| 31927 | Scheduling page                   |
-| 32680 | Scheduling page key index         |
-| 31926 | Public busy list                  |
-| 1057  | Booking request gift wrap         |
-| 1058  | Booking response gift wrap        |
-
 ## Protocol Proposals
 
 The protocols used by this app are formalized as NIP proposals:
@@ -113,7 +80,7 @@ The protocols used by this app are formalized as NIP proposals:
 | [NIP-Appointment-Scheduling](nips/NIP-Appointment-Scheduling.md) | Scheduling pages and booking request/response flow |
 | [nip09x](nips/NIP-09-PR.md) | Participant Self-Removal (kind `84`) |
 
-For implementation details see [PROTOCOL.md](PROTOCOL.md) and [SCHEDULING_PROTOCOL.md](SCHEDULING_PROTOCOL.md).
+For a current, code-derived breakdown of every flow's Nostr layer (event kinds, tags, encryption, relay routing), see [docs/nostr-layer-reference.html](docs/nostr-layer-reference.html).
 
 ## Contributing
 

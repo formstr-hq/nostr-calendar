@@ -5,8 +5,8 @@
  * - Desktop: shown as a page (navigated to via /notifications route)
  * - Mobile: shown full-page with back navigation
  *
- * Each invitation card shows the event details with grey background
- * and dashed border styling. Users can accept (add to calendar) or dismiss.
+ * Each invitation card shows the event details and lets users accept, dismiss,
+ * or report it. Report is deliberately warning-coloured.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -34,7 +34,7 @@ import { FormattedMessage, useIntl } from "react-intl";
 import { useCalendarLists } from "../stores/calendarLists";
 import { useAcceptWithFormsFlow } from "../hooks/useAcceptWithFormsFlow";
 import { FormAttachmentRow } from "./FormAttachmentRow";
-import type { ReportType } from "../common/nostr";
+import type { ReportType } from "../nostr/reports";
 
 export function InvitationPanel() {
   const intl = useIntl();
@@ -121,19 +121,36 @@ export function InvitationPanel() {
   };
 
   return (
-    <Box p={2} maxWidth={isMobile ? "100%" : 600} mx="auto">
-      <Box display="flex" alignItems="center" gap={1} mb={3}>
-        <IconButton onClick={() => navigate(-1)}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h5" fontWeight={600}>
-          {intl.formatMessage({ id: "invitation.invitations" })}
-        </Typography>
-        {pendingInvitations.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            ({pendingInvitations.length})
-          </Typography>
+    <Box sx={{ width: "100%", maxWidth: 600, mx: "auto", p: 2 }}>
+      <Box
+        sx={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          mb: 3,
+          minHeight: 40,
+        }}
+      >
+        {isMobile && (
+          <IconButton
+            aria-label={intl.formatMessage({ id: "invitation.back" })}
+            onClick={() => navigate(-1)}
+            sx={{ position: "absolute", left: 0 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
         )}
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="h5" fontWeight={600}>
+            {intl.formatMessage({ id: "invitation.invitations" })}
+          </Typography>
+          {pendingInvitations.length > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              ({pendingInvitations.length})
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       {pendingInvitations.length === 0 && (
@@ -147,12 +164,14 @@ export function InvitationPanel() {
       {pendingInvitations.map((invitation) => (
         <Paper
           key={invitation.giftWrapId}
+          data-testid="invitation-card"
           sx={{
             mb: 2,
             p: 2,
-            backgroundColor: "#e0e0e0",
-            border: "2px dashed #999",
-            borderRadius: 2,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: "var(--cal-radius-lg)",
           }}
         >
           {invitation.event ? (

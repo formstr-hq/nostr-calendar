@@ -24,8 +24,10 @@ import okhttp3.OkHttpClient;
 
 /**
  * Background worker that polls relays for booking-related gift wraps:
- * - kind 1057 for new incoming booking requests
- * - kind 1058 for booking responses, filtered to approved ones
+ * - kind 1059 (k=1057), plus legacy kind 1057, for new incoming booking requests
+ * - kind 1059 (k=1058), plus legacy kind 1058, for booking responses, filtered to approved ones
+ * No kind-84 tombstone query is needed here (unlike InvitationWorker) — there is
+ * no pre-1059 kind-84 dismissal history for booking to stay compatible with.
  */
 public class BookingWorker extends Worker {
 
@@ -138,13 +140,20 @@ public class BookingWorker extends Worker {
         queryRelay(client, relayUrl, pubkey, 1058, since, approvalIds, true);
     }
 
+    /**
+     * Dual-reads, mirroring InvitationWorker's queryRelay: new gift wraps are
+     * standard NIP-59 wraps (kind 1059) carrying the public `k` classifier
+     * tag set to the legacy kind, plus a read of the pre-migration legacy
+     * kind itself for backwards compatibility.
+     */
     private void queryRelay(OkHttpClient client, String relayUrl, String pubkey,
-                            int kind, long since, Set<String> eventIds,
+                            int legacyKind, long since, Set<String> eventIds,
                             boolean approvalsOnly) {
         try {
             JSONObject filterObj = new JSONObject();
-            filterObj.put("kinds", new JSONArray().put(kind));
+            filterObj.put("kinds", new JSONArray().put(1059));
             filterObj.put("#p", new JSONArray().put(pubkey));
+            filterObj.put("#k", new JSONArray().put(String.valueOf(legacyKind)));
             if (since > 0) {
                 filterObj.put("since", since);
             }
@@ -152,21 +161,45 @@ public class BookingWorker extends Worker {
             RelayQueryUtils.queryEvents(
                     client,
                     relayUrl,
-                    "booking_" + kind,
+                    "booking_" + legacyKind,
                     filterObj,
                     RELAY_TIMEOUT_SECONDS,
                     TAG,
-                    event -> {
-                        if (approvalsOnly && !isApprovedResponse(event)) {
-                            return;
-                        }
-                        synchronized (eventIds) {
-                            eventIds.add(event.getString("id"));
-                        }
-                    }
+                    event -> handleBookingEvent(event, eventIds, approvalsOnly)
+            );
+
+            JSONObject legacyFilter = new JSONObject();
+            legacyFilter.put("kinds", new JSONArray().put(legacyKind));
+            legacyFilter.put("#p", new JSONArray().put(pubkey));
+            if (since > 0) {
+                legacyFilter.put("since", since);
+            }
+            RelayQueryUtils.queryEvents(
+                    client,
+                    relayUrl,
+                    "booking_legacy_" + legacyKind,
+                    legacyFilter,
+                    RELAY_TIMEOUT_SECONDS,
+                    TAG,
+                    event -> handleBookingEvent(event, eventIds, approvalsOnly)
             );
         } catch (Exception e) {
             Log.w(TAG, "Failed to query booking relay: " + relayUrl, e);
+        }
+    }
+
+    private void handleBookingEvent(JSONObject event, Set<String> eventIds,
+                                    boolean approvalsOnly) {
+        try {
+            if (approvalsOnly && !isApprovedResponse(event)) {
+                return;
+            }
+            String id = event.getString("id");
+            synchronized (eventIds) {
+                eventIds.add(id);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to handle booking event", e);
         }
     }
 

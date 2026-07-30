@@ -1,10 +1,12 @@
 import { create } from "zustand";
-import { fetchUserProfile } from "../common/nostr";
+import { fetchUserProfile } from "../nostr/profiles";
 
 export interface IParticipant {
   publicKey: string;
   picture?: string;
   name?: string;
+  /** Profile-declared NIP-05 identifier; callers must verify it before trust. */
+  nip05?: string;
   createdAt?: number;
   fetching: boolean;
 }
@@ -28,9 +30,10 @@ export const useParticipants = create<{
     const event = await fetchUserProfile(participantPubKey);
 
     if (event) {
-      const { name, picture } = JSON.parse(event.content) as {
+      const { name, picture, nip05 } = JSON.parse(event.content) as {
         name: string;
         picture: string;
+        nip05?: string;
       };
       set(({ participants }) => ({
         participants: {
@@ -38,6 +41,7 @@ export const useParticipants = create<{
           [participantPubKey]: {
             name,
             picture,
+            nip05,
             publicKey: event.pubkey,
             createdAt: event.created_at,
             fetching: false,

@@ -1,0 +1,94 @@
+# Notification smoke test — one-time event fires a notification on Android.
+#
+# What this tests:
+#   - Maestro can drive the Capacitor/WebView app end-to-end
+#   - Creating an event schedules a LocalNotification via @capacitor/local-notifications
+#   - The notification appears in the Android notification shade at the scheduled time
+#
+# Prerequisites:
+#   - App installed with VITE_TEST_RELAY=ws://10.0.2.2:7777 baked in (pnpm test:e2e:native)
+#   - strfry relay running: cd e2e/relay && docker compose up -d
+#   - App notification permission granted (done by run.sh via adb)
+#   - Alice's nsec ready: --env ALICE_NSEC=<nsec>
+#
+# Duration: ~2 minutes (event fires 90 s after creation)
+#
+# Selector strategy: WebView elements in the Android accessibility tree do not
+# expose resource-id (data-testid is not surfaced there). All selectors use
+# text/accessibilityText matching instead. aria-label attributes on each element
+# set the accessibilityText field, giving Maestro an exact, stable selector.
+
+appId: app.formstr.calendar
+---
+# ── 1. Compute event start time (90 s from now) ────────────────────────────
+- runScript:
+    file: ../scripts/compute-event-time.js
+
+# ── 2. Launch / bring app to foreground ────────────────────────────────────
+- launchApp:
+    clearState: false   # keep auth state from a prior login flow
+
+# ── 3. Login — skip if already authenticated ───────────────────────────────
+# The app auto-shows LoginModal when !user && isInitialized (App.tsx).
+# Use optional assertVisible to wait ~5s for the app to render before checking —
+# it succeeds fast if already authed (User menu visible), times out silently if not.
+# aria-label="User menu" on the IconButton sets accessibilityText to match.
+- assertVisible:
+    text: "User menu"
+    optional: true
+
+- runFlow:
+    when:
+      visible: "Sign in to Calendar"   # LoginModal title — unique to the unauthenticated state
+    file: ./login-nsec.yaml
+
+# ── 4. Navigate to today's day view ─────────────────────────────────────────
+# Tap today's date number to enter DayView from whatever calendar view is shown.
+- tapOn:
+    text: "${output.todayDay}"
+    index: 0
+
+# ── 5. Open the event creation dialog by tapping a time slot ────────────────
+# Tap the center of the screen — DayView has auto-scrolled to the current hour
+# so any visible point in the time grid opens the event dialog.
+# aria-label matching does not surface in this Capacitor WebView; coordinate
+# tap is the reliable fallback.
+- tapOn:
+    point: "50%, 50%"
+
+# ── 6. Fill in the event title ───────────────────────────────────────────────
+# TextField has label="Title" — visible floating label text, findable by Maestro.
+- tapOn:
+    text: "Title"
+- inputText: "Notification Test Event"
+
+# ── 7. Set start time to 90 seconds from now ────────────────────────────────
+# MUI DateTimePicker in mobile mode opens a picker dialog on tap.
+# Pressing Back dismisses the dialog while the input retains focus,
+# then eraseText/inputText write directly into the focused section-based field.
+# Format: "M/D/YYYY h:mm AM" — produced by compute-event-time.js
+- tapOn:
+    text: "Start time"
+- pressKey: BACK
+- eraseText: 30
+- inputText: "${output.startTime}"
+
+# ── 8. Save the event ────────────────────────────────────────────────────────
+- tapOn:
+    text: "Save Event"
+
+# ── 9. Pull down the Android notification shade ──────────────────────────────
+# Do this before waiting so the shade is already open when the notification fires.
+- swipe:
+    direction: DOWN
+    startX: 540
+    startY: 0
+    endX: 540
+    endY: 700
+
+# ── 10. Wait up to 120 s for the notification to appear ─────────────────────
+# The event fires 90 s after creation; extendedWaitUntil polls until visible.
+- extendedWaitUntil:
+    visible:
+      text: "Notification Test Event"
+    timeout: 120000
