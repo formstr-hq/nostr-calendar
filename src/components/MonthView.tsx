@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   IconButton,
   Paper,
   styled,
@@ -208,7 +209,18 @@ export function MonthView({ events }: MonthViewProps) {
               background: isWeekend(day) ? weekendBg : "transparent",
             }}
           >
-            <DateLabel day={day} size={30} />
+            <DateLabel
+              day={day}
+              size={30}
+              onClick={
+                isMobileViewport
+                  ? () => {
+                      setMobileAgendaDay(day);
+                      setMobileSheetOpen(true);
+                    }
+                  : undefined
+              }
+            />
             {isMobileViewport ? (
               <Box display="flex" justifyContent="center" gap={0.5} mt={0.5}>
                 {visible.map((e) => (
@@ -353,6 +365,17 @@ export function MonthView({ events }: MonthViewProps) {
                   />
                 ))}
               </Box>
+              <Button
+                fullWidth
+                sx={{ mt: 2 }}
+                variant="outlined"
+                onClick={() => {
+                  setMobileSheetOpen(false);
+                  setDate(mobileAgendaDay, "day");
+                }}
+              >
+                {intl.formatMessage({ id: "navigation.goToDate" })}
+              </Button>
             </Box>
           )}
         </BottomSheet>

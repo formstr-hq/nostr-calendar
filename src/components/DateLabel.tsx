@@ -11,15 +11,21 @@ const defaultSize = 36;
 export function DateLabel({
   day,
   size = defaultSize,
+  onClick,
 }: {
   day: Dayjs;
   size?: number;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   const isToday = today.isSame(day, "date");
   const navigate = useNavigate();
   const fontSize = size / defaultSize;
   const onDateClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-    navigate(getRouteFromDate(day, "day"));
+    if (onClick) {
+      onClick(e);
+    } else {
+      navigate(getRouteFromDate(day, "day"));
+    }
     e.stopPropagation();
   };
   return (
