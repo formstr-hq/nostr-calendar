@@ -42,7 +42,7 @@ export function resolveCalendarColor(
 export function useResolvedCalendarColor(
   event: ICalendarEvent,
 ): string | undefined {
-  const nostrCalendars = useCalendarLists.getState().calendars;
+  const nostrCalendars = useCalendarLists((state) => state.calendars);
   const deviceCalendars = useDeviceCalendars((s) => s.calendars);
   return resolveCalendarColor(event, nostrCalendars, deviceCalendars);
 }

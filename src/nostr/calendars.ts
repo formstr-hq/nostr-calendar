@@ -283,7 +283,14 @@ export async function moveEventBetweenCalendarLists(
     return null;
   }
 
-  // Remove from source calendar if found
+  // Publish the destination first so the event remains in at least one list
+  // if publishing the source removal fails.
+  const updatedTarget = await addEventToCalendarList(
+    targetCalendar,
+    eventRef,
+    callbacks,
+  );
+
   let updatedSource: ICalendarList | undefined;
   if (sourceCalendar) {
     updatedSource = await removeEventFromCalendarList(
@@ -292,13 +299,6 @@ export async function moveEventBetweenCalendarLists(
       callbacks,
     );
   }
-
-  // Add to target calendar
-  const updatedTarget = await addEventToCalendarList(
-    targetCalendar,
-    eventRef,
-    callbacks,
-  );
 
   return { source: updatedSource, target: updatedTarget };
 }

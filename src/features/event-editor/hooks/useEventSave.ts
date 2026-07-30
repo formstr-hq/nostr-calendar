@@ -135,8 +135,14 @@ export function useEventSave({
                 (url, ok) =>
                   callbacks.reportRelayOutcome("add-to-calendar", url, ok),
               );
-              useTimeBasedEvents.getState().updateEvent(editResult.event);
-              savedEvent = editResult.event;
+              // The calendar-list move is stored separately from the event
+              // payload. Apply its authoritative destination locally so the
+              // calendar grid updates without waiting for a relay replay.
+              savedEvent = {
+                ...editResult.event,
+                calendarId: editResult.calendarId,
+              };
+              useTimeBasedEvents.getState().updateEvent(savedEvent);
             },
           });
 

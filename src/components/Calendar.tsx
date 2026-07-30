@@ -10,6 +10,7 @@ import { useCalendarLists } from "../stores/calendarLists";
 import { useInvitations } from "../stores/invitations";
 import { useDateWithRouting } from "../hooks/useDateWithRouting";
 import { useVisibleDeviceEvents } from "../hooks/useVisibleDeviceEvents";
+import { findCalendarForEvent } from "../utils/calendarListTypes";
 
 function Calendar() {
   const events = useTimeBasedEvents((state) => state);
@@ -42,12 +43,22 @@ function Calendar() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const visibleCalendars = new Set(
-    calendars.filter((cal) => cal.isVisible).map((cal) => cal.id),
-  );
-  const visibleEvents = events.events.filter((evt) =>
-    visibleCalendars.has(evt.calendarId ?? ""),
-  );
+  const visibleEvents = events.events.flatMap((event) => {
+    // Calendar-list refs are the ownership source of truth. The event payload
+    // can briefly retain its old calendar ID while the event edit is published.
+    const owningCalendar = findCalendarForEvent(calendars, event);
+    const calendarId = owningCalendar?.id ?? event.calendarId;
+    if (
+      !calendars.some(
+        (calendar) => calendar.id === calendarId && calendar.isVisible,
+      )
+    ) {
+      return [];
+    }
+    return calendarId === event.calendarId
+      ? [event]
+      : [{ ...event, calendarId }];
+  });
 
   const allEvents = [
     ...visibleEvents,

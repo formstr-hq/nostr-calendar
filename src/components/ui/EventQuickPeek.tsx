@@ -334,7 +334,6 @@ function EventPeekBody({
             p: 0,
             font: "inherit",
             fontWeight: 600,
-            color: "primary.main",
           }}
         >
           {intl.formatMessage({ id: "event.open" })} →

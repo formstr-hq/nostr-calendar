@@ -399,7 +399,7 @@
         <h3>Private calendar lists <span class="kind-badge">kind 32123</span></h3>
         <div class="field"><span class="label">Identity</span><p>One per calendar a user creates. <code>d</code> = random hash. Outer tags: <code>["d", id]</code> only.</p></div>
         <div class="field"><span class="label">Content — different encryption idiom from events/RSVPs</span><p>NIP-44, but encrypted <em>via the live signer</em> to the user's own real pubkey (<code>signerEncrypt</code>) rather than a raw held key — works through NIP-07/bunker round trips too. JSON tag array: <code>title</code>, <code>content</code> (description), <code>color</code>, optional <code>notifications:"disabled"</code>, and one <code>["a", coordinate, relayUrl, viewKey]</code> per member event.</p></div>
-        <div class="field"><span class="label">Mutations</span><p>Add/remove/move-between-lists all read-modify-republish the whole list event — no partial updates.</p></div>
+        <div class="field"><span class="label">Mutations</span><p>Add/remove/move-between-lists all read-modify-republish the whole list event — no partial updates. A move publishes the destination addition before removing the source reference, so a failed source update leaves the event in a calendar.</p></div>
         <div class="field"><span class="label">Deletion</span><p>NIP-09 kind 5 with <code>a</code> (list coordinate) and <code>e</code> (last known id).</p></div>
         <div class="callout"><span class="label">No public/followable calendars</span><p>There is no NIP-51-style public list, and no mechanism to subscribe to someone else's calendar — 32123 lists are private and single-owner only.</p></div>
       </article>
