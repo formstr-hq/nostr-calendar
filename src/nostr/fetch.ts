@@ -1,6 +1,10 @@
 import { Event, Filter } from "nostr-tools";
 import { collectOnce } from "../dataLayer/collect";
 
+interface FetchOptions {
+  relays?: string[];
+}
+
 /** Newest event of a batch (replaceable semantics for one-shot reads). */
 export function latestOf(events: Event[]): Event | null {
   return events.reduce<Event | null>(
@@ -11,11 +15,17 @@ export function latestOf(events: Event[]): Event | null {
 }
 
 /** One-shot fetch of every matching event across the configured relays. */
-export async function fetchAll(filters: Filter[]): Promise<Event[]> {
-  return collectOnce(filters);
+export async function fetchAll(
+  filters: Filter[],
+  options?: FetchOptions,
+): Promise<Event[]> {
+  return collectOnce(filters, options);
 }
 
 /** One-shot fetch of the newest matching event, or null if none exist. */
-export async function fetchLatest(filters: Filter[]): Promise<Event | null> {
-  return latestOf(await collectOnce(filters));
+export async function fetchLatest(
+  filters: Filter[],
+  options?: FetchOptions,
+): Promise<Event | null> {
+  return latestOf(await collectOnce(filters, options));
 }

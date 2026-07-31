@@ -32,7 +32,6 @@ import {
   fetchSchedulingPage,
   createBookingIdentity,
 } from "../nostr/booking";
-import { addGossipRelays } from "../nostr/core";
 import {
   getDisplaySlots,
   type IDisplaySlot,
@@ -135,10 +134,13 @@ export const BookingPage = () => {
       setFetchState("error");
       return;
     }
-    addGossipRelays(data.relays ?? []);
-
     const subscription = fetchSchedulingPage(
-      { pubkey: data.pubkey, dTag: data.identifier, viewKeyHex: viewKey },
+      {
+        pubkey: data.pubkey,
+        dTag: data.identifier,
+        viewKeyHex: viewKey,
+        relays: data.relays,
+      },
       (parsed) => {
         setPage(parsed);
         // Default to first slot duration if fixed mode
