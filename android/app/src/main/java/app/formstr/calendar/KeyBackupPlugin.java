@@ -18,11 +18,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-/** Native clipboard and Downloads support for the encrypted ncryptsec backup. */
+/** Native clipboard and Downloads support for exported text files. */
 @CapacitorPlugin(name = "KeyBackup")
 public class KeyBackupPlugin extends Plugin {
-    private static final String KEY_FILE_NAME = "key.txt";
-
     @PluginMethod
     public void copyText(PluginCall call) {
         String text = call.getString("text");
@@ -43,10 +41,12 @@ public class KeyBackupPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void saveKeyFile(PluginCall call) {
+    public void saveFile(PluginCall call) {
         String text = call.getString("text");
-        if (text == null) {
-            call.reject("text is required");
+        String fileName = call.getString("fileName");
+        String mimeType = call.getString("mimeType");
+        if (text == null || fileName == null || mimeType == null) {
+            call.reject("text, fileName, and mimeType are required");
             return;
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -55,8 +55,8 @@ public class KeyBackupPlugin extends Plugin {
         }
 
         ContentValues values = new ContentValues();
-        values.put(MediaStore.Downloads.DISPLAY_NAME, KEY_FILE_NAME);
-        values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+        values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+        values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
         values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
         values.put(MediaStore.Downloads.IS_PENDING, 1);
 
@@ -68,7 +68,7 @@ public class KeyBackupPlugin extends Plugin {
         }
 
         try (OutputStream output = getContext().getContentResolver().openOutputStream(uri)) {
-            if (output == null) throw new IllegalStateException("Could not open key file");
+            if (output == null) throw new IllegalStateException("Could not open file");
             output.write(text.getBytes(StandardCharsets.UTF_8));
             output.flush();
 
@@ -81,7 +81,7 @@ public class KeyBackupPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception error) {
             getContext().getContentResolver().delete(uri, null, null);
-            call.reject("Could not save key file", error);
+            call.reject("Could not save file", error);
         }
     }
 }

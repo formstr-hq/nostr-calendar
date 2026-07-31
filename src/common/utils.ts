@@ -2,6 +2,8 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { ICalendarEvent } from "../stores/events";
+import { saveTextFile } from "../plugins/keyBackup";
+import { isNative } from "../utils/platform";
 import { NestedObject } from "./dictionary";
 
 export function flattenMessages(
@@ -28,7 +30,9 @@ export function flattenMessages(
   );
 }
 
-export const exportICS = (calendarEvent: ICalendarEvent) => {
+export const exportICS = async (
+  calendarEvent: ICalendarEvent,
+): Promise<void> => {
   const start =
     new Date(calendarEvent.begin)
       .toISOString()
@@ -77,13 +81,18 @@ DESCRIPTION:${calendarEvent.description || ""}
   icsContent += `END:VEVENT
 END:VCALENDAR`;
 
-  const blob = new Blob([icsContent], {
-    type: "text/calendar;charset=utf-8",
-  });
+  const fileName = `${title.replace(/[\\/:*?"<>|]/g, "_")}.ics`;
+  const mimeType = "text/calendar;charset=utf-8";
+  if (isNative) {
+    await saveTextFile(icsContent, fileName, mimeType);
+    return;
+  }
+
+  const blob = new Blob([icsContent], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${title}.ics`;
+  link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
 };

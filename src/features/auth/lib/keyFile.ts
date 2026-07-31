@@ -1,10 +1,10 @@
 import { saveKeyBackup } from "../../../plugins/keyBackup";
-import { isAndroidNative } from "../../../utils/platform";
+import { isNative } from "../../../utils/platform";
 
 const KEY_FILE_NAME = "key.txt";
 
 export function downloadNcryptsec(ncryptsec: string): Promise<void> {
-  if (isAndroidNative()) {
+  if (isNative) {
     return saveKeyBackup(ncryptsec).then(() => undefined);
   }
 

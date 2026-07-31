@@ -1,9 +1,13 @@
 import { registerPlugin } from "@capacitor/core";
-import { isAndroidNative } from "../utils/platform";
+import { isNative } from "../utils/platform";
 
 type KeyBackupPlugin = {
   copyText(options: { text: string }): Promise<void>;
-  saveKeyFile(options: { text: string }): Promise<{ uri: string }>;
+  saveFile(options: {
+    text: string;
+    fileName: string;
+    mimeType: string;
+  }): Promise<{ uri: string }>;
 };
 
 const keyBackupPlugin = registerPlugin<KeyBackupPlugin>("KeyBackup");
@@ -32,8 +36,16 @@ export async function copyKeyBackup(text: string): Promise<void> {
 }
 
 export async function saveKeyBackup(text: string): Promise<boolean> {
-  if (!isAndroidNative()) return false;
+  return saveTextFile(text, "key.txt", "text/plain");
+}
 
-  await keyBackupPlugin.saveKeyFile({ text });
+export async function saveTextFile(
+  text: string,
+  fileName: string,
+  mimeType: string,
+): Promise<boolean> {
+  if (!isNative) return false;
+
+  await keyBackupPlugin.saveFile({ text, fileName, mimeType });
   return true;
 }

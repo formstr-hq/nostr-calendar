@@ -73,7 +73,7 @@ export function EventActionsBar({
               <MenuItem
                 onClick={() => {
                   closeMenu();
-                  exportICS(event);
+                  void exportICS(event);
                 }}
               >
                 <ListItemIcon>
@@ -193,21 +193,19 @@ export function EventActionsBar({
           </MenuItem>
         )}
 
-        {!isNative && (
-          <MenuItem
-            onClick={() => {
-              closeMenu();
-              exportICS(event);
-            }}
-          >
-            <ListItemIcon>
-              <Download fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>
-              {intl.formatMessage({ id: "event.downloadDetails" })}
-            </ListItemText>
-          </MenuItem>
-        )}
+        <MenuItem
+          onClick={() => {
+            closeMenu();
+            void exportICS(event);
+          }}
+        >
+          <ListItemIcon>
+            <Download fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            {intl.formatMessage({ id: "event.downloadDetails" })}
+          </ListItemText>
+        </MenuItem>
 
         {isEditable && (
           <MenuItem
