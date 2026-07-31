@@ -8,7 +8,6 @@ import { useRelayStore } from "../stores/relays";
 export const defaultRelays = import.meta.env.VITE_TEST_RELAY
   ? [import.meta.env.VITE_TEST_RELAY as string]
   : [
-      "wss://relay.damus.io/",
       "wss://relay.primal.net/",
       "wss://nos.lol",
       "wss://relay.nostr.wirednet.jp/",
