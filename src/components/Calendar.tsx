@@ -33,6 +33,24 @@ function Calendar() {
         '[data-current-time-marker="true"]',
       );
       if (!marker) return;
+
+      const scrollContainer = marker.closest<HTMLElement>("main");
+      if (
+        scrollContainer &&
+        scrollContainer.scrollHeight > scrollContainer.clientHeight
+      ) {
+        const top =
+          marker.getBoundingClientRect().top -
+          scrollContainer.getBoundingClientRect().top +
+          scrollContainer.scrollTop;
+        scrollContainer.scrollTo({
+          top: Math.max(0, top - scrollContainer.clientHeight * 0.35),
+          left: 0,
+          behavior: "auto",
+        });
+        return;
+      }
+
       const top = marker.getBoundingClientRect().top + window.scrollY;
       window.scrollTo({
         top: Math.max(0, top - window.innerHeight * 0.35),

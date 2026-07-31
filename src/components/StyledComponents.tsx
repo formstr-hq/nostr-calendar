@@ -11,6 +11,9 @@ export const StyledSecondaryHeader = styled(Box, {
 })<SecondaryHeaderProps>(({ theme, topOffset = 0 }) => ({
   position: "sticky",
   top: `calc(var(--safe-area-top) + ${64 + topOffset}px)`,
+  "html.ios-native &": {
+    top: 0,
+  },
   background:
     theme.vars?.palette.background.paper ?? theme.palette.background.paper,
   zIndex: 1,

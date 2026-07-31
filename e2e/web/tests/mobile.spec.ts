@@ -25,6 +25,49 @@ test("mobile day view hides desktop navigation arrows", async ({
   await expect(page).toHaveURL(/\/m\/2026\/7$/);
 });
 
+test("native iOS keeps app chrome fixed and input text at 16px", async ({
+  authedPage: page,
+}) => {
+  await navigate(page, "/d/2026/7/20");
+  await page.locator("html").evaluate((html) => {
+    html.classList.add("ios-native");
+  });
+
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector("main")!;
+    const dateLabel = document.querySelector(
+      '[data-testid="topbar-date-label"]',
+    )!;
+    const tabBar = document.querySelector("nav")!;
+    const before = {
+      mainTop: main.getBoundingClientRect().top,
+      headerTop: dateLabel.getBoundingClientRect().top,
+      footerBottom: tabBar.getBoundingClientRect().bottom,
+    };
+    main.scrollTop = 300;
+    const after = {
+      mainTop: main.getBoundingClientRect().top,
+      headerTop: dateLabel.getBoundingClientRect().top,
+      footerBottom: tabBar.getBoundingClientRect().bottom,
+    };
+
+    return {
+      scrollable: main.scrollHeight > main.clientHeight,
+      overflowY: getComputedStyle(main).overflowY,
+      before,
+      after,
+    };
+  });
+
+  expect(layout.scrollable).toBe(true);
+  expect(layout.overflowY).toBe("auto");
+  expect(layout.after).toEqual(layout.before);
+
+  await page.getByRole("button", { name: "Open calendars" }).click();
+  await page.getByRole("button", { name: /New event/ }).click();
+  await expect(page.getByTestId("event-title")).toHaveCSS("font-size", "16px");
+});
+
 test("mobile day view navigates to the next day on a left swipe", async ({
   authedPage: page,
 }) => {

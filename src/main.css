@@ -38,3 +38,12 @@ body {
 html.ios-native {
   overscroll-behavior: none;
 }
+
+/* iOS zooms the WebView when text-entry controls are smaller than 16px. */
+html.ios-native input,
+html.ios-native textarea,
+html.ios-native select,
+html.ios-native .MuiInputBase-input,
+html.ios-native .MuiSelect-select {
+  font-size: 16px !important;
+}

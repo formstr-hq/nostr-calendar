@@ -38,7 +38,17 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
   });
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100dvh" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100dvh",
+        "html.ios-native &": {
+          height: "100dvh",
+          minHeight: 0,
+          overflow: "hidden",
+        },
+      }}
+    >
       {!isMobile && (
         <Sidebar onNewEvent={openNewEvent} onImportEvent={onImportEvent} />
       )}
@@ -49,6 +59,7 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
+          "html.ios-native &": { minHeight: 0 },
         }}
       >
         <TopBar
@@ -70,6 +81,13 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
             minWidth: 0,
             display: "flex",
             flexDirection: "column",
+            "html.ios-native &": {
+              minHeight: 0,
+              overflowX: "hidden",
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              WebkitOverflowScrolling: "touch",
+            },
             pb: isMobile
               ? `calc(${MOBILE_TAB_BAR_HEIGHT}px + var(--safe-area-bottom))`
               : undefined,
