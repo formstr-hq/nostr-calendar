@@ -13,6 +13,10 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		A19F5107218F7D0100000001 /* IOSNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */; };
 		A19F5107218F7D0100000003 /* KeyBackupPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */; };
+		A19F5107218F7D0100000005 /* IOSRelayQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */; };
+		A19F5107218F7D0100000007 /* IOSIncomingNotificationPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */; };
+		A19F5107218F7D0100000009 /* IOSBackgroundNotificationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */; };
+		A19F5107218F7D0100000011 /* NotificationSchedulerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -26,6 +30,10 @@
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSNotificationScheduler.swift; sourceTree = "<group>"; };
 		A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBackupPlugin.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRelayQueryClient.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSIncomingNotificationPoller.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSBackgroundNotificationCoordinator.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSchedulerPlugin.swift; sourceTree = "<group>"; };
 		504EC3091FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -70,7 +78,11 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */,
+				A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */,
+				A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */,
+				A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */,
 				A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */,
+				A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */,
 				504EC3091FED79650016851F /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -165,7 +177,11 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A19F5107218F7D0100000001 /* IOSNotificationScheduler.swift in Sources */,
+				A19F5107218F7D0100000005 /* IOSRelayQueryClient.swift in Sources */,
+				A19F5107218F7D0100000007 /* IOSIncomingNotificationPoller.swift in Sources */,
+				A19F5107218F7D0100000009 /* IOSBackgroundNotificationCoordinator.swift in Sources */,
 				A19F5107218F7D0100000003 /* KeyBackupPlugin.swift in Sources */,
+				A19F5107218F7D0100000011 /* NotificationSchedulerPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,5 +1,5 @@
 import { registerPlugin } from "@capacitor/core";
-import { isAndroidNative } from "../utils/platform";
+import { isNative } from "../utils/platform";
 
 type NotificationSchedulerPlugin = {
   reconcile(): Promise<void>;
@@ -12,7 +12,7 @@ const notificationScheduler = registerPlugin<NotificationSchedulerPlugin>(
 );
 
 export async function reconcileNotificationSchedule(): Promise<void> {
-  if (!isAndroidNative()) return;
+  if (!isNative) return;
 
   try {
     await notificationScheduler.reconcile();
@@ -22,7 +22,7 @@ export async function reconcileNotificationSchedule(): Promise<void> {
 }
 
 export async function clearBackgroundNotificationSchedule(): Promise<void> {
-  if (!isAndroidNative()) return;
+  if (!isNative) return;
 
   try {
     await notificationScheduler.clear();
@@ -34,7 +34,7 @@ export async function clearBackgroundNotificationSchedule(): Promise<void> {
 export async function cancelBackgroundEventNotifications(
   eventId: string,
 ): Promise<void> {
-  if (!isAndroidNative() || !eventId) return;
+  if (!isNative || !eventId) return;
 
   try {
     await notificationScheduler.cancelEvent({ eventId });

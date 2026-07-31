@@ -8,9 +8,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         CAPBridge.registerPlugin(KeyBackupPlugin.self)
-        IOSNotificationScheduler.shared.registerBackgroundRefresh()
-        IOSNotificationScheduler.shared.scheduleBackgroundRefresh()
-        IOSNotificationScheduler.shared.reconcile()
+        CAPBridge.registerPlugin(NotificationSchedulerPlugin.self)
+        IOSBackgroundNotificationCoordinator.shared.registerBackgroundRefresh()
+        IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
+        IOSBackgroundNotificationCoordinator.shared.refresh()
         return true
     }
 
@@ -20,7 +21,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        IOSNotificationScheduler.shared.scheduleBackgroundRefresh()
+        IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
@@ -28,8 +29,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        IOSNotificationScheduler.shared.reconcile()
-        IOSNotificationScheduler.shared.scheduleBackgroundRefresh()
+        IOSBackgroundNotificationCoordinator.shared.refresh()
+        IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

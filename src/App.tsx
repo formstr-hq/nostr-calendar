@@ -127,8 +127,8 @@ function Application() {
   }, []);
 
   useEffect(() => {
-    return addNotificationClickListener((eventId) => {
-      navigate(`/notification-event/${eventId}`);
+    return addNotificationClickListener((route) => {
+      navigate(route);
     });
   }, [navigate]);
 

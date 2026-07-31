@@ -1,4 +1,3 @@
-import BackgroundTasks
 import Foundation
 import UserNotifications
 
@@ -10,11 +9,11 @@ final class IOSNotificationScheduler {
     private let preferenceKey = "CapacitorStorage.cal:notification-preferences"
     private let notificationKeyPrefix = "v2:"
     private let scheduleWindow: TimeInterval = 2 * 24 * 60 * 60
-    private let refreshInterval: TimeInterval = 6 * 60 * 60
+    private let refreshInterval: TimeInterval = 15 * 60
     private let maximumPendingNotifications = 64
     private let defaultOffsets = [10, 0]
 
-    private var refreshIdentifier: String {
+    var refreshIdentifier: String {
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? "app.formstr.calendar"
         return "\(bundleIdentifier).notification-refresh"
     }
@@ -37,31 +36,6 @@ final class IOSNotificationScheduler {
     }
 
     private init() {}
-
-    func registerBackgroundRefresh() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: refreshIdentifier,
-            using: nil
-        ) { [weak self] task in
-            guard let self, let refreshTask = task as? BGAppRefreshTask else {
-                task.setTaskCompleted(success: false)
-                return
-            }
-
-            self.scheduleBackgroundRefresh()
-            var completed = false
-            refreshTask.expirationHandler = {
-                guard !completed else { return }
-                completed = true
-                refreshTask.setTaskCompleted(success: false)
-            }
-            self.reconcile {
-                guard !completed else { return }
-                completed = true
-                refreshTask.setTaskCompleted(success: true)
-            }
-        }
-    }
 
     func scheduleBackgroundRefresh() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: refreshIdentifier)
@@ -122,6 +96,37 @@ final class IOSNotificationScheduler {
         }
     }
 
+    func reconcileAsync() async {
+        await withCheckedContinuation { continuation in
+            reconcile {
+                continuation.resume()
+            }
+        }
+    }
+
+    func clear(completion: @escaping () -> Void = {}) {
+        removePendingEventNotifications(
+            center: UNUserNotificationCenter.current(),
+            completion: completion
+        )
+    }
+
+    func cancel(eventId: String, completion: @escaping () -> Void = {}) {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { [weak self] requests in
+            guard let self else {
+                completion()
+                return
+            }
+            let identifiers = requests.compactMap { request in
+                self.eventId(for: request) == eventId ? request.identifier : nil
+            }
+            center.removePendingNotificationRequests(withIdentifiers: identifiers)
+            center.removeDeliveredNotifications(withIdentifiers: identifiers)
+            completion()
+        }
+    }
+
     private func removePendingEventNotifications(
         center: UNUserNotificationCenter,
         completion: @escaping () -> Void
@@ -141,6 +146,11 @@ final class IOSNotificationScheduler {
         let extra = request.content.userInfo["cap_extra"] as? [String: Any]
         let key = extra?["notificationKey"] as? String
         return key?.hasPrefix(notificationKeyPrefix) == true
+    }
+
+    private func eventId(for request: UNNotificationRequest) -> String? {
+        let extra = request.content.userInfo["cap_extra"] as? [String: Any]
+        return extra?["eventId"] as? String
     }
 
     private func makeRequest(_ candidate: Candidate) -> UNNotificationRequest {
