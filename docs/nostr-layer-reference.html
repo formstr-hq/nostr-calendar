@@ -328,6 +328,7 @@
       <article class="flow" id="f-pub-edit">
         <h3>Public event — edit</h3>
         <p>Same publish function as creation, replacing on the same <code>d</code> tag with a newer <code>created_at</code>. No participant-notification step exists for public events, same as on create.</p>
+        <p>Native clients with a cached future or recurring event may independently poll its existing coordinate and show a local <strong>Event updates</strong> alert after receiving a newer version. Private payloads are decrypted with their locally cached view key before comparison. This is client-side cache behavior only: it adds no Nostr kind, tag, relay message, or author-published notification.</p>
       </article>
 
       <article class="flow" id="f-duplicate">

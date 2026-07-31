@@ -11,8 +11,33 @@ import {
   clearBackgroundNotificationSchedule,
   reconcileNotificationSchedule,
 } from "../plugins/notificationScheduler";
+import type { EventUpdate } from "./eventUpdates";
 
 export const NOTIFICATION_SCHEDULE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+const EVENT_UPDATES_CHANNEL_ID = "event_updates";
+
+function notificationId(key: string): number {
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash) || 1;
+}
+
+async function ensureEventUpdatesChannel() {
+  try {
+    await LocalNotifications.createChannel({
+      id: EVENT_UPDATES_CHANNEL_ID,
+      name: "Event updates",
+      description: "Notifications when calendar events are updated",
+      importance: 4,
+      visibility: 1,
+      vibration: true,
+    });
+  } catch (error) {
+    console.warn("Failed to create event updates channel", error);
+  }
+}
 
 function sortNotifications(
   notifications: IScheduledNotification[],
@@ -106,6 +131,35 @@ export async function scheduleEventNotifications(
 
   await reconcileNotificationSchedule();
   return sortNotifications(scheduledInfo);
+}
+
+export async function scheduleEventUpdateNotification(
+  event: ICalendarEvent,
+  update: EventUpdate,
+): Promise<void> {
+  if (!isNative || !update.shouldNotify) return;
+
+  try {
+    const permission = await LocalNotifications.checkPermissions();
+    if (permission.display !== "granted") return;
+
+    await ensureEventUpdatesChannel();
+    const key = `event-update:${event.kind}:${event.user}:${event.id}:${event.eventId}`;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notificationId(key),
+          title: `${event.title || "Calendar event"} was updated`,
+          body: update.body || "This event was updated",
+          schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
+          channelId: EVENT_UPDATES_CHANNEL_ID,
+          extra: { openRoute: `/notification-event/${event.id}` },
+        },
+      ],
+    });
+  } catch (error) {
+    console.warn("Failed to schedule event update notification", error);
+  }
 }
 
 export function addNotificationClickListener(

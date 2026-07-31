@@ -33,6 +33,7 @@ import type { ICalendarEvent } from "../utils/types";
 import {
   scheduleEventNotifications,
   cancelEventNotifications,
+  scheduleEventUpdateNotification,
 } from "../utils/notifications";
 import { useNotifications } from "./notifications";
 import { clearNotificationPreference } from "../utils/notificationPreferences";
@@ -50,6 +51,8 @@ import {
 import type { ObserveHandle } from "@formstr/local-relay";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
 import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
+import { getEventUpdate, shouldNotifyEventUpdate } from "../utils/eventUpdates";
+import { useUser } from "./user";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
@@ -95,6 +98,12 @@ const syncEventNotifications = async (
   } catch (error) {
     console.warn("Failed to sync event notifications", error);
   }
+};
+
+const notifyEventUpdate = (previous: ICalendarEvent, fresh: ICalendarEvent) => {
+  const currentUser = useUser.getState().user?.pubkey;
+  if (!shouldNotifyEventUpdate(previous, fresh, currentUser)) return;
+  void scheduleEventUpdateNotification(fresh, getEventUpdate(previous, fresh));
 };
 
 let publicSubscription: ObserveHandle | undefined;
@@ -171,6 +180,7 @@ const processPrivateEvent = (
   } else if (store.allKeys.includes(parsedEvent.id)) {
     const previousEvent = store.byKey[parsedEvent.id];
     if (parsedEvent.createdAt > previousEvent.createdAt) {
+      notifyEventUpdate(previousEvent, parsedEvent);
       store = removeOne(store, parsedEvent.id);
       store = appendOne(store, parsedEvent.id, parsedEvent);
       changed = true;
@@ -465,6 +475,7 @@ export const useTimeBasedEvents = create<{
           if (store.allKeys.includes(parsedEvent.id)) {
             const previousEvent = store.byKey[parsedEvent.id];
             if (parsedEvent.createdAt > previousEvent.createdAt) {
+              notifyEventUpdate(previousEvent, parsedEvent);
               store = removeOne(store, parsedEvent.id);
               store = appendOne(store, parsedEvent.id, parsedEvent);
             }

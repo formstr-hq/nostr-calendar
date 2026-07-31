@@ -413,9 +413,17 @@
           <tr><th>Worker</th><th>Cadence</th><th>Constraints</th><th>Reads network?</th><th>Decrypts?</th></tr>
           <tr><td class="k">NotificationWorker</td><td>Every 6h, + once immediately on launch</td><td>none</td><td>No — local cache only</td><td>No</td></tr>
           <tr><td class="k">InvitationWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
-          <tr><td class="k">BookingWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
-        </table>
-        <p class="trigger" style="margin-top:14px;">All three are <code>androidx.work.Worker</code> jobs, so the OS can run them even with the app fully killed, subject to Doze/battery restrictions.</p>
+           <tr><td class="k">BookingWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
+           <tr><td class="k">EventUpdateWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — cached event coordinates, up to 3 relays</td><td>Private event payloads via their cached NIP-44 view key</td></tr>
+         </table>
+        <p class="trigger" style="margin-top:14px;">All four are <code>androidx.work.Worker</code> jobs, so the OS can run them even with the app fully killed, subject to Doze/battery restrictions.</p>
+      </article>
+
+      <article class="flow" id="a-event-update-worker">
+        <h3>EventUpdateWorker <span class="chip file">EventUpdateWorker.java</span> <span class="chip android">Android only</span></h3>
+        <p>Every 15 minutes while network-connected, the worker reads future or recurring event coordinates from <code>cal:events</code>, combines each event's relay hint with the stored relay list, and queries exact kind/author/d-tag filters. Private payloads are NIP-44-decrypted with their cached nsec view key before comparison. It retains only a strictly newer replacement for each coordinate.</p>
+        <p>The worker compares title, description, image, location, categories, participants, and time. Participant removals alone do not alert; additions do. The event author and a participant who was removed are not notified. Accepted replacements are written to <code>cal:events</code> before an <strong>Event updates</strong> channel notification is posted, and the notification opens <code>/notification-event/&lt;d-tag&gt;</code>.</p>
+        <p>When start, end, or recurrence changes, it immediately enqueues NotificationWorker. Its existing desired-schedule diff cancels stale alarms and creates reminders at the new times using the user's saved offsets. Every cache update also calls <code>CalendarWidget.refreshAll()</code>.</p>
       </article>
 
       <article class="flow" id="a-notifworker">
@@ -501,6 +509,12 @@
         <h3>IOSNotificationScheduler <span class="chip file">IOSNotificationScheduler.swift · 514 lines</span></h3>
         <p>A close Swift port of NotificationWorker's reconciliation algorithm — necessarily reimplemented rather than shared, since Java and Swift can't share a class. Same <code>CapacitorStorage.cal:events</code> / <code>cal:calendar_lists</code> / <code>cal:notification-preferences</code> keys (Capacitor's Preferences plugin prefixes iOS <code>UserDefaults</code> the same way), same 48-hour window, same <code>[10, 0]</code>-minute default offsets, same <code>v2:</code> key prefix and hash-to-int identifier scheme, and its own independent RRULE evaluator covering the identical subset — DAILY/WEEKLY/MONTHLY/YEARLY, <code>INTERVAL</code>, <code>BYDAY</code>, <code>COUNT</code>, <code>UNTIL</code> — as Android's RecurrenceUtils.</p>
         <div class="field"><span class="label">Where the platforms genuinely diverge</span><p>No <code>AlarmManager</code> equivalent exists on iOS, so scheduling uses <code>UNCalendarNotificationTrigger</code> fired by the system, and refresh runs opportunistically via <code>BGAppRefreshTaskRequest</code> rather than on a guaranteed cadence — iOS decides when it actually gets to run, not the app. The scheduler also caps itself at 64 pending notifications total and explicitly reserves headroom for any non-event notifications already pending — a real, system-enforced iOS ceiling Android's AlarmManager has no analog for.</p></div>
+      </article>
+
+      <article class="flow" id="i-event-update-poller">
+        <h3>IOSEventUpdatePoller <span class="chip file">IOSEventUpdatePoller.swift</span></h3>
+        <p>Runs before iOS reminder reconciliation on launch, foreground, and an OS-granted background refresh. It performs the same best-effort event-coordinate fetch and cache-before-notify comparison as Android, decrypting private payloads with their cached nsec view key, then posts an immediate notification in the <code>event_updates</code> thread with a Capacitor <code>openRoute</code> payload.</p>
+        <p>Time changes call <code>IOSNotificationScheduler.reconcileAsync()</code> after the cache write, removing obsolete pending reminders and adding replacements. iOS background refresh timing is controlled by the OS, so this is not guaranteed delivery.</p>
       </article>
 
       <article class="flow" id="i-gaps">

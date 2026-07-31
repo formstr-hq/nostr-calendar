@@ -6,6 +6,7 @@ final class IOSBackgroundNotificationCoordinator {
 
     private let scheduler = IOSNotificationScheduler.shared
     private let poller = IOSIncomingNotificationPoller.shared
+    private let eventUpdatePoller = IOSEventUpdatePoller.shared
 
     private init() {}
 
@@ -56,6 +57,8 @@ final class IOSBackgroundNotificationCoordinator {
     }
 
     private func refreshNow() async {
+        await eventUpdatePoller.refresh()
+        guard !Task.isCancelled else { return }
         await scheduler.reconcileAsync()
         guard !Task.isCancelled else { return }
         await poller.refresh()
