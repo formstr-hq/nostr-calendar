@@ -371,7 +371,7 @@
 
       <article class="flow" id="js-fork">
         <h3>Platform fork <span class="chip file">notifications.ts</span></h3>
-        <p>Every exported function in <code>src/utils/notifications.ts</code> — <code>scheduleEventNotifications</code>, <code>requestNotificationPermission</code>, <code>cancelEventNotifications</code>, <code>cancelAllNotifications</code>, <code>addNotificationClickListener</code> — opens with <code>if (!isNative) return …</code>. From there it splits again on <code>isAndroidNative()</code>:</p>
+        <p>Every exported function in <code>src/utils/notifications.ts</code> — <code>scheduleEventNotifications</code>, <code>requestNotificationPermission</code>, <code>cancelEventNotifications</code>, <code>cancelAllNotifications</code>, <code>addNotificationClickListener</code> — opens with <code>if (!isNative) return …</code>. Native scheduling is then delegated through the platform's <code>NotificationScheduler</code> plugin:</p>
         <table class="tagtable">
           <tr><th>Platform</th><th>What actually schedules</th></tr>
           <tr><td class="tagname"><span class="chip android">Android</span></td><td><code>scheduleEventNotifications</code> computes a candidate list purely to show the user a "next reminder" preview, then just calls <code>reconcile()</code> — the real <code>AlarmManager</code> call happens entirely inside <code>NotificationWorker.doWork()</code>, re-reading the cache and re-expanding recurrence a second time with its own engine.</td></tr>
@@ -404,7 +404,7 @@
             <li><strong>Internal <code>openRoute</code> extra</strong> — the string every notification and widget tap uses to jump to a specific screen (<code>/bookings</code>, <code>/notifications</code>, <code>/notification-event/&lt;id&gt;</code>).</li>
           </ul>
         </div>
-        <div class="field"><span class="label">The cold-start race</span><p>All three funnel into <code>window.dispatchEvent(new CustomEvent(...))</code> calls injected via <code>evaluateJavascript</code> — but only once the JS layer has called the <code>AppReady</code> plugin's <code>notifyReady()</code>. Until then, routes and ICS content sit in <code>pendingRoute</code>/<code>pendingIcsContent</code> and flush the moment the app signals it's ready. This is the fix for a deep link firing before React has mounted its listeners.</p></div>
+        <div class="field"><span class="label">The cold-start race</span><p>All three funnel into <code>window.dispatchEvent(new CustomEvent(...))</code> calls injected via <code>evaluateJavascript</code> — but only once the JS layer has called the <code>AppReady</code> plugin's <code>notifyReady()</code>. Until then, routes and ICS content sit in <code>pendingRoute</code>/<code>pendingIcsContent</code> and flush the moment the app signals it's ready. The shared JS <code>ICSListener</code> passively listens for <code>icsFileReceived</code> on every platform; Android is currently the only native producer. This is the fix for a deep link firing before React has mounted its listeners.</p></div>
       </article>
 
       <article class="flow" id="a-workers">

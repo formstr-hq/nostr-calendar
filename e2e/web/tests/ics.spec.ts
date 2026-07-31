@@ -35,6 +35,22 @@ test("user imports an .ics file into a new event", async ({
   });
 });
 
+test("native ICS bridge opens a prefilled event editor", async ({
+  authedPage: page,
+}) => {
+  const content = await fs.readFile(ICS_FIXTURE, "utf-8");
+
+  await page.evaluate((icsContent) => {
+    window.dispatchEvent(
+      new CustomEvent("icsFileReceived", { detail: icsContent }),
+    );
+  }, content);
+
+  await expect(page.getByRole("dialog").getByTestId("event-title")).toHaveValue(
+    "ICS Imported Meeting",
+  );
+});
+
 test("user downloads an event as .ics", async ({ authedPage: page }) => {
   const title = uniqueName("Export me");
   await createEventViaDialog(page, {

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { parseICS } from "../common/utils";
 import { ICalendarEvent } from "../utils/types";
-import { isAndroidNative } from "../utils/platform";
 import { useUser } from "../stores/user";
 import CalendarEventEdit from "./CalendarEventEdit";
 
@@ -19,10 +18,9 @@ export function ICSListener({
   const { user } = useUser();
   const pendingIcsContent = useRef<string | null>(null);
 
-  // Handle incoming .ics files on Android (when app is opened via file intent)
+  // Android currently dispatches this event for .ics file intents. Registering
+  // the passive listener everywhere also keeps the bridge testable on the web.
   useEffect(() => {
-    if (!isAndroidNative()) return;
-
     const handleIcsFile = (e: Event) => {
       const content = (e as CustomEvent<string>).detail;
       if (!content) return;
