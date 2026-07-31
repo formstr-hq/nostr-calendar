@@ -21,9 +21,19 @@ import { dataLayer, type Event, type Filter } from "@formstr/local-relay";
  */
 export function collectOnce(
   filters: Filter[],
-  options?: { localOnly?: boolean; timeoutMs?: number; quietMs?: number },
+  options?: {
+    localOnly?: boolean;
+    relays?: string[];
+    timeoutMs?: number;
+    quietMs?: number;
+  },
 ): Promise<Event[]> {
-  const { localOnly = false, timeoutMs = 4000, quietMs = 700 } = options || {};
+  const {
+    localOnly = false,
+    relays,
+    timeoutMs = 4000,
+    quietMs = 700,
+  } = options || {};
   return new Promise((resolve) => {
     const byId = new Map<string, Event>();
     let settled = false;
@@ -53,7 +63,7 @@ export function collectOnce(
         },
         // Deliberately no onEose handler: local EOSE is not completion here.
       },
-      { localOnly },
+      { localOnly, relays },
     );
 
     // A pure cache read (localOnly) has no upstream to wait for, so collapse the

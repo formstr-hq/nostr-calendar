@@ -2,12 +2,7 @@ import { Event, nip19, Filter } from "nostr-tools";
 import { dataLayer, type ObserveHandle } from "@formstr/local-relay";
 import { EventKinds } from "./kinds";
 import { getUserPublicKey, selfEncrypt, selfDecrypt } from "./crypto";
-import {
-  buildAndSign,
-  publishSignedEvent,
-  makeDTag,
-  addGossipRelays,
-} from "./core";
+import { buildAndSign, publishSignedEvent, makeDTag } from "./core";
 import { RSVPStatus } from "../utils/types";
 import type { NSec } from "nostr-tools/nip19";
 
@@ -256,7 +251,6 @@ export const fetchPrivateEventRSVPs = (
   onRSVP: (record: RSVPRecord) => void,
   onEose?: () => void,
 ): ObserveHandle => {
-  addGossipRelays([params.relayHint]);
   return dataLayer.observe(
     [
       {
@@ -277,6 +271,7 @@ export const fetchPrivateEventRSVPs = (
       },
       onEose,
     },
+    { relays: params.relayHint ? [params.relayHint] : undefined },
   );
 };
 

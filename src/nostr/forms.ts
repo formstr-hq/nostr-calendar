@@ -1,6 +1,5 @@
 import { Event } from "nostr-tools";
 import { EventKinds } from "./kinds";
-import { addGossipRelays } from "./core";
 import { fetchAll, fetchLatest } from "./fetch";
 
 /**
@@ -23,28 +22,32 @@ export const fetchUserFormResponse = async (
   userPubkey: string,
   extraRelays: string[] = [],
 ): Promise<Event | null> => {
-  addGossipRelays(extraRelays);
   // No `limit`: local-relay 0.4.2's outbox fetch drops tag filters from the
   // wire REQ, so a limit would cap to the author's newest events rather than
   // this form's responses. The interest itself still matches by #a.
-  return fetchLatest([
-    {
-      kinds: [EventKinds.FormResponse],
-      authors: [userPubkey],
-      "#a": [formCoordinate],
-    },
-  ]);
+  return fetchLatest(
+    [
+      {
+        kinds: [EventKinds.FormResponse],
+        authors: [userPubkey],
+        "#a": [formCoordinate],
+      },
+    ],
+    { relays: extraRelays },
+  );
 };
 
 export const getAllResponsesForForm = async (
   formCoordinate: string,
   extraRelays: string[] = [],
 ): Promise<Event[]> => {
-  addGossipRelays(extraRelays);
-  return fetchAll([
-    {
-      kinds: [EventKinds.FormResponse],
-      "#a": [formCoordinate],
-    },
-  ]);
+  return fetchAll(
+    [
+      {
+        kinds: [EventKinds.FormResponse],
+        "#a": [formCoordinate],
+      },
+    ],
+    { relays: extraRelays },
+  );
 };

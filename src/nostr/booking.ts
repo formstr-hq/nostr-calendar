@@ -373,7 +373,8 @@ export function fetchSchedulingPage(
     pubkey,
     dTag,
     viewKeyHex,
-  }: { pubkey: string; dTag: string; viewKeyHex: string },
+    relays,
+  }: { pubkey: string; dTag: string; viewKeyHex: string; relays?: string[] },
   onPage: (page: ISchedulingPage) => void,
   onError: () => void,
 ): StandingSubscription {
@@ -410,6 +411,6 @@ export function fetchSchedulingPage(
         onPage(nostrEventToSchedulingPage(eventToProcess));
       },
     },
-    { dedupeById: false },
+    { dedupeById: false, relays },
   );
 }

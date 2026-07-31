@@ -31,9 +31,9 @@ export function nextCreatedAt(previousCreatedAtSecs = 0): number {
 }
 
 /**
- * Feed relay hints (from naddrs, gift wraps, form links…) to the worker's
- * gossip pool so discovery reads can reach them. Read-only routing input —
- * never a publish target. Malformed hints are ignored by the worker.
+ * Feed relay hints discovered through DMs to the worker's gossip pool.
+ * General query hints belong on that interest's `observe` options instead.
+ * Malformed hints are ignored by the worker.
  */
 export function addGossipRelays(hints: Array<string | undefined>) {
   for (const hint of hints) {

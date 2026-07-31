@@ -35,7 +35,6 @@ import { createLogger } from "../utils/logger";
 import {
   buildAndSign,
   publishSignedEvent,
-  addGossipRelays,
   nextCreatedAt,
   makeDTag,
 } from "./core";
@@ -527,10 +526,7 @@ export function viewPrivateEvent(calendarEvent: Event, viewKey: string) {
   return null;
 }
 
-/**
- * Observes private calendar events by their d-tag IDs. Relay hints (e.g. from
- * calendar-list refs) are fed to the worker's gossip pool for discovery.
- */
+/** Observes private calendar events by their d-tag IDs. */
 export function fetchPrivateCalendarEvents(
   {
     eventIds,
@@ -550,7 +546,6 @@ export function fetchPrivateCalendarEvents(
   onEvent: (event: Event) => void,
   onEose?: () => void,
 ): ObserveHandle {
-  addGossipRelays(relays ?? []);
   const filter: Filter = {
     kinds: kinds,
     "#d": eventIds,
@@ -559,12 +554,16 @@ export function fetchPrivateCalendarEvents(
     ...(until && { until }),
   };
 
-  return dataLayer.observe([filter], {
-    onEvent: (event: Event) => {
-      onEvent(event);
+  return dataLayer.observe(
+    [filter],
+    {
+      onEvent: (event: Event) => {
+        onEvent(event);
+      },
+      onEose,
     },
-    onEose,
-  });
+    { relays },
+  );
 }
 
 export const fetchCalendarEvents = (
@@ -681,10 +680,10 @@ export const fetchCalendarEvent = async (
   naddr: NAddr,
 ): Promise<{ event: Event; relayHint: string }> => {
   const { data } = decode(naddr as NAddr);
-  addGossipRelays(data.relays ?? []);
+  let relays = data.relays ?? [];
   try {
     // Warming the author's relay list also teaches the worker their outbox.
-    addGossipRelays(await fetchRelayList(data.pubkey));
+    relays = [...relays, ...(await fetchRelayList(data.pubkey, relays))];
   } catch {
     // Hints only — the user relays may already carry the event.
   }
@@ -697,7 +696,7 @@ export const fetchCalendarEvent = async (
     authors: [data.pubkey],
   };
 
-  const event = await fetchLatest([filter]);
+  const event = await fetchLatest([filter], { relays });
   if (!event) {
     throw new Error("EVENT_NOT_FOUND");
   }

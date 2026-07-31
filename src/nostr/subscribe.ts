@@ -28,7 +28,7 @@ export function createSubscription(
     onEvent: (event: Event) => void;
     onEose?: () => void;
   },
-  opts: { dedupeById?: boolean } = {},
+  opts: { dedupeById?: boolean; relays?: string[] } = {},
 ): StandingSubscription {
   let handle: ObserveHandle | undefined;
   const processedIds = opts.dedupeById ? new Set<string>() : undefined;
@@ -36,16 +36,20 @@ export function createSubscription(
   return {
     start: () => {
       if (handle) return;
-      handle = dataLayer.observe(buildFilters(), {
-        onEvent: (event: Event) => {
-          if (processedIds) {
-            if (processedIds.has(event.id)) return;
-            processedIds.add(event.id);
-          }
-          handlers.onEvent(event);
+      handle = dataLayer.observe(
+        buildFilters(),
+        {
+          onEvent: (event: Event) => {
+            if (processedIds) {
+              if (processedIds.has(event.id)) return;
+              processedIds.add(event.id);
+            }
+            handlers.onEvent(event);
+          },
+          onEose: handlers.onEose,
         },
-        onEose: handlers.onEose,
-      });
+        { relays: opts.relays },
+      );
     },
     stop: () => {
       handle?.unobserve();

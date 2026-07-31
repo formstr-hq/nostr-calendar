@@ -2,15 +2,19 @@ import { UnsignedEvent } from "nostr-tools";
 import { signerManager } from "../common/signer";
 import { EventKinds } from "./kinds";
 import { getUserPublicKey } from "./crypto";
-import { buildAndSign, publishSignedEvent, addGossipRelays } from "./core";
+import { buildAndSign, publishSignedEvent } from "./core";
 import { fetchAll, fetchLatest } from "./fetch";
 
-export const fetchRelayList = async (pubkey: string): Promise<string[]> => {
+export const fetchRelayList = async (
+  pubkey: string,
+  relayHints: string[] = [],
+): Promise<string[]> => {
   // NIP-46 signers know their bunker relays — useful discovery hints.
-  addGossipRelays(await signerManager.getSignerRelays());
-  const event = await fetchLatest([
-    { kinds: [EventKinds.RelayList], authors: [pubkey], limit: 1 },
-  ]);
+  const relays = [...relayHints, ...(await signerManager.getSignerRelays())];
+  const event = await fetchLatest(
+    [{ kinds: [EventKinds.RelayList], authors: [pubkey], limit: 1 }],
+    { relays },
+  );
   if (!event) return [];
   return event.tags
     .filter((tag) => tag[0] === "r" && tag[1])
@@ -27,10 +31,11 @@ export const fetchRelayLists = async (
   pubkeys: string[],
 ): Promise<Map<string, string[]>> => {
   if (pubkeys.length === 0) return new Map();
-  addGossipRelays(await signerManager.getSignerRelays());
-  const events = await fetchAll([
-    { kinds: [EventKinds.RelayList], authors: pubkeys },
-  ]);
+  const relays = await signerManager.getSignerRelays();
+  const events = await fetchAll(
+    [{ kinds: [EventKinds.RelayList], authors: pubkeys }],
+    { relays },
+  );
   const result = new Map<string, string[]>();
   for (const event of events) {
     const relays = event.tags
