@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mobile — Device Calendars</title>
+<style>
+  :root{
+    --canvas:#f4f4f3; --surface:#fff; --border:#e4e4e2;
+    --text:#0b0b0c; --text-2:#686865; --text-3:#9a9a97;
+    --accent:#111111; --accent-soft:#f0f0ef;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text)}
+  a{text-decoration:none;color:inherit}
+  button{font-family:inherit;cursor:pointer}
+
+  .mockup-toolbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1a1a;color:#fff;font-size:11.5px}
+  .mockup-toolbar b{font-weight:700}
+  .mockup-toolbar span{color:#a3a3a0}
+
+  .frame{width:390px;height:844px;background:var(--canvas);display:flex;flex-direction:column;overflow:hidden;margin:0 auto}
+  .statusbar{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:13px;font-weight:600}
+
+  .navbar{display:flex;align-items:center;padding:4px 12px 8px;gap:8px}
+  .navbar a{font-size:14px;color:var(--text-2)}
+  .navbar h1{flex:1;text-align:center;font-size:15px;font-weight:700;margin:0;margin-right:24px}
+
+  .scroll{flex:1;overflow-y:auto;padding:4px 16px 24px}
+
+  .section-label{font-size:10.5px;font-weight:700;letter-spacing:1.2px;color:var(--text-3);text-transform:uppercase;margin:18px 4px 8px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+
+  .group-hdr{display:flex;align-items:center;gap:8px;padding:14px 16px;cursor:pointer}
+  .chev{width:13px;height:13px;color:var(--text-3);flex-shrink:0;transition:transform .15s}
+  .card.collapsed .chev{transform:rotate(-90deg)}
+  .group-title{flex:1;font-size:14px;font-weight:600;color:var(--text)}
+  .group-count{font-size:12px;color:var(--text-3)}
+  .group-body{border-top:1px solid #f2f0ea}
+  .card.collapsed .group-body{display:none}
+
+  .cal-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #f2f0ea}
+  .cal-row:first-child{border-top:none}
+  .dot{width:11px;height:11px;border-radius:6px;flex-shrink:0}
+  .cal-name{flex:1;font-size:14px;font-weight:500;color:var(--text)}
+  .toggle{width:46px;height:26px;border-radius:13px;border:none;position:relative;flex-shrink:0}
+  .toggle .knob{position:absolute;top:2px;width:22px;height:22px;border-radius:11px;background:#fff;transition:left .15s}
+  .toggle.on{background:#111111}
+  .toggle.on .knob{left:22px}
+  .toggle.off{background:#d8d8d6}
+  .toggle.off .knob{left:2px}
+
+  .account-label{display:flex;align-items:center;gap:7px;padding:10px 16px 2px;font-size:10.5px;font-weight:700;color:var(--text-3);border-top:1px solid #f2f0ea}
+  .account-label svg{width:11px;height:11px}
+
+  .empty-card{padding:22px 18px;text-align:center}
+  .empty-card svg{width:28px;height:28px;color:var(--text-3);margin-bottom:10px}
+  .empty-card p{font-size:12.5px;color:var(--text-2);line-height:1.5;margin:0 0 14px}
+  .connect-btn{height:44px;width:100%;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
+
+  .icon{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<div class="mockup-toolbar">
+  <b>Mockup</b>
+  <span>docs/device-calendars-plan.md §7 — mobile settings · switches/chips throughout, no iOS-style list rows</span>
+</div>
+
+<div class="frame">
+  <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="navbar"><a href="13-mobile-settings.html">‹ Settings</a><h1>Calendars</h1></div>
+
+  <div class="scroll">
+    <div class="section-label">Synced</div>
+    <div class="card">
+      <div class="cal-row">
+        <span class="dot" style="background:#111111"></span>
+        <span class="cal-name">Personal</span>
+        <button class="toggle on" onclick="flip(this)"><span class="knob"></span></button>
+      </div>
+      <div class="cal-row">
+        <span class="dot" style="background:#3B82F6"></span>
+        <span class="cal-name">Work</span>
+        <button class="toggle on" onclick="flip(this)"><span class="knob"></span></button>
+      </div>
+      <div class="cal-row">
+        <span class="dot" style="background:#8B5CF6"></span>
+        <span class="cal-name">Meetups</span>
+        <button class="toggle off" onclick="flip(this)"><span class="knob"></span></button>
+      </div>
+    </div>
+
+    <div class="section-label">Device only</div>
+
+    <!-- Connected state -->
+    <div class="card" id="device-card">
+      <div class="group-hdr" onclick="toggleCard()">
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        <span class="group-title">On this iPhone</span>
+        <span class="group-count">4</span>
+      </div>
+      <div class="group-body">
+        <div class="account-label" style="border-top:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+          rama@gmail.com
+        </div>
+        <div class="cal-row">
+          <span class="dot" style="background:#111111"></span>
+          <span class="cal-name">Personal</span>
+          <button class="toggle on" onclick="flip(this)"><span class="knob"></span></button>
+        </div>
+        <div class="cal-row">
+          <span class="dot" style="background:#F59E0B"></span>
+          <span class="cal-name">Birthdays</span>
+          <button class="toggle off" onclick="flip(this)"><span class="knob"></span></button>
+        </div>
+        <div class="account-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          On this device
+        </div>
+        <div class="cal-row">
+          <span class="dot" style="background:#64748B"></span>
+          <span class="cal-name">Home</span>
+          <button class="toggle on" onclick="flip(this)"><span class="knob"></span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tap a row's dot to open manage dialog (color only) in the real app -->
+    <p style="font-size:10.5px;color:var(--text-3);line-height:1.6;margin:14px 6px 0">Tapping a calendar's color dot opens the same color-only manage dialog as desktop — see 27-device-calendar-manage-dialog.html.</p>
+  </div>
+</div>
+
+<script>
+function flip(btn){
+  btn.classList.toggle('on');
+  btn.classList.toggle('off');
+}
+function toggleCard(){
+  document.getElementById('device-card').classList.toggle('collapsed');
+}
+</script>
+</body>
+</html>

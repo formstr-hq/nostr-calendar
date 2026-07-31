@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Device Calendar — Components</title>
+<style>
+  :root{
+    --canvas:#f4f4f3; --surface:#fff; --border:#e4e4e2;
+    --text:#0b0b0c; --text-2:#686865; --text-3:#9a9a97;
+    --accent:#111111; --accent-soft:#f0f0ef;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--canvas);font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text)}
+  .frame{width:1440px;padding:40px 48px 64px}
+  h1{font-size:24px;font-weight:800;letter-spacing:-0.5px;margin:0 0 4px}
+  .sub{font-size:12.5px;color:var(--text-2);margin:0 0 36px}
+  h2{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--text-3);text-transform:uppercase;margin:0 0 14px}
+  .note{font-size:11.5px;color:var(--text-2);margin:8px 0 32px;max-width:640px;line-height:1.5}
+  .row{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:8px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 28px;margin-bottom:32px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+
+  /* EventChip — month view, private/nostr style */
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600;height:24px}
+  .chip.nostr-private{background:#3b82f6;color:#fff}
+  .chip.nostr-public{background:#8b5cf61f;color:#5b21b6;font-weight:700}
+  .chip.device{background:#64748b;color:#fff}
+  .icon{width:12px;height:12px;flex-shrink:0}
+
+  /* EventCard block — week/day */
+  .block{width:180px;padding:10px 12px;border-radius:10px}
+  .block .t{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .block .m{font-size:11px;font-weight:600;margin-top:6px;opacity:.85}
+
+  /* EventChipsRow pill */
+  .pill{display:inline-flex;align-items:center;gap:6px;border-radius:14px;padding:6px 14px;font-size:11px;font-weight:600}
+  .pill.calendar-name{background:#8b5cf624;color:#5b21b6}
+  .pill.device-source{background:#ececea;color:#686865}
+
+  /* Month cell mock */
+  .cell{border:1px solid var(--border);border-radius:10px;padding:10px;width:180px}
+  .cell .d{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px}
+  .cell .chip{display:flex;width:100%;margin-bottom:4px}
+
+  /* Quick peek popover */
+  .peek{width:260px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(11,11,12,.12);padding:16px 18px}
+  .peek .title{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .peek .meta{font-size:11.5px;color:var(--text-2);margin-bottom:4px}
+
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="frame">
+  <h1>Device Calendar — chip &amp; label components</h1>
+  <p class="sub">Mockup for docs/device-calendars-plan.md §7 · phone-icon / "in your device calendar" treatment · calm paper, loud ink</p>
+
+  <h2>EventChip — month view</h2>
+  <div class="row">
+    <div class="chip nostr-private">9:30 Team sync</div>
+    <div class="chip nostr-public">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/></svg>
+      15:00 Nostr meetup
+    </div>
+    <div class="chip device">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+      12:00 Dentist
+    </div>
+  </div>
+  <p class="note"><b>isDevice</b> prop on <code>EventChip.tsx</code>: same shape as the existing private chip (solid fill, white text, no bars, r6/h24) — fill uses the <b>device calendar's own color</b> (shown here as slate #64748b as a placeholder), phone icon replaces the globe used for public events. Plumbed via <code>isDevice=(event.source === "device")</code> from <code>EventCard.tsx</code>, <code>MonthView.tsx</code>, <code>EventQuickPeek.tsx</code>.</p>
+
+  <h2>Month grid — device event alongside Nostr events</h2>
+  <div class="row">
+    <div class="cell">
+      <div class="d">14</div>
+      <div class="chip nostr-private" style="width:100%">9:30 Standup</div>
+      <div class="chip device" style="width:100%">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+        12:00 Dentist
+      </div>
+      <div class="chip nostr-public" style="width:100%">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/></svg>
+        18:00 Meetup
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <h2>Event block — week / day view</h2>
+      <div class="block device" style="background:#64748b1f;color:#334155;border:1px solid #64748b40">
+        <div class="t">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          Dentist appointment
+        </div>
+        <div class="m">12:00 – 12:45</div>
+        <div class="m">Riverside Dental</div>
+      </div>
+    </div>
+
+    <div>
+      <h2>EventQuickPeek popover</h2>
+      <div class="peek">
+        <div class="title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          Dentist appointment
+        </div>
+        <div class="meta">Today · 12:00 – 12:45</div>
+        <div class="meta">Riverside Dental</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>EventChipsRow — "in your device calendar" pill</h2>
+  <div class="card">
+    <div class="row" style="margin-bottom:0">
+      <span class="pill calendar-name"><span style="width:9px;height:9px;border-radius:5px;background:#8b5cf6;display:inline-block"></span>Nostr meetups</span>
+      <span class="pill" style="background:#ececea;color:#686865">Public</span>
+      <span class="pill device-source">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+        in your device calendar
+      </span>
+    </div>
+    <p class="note" style="margin-bottom:0">Replaces the current <code>if (event.source === "device") return null</code> in <code>EventChipsRow.tsx</code>. Styled like the calendar-name pill (r14, tinted bg) rather than the public/private pill, since neither concept applies to a device event. New i18n key for the label.</p>
+  </div>
+</div>
+</body>
+</html>

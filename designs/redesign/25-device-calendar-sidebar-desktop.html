@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Device Calendar — Sidebar (Desktop)</title>
+<style>
+  :root{
+    --canvas:#f4f4f3; --surface:#fff; --border:#e4e4e2;
+    --text:#0b0b0c; --text-2:#686865; --text-3:#9a9a97;
+    --accent:#111111; --accent-soft:#f0f0ef;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text)}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer}
+  .mockup-toolbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1a1a1a;color:#fff;font-size:12px}
+  .mockup-toolbar b{font-weight:700}
+  .mockup-toolbar .seg{display:flex;background:#2c2c2c;border-radius:8px;padding:2px;gap:2px;margin-left:8px}
+  .mockup-toolbar .seg button{border:none;background:transparent;color:#a3a3a0;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:6px}
+  .mockup-toolbar .seg button.active{background:#fff;color:#0b0b0c}
+
+  .frame{width:1440px;height:900px;display:flex;background:var(--canvas);overflow:hidden}
+  .topbar{position:absolute;top:0;left:0;right:0;height:0}
+
+  .sidebar{width:280px;flex-shrink:0;border-right:1px solid var(--border);padding:20px 16px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+  .new-btn{height:40px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+
+  .mini-cal{border:1px solid var(--border);border-radius:12px;padding:12px}
+  .mini-cal .hdr{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:8px}
+  .mini-cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:10px;color:var(--text-3);text-align:center}
+  .mini-cal .grid span{padding:3px 0}
+  .mini-cal .grid .day{color:var(--text);border-radius:9px}
+  .mini-cal .grid .today{background:var(--accent);color:#fff;font-weight:700}
+
+  .group{border-top:1px solid var(--border);padding-top:14px}
+  .group-hdr{display:flex;align-items:center;gap:8px;padding:4px 4px;cursor:pointer;user-select:none;border-radius:8px}
+  .group-hdr:hover{background:#00000006}
+  .chev{width:14px;height:14px;color:var(--text-3);flex-shrink:0;transition:transform .15s}
+  .group.collapsed .chev{transform:rotate(-90deg)}
+  .group-title{flex:1;font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--text-2);text-transform:uppercase}
+  .group-count{font-size:10.5px;color:var(--text-3)}
+  .group-body{padding-top:6px;display:flex;flex-direction:column;gap:1px}
+  .group.collapsed .group-body{display:none}
+
+  .cal-row{display:flex;align-items:center;gap:10px;padding:6px 6px;border-radius:8px}
+  .cal-row:hover{background:#00000006}
+  .cal-row:hover .manage-btn{opacity:1}
+  .cbx{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px}
+  .cal-name{flex:1;font-size:12.5px;color:var(--text)}
+  .manage-btn{border:none;background:none;color:var(--text-3);font-size:14px;padding:2px 4px;border-radius:6px;opacity:0;transition:opacity .1s}
+  .manage-btn:hover{background:#00000010;color:var(--text)}
+
+  .account-label{font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:.4px;padding:8px 6px 2px;display:flex;align-items:center;gap:6px}
+  .account-label svg{width:10px;height:10px;flex-shrink:0}
+
+  .connect-cta{border:1.5px dashed var(--border);border-radius:12px;padding:16px 14px;text-align:center;margin-top:4px}
+  .connect-cta p{font-size:11.5px;color:var(--text-2);margin:0 0 10px;line-height:1.5}
+  .connect-cta button{height:34px;padding:0 16px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--text)}
+  .connect-cta button:hover{background:var(--accent-soft)}
+
+  .canvas-area{flex:1;background:var(--canvas);display:flex;align-items:center;justify-content:center}
+  .canvas-placeholder{color:var(--text-3);font-size:13px;text-align:center;line-height:1.6}
+
+  .icon{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<div class="mockup-toolbar">
+  <b>Mockup state</b>
+  <div class="seg">
+    <button id="state-connected" class="active" onclick="setState('connected')">Device connected</button>
+    <button id="state-notconnected" onclick="setState('notconnected')">Not connected yet</button>
+  </div>
+  <span style="margin-left:auto;color:#a3a3a0">docs/device-calendars-plan.md §7 — SidebarContent.tsx</span>
+</div>
+
+<div class="frame">
+  <div class="sidebar">
+    <button class="new-btn">+ New event</button>
+
+    <div class="mini-cal">
+      <div class="hdr"><span>July 2026</span><span style="color:var(--text-3)">‹ ›</span></div>
+      <div class="grid">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+        <span class="day">29</span><span class="day">30</span><span class="day">1</span><span class="day">2</span><span class="day">3</span><span class="day">4</span><span class="day">5</span>
+        <span class="day">6</span><span class="day">7</span><span class="day">8</span><span class="day">9</span><span class="day">10</span><span class="day">11</span><span class="day">12</span>
+        <span class="day today">13</span><span class="day">14</span><span class="day">15</span><span class="day">16</span><span class="day">17</span><span class="day">18</span><span class="day">19</span>
+      </div>
+    </div>
+
+    <!-- Synced (Nostr) group -->
+    <div class="group" id="group-synced">
+      <div class="group-hdr" onclick="toggleGroup('group-synced')">
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        <span class="group-title">Synced</span>
+        <span class="group-count">5</span>
+      </div>
+      <div class="group-body">
+        <div class="cal-row">
+          <span class="cbx" style="background:#111111;border-color:#111111">✓</span>
+          <span class="cal-name">Personal</span>
+          <button class="manage-btn" onclick="location.href='27-device-calendar-manage-dialog.html'">⋯</button>
+        </div>
+        <div class="cal-row">
+          <span class="cbx" style="background:#3B82F6;border-color:#3B82F6">✓</span>
+          <span class="cal-name">Work</span>
+          <button class="manage-btn">⋯</button>
+        </div>
+        <div class="cal-row">
+          <span class="cbx" style="background:#10B981;border-color:#10B981">✓</span>
+          <span class="cal-name">Family</span>
+          <button class="manage-btn">⋯</button>
+        </div>
+        <div class="cal-row">
+          <span class="cbx"></span>
+          <span class="cal-name" style="color:var(--text-3)">Meetups</span>
+          <button class="manage-btn">⋯</button>
+        </div>
+        <div class="cal-row">
+          <span class="cbx" style="background:#F43F5E;border-color:#F43F5E">✓</span>
+          <span class="cal-name">Deadlines</span>
+          <button class="manage-btn">⋯</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device only group -->
+    <div class="group" id="group-device">
+      <div class="group-hdr" onclick="toggleGroup('group-device')">
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        <span class="group-title">Device only</span>
+        <span class="group-count" id="device-count">4</span>
+      </div>
+      <div class="group-body" id="device-body">
+        <!-- filled by JS depending on mockup state -->
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area">
+    <div class="canvas-placeholder">Month grid<br><span style="font-size:11px">(unchanged — see 01-month-view-desktop.html)</span></div>
+  </div>
+</div>
+
+<script>
+function toggleGroup(id){
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+const CONNECTED_HTML = `
+  <div class="account-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+    rama@gmail.com
+  </div>
+  <div class="cal-row">
+    <span class="cbx" style="background:#111111;border-color:#111111">✓</span>
+    <span class="cal-name">Personal</span>
+    <button class="manage-btn" onclick="location.href='27-device-calendar-manage-dialog.html'">⋯</button>
+  </div>
+  <div class="cal-row">
+    <span class="cbx" style="background:#F59E0B;border-color:#F59E0B">✓</span>
+    <span class="cal-name">Birthdays</span>
+    <button class="manage-btn">⋯</button>
+  </div>
+  <div class="account-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+    On this iPhone
+  </div>
+  <div class="cal-row">
+    <span class="cbx" style="background:#64748B;border-color:#64748B">✓</span>
+    <span class="cal-name">Home</span>
+    <button class="manage-btn">⋯</button>
+  </div>
+  <div class="cal-row">
+    <span class="cbx"></span>
+    <span class="cal-name" style="color:var(--text-3)">Reminders</span>
+    <button class="manage-btn">⋯</button>
+  </div>
+`;
+
+const NOTCONNECTED_HTML = `
+  <div class="connect-cta">
+    <p>See and manage events from your phone's calendar, right alongside your Nostr events.</p>
+    <button onclick="setState('connected')">Connect device calendar</button>
+  </div>
+`;
+
+function setState(state){
+  const body = document.getElementById('device-body');
+  const count = document.getElementById('device-count');
+  document.getElementById('state-connected').classList.toggle('active', state==='connected');
+  document.getElementById('state-notconnected').classList.toggle('active', state==='notconnected');
+  if(state === 'connected'){
+    body.innerHTML = CONNECTED_HTML;
+    count.style.display = '';
+  } else {
+    body.innerHTML = NOTCONNECTED_HTML;
+    count.style.display = 'none';
+  }
+}
+setState('connected');
+</script>
+</body>
+</html>

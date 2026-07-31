@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Settings — Calendars</title>
+<style>
+  :root{
+    --canvas:#f4f4f3; --surface:#fff; --border:#e4e4e2;
+    --text:#0b0b0c; --text-2:#686865; --text-3:#9a9a97;
+    --accent:#111111; --accent-soft:#f0f0ef;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text)}
+  a{color:var(--accent);text-decoration:none}
+  select,input,button{font-family:inherit;cursor:pointer}
+
+  .mockup-toolbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1a1a1a;color:#fff;font-size:12px}
+  .mockup-toolbar b{font-weight:700}
+  .mockup-toolbar span{color:#a3a3a0}
+
+  .frame{width:1440px;height:900px;display:flex;flex-direction:column;background:var(--canvas);overflow:hidden}
+  .topbar{height:56px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;font-size:13.5px;font-weight:700}
+  .topbar a{margin-left:auto;font-size:12.5px;color:var(--text-2);font-weight:500}
+
+  .body{flex:1;display:flex;min-height:0;overflow:auto}
+  .nav{width:280px;flex-shrink:0;padding:24px 16px}
+  .nav a{display:block;padding:10px 24px;border-radius:10px;margin-bottom:2px;font-size:13px;font-weight:500;color:#3a3a38}
+  .nav a.active{font-weight:700;color:#1a1a1a;background:var(--accent-soft)}
+
+  .content{flex:1;padding:24px 40px;max-width:800px}
+  h1{font-size:22px;font-weight:800;letter-spacing:-0.4px;margin:0 0 4px}
+  .sub{font-size:12.5px;color:var(--text-2);margin:0 0 20px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:20px;overflow:hidden}
+  .group-hdr{display:flex;align-items:center;gap:8px;padding:16px 20px;cursor:pointer;user-select:none}
+  .group-hdr:hover{background:#00000005}
+  .chev{width:14px;height:14px;color:var(--text-3);flex-shrink:0;transition:transform .15s}
+  .card.collapsed .chev{transform:rotate(-90deg)}
+  .group-title{flex:1;font-size:10.5px;font-weight:700;letter-spacing:1.2px;color:var(--text-3);text-transform:uppercase}
+  .group-count{font-size:11px;color:var(--text-3)}
+  .group-body{border-top:1px solid var(--border)}
+  .card.collapsed .group-body{display:none}
+
+  .cal-row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid #f2f0ea}
+  .cal-row:first-child{border-top:none}
+  .cbx{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+  .cal-info{flex:1}
+  .cal-name{font-size:13px;font-weight:600;color:var(--text)}
+  .cal-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+  .manage-btn{border:1.5px solid var(--border);background:#fff;border-radius:9px;padding:7px 14px;font-size:11.5px;font-weight:600;color:var(--text)}
+  .manage-btn:hover{background:var(--accent-soft)}
+
+  .account-label{display:flex;align-items:center;gap:8px;padding:10px 20px 2px;font-size:10.5px;font-weight:700;color:var(--text-3);letter-spacing:.4px;border-top:1px solid #f2f0ea}
+  .account-label svg{width:11px;height:11px}
+
+  .empty-state{padding:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+  .empty-state p{font-size:12px;color:var(--text-2);margin:0;line-height:1.5;max-width:440px}
+  .connect-btn{height:38px;padding:0 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;flex-shrink:0}
+
+  .icon{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<div class="mockup-toolbar">
+  <b>Mockup</b>
+  <span>docs/device-calendars-plan.md §7 — CalendarsSettingsPage.tsx · "Calendars" nav item, previously a stub (href="#") in 06-settings-general.html</span>
+</div>
+
+<div class="frame">
+  <div class="topbar">Settings<a href="01-month-view-desktop.html">← Back to calendar</a></div>
+  <div class="body">
+    <div class="nav">
+      <a href="06-settings-general.html">General</a>
+      <a href="07-settings-appearance.html">Appearance</a>
+      <a class="active" href="#">Calendars</a>
+      <a href="#">Notifications</a>
+      <a href="15-bookings-desktop.html">Booking pages</a>
+      <a href="#">Relays &amp; sync</a>
+      <a href="#">Import / export</a>
+      <a href="#">Keyboard shortcuts</a>
+      <a href="#">About</a>
+    </div>
+
+    <div class="content">
+      <h1>Calendars</h1>
+      <p class="sub">Colors, visibility and device connections.</p>
+
+      <div class="card" id="card-synced">
+        <div class="group-hdr" onclick="toggleCard('card-synced')">
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          <span class="group-title">Synced</span>
+          <span class="group-count">5 calendars</span>
+        </div>
+        <div class="group-body">
+          <div class="cal-row">
+            <span class="cbx" style="background:#111111;border-color:#111111">✓</span>
+            <div class="cal-info"><div class="cal-name">Personal</div><div class="cal-sub">Nostr calendar · 12 events</div></div>
+            <button class="manage-btn" onclick="location.href='27-device-calendar-manage-dialog.html'">Manage</button>
+          </div>
+          <div class="cal-row">
+            <span class="cbx" style="background:#3B82F6;border-color:#3B82F6">✓</span>
+            <div class="cal-info"><div class="cal-name">Work</div><div class="cal-sub">Nostr calendar · 4 events</div></div>
+            <button class="manage-btn">Manage</button>
+          </div>
+          <div class="cal-row">
+            <span class="cbx" style="background:#8B5CF6;border-color:#8B5CF6">✓</span>
+            <div class="cal-info"><div class="cal-name">Meetups</div><div class="cal-sub">Nostr calendar · public · 2 events</div></div>
+            <button class="manage-btn">Manage</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="card-device">
+        <div class="group-hdr" onclick="toggleCard('card-device')">
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          <span class="group-title">Device only</span>
+          <span class="group-count">4 calendars</span>
+        </div>
+        <div class="group-body">
+          <div class="account-label" style="border-top:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+            rama@gmail.com
+          </div>
+          <div class="cal-row">
+            <span class="cbx" style="background:#111111;border-color:#111111">✓</span>
+            <div class="cal-info"><div class="cal-name">Personal</div><div class="cal-sub">Device calendar · read &amp; write</div></div>
+            <button class="manage-btn" onclick="location.href='27-device-calendar-manage-dialog.html'">Manage</button>
+          </div>
+          <div class="cal-row">
+            <span class="cbx" style="background:#F59E0B;border-color:#F59E0B">✓</span>
+            <div class="cal-info"><div class="cal-name">Birthdays</div><div class="cal-sub">Device calendar · read only</div></div>
+            <button class="manage-btn">Manage</button>
+          </div>
+          <div class="account-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+            On this device
+          </div>
+          <div class="cal-row">
+            <span class="cbx" style="background:#64748B;border-color:#64748B">✓</span>
+            <div class="cal-info"><div class="cal-name">Home</div><div class="cal-sub">Device calendar · read &amp; write</div></div>
+            <button class="manage-btn">Manage</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="sub" style="max-width:640px;line-height:1.6">Mirrors the sidebar's grouping exactly (<code>useDeviceCalendars()</code>, same row shape, same device variant of <code>CalendarManageDialog</code>). Only rendered when <code>available</code> is true; shows the same "Connect device calendar" empty state as the sidebar otherwise — see 25-device-calendar-sidebar-desktop.html.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleCard(id){
+  document.getElementById(id).classList.toggle('collapsed');
+}
+</script>
+</body>
+</html>
