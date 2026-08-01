@@ -106,10 +106,10 @@ test("mobile calendars bottom sheet opens and closes", async ({
   authedPage: page,
 }) => {
   await page.getByRole("button", { name: "Open calendars" }).click();
-  await expect(page.getByText("Calendars", { exact: true })).toBeVisible();
+  await expect(page.getByText("Synced", { exact: true })).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(page.getByText("Calendars", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Synced", { exact: true })).not.toBeVisible();
 });
 
 test("mobile settings panel collapses and navigates sections", async ({

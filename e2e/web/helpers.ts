@@ -81,10 +81,12 @@ export async function openEventModal(page: Page, title: string): Promise<Locator
 /**
  * Waits for the sidebar (calendar list, mini calendar, scheduling links) to
  * be ready. The desktop Sidebar is persistent — nothing to open — this just
- * guards against racing the initial render.
+ * guards against racing the initial render. "Synced" is the Nostr-calendars
+ * group heading (sidebar.calendarsSynced) that replaced the old single
+ * "Calendars" heading once device calendars got their own group.
  */
 export async function openSidebar(page: Page): Promise<void> {
-  await expect(page.getByText("Calendars", { exact: true })).toBeVisible();
+  await expect(page.getByText("Synced", { exact: true })).toBeVisible();
 }
 
 /** A unique-enough suffix so parallel tests never share entity names. */

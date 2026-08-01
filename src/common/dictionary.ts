@@ -159,6 +159,7 @@ const dictionary: NestedObject = {
       publicEvent: "Public event",
       privateEventChip: "Private",
       inYourCalendar: "In your calendar",
+      inYourDeviceCalendar: "In your device calendar",
       hostedBy: "Event created by {participant}",
       directions: "Directions",
       moreOptions: "More options",
@@ -248,6 +249,12 @@ const dictionary: NestedObject = {
       confirm: "Confirm",
       deleting: "Deleting...",
     },
+    deleteDeviceEvent: {
+      title: "Delete device event",
+      description: "This will delete the event from your phone's calendar app.",
+      confirm: "Delete",
+      error: "We could not delete this event. Please try again.",
+    },
     booking: {
       step: {
         publishAppointment: "Publishing appointment",
@@ -276,9 +283,20 @@ const dictionary: NestedObject = {
       reallyDelete: "Really Delete?",
       actionFailed:
         "The calendar could not be saved to your relays. Please try again.",
+      readWrite: "read & write",
+      readOnly: "read only",
+      manageCalendar: "Manage calendar",
+      deviceReadOnlyNote: "Name and account are read-only for device calendars",
+      deviceColorFallbackNote:
+        "Some Google-synced calendars don't accept color changes from apps. If that happens here, Formstr will still show this color everywhere in the app — it just won't write back to your device.",
     },
     sidebar: {
       calendars: "Calendars",
+      calendarsSynced: "Synced",
+      calendarsDeviceOnly: "Device only",
+      connectDeviceCalendarHelp:
+        "See and manage events from your phone's calendar, right alongside your Nostr events.",
+      connectDeviceCalendar: "Connect device calendar",
       noCalendarsYet: "No calendars yet",
       settingsLink: "Settings",
       yourResponse: "Ihre Antwort",
@@ -313,6 +331,10 @@ const dictionary: NestedObject = {
         "We could not read your device calendars. Please try again.",
       errorReadEvents:
         "We could not load events from your device calendars. Please try again.",
+      errorWriteFailed:
+        "We could not save this event to your device calendar. Please try again.",
+      errorDeleteFailed:
+        "We could not delete this event from your device calendar. Please try again.",
       errorUnknown:
         "Something went wrong while reading your device calendars. Please try again.",
     },
@@ -714,6 +736,7 @@ const dictionary: NestedObject = {
       allDayDate: "{date} ⋅ {label}",
       allDayDateRange: "{start} – {end} ⋅ {label}",
       deviceReadOnly: "Aus dem Gerätekalender — schreibgeschützt.",
+      inYourDeviceCalendar: "In Ihrem Gerätekalender",
       repeats: "Wiederholt sich {label}",
       event: "Termin",
       eventNotFound:
@@ -795,6 +818,14 @@ const dictionary: NestedObject = {
       confirm: "Bestätigen",
       deleting: "Löschen...",
     },
+    deleteDeviceEvent: {
+      title: "Geräte-Termin löschen",
+      description:
+        "Dies löscht den Termin aus der Kalender-App Ihres Telefons.",
+      confirm: "Löschen",
+      error:
+        "Der Termin konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.",
+    },
     booking: {
       step: {
         publishAppointment: "Termin wird veröffentlicht",
@@ -820,9 +851,21 @@ const dictionary: NestedObject = {
       deleteWarning:
         "Das Löschen dieses Kalenders entfernt alle Ihre Termine daraus und sie könnten für immer verloren gehen. Sind Sie sicher?",
       reallyDelete: "Wirklich löschen?",
+      readWrite: "Lesen & Schreiben",
+      readOnly: "Nur Lesen",
+      manageCalendar: "Kalender verwalten",
+      deviceReadOnlyNote:
+        "Name und Konto sind bei Gerätekalendern schreibgeschützt",
+      deviceColorFallbackNote:
+        "Manche mit Google synchronisierte Kalender akzeptieren keine Farbänderungen von Apps. Falls das hier passiert, zeigt Formstr diese Farbe trotzdem überall in der App an — sie wird nur nicht auf Ihr Gerät zurückgeschrieben.",
     },
     sidebar: {
       calendars: "Kalender",
+      calendarsSynced: "Synchronisiert",
+      calendarsDeviceOnly: "Nur auf diesem Gerät",
+      connectDeviceCalendarHelp:
+        "Sehen und verwalten Sie Termine aus dem Kalender Ihres Telefons, direkt neben Ihren Nostr-Terminen.",
+      connectDeviceCalendar: "Gerätekalender verbinden",
       noCalendarsYet: "Noch keine Kalender",
       createCalendar: "Kalender erstellen",
       about: "Über uns",
@@ -852,6 +895,10 @@ const dictionary: NestedObject = {
         "Ihre Gerätekalender konnten nicht gelesen werden. Bitte versuchen Sie es erneut.",
       errorReadEvents:
         "Ereignisse aus Ihren Gerätekalendern konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      errorWriteFailed:
+        "Der Termin konnte nicht in Ihrem Gerätekalender gespeichert werden. Bitte versuchen Sie es erneut.",
+      errorDeleteFailed:
+        "Der Termin konnte nicht aus Ihrem Gerätekalender gelöscht werden. Bitte versuchen Sie es erneut.",
       errorUnknown:
         "Beim Lesen Ihrer Gerätekalender ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     },

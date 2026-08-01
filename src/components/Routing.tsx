@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router";
 import { ViewEventPage } from "./ViewEventPage";
 import { EditEventPage } from "./EditEventPage";
+import { EditDeviceEventPage } from "./EditDeviceEventPage";
 import { DuplicateEventPage } from "./DuplicateEventPage";
 import { NotificationEventPage } from "./NotificationEventPage";
 import { ROUTES } from "../utils/routingHelper";
@@ -20,6 +21,10 @@ export const Routing = () => {
         <Route path="/dev/ui" element={<DevUiShowcase />} />
       )}
       <Route path={`${ROUTES.Settings}/*`} element={<SettingsPage />} />
+      <Route
+        path={ROUTES.EditDeviceEventPage}
+        element={<EditDeviceEventPage />}
+      />
       <Route path={ROUTES.EditEventPage} element={<EditEventPage />} />
       <Route
         path={ROUTES.DuplicateEventPage}

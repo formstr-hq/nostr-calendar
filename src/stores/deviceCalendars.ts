@@ -8,19 +8,29 @@
  */
 
 import { create } from "zustand";
-import { getItem, setItem } from "../common/localStorage";
+import { getItem, setItem, setSecureItem } from "../common/localStorage";
 import {
   DeviceCalendar,
   type DeviceCalendarInfo,
   type DeviceCalendarPermissionState,
 } from "../plugins/deviceCalendar";
-import { deviceEventToCalendarEvent } from "../utils/deviceCalendarAdapter";
+import {
+  calendarEventToDeviceFields,
+  deviceEventStableId,
+  deviceEventToCalendarEvent,
+  stripDeviceCalendarPrefix,
+} from "../utils/deviceCalendarAdapter";
+import { NOTIFICATION_SCHEDULE_WINDOW_MS } from "../utils/notifications";
 import type { ICalendarEvent } from "../utils/types";
 
 const VISIBILITY_STORAGE_KEY = "cal:device_visibility";
 const PERMISSION_STORAGE_KEY = "cal:device_permission";
+const COLOR_OVERRIDES_STORAGE_KEY = "cal:device_color_overrides";
+/** Native-readable snapshot: read by NotificationWorker.java / IOSNotificationScheduler.swift. */
+const DEVICE_EVENTS_NATIVE_KEY = "cal:device_events";
 
 type Visibility = Record<string, boolean>;
+type ColorOverrides = Record<string, string>;
 
 interface DeviceCalendarsState {
   /** Whether the native bridge is implemented on this platform. */
@@ -30,6 +40,13 @@ interface DeviceCalendarsState {
   calendars: DeviceCalendarInfo[];
   /** Native -> visible flag, persisted to localStorage. Default-on once discovered. */
   visibility: Visibility;
+  /**
+   * App-side display color override, keyed by native calendar id. Used when a
+   * native color write-back was rejected by the OS/account (some Google-synced
+   * calendars silently revert this) — deliberately plain localStorage, since
+   * native code never needs to read it.
+   */
+  colorOverrides: ColorOverrides;
   /** Already converted to ICalendarEvent. */
   events: ICalendarEvent[];
   loading: boolean;
@@ -37,11 +54,22 @@ interface DeviceCalendarsState {
 
   init: () => Promise<void>;
   syncPermission: () => Promise<void>;
-  requestAccess: () => Promise<void>;
+  requestWriteAccess: () => Promise<void>;
   refreshCalendars: () => Promise<void>;
   refreshEvents: (range: { startMs: number; endMs: number }) => Promise<void>;
   toggleVisibility: (nativeCalendarId: string) => void;
   setAllVisibility: (visible: boolean) => void;
+  createDeviceEvent: (
+    fields: ReturnType<typeof calendarEventToDeviceFields>,
+  ) => Promise<ICalendarEvent | null>;
+  updateDeviceEvent: (event: ICalendarEvent) => Promise<void>;
+  deleteDeviceEvent: (event: ICalendarEvent) => Promise<void>;
+  setColorOverride: (nativeCalendarId: string, color: string) => void;
+  clearColorOverride: (nativeCalendarId: string) => void;
+  updateCalendarColor: (
+    nativeCalendarId: string,
+    color: string,
+  ) => Promise<void>;
 }
 
 const DEVICE_CALENDAR_ERROR_MESSAGES = {
@@ -50,6 +78,8 @@ const DEVICE_CALENDAR_ERROR_MESSAGES = {
   permissionDenied: "deviceCalendar.errorPermissionDenied",
   readCalendars: "deviceCalendar.errorReadCalendars",
   readEvents: "deviceCalendar.errorReadEvents",
+  writeFailed: "deviceCalendar.errorWriteFailed",
+  deleteFailed: "deviceCalendar.errorDeleteFailed",
   unknown: "deviceCalendar.errorUnknown",
 } as const;
 
@@ -73,6 +103,15 @@ const normalizeDeviceCalendarError = (error: unknown): string => {
   if (message.startsWith("Failed to read events:")) {
     return DEVICE_CALENDAR_ERROR_MESSAGES.readEvents;
   }
+  if (message.startsWith("Failed to create event")) {
+    return DEVICE_CALENDAR_ERROR_MESSAGES.writeFailed;
+  }
+  if (message.startsWith("Failed to update event")) {
+    return DEVICE_CALENDAR_ERROR_MESSAGES.writeFailed;
+  }
+  if (message.startsWith("Failed to delete event")) {
+    return DEVICE_CALENDAR_ERROR_MESSAGES.deleteFailed;
+  }
 
   return DEVICE_CALENDAR_ERROR_MESSAGES.unknown;
 };
@@ -93,6 +132,42 @@ const persistPermission = (
   setItem(PERMISSION_STORAGE_KEY, permission);
 };
 
+/**
+ * Snapshot shape intentionally mirrors `cal:events` ("id"/"title"/"begin"/
+ * "end"/"repeat"/"location") so NotificationWorker.java / IOSNotificationScheduler.swift
+ * reuse their existing Nostr-event reconciliation logic unchanged for device
+ * events too — they naturally fall back to the default reminder offsets since
+ * neither native side finds a matching entry for a "device:..." id in the
+ * Nostr-only calendar/preference maps.
+ */
+function toNativeDeviceEventSnapshot(events: ICalendarEvent[]) {
+  const now = Date.now();
+  const windowEnd = now + NOTIFICATION_SCHEDULE_WINDOW_MS;
+  return events
+    .filter(
+      (event) =>
+        event.repeat.rrule || (event.end >= now && event.begin <= windowEnd),
+    )
+    .map((event) => ({
+      id: deviceEventStableId(
+        event.id,
+        stripDeviceCalendarPrefix(event.calendarId),
+      ),
+      title: event.title,
+      begin: event.begin,
+      end: event.end,
+      repeat: { rrule: event.repeat.rrule },
+      location: event.location,
+    }));
+}
+
+async function writeNativeDeviceEventsSnapshot(events: ICalendarEvent[]) {
+  await setSecureItem(
+    DEVICE_EVENTS_NATIVE_KEY,
+    toNativeDeviceEventSnapshot(events),
+  );
+}
+
 export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
   // Monotonic token used to drop stale `listEvents` responses when a newer
   // refresh has been kicked off (e.g. user toggling a calendar twice quickly).
@@ -107,6 +182,7 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
     permission: getInitialPermission(),
     calendars: [],
     visibility: getItem<Visibility>(VISIBILITY_STORAGE_KEY, {}),
+    colorOverrides: getItem<ColorOverrides>(COLOR_OVERRIDES_STORAGE_KEY, {}),
     events: [],
     loading: false,
     error: undefined,
@@ -146,7 +222,7 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
       }
     },
 
-    async requestAccess() {
+    async requestWriteAccess() {
       if (!DeviceCalendar.isAvailable()) return;
       try {
         const status = await DeviceCalendar.requestPermissions();
@@ -198,6 +274,7 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
       if (calendarIds.length === 0) {
         invalidateEventQueries();
         set({ events: [] });
+        void writeNativeDeviceEventsSnapshot([]);
         return;
       }
       const generation = ++refreshGeneration;
@@ -210,7 +287,9 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
         // Drop stale responses: a newer refresh has been kicked off in the
         // meantime (e.g. user toggled visibility twice quickly).
         if (generation !== refreshGeneration) return;
-        set({ events: native.map(deviceEventToCalendarEvent) });
+        const events = native.map(deviceEventToCalendarEvent);
+        set({ events });
+        void writeNativeDeviceEventsSnapshot(events);
       } catch (e) {
         if (generation !== refreshGeneration) return;
         set({ error: normalizeDeviceCalendarError(e) });
@@ -236,6 +315,91 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
       invalidateEventQueries();
       setItem(VISIBILITY_STORAGE_KEY, next);
       set({ visibility: next });
+    },
+
+    async createDeviceEvent(fields) {
+      set({ error: undefined });
+      try {
+        const eventId = await DeviceCalendar.createEvent(fields);
+        const created = deviceEventToCalendarEvent({
+          id: eventId,
+          calendarId: fields.calendarId,
+          title: fields.title,
+          description: fields.description,
+          location: fields.location,
+          beginMs: fields.beginMs,
+          endMs: fields.endMs,
+          allDay: fields.allDay,
+          organizer: "",
+          rrule: fields.rrule,
+        });
+        const events = [...get().events, created];
+        set({ events });
+        void writeNativeDeviceEventsSnapshot(events);
+        return created;
+      } catch (e) {
+        set({ error: normalizeDeviceCalendarError(e) });
+        return null;
+      }
+    },
+
+    async updateDeviceEvent(event) {
+      const fields = calendarEventToDeviceFields(event);
+      await DeviceCalendar.updateEvent({
+        id: event.id,
+        title: fields.title,
+        description: fields.description,
+        location: fields.location,
+        beginMs: fields.beginMs,
+        endMs: fields.endMs,
+        allDay: fields.allDay,
+        rrule: fields.rrule ?? "",
+      });
+      const events = get().events.map((e) => (e.id === event.id ? event : e));
+      set({ events });
+      void writeNativeDeviceEventsSnapshot(events);
+    },
+
+    async deleteDeviceEvent(event) {
+      await DeviceCalendar.deleteEvent(event.id);
+      const events = get().events.filter((e) => e.id !== event.id);
+      set({ events });
+      void writeNativeDeviceEventsSnapshot(events);
+    },
+
+    setColorOverride(nativeCalendarId, color) {
+      const next = { ...get().colorOverrides, [nativeCalendarId]: color };
+      setItem(COLOR_OVERRIDES_STORAGE_KEY, next);
+      set({ colorOverrides: next });
+    },
+
+    clearColorOverride(nativeCalendarId) {
+      const next = { ...get().colorOverrides };
+      delete next[nativeCalendarId];
+      setItem(COLOR_OVERRIDES_STORAGE_KEY, next);
+      set({ colorOverrides: next });
+    },
+
+    async updateCalendarColor(nativeCalendarId, color) {
+      set({ error: undefined });
+      try {
+        const result = await DeviceCalendar.updateCalendarColor(
+          nativeCalendarId,
+          color,
+        );
+        if (result.applied) {
+          const calendars = get().calendars.map((c) =>
+            c.id === nativeCalendarId ? { ...c, color } : c,
+          );
+          set({ calendars });
+          get().clearColorOverride(nativeCalendarId);
+        } else {
+          get().setColorOverride(nativeCalendarId, color);
+        }
+      } catch (e) {
+        set({ error: normalizeDeviceCalendarError(e) });
+        get().setColorOverride(nativeCalendarId, color);
+      }
     },
   };
 });

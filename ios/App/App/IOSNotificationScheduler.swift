@@ -5,6 +5,16 @@ final class IOSNotificationScheduler {
     static let shared = IOSNotificationScheduler()
 
     private let eventKey = "CapacitorStorage.cal:events"
+    // Device-calendar events (edited outside the app or never opened in the
+    // editor) get their reminders from this rolling snapshot — see
+    // useDeviceCalendars.refreshEvents() on the JS side. Shares the same
+    // field shape ("id"/"title"/"begin"/"end"/"repeat"/"location") as
+    // eventKey, so it's merged straight into buildDesiredNotifications below:
+    // device events have no calendarId match in calendarKey and no entry in
+    // preferenceKey, so they naturally fall through to "scheduled" with the
+    // default reminder offsets — no per-event/per-calendar preference concept
+    // exists for device events.
+    private let deviceEventKey = "CapacitorStorage.cal:device_events"
     private let calendarKey = "CapacitorStorage.cal:calendar_lists"
     private let preferenceKey = "CapacitorStorage.cal:notification-preferences"
     private let notificationKeyPrefix = "v2:"
@@ -179,7 +189,7 @@ final class IOSNotificationScheduler {
     }
 
     private func buildDesiredNotifications(now: Date) -> [Candidate] {
-        let events = jsonArray(forKey: eventKey)
+        let events = jsonArray(forKey: eventKey) + jsonArray(forKey: deviceEventKey)
         let calendars = jsonArray(forKey: calendarKey)
         let preferences = jsonObject(forKey: preferenceKey)
         let scheduleEnd = now.addingTimeInterval(scheduleWindow)

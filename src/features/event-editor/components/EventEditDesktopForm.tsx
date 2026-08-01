@@ -5,6 +5,7 @@ import { CalendarListSelect } from "../../../components/CalendarListSelect";
 import { SectionLabel } from "../../../components/ui/SectionLabel";
 import type { IFormAttachment } from "../../../utils/types";
 import { WhenFields } from "./WhenFields";
+import { DeviceCalendarStaticRow } from "./DeviceCalendarStaticRow";
 import { EventAttachmentsSection } from "./EventAttachmentsSection";
 import { EventNotesSection } from "./EventNotesSection";
 import { EventNotificationsSection } from "./EventNotificationsSection";
@@ -107,12 +108,16 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         supportsBusyListPublish={props.supportsBusyListPublish}
         onPublishBusyChange={props.onPublishBusyChange}
         calendarSlot={
-          <CalendarListSelect
-            value={selectedCalendarId}
-            onChange={setSelectedCalendarId}
-            variant="pill"
-            label={intl.formatMessage({ id: "event.calendar" })}
-          />
+          eventDetails.source === "device" ? (
+            <DeviceCalendarStaticRow calendarId={selectedCalendarId} />
+          ) : (
+            <CalendarListSelect
+              value={selectedCalendarId}
+              onChange={setSelectedCalendarId}
+              variant="pill"
+              label={intl.formatMessage({ id: "event.calendar" })}
+            />
+          )
         }
         calendarHelper={
           mode === "create" && calendars.length === 0 ? (
@@ -152,7 +157,7 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         />
       </Box>
 
-      {isPrivate && (
+      {isPrivate && eventDetails.source !== "device" && (
         <EventAttachmentsSection
           variant="desktop"
           attachedForms={attachedForms}

@@ -26,10 +26,11 @@ import {
   getEditEventPage,
   getEventPage,
 } from "../../../utils/routingHelper";
-import { getAppBaseUrl, isNative } from "../../../utils/platform";
+import { getAppBaseUrl } from "../../../utils/platform";
 import { useUser } from "../../../stores/user";
 import { getEventOccurrenceRange } from "../../../utils/eventOccurrence";
 import { DeleteEventDialog } from "./DeleteEventDialog";
+import { DeviceEventActionsBar } from "./DeviceEventActionsBar";
 
 /**
  * Overlaid on the event banner's top-right corner (mockup 12's edit/kebab
@@ -56,46 +57,15 @@ export function EventActionsBar({
   const iconSize = isMobile ? "small" : "medium";
   const closeMenu = () => setMenuAnchor(null);
 
-  // Device events have no Nostr coordinate; only ICS export applies.
+  // Device events have no Nostr coordinate — a separate component avoids
+  // branching this one's menu around a wholly different action set.
   if (event.source === "device") {
     return (
-      <Box sx={{ display: "flex" }}>
-        {!isNative && (
-          <>
-            <IconButton
-              size={iconSize}
-              aria-label={intl.formatMessage({ id: "event.moreOptions" })}
-              onClick={(e) => setMenuAnchor(e.currentTarget)}
-            >
-              <MoreVertIcon fontSize={iconSize} />
-            </IconButton>
-            <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={closeMenu}>
-              <MenuItem
-                onClick={() => {
-                  closeMenu();
-                  void exportICS(event);
-                }}
-              >
-                <ListItemIcon>
-                  <Download fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>
-                  {intl.formatMessage({ id: "event.downloadDetails" })}
-                </ListItemText>
-              </MenuItem>
-            </Menu>
-          </>
-        )}
-        {showClose && (
-          <IconButton
-            size={iconSize}
-            aria-label={intl.formatMessage({ id: "navigation.close" })}
-            onClick={closeModal}
-          >
-            <CloseIcon fontSize={iconSize} />
-          </IconButton>
-        )}
-      </Box>
+      <DeviceEventActionsBar
+        event={event}
+        closeModal={closeModal}
+        showClose={showClose}
+      />
     );
   }
 

@@ -95,6 +95,7 @@ export function EventQuickPeek(props: EventQuickPeekProps) {
                   title={event.title}
                   color={color}
                   isPublic={isPublic}
+                  isDevice={event.source === "device"}
                   time={time}
                   onClick={() => props.onOpen(event)}
                 />

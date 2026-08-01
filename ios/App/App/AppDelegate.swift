@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         CAPBridge.registerPlugin(KeyBackupPlugin.self)
         CAPBridge.registerPlugin(NotificationSchedulerPlugin.self)
+        CAPBridge.registerPlugin(DeviceCalendarPlugin.self)
         IOSBackgroundNotificationCoordinator.shared.registerBackgroundRefresh()
         IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
         IOSBackgroundNotificationCoordinator.shared.refresh()

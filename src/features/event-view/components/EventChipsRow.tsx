@@ -2,6 +2,7 @@ import { Box, Chip, alpha, useTheme } from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
 import LockIcon from "@mui/icons-material/Lock";
 import CheckIcon from "@mui/icons-material/Check";
+import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import { useIntl } from "react-intl";
 import { ICalendarEvent } from "../../../utils/types";
 import type { ICalendarList } from "../../../utils/calendarListTypes";
@@ -18,7 +19,23 @@ export function EventChipsRow({
   const intl = useIntl();
   const theme = useTheme();
 
-  if (event.source === "device") return null;
+  if (event.source === "device") {
+    return (
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+        <Chip
+          size="small"
+          icon={<PhoneIphoneIcon />}
+          label={intl.formatMessage({ id: "event.inYourDeviceCalendar" })}
+          sx={{
+            borderRadius: `${radius.pill}px`,
+            bgcolor: theme.palette.action.selected,
+            color: theme.palette.text.secondary,
+            fontWeight: 600,
+          }}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>

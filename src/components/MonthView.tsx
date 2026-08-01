@@ -95,6 +95,7 @@ function DayCellEvent({
           title={event.title}
           color={color}
           isPublic={isPublic}
+          isDevice={event.source === "device"}
           time={
             event.allDay
               ? undefined

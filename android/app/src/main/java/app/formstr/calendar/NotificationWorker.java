@@ -40,6 +40,7 @@ public class NotificationWorker extends Worker {
     private static final String TAG = "NotificationWorker";
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
+    private static final String DEVICE_EVENTS_KEY = "cal:device_events";
     private static final String CALENDARS_KEY = "cal:calendar_lists";
     private static final String NOTIFICATION_PREFERENCES_KEY = "cal:notification-preferences";
     static final String SCHEDULED_NOTIFICATIONS_KEY = "cal:scheduled-event-notifications-v2";
@@ -95,6 +96,16 @@ public class NotificationWorker extends Worker {
             }
 
             JSONArray events = parseArray(prefs.getString(EVENTS_KEY, null));
+            // Device-calendar events (edited outside the app or never opened in the
+            // editor) get their reminders from this rolling snapshot rather than the
+            // Nostr event cache — see useDeviceCalendars.refreshEvents(). Shares the
+            // same field shape ("id"/"title"/"begin"/"end"/"repeat"/"location") as
+            // EVENTS_KEY, so it reuses collectEventNotifications unchanged: device
+            // events have no calendarId match in CALENDARS_KEY and no entry in
+            // NOTIFICATION_PREFERENCES_KEY, so they naturally fall through to
+            // "scheduled" with the default reminder offsets — no per-event/per-
+            // calendar preference concept exists for device events.
+            JSONArray deviceEvents = parseArray(prefs.getString(DEVICE_EVENTS_KEY, null));
             JSONArray calendars = parseArray(prefs.getString(CALENDARS_KEY, null));
             JSONObject notificationPreferences = parseObject(
                     prefs.getString(NOTIFICATION_PREFERENCES_KEY, null));
@@ -105,6 +116,16 @@ public class NotificationWorker extends Worker {
             for (int i = 0; i < events.length(); i++) {
                 collectEventNotifications(
                         events.getJSONObject(i),
+                        calendars,
+                        notificationPreferences,
+                        now,
+                        scheduleEnd,
+                        desired
+                );
+            }
+            for (int i = 0; i < deviceEvents.length(); i++) {
+                collectEventNotifications(
+                        deviceEvents.getJSONObject(i),
                         calendars,
                         notificationPreferences,
                         now,

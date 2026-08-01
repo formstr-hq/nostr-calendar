@@ -109,6 +109,7 @@ export function EventEditMobileForm(props: EventEditFormProps) {
           calendarsEmpty={mode === "create" && calendars.length === 0}
           location={eventDetails.location}
           onLocationChange={(location) => updateField("location", location)}
+          isDeviceEvent={eventDetails.source === "device"}
         />
 
         <GroupCard sx={{ p: 2 }}>
@@ -124,7 +125,7 @@ export function EventEditMobileForm(props: EventEditFormProps) {
           />
         </GroupCard>
 
-        {isPrivate && (
+        {isPrivate && eventDetails.source !== "device" && (
           <EventAttachmentsSection
             variant="mobile"
             attachedForms={attachedForms}
