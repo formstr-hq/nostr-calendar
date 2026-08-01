@@ -248,9 +248,26 @@ export async function createBookingPage(
   return pageUrl;
 }
 
+/** Selects a future weekday within the booking page's 30-day horizon. */
+export async function selectFirstAvailableWeekday(page: Page): Promise<void> {
+  const availableWeekday = () =>
+    page
+      .getByRole("button", {
+        name: /^(Monday|Tuesday|Wednesday|Thursday|Friday),/,
+      })
+      .and(page.locator(":enabled"));
+
+  if ((await availableWeekday().count()) === 0) {
+    await page.getByRole("button", { name: "next month" }).click();
+  }
+
+  await expect(availableWeekday().first()).toBeVisible({ timeout: 15_000 });
+  await availableWeekday().first().click();
+}
+
 /**
- * As Bob, opens a booking link, picks the first available slot of next month
- * (always fully in the future) and submits a booking request.
+ * As Bob, opens a booking link, picks the first available future slot and
+ * submits a booking request.
  */
 export async function bookFirstSlot(
   page: Page,
@@ -265,16 +282,7 @@ export async function bookFirstSlot(
   await expect(
     page.getByText("Times are shown in your local timezone"),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "next month" }).click();
-
-  // Advancing the month preserves the selected day-of-month. It can now land
-  // on a weekend (with no default availability), so explicitly choose an
-  // enabled weekday before looking for time slots.
-  const availableDay = page
-    .getByRole("button", { name: /^(Monday|Tuesday|Wednesday|Thursday|Friday),/ })
-    .and(page.locator(":enabled"))
-    .first();
-  await availableDay.click();
+  await selectFirstAvailableWeekday(page);
 
   // Slot buttons are labelled with their start time, e.g. "09:00 AM".
   const slots = page

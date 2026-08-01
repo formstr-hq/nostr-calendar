@@ -1,5 +1,5 @@
 import { test, expect, navigate } from "../fixtures/index.js";
-import { uniqueName } from "../helpers.js";
+import { selectFirstAvailableWeekday, uniqueName } from "../helpers.js";
 import type { Page } from "@playwright/test";
 import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 
@@ -81,16 +81,7 @@ test("public booking page offers the configured durations", async ({
   await expect(bob.getByRole("button", { name: "30 min" })).toBeVisible();
   await bob.getByRole("button", { name: "45 min" }).click();
 
-  // Advancing the month preserves the selected day-of-month, which can be a
-  // weekend. Pick an enabled weekday before asserting the time grid.
-  await bob.getByRole("button", { name: "next month" }).click();
-  await bob
-    .getByRole("button", {
-      name: /^(Monday|Tuesday|Wednesday|Thursday|Friday),/,
-    })
-    .and(bob.locator(":enabled"))
-    .first()
-    .click();
+  await selectFirstAvailableWeekday(bob);
   const slots = bob
     .getByRole("button", { name: /\d{1,2}:\d{2}/ })
     .and(bob.locator(":enabled"));
