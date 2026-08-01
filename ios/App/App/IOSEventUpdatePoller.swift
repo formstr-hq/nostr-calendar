@@ -67,6 +67,7 @@ actor IOSEventUpdatePoller {
 
         guard changed else { return }
         setJSONArray(events, for: "cal:events")
+        IOSWidgetDataBridge.synchronize()
         if timeChanged {
             await IOSNotificationScheduler.shared.reconcileAsync()
         }

@@ -11,12 +11,14 @@ public class NotificationSchedulerPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     @objc func reconcile(_ call: CAPPluginCall) {
+        IOSWidgetDataBridge.synchronize()
         IOSNotificationScheduler.shared.reconcile {
             call.resolve()
         }
     }
 
     @objc func clear(_ call: CAPPluginCall) {
+        IOSWidgetDataBridge.synchronize()
         IOSNotificationScheduler.shared.clear {
             call.resolve()
         }

@@ -10,6 +10,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         CAPBridge.registerPlugin(KeyBackupPlugin.self)
         CAPBridge.registerPlugin(NotificationSchedulerPlugin.self)
         CAPBridge.registerPlugin(DeviceCalendarPlugin.self)
+        IOSWidgetDataBridge.synchronize()
         IOSBackgroundNotificationCoordinator.shared.registerBackgroundRefresh()
         IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
         IOSBackgroundNotificationCoordinator.shared.refresh()
@@ -30,6 +31,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
+        IOSWidgetDataBridge.synchronize()
         IOSBackgroundNotificationCoordinator.shared.refresh()
         IOSBackgroundNotificationCoordinator.shared.scheduleBackgroundRefresh()
     }

@@ -22,12 +22,18 @@ import {
 } from "../utils/deviceCalendarAdapter";
 import { NOTIFICATION_SCHEDULE_WINDOW_MS } from "../utils/notifications";
 import type { ICalendarEvent } from "../utils/types";
+import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
 
 const VISIBILITY_STORAGE_KEY = "cal:device_visibility";
 const PERMISSION_STORAGE_KEY = "cal:device_permission";
 const COLOR_OVERRIDES_STORAGE_KEY = "cal:device_color_overrides";
 /** Native-readable snapshot: read by NotificationWorker.java / IOSNotificationScheduler.swift. */
 const DEVICE_EVENTS_NATIVE_KEY = "cal:device_events";
+const DEVICE_CALENDARS_NATIVE_KEY = "cal:device_calendars";
+const DEVICE_EVENT_SNAPSHOT_WINDOW_MS = Math.max(
+  NOTIFICATION_SCHEDULE_WINDOW_MS,
+  5 * 24 * 60 * 60 * 1000,
+);
 
 type Visibility = Record<string, boolean>;
 type ColorOverrides = Record<string, string>;
@@ -142,7 +148,7 @@ const persistPermission = (
  */
 function toNativeDeviceEventSnapshot(events: ICalendarEvent[]) {
   const now = Date.now();
-  const windowEnd = now + NOTIFICATION_SCHEDULE_WINDOW_MS;
+  const windowEnd = now + DEVICE_EVENT_SNAPSHOT_WINDOW_MS;
   return events
     .filter(
       (event) =>
@@ -154,8 +160,10 @@ function toNativeDeviceEventSnapshot(events: ICalendarEvent[]) {
         stripDeviceCalendarPrefix(event.calendarId),
       ),
       title: event.title,
+      calendarId: stripDeviceCalendarPrefix(event.calendarId),
       begin: event.begin,
       end: event.end,
+      allDay: event.allDay,
       repeat: { rrule: event.repeat.rrule },
       location: event.location,
     }));
@@ -166,6 +174,17 @@ async function writeNativeDeviceEventsSnapshot(events: ICalendarEvent[]) {
     DEVICE_EVENTS_NATIVE_KEY,
     toNativeDeviceEventSnapshot(events),
   );
+  await reconcileNotificationSchedule();
+}
+
+async function writeNativeDeviceCalendarsSnapshot(
+  calendars: DeviceCalendarInfo[],
+) {
+  await setSecureItem(
+    DEVICE_CALENDARS_NATIVE_KEY,
+    calendars.map(({ id, name, accountName }) => ({ id, name, accountName })),
+  );
+  await reconcileNotificationSchedule();
 }
 
 export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
@@ -192,6 +211,8 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
         persistPermission("denied");
         invalidateEventQueries();
         set({ available: false, permission: "denied", events: [] });
+        void writeNativeDeviceEventsSnapshot([]);
+        void writeNativeDeviceCalendarsSnapshot([]);
         return;
       }
       await get().syncPermission();
@@ -215,7 +236,9 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
           await get().refreshCalendars();
         } else {
           invalidateEventQueries();
-          set({ events: [] });
+          set({ calendars: [], events: [] });
+          void writeNativeDeviceEventsSnapshot([]);
+          void writeNativeDeviceCalendarsSnapshot([]);
         }
       } catch (e) {
         set({ error: normalizeDeviceCalendarError(e) });
@@ -232,7 +255,9 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
           await get().refreshCalendars();
         } else {
           invalidateEventQueries();
-          set({ events: [] });
+          set({ calendars: [], events: [] });
+          void writeNativeDeviceEventsSnapshot([]);
+          void writeNativeDeviceCalendarsSnapshot([]);
         }
       } catch (e) {
         set({ error: normalizeDeviceCalendarError(e) });
@@ -256,6 +281,7 @@ export const useDeviceCalendars = create<DeviceCalendarsState>((set, get) => {
         }
         if (changed) setItem(VISIBILITY_STORAGE_KEY, next);
         set({ calendars, visibility: next, loading: false });
+        void writeNativeDeviceCalendarsSnapshot(calendars);
       } catch (e) {
         set({ loading: false, error: normalizeDeviceCalendarError(e) });
       }
