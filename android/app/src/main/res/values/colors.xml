@@ -9,5 +9,11 @@
     <color name="widget_config_text_secondary">#686865</color>
     <color name="widget_config_text_tertiary">#9A9A97</color>
     <color name="widget_config_accent_soft">#F0F0EF</color>
+    <color name="widget_config_accent">#111111</color>
     <color name="widget_config_on_accent">#FFFFFF</color>
+    <color name="widget_background_color">#FFFFFF</color>
+    <color name="widget_text_primary">#111111</color>
+    <color name="widget_text_secondary">#686865</color>
+    <color name="widget_text_tertiary">#9A9A97</color>
+    <color name="widget_divider">#EEEEEC</color>
 </resources>

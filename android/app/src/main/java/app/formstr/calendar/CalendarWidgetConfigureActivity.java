@@ -196,11 +196,13 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
         int horizontalPadding = getResources().getDimensionPixelSize(
                 R.dimen.widget_config_row_horizontal_padding
         );
-        checkBox.setPadding(horizontalPadding, 0, horizontalPadding, 0);
-        container.addView(checkBox, new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
+        );
+        layoutParams.setMarginStart(horizontalPadding);
+        layoutParams.setMarginEnd(horizontalPadding);
+        container.addView(checkBox, layoutParams);
         choices.put(checkBox, id);
     }
 

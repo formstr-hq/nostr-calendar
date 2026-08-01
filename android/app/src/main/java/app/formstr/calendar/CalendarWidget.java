@@ -9,13 +9,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.CalendarContract;
 import android.util.Log;
-import android.view.View;
 import android.widget.RemoteViews;
 
 import androidx.core.content.ContextCompat;
@@ -38,9 +36,7 @@ public class CalendarWidget extends AppWidgetProvider {
     private static final String TAG = "CalendarWidget";
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
-    private static final int MAX_VISIBLE_EVENTS = 5;
-
-    private static final class WidgetEvent {
+    static final class WidgetEvent {
         final String title;
         final long displayBegin;
         final boolean allDay;
@@ -76,6 +72,14 @@ public class CalendarWidget extends AppWidgetProvider {
         }
     }
 
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        super.onReceive(context, intent);
+        if (Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+            refreshAll(context);
+        }
+    }
+
     /** Called by NotificationWorker whenever the event cache is fresh. */
     static void refreshAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
@@ -96,6 +100,7 @@ public class CalendarWidget extends AppWidgetProvider {
                     context, 0, launchIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_root, launchPending);
+            views.setPendingIntentTemplate(R.id.widget_event_list, launchPending);
 
             // Date header: day name (small) + date (large)
             Date now = new Date();
@@ -104,11 +109,14 @@ public class CalendarWidget extends AppWidgetProvider {
             views.setTextViewText(R.id.widget_date,
                     new SimpleDateFormat("MMMM d", Locale.getDefault()).format(now));
 
-            // Load and display upcoming events
-            List<WidgetEvent> events = getUpcomingEvents(context, appWidgetId);
-            populateEvents(context, views, events, appWidgetId);
+            Intent serviceIntent = new Intent(context, CalendarWidgetService.class);
+            serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
+            views.setRemoteAdapter(R.id.widget_event_list, serviceIntent);
+            views.setEmptyView(R.id.widget_event_list, R.id.widget_empty);
 
             appWidgetManager.updateAppWidget(appWidgetId, views);
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_event_list);
         } catch (Exception e) {
             Log.e(TAG, "Failed to update widget", e);
         }
@@ -118,7 +126,7 @@ public class CalendarWidget extends AppWidgetProvider {
     // Event loading
     // -------------------------------------------------------------------------
 
-    private static List<WidgetEvent> getUpcomingEvents(Context context, int appWidgetId) {
+    static List<WidgetEvent> getUpcomingEvents(Context context, int appWidgetId) {
         List<WidgetEvent> result = new ArrayList<>();
         long now = System.currentTimeMillis();
         long rangeEnd = sevenDayRangeEnd(now);
@@ -259,115 +267,7 @@ public class CalendarWidget extends AppWidgetProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // View population
-    // -------------------------------------------------------------------------
-
-    private static final int[] ROW_IDS = {
-            R.id.widget_event_row_1,
-            R.id.widget_event_row_2,
-            R.id.widget_event_row_3,
-            R.id.widget_event_row_4,
-            R.id.widget_event_row_5,
-    };
-    private static final int[] DAY_IDS = {
-            R.id.widget_day_1,
-            R.id.widget_day_2,
-            R.id.widget_day_3,
-            R.id.widget_day_4,
-            R.id.widget_day_5,
-    };
-    private static final int[] TIME_IDS = {
-            R.id.widget_time_1,
-            R.id.widget_time_2,
-            R.id.widget_time_3,
-            R.id.widget_time_4,
-            R.id.widget_time_5,
-    };
-    private static final int[] TITLE_IDS = {
-            R.id.widget_title_1,
-            R.id.widget_title_2,
-            R.id.widget_title_3,
-            R.id.widget_title_4,
-            R.id.widget_title_5,
-    };
-
-    private static void populateEvents(
-            Context context,
-            RemoteViews views,
-            List<WidgetEvent> events,
-            int appWidgetId
-    ) {
-        if (events.isEmpty()) {
-            views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
-            views.setViewVisibility(R.id.widget_more, View.GONE);
-            for (int rowId : ROW_IDS) {
-                views.setViewVisibility(rowId, View.GONE);
-            }
-            return;
-        }
-
-        views.setViewVisibility(R.id.widget_empty, View.GONE);
-        int visibleCount = visibleEventCount(context, appWidgetId, events);
-
-        for (int i = 0; i < MAX_VISIBLE_EVENTS; i++) {
-            if (i < visibleCount) {
-                WidgetEvent widgetEvent = events.get(i);
-                boolean showDay = showsDayHeading(events, i);
-
-                views.setViewVisibility(ROW_IDS[i], View.VISIBLE);
-                views.setViewVisibility(DAY_IDS[i], showDay ? View.VISIBLE : View.GONE);
-                if (showDay) {
-                    views.setTextViewText(DAY_IDS[i], formatDayHeading(widgetEvent.displayBegin));
-                }
-                views.setTextViewText(TIME_IDS[i], formatEventTime(context, widgetEvent));
-                views.setTextViewText(TITLE_IDS[i], widgetEvent.title);
-            } else {
-                views.setViewVisibility(ROW_IDS[i], View.GONE);
-            }
-        }
-
-        int hiddenCount = events.size() - visibleCount;
-        views.setViewVisibility(R.id.widget_more, hiddenCount > 0 ? View.VISIBLE : View.GONE);
-        if (hiddenCount > 0) {
-            views.setTextViewText(
-                    R.id.widget_more,
-                    context.getResources().getQuantityString(
-                            R.plurals.widget_more_events,
-                            hiddenCount,
-                            hiddenCount
-                    )
-            );
-        }
-    }
-
-    private static int visibleEventCount(Context context, int appWidgetId, List<WidgetEvent> events) {
-        Bundle options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId);
-        boolean landscape = context.getResources().getConfiguration().orientation
-                == Configuration.ORIENTATION_LANDSCAPE;
-        int height = options.getInt(
-                landscape
-                        ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
-                        : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
-                180
-        );
-        if (height <= 0) height = 180;
-        int availableHeight = Math.max(20, height - 78);
-        int usedHeight = 0;
-        int visibleCount = 0;
-
-        for (int i = 0; i < Math.min(MAX_VISIBLE_EVENTS, events.size()); i++) {
-            int rowHeight = 20 + (showsDayHeading(events, i) ? 16 : 0);
-            boolean hasHiddenEvents = i + 1 < events.size();
-            int overflowHeight = hasHiddenEvents ? 16 : 0;
-            if (visibleCount > 0 && usedHeight + rowHeight + overflowHeight > availableHeight) break;
-            usedHeight += rowHeight;
-            visibleCount++;
-        }
-        return visibleCount;
-    }
-
-    private static boolean showsDayHeading(List<WidgetEvent> events, int index) {
+    static boolean showsDayHeading(List<WidgetEvent> events, int index) {
         Calendar today = Calendar.getInstance();
         Calendar event = Calendar.getInstance();
         event.setTimeInMillis(events.get(index).displayBegin);
@@ -379,7 +279,7 @@ public class CalendarWidget extends AppWidgetProvider {
         return !isSameDay(previous, event);
     }
 
-    private static String formatDayHeading(long beginMs) {
+    static String formatDayHeading(long beginMs) {
         Locale locale = Locale.getDefault();
         return new SimpleDateFormat("EEEE, MMMM d", locale)
                 .format(new Date(beginMs))
@@ -390,7 +290,7 @@ public class CalendarWidget extends AppWidgetProvider {
     // Time formatting
     // -------------------------------------------------------------------------
 
-    private static String formatEventTime(Context context, WidgetEvent widgetEvent) {
+    static String formatEventTime(Context context, WidgetEvent widgetEvent) {
         long beginMs = widgetEvent.displayBegin;
         if (beginMs == 0) return "";
 

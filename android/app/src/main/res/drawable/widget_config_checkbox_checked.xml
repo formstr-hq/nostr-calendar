@@ -5,7 +5,7 @@
     android:viewportWidth="22"
     android:viewportHeight="22">
     <path
-        android:fillColor="@color/widget_config_backdrop"
+        android:fillColor="@color/widget_config_accent"
         android:pathData="M6,0 L16,0 Q22,0 22,6 L22,16 Q22,22 16,22 L6,22 Q0,22 0,16 L0,6 Q0,0 6,0 Z" />
     <path
         android:fillColor="@android:color/transparent"

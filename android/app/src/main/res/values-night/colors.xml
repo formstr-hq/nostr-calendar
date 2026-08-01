@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_config_backdrop">#111111</color>
+    <color name="widget_config_canvas">#1A1A1A</color>
+    <color name="widget_config_surface">#242424</color>
+    <color name="widget_config_border">#383838</color>
+    <color name="widget_config_border_strong">#555555</color>
+    <color name="widget_config_text">#F2F2F0</color>
+    <color name="widget_config_text_secondary">#B8B8B4</color>
+    <color name="widget_config_text_tertiary">#8E8E89</color>
+    <color name="widget_config_accent_soft">#303030</color>
+    <color name="widget_config_accent">#F2F2F0</color>
+    <color name="widget_config_on_accent">#111111</color>
+    <color name="widget_background_color">#1A1A1A</color>
+    <color name="widget_text_primary">#F2F2F0</color>
+    <color name="widget_text_secondary">#B8B8B4</color>
+    <color name="widget_text_tertiary">#8E8E89</color>
+    <color name="widget_divider">#383838</color>
+</resources>

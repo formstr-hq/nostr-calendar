@@ -64,6 +64,7 @@ export function SidebarDeviceCalendars() {
             <Button
               size="small"
               variant="outlined"
+              sx={{ color: "text.primary", borderColor: "text.primary" }}
               onClick={() => void requestWriteAccess()}
             >
               {intl.formatMessage({ id: "sidebar.connectDeviceCalendar" })}

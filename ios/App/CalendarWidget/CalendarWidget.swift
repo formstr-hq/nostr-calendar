@@ -45,6 +45,7 @@ struct CalendarWidgetView: View {
                 .tracking(1.2)
             Text(entry.date.formatted(.dateTime.month(.wide).day()))
                 .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primary)
                 .padding(.bottom, 8)
             Divider()
                 .padding(.bottom, 8)
@@ -55,6 +56,11 @@ struct CalendarWidgetView: View {
                     .foregroundStyle(.tertiary)
             } else {
                 ViewThatFits(in: .vertical) {
+                    eventList(limit: entry.events.count)
+                    eventList(limit: 12)
+                    eventList(limit: 10)
+                    eventList(limit: 8)
+                    eventList(limit: 6)
                     eventList(limit: 5)
                     eventList(limit: 4)
                     eventList(limit: 3)
@@ -102,6 +108,7 @@ struct CalendarWidgetView: View {
                 .frame(width: 62, alignment: .leading)
             Text(event.title)
                 .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
         }
     }
@@ -135,7 +142,7 @@ struct FormstrCalendarWidget: Widget {
         }
         .configurationDisplayName("Calendar by Form*")
         .description("Shows upcoming events from your selected calendars.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
