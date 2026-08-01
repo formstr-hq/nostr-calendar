@@ -31,7 +31,7 @@ const dictionary: NestedObject = {
       description: "Description",
       location: "Location",
       participants: "Participants",
-      addParticipants: "Enter participant nPub",
+      addParticipants: "Search name, NIP-05, or npub",
       rsvpDetails: "RSVP Details",
       privateEvent: "Private Event",
       privateEventCaption:
@@ -477,6 +477,10 @@ const dictionary: NestedObject = {
       author: "Organiser",
       alreadyAdded: "Participant already added",
       invalid: "Enter a valid npub, NIP-05, or hex pubkey",
+      searching: "Searching profiles...",
+      noResults: "No profiles found",
+      noHistory: "No previous participants yet",
+      previouslyMet: "You have shared an event with this person",
     },
     report: {
       reportEvent: "Report this event",
@@ -624,7 +628,7 @@ const dictionary: NestedObject = {
       description: "Beschreibung",
       location: "Ort",
       participants: "Teilnehmer",
-      addParticipants: "Teilnehmer nPub eingeben",
+      addParticipants: "Name, NIP-05 oder npub suchen",
       rsvpDetails: "RSVP Details",
       privateEvent: "Privater Termin",
       privateEventCaption:
@@ -1025,6 +1029,10 @@ const dictionary: NestedObject = {
       author: "Organisator",
       alreadyAdded: "Teilnehmer bereits hinzugefügt",
       invalid: "Geben Sie eine gültige npub, NIP-05 oder Hex-Pubkey ein",
+      searching: "Profile werden gesucht...",
+      noResults: "Keine Profile gefunden",
+      noHistory: "Noch keine früheren Teilnehmer",
+      previouslyMet: "Sie hatten bereits einen Termin mit dieser Person",
     },
     report: {
       reportEvent: "Dieses Ereignis melden",

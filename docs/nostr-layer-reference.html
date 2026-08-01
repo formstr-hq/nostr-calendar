@@ -222,6 +222,7 @@
       <li><a href="#f-settings">Settings sync</a></li>
       <li><a href="#f-relays">Relay management</a></li>
       <li><a href="#f-profile">Profile &amp; NIP-05</a></li>
+      <li><a href="#f-participant-search">Participant search</a></li>
     </ul>
 
     <h4>Cross-cutting</h4>
@@ -239,7 +240,7 @@
       <h1>What actually happens on the wire</h1>
       <p>Every flow in nostr-calendar that touches Nostr, traced from <code>src/nostr/</code>, <code>src/features/</code>, <code>src/stores/</code>, and <code>src/common/signer/</code> — kinds, tags, content shape, encryption, and relay routing, exactly as implemented today.</p>
       <p>Existing docs/README were not consulted; this reflects current code only.</p>
-      <div class="meta">nostr-calendar · compiled 2026-07-25</div>
+      <div class="meta">nostr-calendar · compiled 2026-08-01</div>
     </div>
 
     <section class="category" id="kind-index">
@@ -247,7 +248,7 @@
       <p class="category-note">Every event kind this app reads or writes, in one place. Kinds marked "legacy" in the domain column are read for migration only — the app never publishes them anymore.</p>
       <table class="kindtable">
         <tr><th>Kind</th><th>Name</th><th>Spec</th><th>Domain</th></tr>
-        <tr><td class="k">0</td><td>User Profile</td><td class="spec">NIP-01</td><td>read-only in this app</td></tr>
+        <tr><td class="k">0</td><td>User Profile</td><td class="spec">NIP-01 / NIP-50 search</td><td>read-only in this app</td></tr>
         <tr><td class="k">5</td><td>Deletion</td><td class="spec">NIP-09</td><td>shared across all flows</td></tr>
         <tr><td class="k">1059</td><td>Gift Wrap (outer)</td><td class="spec">NIP-59</td><td>shared transport — every wrap of this kind carries a public <code>k</code> tag whose value is one of the three "outer" constants below</td></tr>
         <tr><td class="k">14</td><td>Rumor</td><td class="spec">NIP-17 kind, reused</td><td>one shared rumor kind for calendar invitations, booking requests, <em>and</em> booking responses — differentiated only by the parent wrap's <code>k</code> tag, not by rumor kind</td></tr>
@@ -438,7 +439,7 @@
 
       <article class="flow" id="f-logout">
         <h3>Logout</h3>
-        <p>Clears the active signer/local key and cached user data. No Nostr event published. A separate caller-triggered step tears down the relay worker and wipes its IndexedDB cache — a data-layer action, not a protocol one.</p>
+        <p>Clears the active signer/local key and cached user data, including the separate IndexedDB prior-participant history. No Nostr event published. A separate caller-triggered step tears down the relay worker and wipes its IndexedDB event cache — data-layer actions, not protocol ones.</p>
       </article>
     </section>
 
@@ -530,12 +531,23 @@
           <p>Fetching <em>other</em> pubkeys' kind-10002 lists (<code>fetchRelayList</code>/<code>fetchRelayLists</code> for gift-wrap recipients, naddr relay-hint resolution) is purely a gossip/outbox-routing input — those never get written into <code>useRelayStore</code> or folded into the app's own connection set. Only the logged-in user's own list round-trips into local config.</p>
         </div>
         <p>Per-event publish fan-out (inside the worker, outside this repo): user relays ∪ author's own outbox ∪ each p-tagged recipient's inbox. Delivery is durable — "zero acceptance means queued for retry, not failed."</p>
+        <div class="field"><span class="label">Dedicated profile-search relays</span><p>At data-layer bootstrap the app separately calls <code>setSearchRelays</code> with <code>wss://relay.noswhere.com</code> and <code>wss://nostr.wine</code> (or <code>VITE_TEST_RELAY</code> in tests). Filters with a non-blank NIP-50 <code>search</code> field route there instead of through author/outbox or ordinary user relays; an empty configured set falls back to the ordinary read set. These relays are routing policy only and are not published in kind 10002.</p></div>
       </article>
 
       <article class="flow" id="f-profile">
         <h3>Profile fetch &amp; NIP-05 verification</h3>
         <p><strong>Profile:</strong> plain kind-0 read, <code>content</code> parsed ad hoc as JSON. <strong>No profile-publish path exists anywhere in <code>src/nostr/</code></strong> — the only kind-0 write is buried inside <code>@formstr/signer</code>'s account creation; there's no visible "edit profile" flow.</p>
-        <p><strong>NIP-05:</strong> fetches <code>/.well-known/nostr.json</code> with <code>redirect:"error"</code> — explicitly refuses to follow redirects as anti-spoofing hardening beyond the bare spec. A profile's self-reported <code>nip05</code> field is never trusted at face value; this resolver is the only trusted verification path, used to show a verified badge on booking requesters.</p>
+        <p><strong>NIP-05:</strong> fetches <code>/.well-known/nostr.json</code> with <code>redirect:"error"</code> — explicitly refuses to follow redirects as anti-spoofing hardening beyond the bare spec. A profile's self-reported <code>nip05</code> field is never trusted at face value; this resolver is the trusted verification path used by booking identity and participant search.</p>
+      </article>
+
+      <article class="flow" id="f-participant-search">
+        <h3>Participant search <span class="kind-badge">kind 0 · NIP-50</span></h3>
+        <p class="trigger">Triggered by: focusing or typing in the event editor's participant picker. Free text and NIP-05 input are debounced for <strong>100 ms</strong>, then open <code>{kinds:[0], search:query, limit:10}</code> on the dedicated search relays. A complete npub or 64-character hex pubkey bypasses the debounce. This is a debounce, not a 100 ms relay timeout; the interest remains live until the query changes or the picker unmounts.</p>
+        <div class="field"><span class="label">Prior-participant history</span><p>A separate local IndexedDB database (<code>nostr-calendar-participants</code>) records, per account, pubkeys previously seen as either an event host or participant in loaded calendar events, excluding the account itself. It stores the earliest interaction time plus the latest cached kind-0 profile snapshot. Empty-query suggestions come from this history; matching history results are placed before network results and their avatars receive a high-contrast border (black in light mode, white in dark mode) with a row-level “Previously met” tooltip. Selected participants and the current account are excluded from every result.</p></div>
+        <div class="field"><span class="label">Exact identities</span><p>A complete <code>npub</code> (or 64-character hex pubkey) is decoded immediately, shown as a selectable fallback row without waiting for the free-text debounce, and upgraded when its directly fetched kind-0 profile arrives. An exact NIP-05 identifier is resolved through <code>/.well-known/nostr.json</code>, then its pubkey profile is fetched directly. Failed NIP-05 resolution is surfaced as an invalid-identity error.</p></div>
+        <div class="field"><span class="label">Display trust</span><p>Profile <code>name</code>/<code>display_name</code>/picture may label a result, but a claimed <code>nip05</code> is displayed only after it resolves back to that result's pubkey. Until verified (or when verification fails), the row shows a shortened <code>npub</code>. The shield means only “found in this device's prior calendar history”; it is not a web-of-trust or identity-verification claim.</p></div>
+        <div class="callout"><span class="label">Local matcher limitation</span><p>The worker defensively checks cache replay and relay responses using a case-insensitive, all-whitespace-terms-must-occur substring match against raw event <code>content</code>. It does not implement NIP-50 operators, ranking, language tokenization, or independent tag/JSON-field search, so it may reject results admitted by a richer relay implementation.</p></div>
+        <div class="callout"><span class="label">No protocol migration</span><p>This feature only reads existing kind-0 events and writes device-local IndexedDB history. It introduces no Nostr kind, tag, content, encryption, or publish change; no wire-format migration or compatibility window is needed.</p></div>
       </article>
     </section>
 

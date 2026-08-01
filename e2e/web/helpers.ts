@@ -102,6 +102,24 @@ export function futureDate(daysFromNow: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Resolve and select an exact npub from the participant autocomplete. */
+export async function addParticipantByNpub(
+  page: Page,
+  scope: Locator | Page,
+  npub: string,
+): Promise<void> {
+  const input = scope.getByRole("combobox", {
+    name: "Search name, NIP-05, or npub",
+  });
+  await input.fill(npub);
+
+  // Exact npub lookup contributes one result even before profile metadata is
+  // available. Waiting for that result avoids racing Enter against resolution.
+  const option = page.getByRole("option");
+  await expect(option).toHaveCount(1);
+  await option.click();
+}
+
 /** Navigates to the day view for a YYYY-MM-DD date. */
 export async function gotoDay(page: Page, date: string): Promise<void> {
   const [year, month, day] = date.split("-");
@@ -151,9 +169,7 @@ export async function createInviteEvent(
     title,
     calendarName,
     configure: async (dialog) => {
-      const participantInput = dialog.getByPlaceholder("Enter participant nPub");
-      await participantInput.fill(participantNpub);
-      await participantInput.press("Enter");
+      await addParticipantByNpub(authorPage, dialog, participantNpub);
       // Wait for the participant chip to resolve before saving.
       await expect(dialog.getByRole("listitem")).toBeVisible();
     },

@@ -1,11 +1,40 @@
-import { CircularProgress, IconButton, TextField } from "@mui/material";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import { useState } from "react";
+import {
+  Box,
+  CircularProgress,
+  MenuList,
+  Paper,
+  Popper,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import { useIntl } from "react-intl";
-import { nip19 } from "nostr-tools";
-import { NPub } from "nostr-tools/nip19";
-import { NIP05_REGEX } from "nostr-tools/nip05";
-import { resolveNip05 } from "../nostr/nip05";
+import { useParticipantSearch } from "../features/event-editor/hooks/useParticipantSearch";
+import { useParticipantHistory } from "../stores/participantHistory";
+import { useUser } from "../stores/user";
+import { radius, shadow, spacing } from "../theme/tokens";
+import { ParticipantSearchOption } from "./ParticipantSearchOption";
+
+const ResultsPaper = styled(Paper)(({ theme }) => ({
+  width: "var(--participant-picker-width)",
+  maxHeight: spacing * 36,
+  overflowY: "auto",
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: radius.popover,
+  boxShadow: shadow.popover,
+}));
+
+const EmptyStatus = styled(Typography)({
+  padding: `${spacing * 1.5}px ${spacing * 2}px`,
+});
 
 export const ParticipantAdd = ({
   onAdd,
@@ -14,111 +43,150 @@ export const ParticipantAdd = ({
   onAdd: (pubKey: string) => void;
   participants?: string[];
 }) => {
-  const [pubKey, updatePubkey] = useState("");
-  const [errorMessageId, updateErrorMessageId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const canSubmit = !!pubKey && !loading;
   const intl = useIntl();
-  const existingParticipants = new Set(
-    participants.map((participant) => participant.toLowerCase()),
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const currentPubkey = useUser((state) => state.user?.pubkey);
+  const historyByPubkey = useParticipantHistory((state) => state.participants);
+  const historyAccount = useParticipantHistory((state) => state.accountPubkey);
+  const updateProfileSnapshot = useParticipantHistory(
+    (state) => state.updateProfileSnapshot,
   );
+  const history = useMemo(
+    () =>
+      Object.values(historyByPubkey)
+        .sort((a, b) => b.firstInteractionAt - a.firstInteractionAt)
+        .map((person) => ({
+          pubkey: person.participantPubkey,
+          name: person.name,
+          displayName: person.displayName,
+          picture: person.picture,
+          nip05: person.nip05,
+        })),
+    [historyByPubkey],
+  );
+  const { options, loading, error } = useParticipantSearch({
+    query,
+    selectedParticipants: participants,
+    currentPubkey,
+    history,
+    onProfileResolved: (profile) => {
+      updateProfileSnapshot(historyAccount, profile.pubkey, {
+        name: profile.name,
+        displayName: profile.displayName,
+        picture: profile.picture,
+        nip05: profile.nip05,
+        profileCreatedAt: profile.createdAt,
+      });
+    },
+  });
 
-  const addParticipant = (participant: string) => {
-    const normalizedParticipant = participant.trim().toLowerCase();
-    if (existingParticipants.has(normalizedParticipant)) {
-      updateErrorMessageId("participant.alreadyAdded");
-      return;
-    }
+  useEffect(() => setActiveIndex(0), [options]);
 
-    onAdd(normalizedParticipant);
-    updatePubkey("");
+  const selectOption = (index: number) => {
+    const option = options[index];
+    if (!option) return;
+    onAdd(option.pubkey);
+    setQuery("");
+    setFocused(false);
   };
 
-  const onSubmit = async () => {
-    if (!canSubmit) {
-      return;
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setFocused(true);
+      setActiveIndex((index) => Math.min(index + 1, options.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter" && options.length > 0) {
+      event.preventDefault();
+      selectOption(activeIndex);
+    } else if (event.key === "Escape") {
+      setFocused(false);
     }
-
-    const trimmedPubKey = pubKey.trim();
-
-    // npub
-    if (trimmedPubKey.startsWith("npub")) {
-      try {
-        const decoded = nip19.decode(trimmedPubKey as NPub).data;
-        if (typeof decoded !== "string") {
-          updateErrorMessageId("participant.invalid");
-          return;
-        }
-        addParticipant(decoded);
-      } catch {
-        updateErrorMessageId("participant.invalid");
-      }
-      return;
-    }
-
-    // NIP-05 (user@domain)
-    if (NIP05_REGEX.test(trimmedPubKey)) {
-      setLoading(true);
-      const resolved = await resolveNip05(trimmedPubKey);
-      setLoading(false);
-      if (resolved) {
-        addParticipant(resolved);
-      } else {
-        updateErrorMessageId("participant.invalid");
-      }
-      return;
-    }
-
-    // Hex pubkey
-    if (/^[0-9a-fA-F]{64}$/.test(trimmedPubKey)) {
-      addParticipant(trimmedPubKey);
-      return;
-    }
-
-    updateErrorMessageId("participant.invalid");
   };
+
+  const listboxId = "participant-search-results";
+  const open = focused;
+  const status = loading
+    ? intl.formatMessage({ id: "participant.searching" })
+    : query.trim()
+      ? intl.formatMessage({ id: "participant.noResults" })
+      : intl.formatMessage({ id: "participant.noHistory" });
 
   return (
-    <div
-      style={{
-        display: "flex",
-        width: "100%",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
-    >
+    <Box ref={anchorRef}>
       <TextField
+        fullWidth
         size="small"
-        error={!!errorMessageId}
+        inputRef={inputRef}
+        error={!!error}
         helperText={
-          errorMessageId
-            ? intl.formatMessage({ id: errorMessageId })
-            : undefined
+          error ? intl.formatMessage({ id: "participant.invalid" }) : undefined
         }
-        style={{
-          width: "100%",
-        }}
         placeholder={intl.formatMessage({ id: "navigation.addParticipants" })}
-        value={pubKey}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            onSubmit();
-          }
+        value={query}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={onKeyDown}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setFocused(true);
         }}
-        onChange={(e) => {
-          updateErrorMessageId(null);
-          updatePubkey(e.target.value);
+        slotProps={{
+          htmlInput: {
+            role: "combobox",
+            "aria-autocomplete": "list",
+            "aria-expanded": open,
+            "aria-controls": open ? listboxId : undefined,
+            "aria-activedescendant":
+              open && options[activeIndex]
+                ? `${listboxId}-${options[activeIndex].pubkey}`
+                : undefined,
+          },
+          input: {
+            endAdornment: loading ? <CircularProgress size={18} /> : undefined,
+          },
         }}
       />
-      <IconButton
-        style={{
-          height: "100%",
-        }}
-        disabled={!canSubmit}
-        onClick={onSubmit}
+      <Popper
+        open={open}
+        anchorEl={anchorRef.current}
+        placement="bottom-start"
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
       >
-        {loading ? <CircularProgress size={24} /> : <PersonAddIcon />}
-      </IconButton>
-    </div>
+        <ResultsPaper
+          elevation={0}
+          style={
+            {
+              "--participant-picker-width": `${anchorRef.current?.clientWidth ?? spacing * 40}px`,
+            } as CSSProperties
+          }
+        >
+          {options.length > 0 ? (
+            <MenuList id={listboxId} role="listbox" disablePadding>
+              {options.map((option, index) => (
+                <ParticipantSearchOption
+                  key={option.pubkey}
+                  option={option}
+                  listboxId={listboxId}
+                  selected={index === activeIndex}
+                  onActivate={() => setActiveIndex(index)}
+                  onSelect={() => selectOption(index)}
+                />
+              ))}
+            </MenuList>
+          ) : (
+            <EmptyStatus role="status" variant="body2" color="text.secondary">
+              {status}
+            </EmptyStatus>
+          )}
+        </ResultsPaper>
+      </Popper>
+    </Box>
   );
 };

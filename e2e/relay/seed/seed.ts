@@ -12,17 +12,18 @@ export async function seedRelay(relayUrl: string): Promise<void> {
   const tomorrow = Math.floor(Date.now() / 1000) + 86400;
 
   // Kind-0 profiles so participant / booker names render instead of npubs.
-  for (const [name, key] of [
-    ["Alice", TEST_KEYS.alice],
-    ["Bob", TEST_KEYS.bob],
-    ["Carol", TEST_KEYS.carol],
+  for (const [key, metadata] of [
+    [TEST_KEYS.alice, { name: "Alice" }],
+    // Some clients publish username without name/display_name.
+    [TEST_KEYS.bob, { username: "Bob" }],
+    [TEST_KEYS.carol, { name: "Carol", nip05: "carol@profiles.test" }],
   ] as const) {
     const profile: UnsignedEvent = {
       kind: 0,
       pubkey: key.pubkey,
       created_at: Math.floor(Date.now() / 1000),
       tags: [],
-      content: JSON.stringify({ name }),
+      content: JSON.stringify(metadata),
     };
     await relay.publish(finalizeEvent(profile, key.secretBytes));
   }
