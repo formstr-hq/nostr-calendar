@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.provider.CalendarContract;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
@@ -17,6 +18,9 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -50,10 +54,29 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_calendar_widget_configure);
+        applySafeInsets();
         bindCalendarChoices();
 
         findViewById(R.id.widget_config_cancel).setOnClickListener(view -> finish());
         findViewById(R.id.widget_config_save).setOnClickListener(view -> saveAndFinish());
+    }
+
+    private void applySafeInsets() {
+        View root = findViewById(R.id.widget_config_root);
+        int spacing = getResources().getDimensionPixelSize(R.dimen.widget_config_screen_spacing);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            view.setPadding(
+                    insets.left + spacing,
+                    insets.top + spacing,
+                    insets.right + spacing,
+                    insets.bottom + spacing
+            );
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(root);
     }
 
     private void bindCalendarChoices() {
@@ -63,6 +86,7 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
 
         LinearLayout nostrContainer = findViewById(R.id.widget_config_nostr_calendars);
         int nostrCount = bindNostrCalendars(nostrContainer, configured, selectedNostr);
+        nostrContainer.setVisibility(nostrCount == 0 ? View.GONE : View.VISIBLE);
         findViewById(R.id.widget_config_nostr_empty).setVisibility(
                 nostrCount == 0 ? View.VISIBLE : View.GONE
         );
@@ -71,6 +95,7 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
         TextView deviceStatus = findViewById(R.id.widget_config_device_status);
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR)
                 != PackageManager.PERMISSION_GRANTED) {
+            deviceContainer.setVisibility(View.GONE);
             deviceStatus.setText(R.string.widget_config_device_permission_required);
             deviceStatus.setVisibility(View.VISIBLE);
             return;
@@ -78,6 +103,7 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
 
         int deviceCount = bindDeviceCalendars(deviceContainer, configured, selectedDevice);
         if (deviceCount == 0) {
+            deviceContainer.setVisibility(View.GONE);
             deviceStatus.setText(R.string.widget_config_no_device_calendars);
             deviceStatus.setVisibility(View.VISIBLE);
         }
@@ -157,8 +183,24 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
         CheckBox checkBox = new CheckBox(this);
         checkBox.setText(label);
         checkBox.setChecked(checked);
+        checkBox.setButtonDrawable(R.drawable.widget_config_checkbox);
+        checkBox.setBackground(null);
+        checkBox.setGravity(Gravity.CENTER_VERTICAL);
+        checkBox.setTextColor(ContextCompat.getColor(this, R.color.widget_config_text));
+        checkBox.setTextSize(14);
+        checkBox.setMaxLines(2);
+        checkBox.setCompoundDrawablePadding(
+                getResources().getDimensionPixelSize(R.dimen.widget_config_choice_drawable_padding)
+        );
         checkBox.setMinHeight(getResources().getDimensionPixelSize(R.dimen.widget_config_choice_min_height));
-        container.addView(checkBox);
+        int horizontalPadding = getResources().getDimensionPixelSize(
+                R.dimen.widget_config_row_horizontal_padding
+        );
+        checkBox.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+        container.addView(checkBox, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
         choices.put(checkBox, id);
     }
 

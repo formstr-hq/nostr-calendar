@@ -470,7 +470,7 @@
 
       <article class="flow" id="a-widget">
         <h3>CalendarWidget <span class="chip file">CalendarWidget.java</span></h3>
-        <p>A home-screen <code>AppWidgetProvider</code> showing up to 3 upcoming events from a configurable set of Nostr and device calendars. Refreshed both by the OS's own <code>APPWIDGET_UPDATE</code> tick and explicitly after background event updates. Reads <code>cal:events</code> for Nostr data, queries selected device calendars through <code>CalendarContract.Instances</code>, and independently re-derives each recurring Nostr event's next occurrence over a fixed 5-day lookahead. Row times render as a clock time (today), "All day", "Tomorrow", or a weekday abbreviation. Tapping anywhere launches MainActivity.</p>
+        <p>A home-screen <code>AppWidgetProvider</code> showing upcoming events from a configurable set of Nostr and device calendars over seven local calendar days (today plus the next six days). Refreshed both by the OS's own <code>APPWIDGET_UPDATE</code> tick and explicitly after background event updates. Reads <code>cal:events</code> for Nostr data, queries selected device calendars through <code>CalendarContract.Instances</code>, and independently re-derives each recurring Nostr event's next occurrence in the display window. Today's events appear directly below the widget's date header; later events are grouped under full weekday/date headings and every row starts with a clock time or "All day". The resizable layout shows up to five events as height permits and reports any remainder as <code>+N more</code>. Tapping anywhere launches MainActivity.</p>
       </article>
 
       <article class="flow" id="a-plugins">
@@ -520,8 +520,8 @@
 
       <article class="flow" id="i-widget">
         <h3>CalendarWidget <span class="chip ios">iOS 17+</span></h3>
-        <p>A WidgetKit App Intent extension that mirrors Android's compact date header and up-to-three-event list in small and medium families. Its configuration offers the cached Nostr and device calendars, and its timeline reads only App Group snapshots copied by <code>IOSWidgetDataBridge</code>. An empty initial selection preserves the default all-Nostr behavior; an explicit selection filters both sources by calendar ID.</p>
-        <p>The provider uses a 5-day lookahead, evaluates recurring Nostr RRULEs, treats EventKit snapshots as already-expanded occurrences, refreshes every 30 minutes, and reloads immediately after app-side event/calendar reconciliation or a native background event update. Tapping the widget opens the app's universal-link root.</p>
+        <p>A WidgetKit App Intent extension that mirrors Android's compact date header and grouped event list in small and medium families. Its configuration offers the cached Nostr and device calendars, and its timeline reads only App Group snapshots copied by <code>IOSWidgetDataBridge</code>. An empty initial selection preserves the default all-Nostr behavior; an explicit selection filters both sources by calendar ID.</p>
+        <p>The provider uses a seven-local-calendar-day window (today plus the next six days), evaluates recurring Nostr RRULEs, treats EventKit snapshots as already-expanded occurrences, refreshes every 30 minutes, and reloads immediately after app-side event/calendar reconciliation or a native background event update. Today's rows have no redundant heading; later dates receive full weekday/date headings, every event starts with a time or "All day", and <code>ViewThatFits</code> chooses up to five events while reporting hidden rows as <code>+N more</code>. Tapping the widget opens the app's universal-link root.</p>
       </article>
 
       <article class="flow" id="i-gaps">

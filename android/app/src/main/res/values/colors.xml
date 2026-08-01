@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_config_backdrop">#111111</color>
+    <color name="widget_config_canvas">#F4F4F3</color>
+    <color name="widget_config_surface">#FFFFFF</color>
+    <color name="widget_config_border">#E4E4E2</color>
+    <color name="widget_config_border_strong">#D8D8D6</color>
+    <color name="widget_config_text">#0B0B0C</color>
+    <color name="widget_config_text_secondary">#686865</color>
+    <color name="widget_config_text_tertiary">#9A9A97</color>
+    <color name="widget_config_accent_soft">#F0F0EF</color>
+    <color name="widget_config_on_accent">#FFFFFF</color>
+</resources>

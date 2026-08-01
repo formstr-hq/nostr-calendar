@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="widget_config_choice_min_height">48dp</dimen>
+    <dimen name="widget_config_screen_spacing">12dp</dimen>
+    <dimen name="widget_config_row_horizontal_padding">16dp</dimen>
+    <dimen name="widget_config_choice_drawable_padding">12dp</dimen>
 </resources>

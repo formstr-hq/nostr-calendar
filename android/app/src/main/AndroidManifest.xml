@@ -89,7 +89,7 @@
             android:name=".CalendarWidgetConfigureActivity"
             android:exported="true"
             android:label="@string/widget_config_title"
-            android:theme="@style/AppTheme">
+            android:theme="@style/AppTheme.WidgetConfigure">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

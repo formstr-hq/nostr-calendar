@@ -54,9 +54,12 @@ struct CalendarWidgetView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             } else {
-                ForEach(Array(entry.events.enumerated()), id: \.element.id) { index, event in
-                    eventRow(event)
-                    if index < entry.events.count - 1 { Spacer(minLength: 5) }
+                ViewThatFits(in: .vertical) {
+                    eventList(limit: 5)
+                    eventList(limit: 4)
+                    eventList(limit: 3)
+                    eventList(limit: 2)
+                    eventList(limit: 1)
                 }
             }
             Spacer(minLength: 0)
@@ -65,11 +68,34 @@ struct CalendarWidgetView: View {
         .widgetURL(URL(string: "https://calendar.formstr.app/"))
     }
 
+    private func eventList(limit: Int) -> some View {
+        let visibleEvents = Array(entry.events.prefix(limit))
+        let hiddenCount = entry.events.count - visibleEvents.count
+
+        return VStack(alignment: .leading, spacing: 5) {
+            ForEach(Array(visibleEvents.enumerated()), id: \.element.id) { index, event in
+                if showsDayHeading(for: event, at: index, in: visibleEvents) {
+                    Text(dayHeading(event.begin))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.8)
+                        .lineLimit(1)
+                        .padding(.top, index == 0 ? 0 : 2)
+                }
+                eventRow(event)
+            }
+            if hiddenCount > 0 {
+                Text("+\(hiddenCount) more")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func eventRow(_ event: WidgetEvent) -> some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(.primary)
-                .frame(width: 6, height: 6)
             Text(eventTime(event))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -81,17 +107,22 @@ struct CalendarWidgetView: View {
     }
 
     private func eventTime(_ event: WidgetEvent) -> String {
+        event.allDay ? "All day" : event.begin.formatted(date: .omitted, time: .shortened)
+    }
+
+    private func showsDayHeading(
+        for event: WidgetEvent,
+        at index: Int,
+        in events: [WidgetEvent]
+    ) -> Bool {
         let calendar = Calendar.current
-        if event.allDay {
-            if calendar.isDateInToday(event.begin) { return "All day" }
-            if calendar.isDateInTomorrow(event.begin) { return "Tomorrow" }
-            return event.begin.formatted(.dateTime.weekday(.abbreviated))
-        }
-        if calendar.isDateInToday(event.begin) {
-            return event.begin.formatted(date: .omitted, time: .shortened)
-        }
-        if calendar.isDateInTomorrow(event.begin) { return "Tomorrow" }
-        return event.begin.formatted(.dateTime.weekday(.abbreviated))
+        guard !calendar.isDateInToday(event.begin) else { return false }
+        guard index > 0 else { return true }
+        return !calendar.isDate(event.begin, inSameDayAs: events[index - 1].begin)
+    }
+
+    private func dayHeading(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 }
 

@@ -13,7 +13,6 @@ enum WidgetDataStore {
     private static let calendarsKey = "CapacitorStorage.cal:calendar_lists"
     private static let deviceEventsKey = "CapacitorStorage.cal:device_events"
     private static let deviceCalendarsKey = "CapacitorStorage.cal:device_calendars"
-    private static let lookahead: TimeInterval = 5 * 24 * 60 * 60
 
     static func calendarChoices() -> [CalendarChoice] {
         var choices: [CalendarChoice] = jsonArray(for: calendarsKey).compactMap { calendar in
@@ -46,7 +45,10 @@ enum WidgetDataStore {
         let selectedDevice = Set(selected.compactMap { value in
             value.hasPrefix("device:") ? String(value.dropFirst("device:".count)) : nil
         })
-        let rangeEnd = now.addingTimeInterval(lookahead)
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let rangeEnd = calendar.date(byAdding: .day, value: 7, to: startOfToday)?
+            .addingTimeInterval(-1) ?? now.addingTimeInterval(7 * 24 * 60 * 60)
         var result: [WidgetEvent] = []
 
         if useDefault || !selectedNostr.isEmpty {
@@ -69,7 +71,7 @@ enum WidgetDataStore {
             }
         }
 
-        return Array(result.sorted { $0.begin < $1.begin }.prefix(3))
+        return result.sorted { $0.begin < $1.begin }
     }
 
     private static func makeEvent(

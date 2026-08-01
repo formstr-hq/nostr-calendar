@@ -17,5 +17,8 @@
     <string name="widget_config_add">Add widget</string>
     <string name="widget_untitled">Untitled</string>
     <string name="widget_all_day">All day</string>
-    <string name="widget_tomorrow">Tomorrow</string>
+    <plurals name="widget_more_events">
+        <item quantity="one">+%d more</item>
+        <item quantity="other">+%d more</item>
+    </plurals>
 </resources>
