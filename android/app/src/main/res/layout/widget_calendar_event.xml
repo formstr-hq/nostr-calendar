@@ -6,6 +6,12 @@
     android:orientation="vertical"
     android:paddingBottom="5dp">
 
+    <Space
+        android:id="@+id/widget_event_group_gap"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/widget_event_day"
         android:layout_width="wrap_content"

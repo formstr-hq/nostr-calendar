@@ -87,7 +87,7 @@ struct CalendarWidgetView: View {
                         .textCase(.uppercase)
                         .tracking(0.8)
                         .lineLimit(1)
-                        .padding(.top, index == 0 ? 0 : 2)
+                        .padding(.top, index == 0 ? 0 : 6)
                 }
                 eventRow(event)
             }

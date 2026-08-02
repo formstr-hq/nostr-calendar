@@ -57,6 +57,10 @@ public class CalendarWidgetService extends RemoteViewsService {
             CalendarWidget.WidgetEvent event = events.get(position);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_event);
             boolean showDay = CalendarWidget.showsDayHeading(events, position);
+            views.setViewVisibility(
+                    R.id.widget_event_group_gap,
+                    showDay && position > 0 ? View.VISIBLE : View.GONE
+            );
             views.setViewVisibility(R.id.widget_event_day, showDay ? View.VISIBLE : View.GONE);
             if (showDay) {
                 views.setTextViewText(
