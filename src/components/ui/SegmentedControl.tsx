@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+import { Box, BoxProps } from "@mui/material";
 import { radius } from "../../theme/tokens";
 
 export interface SegmentedControlOption<T extends string> {
@@ -11,6 +11,7 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   "aria-label"?: string;
+  wrapperSx?: BoxProps["sx"]
 }
 
 /** N-way pill switch — the "ViewSwitcher" primitive in the redesign mockups. */
@@ -18,6 +19,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  wrapperSx,
   "aria-label": ariaLabel,
 }: SegmentedControlProps<T>) {
   return (
@@ -25,6 +27,7 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       sx={{
+        ...wrapperSx,
         display: "inline-flex",
         bgcolor: "action.hover",
         borderRadius: `${radius.pill}px`,

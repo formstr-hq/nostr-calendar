@@ -27,6 +27,24 @@ const areEqual = (left: string[] = [], right: string[] = []) => {
   );
 };
 
+const normalizedForms = (forms: ICalendarEvent["forms"] = []) =>
+  forms
+    .filter((form) => Boolean(form?.naddr))
+    .map((form) => `${form.naddr}\u0000${form.viewKey ?? ""}`)
+    .sort();
+
+const areFormsEqual = (
+  left: ICalendarEvent["forms"],
+  right: ICalendarEvent["forms"],
+) => {
+  const normalizedLeft = normalizedForms(left);
+  const normalizedRight = normalizedForms(right);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
+};
+
 const formatTimeRange = (begin: number, end: number) => {
   const start = new Date(begin);
   const finish = new Date(end);
@@ -52,9 +70,7 @@ export function getEventUpdate(
     (participant) => !previousParticipants.has(participant),
   );
   const timeChanged =
-    previous.begin !== fresh.begin ||
-    previous.end !== fresh.end ||
-    previous.allDay !== fresh.allDay;
+    previous.begin !== fresh.begin || previous.end !== fresh.end;
 
   if (timeChanged) changedAttributes.push("date and time");
   if (previous.title !== fresh.title) changedAttributes.push("title");
@@ -73,9 +89,7 @@ export function getEventUpdate(
   if (!areEqual(previous.reference, fresh.reference)) {
     changedAttributes.push("references");
   }
-  if (
-    JSON.stringify(previous.forms ?? []) !== JSON.stringify(fresh.forms ?? [])
-  ) {
+  if (!areFormsEqual(previous.forms, fresh.forms)) {
     changedAttributes.push("forms");
   }
   if (previous.notificationPreference !== fresh.notificationPreference) {
@@ -110,7 +124,15 @@ export function shouldNotifyEventUpdate(
   currentUserPubkey?: string,
 ): boolean {
   const currentUser = currentUserPubkey?.toLowerCase();
-  if (!currentUser || fresh.user.toLowerCase() === currentUser) return false;
+  if (
+    !previous.isPrivateEvent ||
+    !fresh.isPrivateEvent ||
+    (fresh.end <= Date.now() && !fresh.repeat.rrule) ||
+    !currentUser ||
+    fresh.user.toLowerCase() === currentUser
+  ) {
+    return false;
+  }
 
   const previousParticipants = normalizedValues(previous.participants);
   const freshParticipants = new Set(normalizedValues(fresh.participants));

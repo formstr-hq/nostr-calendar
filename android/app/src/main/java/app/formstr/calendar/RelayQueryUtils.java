@@ -52,6 +52,13 @@ public final class RelayQueryUtils {
     public static void queryEvents(OkHttpClient client, String relayUrl, String subscriptionPrefix,
                                    JSONObject filterObj, long timeoutSeconds, String logTag,
                                    EventProcessor eventProcessor) {
+        queryEvents(client, relayUrl, subscriptionPrefix, new JSONArray().put(filterObj),
+                timeoutSeconds, logTag, eventProcessor);
+    }
+
+    public static void queryEvents(OkHttpClient client, String relayUrl, String subscriptionPrefix,
+                                   JSONArray filterObjs, long timeoutSeconds, String logTag,
+                                   EventProcessor eventProcessor) {
         String httpUrl = relayUrl.replace("wss://", "https://").replace("ws://", "http://");
         CountDownLatch latch = new CountDownLatch(1);
 
@@ -62,7 +69,10 @@ public final class RelayQueryUtils {
             JSONArray reqMessage = new JSONArray();
             reqMessage.put("REQ");
             reqMessage.put(subscriptionId);
-            reqMessage.put(filterObj);
+            for (int index = 0; index < filterObjs.length(); index++) {
+                JSONObject filter = filterObjs.optJSONObject(index);
+                if (filter != null) reqMessage.put(filter);
+            }
 
             client.newWebSocket(request, new WebSocketListener() {
                 @Override

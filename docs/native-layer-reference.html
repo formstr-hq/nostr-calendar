@@ -422,9 +422,10 @@
 
       <article class="flow" id="a-event-update-worker">
         <h3>EventUpdateWorker <span class="chip file">EventUpdateWorker.java</span> <span class="chip android">Android only</span></h3>
-        <p>Every 15 minutes while network-connected, the worker reads future or recurring event coordinates from <code>cal:events</code>, combines each event's relay hint with the stored relay list, and queries exact kind/author/d-tag filters. Private payloads are NIP-44-decrypted with their cached nsec view key before comparison. It retains only a strictly newer replacement for each coordinate.</p>
-        <p>The worker compares title, description, image, location, categories, participants, and time. Participant removals alone do not alert; additions do. The event author and a participant who was removed are not notified. Accepted replacements are written to <code>cal:events</code> before an <strong>Event updates</strong> channel notification is posted, and the notification opens <code>/notification-event/&lt;d-tag&gt;</code>.</p>
-        <p>When start, end, or recurrence changes, it immediately enqueues NotificationWorker. Its existing desired-schedule diff cancels stale alarms and creates reminders at the new times using the user's saved offsets. Every cache update also calls <code>CalendarWidget.refreshAll()</code>.</p>
+        <p>Every 15 minutes while network-connected, the worker reads <code>cal:events</code> once and selects only private events that are still in the future or have an RRULE. Public events, device events, invitations, and entries without a cached NIP-44 view key are ignored. Following NIP-01's filter semantics, it sends one <code>REQ</code> per relay containing one or more OR filters grouped by exact kind and author; each filter carries the complete list of d-tags for that group. This avoids the false kind/author/d-tag combinations a single cross-product filter would admit. Every response is also validated against the exact cached coordinates before the newest replacement is retained.</p>
+        <p>Each accepted private replacement is NIP-44-decrypted with its cached nsec view key. The worker and foreground path compare the same fields in the same order: time, title, description, location, image, recurrence, categories, references, forms, notification preference, and participant additions. Participant removals alone do not alert; additions do. The event author and a participant who was removed are not notified.</p>
+        <p>All accepted replacements are committed to <code>cal:events</code> before reminders are reconciled or any <strong>Event updates</strong> channel notification is posted. Each notification opens <code>/notification-event/&lt;d-tag&gt;</code>.</p>
+        <p>When start, end, recurrence, or notification preference changes, it immediately enqueues NotificationWorker. Its existing desired-schedule diff cancels stale alarms and creates reminders at the new times using the user's saved offsets. Every cache update also calls <code>CalendarWidget.refreshAll()</code>.</p>
       </article>
 
       <article class="flow" id="a-notifworker">
@@ -465,7 +466,7 @@
 
       <article class="flow" id="a-relay">
         <h3>RelayQueryUtils <span class="chip file">RelayQueryUtils.java · 113 lines</span></h3>
-        <p>The entire Nostr client the background workers need — and nothing more. Raw OkHttp WebSockets, no signing, no relay pool, no reconnect/backoff. Rewrites <code>wss://</code>/<code>ws://</code> to <code>https://</code>/<code>http://</code> for OkHttp's request builder, sends one <code>["REQ", subId, filter]</code>, streams <code>EVENT</code> frames to a caller callback, sends <code>CLOSE</code> and disconnects the moment <code>EOSE</code> arrives — all bounded by a 15-second <code>CountDownLatch</code> timeout shared by both workers.</p>
+        <p>The entire Nostr client the background workers need — and nothing more. Raw OkHttp WebSockets, no signing, no relay pool, no reconnect/backoff. Rewrites <code>wss://</code>/<code>ws://</code> to <code>https://</code>/<code>http://</code> for OkHttp's request builder, sends one NIP-01 <code>["REQ", subId, filter1, filter2, ...]</code> with either one or several filters, streams <code>EVENT</code> frames to a caller callback, sends <code>CLOSE</code> and disconnects the moment <code>EOSE</code> arrives — all bounded by a 15-second <code>CountDownLatch</code> timeout shared by the workers.</p>
       </article>
 
       <article class="flow" id="a-widget">
@@ -514,8 +515,8 @@
 
       <article class="flow" id="i-event-update-poller">
         <h3>IOSEventUpdatePoller <span class="chip file">IOSEventUpdatePoller.swift</span></h3>
-        <p>Runs before iOS reminder reconciliation on launch, foreground, and an OS-granted background refresh. It performs the same best-effort event-coordinate fetch and cache-before-notify comparison as Android, decrypting private payloads with their cached nsec view key, then posts an immediate notification in the <code>event_updates</code> thread with a Capacitor <code>openRoute</code> payload.</p>
-        <p>Time changes call <code>IOSNotificationScheduler.reconcileAsync()</code> after the cache write, removing obsolete pending reminders and adding replacements. iOS background refresh timing is controlled by the OS, so this is not guaranteed delivery.</p>
+        <p>Runs before iOS reminder reconciliation on launch, foreground, and an OS-granted background refresh. It mirrors Android's private-only eligibility, one batched <code>REQ</code> per relay with exact kind/author filters and grouped d-tag lists, NIP-44 parsing, exact-coordinate validation, and field comparison, then writes every accepted replacement to the cache before posting an immediate notification in the <code>event_updates</code> thread with a Capacitor <code>openRoute</code> payload.</p>
+        <p>Time, recurrence, or notification-preference changes call <code>IOSNotificationScheduler.reconcileAsync()</code> after the cache write, removing obsolete pending reminders and adding replacements. iOS background refresh timing is controlled by the OS, so this is not guaranteed delivery.</p>
       </article>
 
       <article class="flow" id="i-widget">

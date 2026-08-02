@@ -180,15 +180,15 @@ const processPrivateEvent = (
   // genuinely new or newer version — otherwise we'd re-schedule notifications
   // and rewrite storage on every replay.
   let changed = false;
+  let previousEvent: ICalendarEvent | undefined;
   if (
     !isValid(new Date(parsedEvent.begin)) ||
     !isValid(new Date(parsedEvent.end))
   ) {
     console.warn("invalid date", parsedEvent, event);
   } else if (store.allKeys.includes(parsedEvent.id)) {
-    const previousEvent = store.byKey[parsedEvent.id];
+    previousEvent = store.byKey[parsedEvent.id];
     if (parsedEvent.createdAt > previousEvent.createdAt) {
-      notifyEventUpdate(previousEvent, parsedEvent);
       store = removeOne(store, parsedEvent.id);
       store = appendOne(store, parsedEvent.id, parsedEvent);
       changed = true;
@@ -202,11 +202,17 @@ const processPrivateEvent = (
   recordParticipantHistory([parsedEvent]);
   void syncEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
-  saveEventsToStorage(updatedEvents);
   useTimeBasedEvents.setState({
     eventById: store.byKey,
     events: updatedEvents,
   });
+  void saveEventsToStorage(updatedEvents)
+    .then(() => {
+      if (previousEvent) notifyEventUpdate(previousEvent, parsedEvent);
+    })
+    .catch((error) => {
+      console.warn("Failed to persist event update", error);
+    });
 };
 
 // The single standing interest in the user's private calendar events, keyed by
@@ -492,7 +498,6 @@ export const useTimeBasedEvents = create<{
           if (store.allKeys.includes(parsedEvent.id)) {
             const previousEvent = store.byKey[parsedEvent.id];
             if (parsedEvent.createdAt > previousEvent.createdAt) {
-              notifyEventUpdate(previousEvent, parsedEvent);
               store = removeOne(store, parsedEvent.id);
               store = appendOne(store, parsedEvent.id, parsedEvent);
               changed = true;

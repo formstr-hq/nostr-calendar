@@ -168,6 +168,9 @@ export function BookingInbox() {
         <SegmentedControl
           aria-label="Booking direction"
           value={tab}
+          wrapperSx={{
+            width: "fit-content"
+          }}
           onChange={setTab}
           options={[
             {

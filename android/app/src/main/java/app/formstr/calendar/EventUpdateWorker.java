@@ -21,9 +21,12 @@ import org.json.JSONObject;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,45 +59,56 @@ public class EventUpdateWorker extends Worker {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             JSONArray events = new JSONArray(prefs.getString(EVENTS_KEY, "[]"));
             String currentUser = RelayQueryUtils.parseJsonString(prefs.getString(USER_KEY, ""));
+            if (currentUser == null || currentUser.isEmpty()) return Result.success();
+
             List<String> defaultRelays = readStrings(prefs.getString(RELAYS_KEY, "[]"));
+            List<JSONObject> eligible = new ArrayList<>();
+            for (int index = 0; index < events.length(); index++) {
+                JSONObject cached = events.optJSONObject(index);
+                if (isEligible(cached)) eligible.add(cached);
+            }
+            if (eligible.isEmpty()) return Result.success();
+
             Map<String, JSONObject> freshByCoordinate = new HashMap<>();
+            Set<String> expectedCoordinates = new HashSet<>();
+            for (JSONObject cached : eligible) expectedCoordinates.add(coordinate(cached));
             OkHttpClient client = RelayQueryUtils.createClient(RELAY_TIMEOUT_SECONDS);
 
             try {
-                for (int index = 0; index < events.length(); index++) {
-                    JSONObject cached = events.optJSONObject(index);
-                    if (!isEligible(cached)) continue;
-                    queryLatest(client, cached, defaultRelays, freshByCoordinate);
-                }
+                queryLatest(client, eligible, defaultRelays, expectedCoordinates, freshByCoordinate);
             } finally {
                 RelayQueryUtils.shutdownClient(client);
             }
 
             boolean changed = false;
             boolean rescheduleReminders = false;
+            List<PendingUpdate> notifications = new ArrayList<>();
             for (int index = 0; index < events.length(); index++) {
                 JSONObject cached = events.optJSONObject(index);
-                if (cached == null) continue;
+                if (!isEligible(cached)) continue;
                 JSONObject fresh = freshByCoordinate.get(coordinate(cached));
                 if (fresh == null || fresh.optLong("created_at") <= cached.optLong("createdAt")) continue;
 
-                JSONObject updated = cached.optBoolean("isPrivateEvent", false)
-                        ? parsePrivateEvent(fresh, cached)
-                        : parsePublicEvent(fresh, cached);
+                JSONObject updated = parsePrivateEvent(fresh, cached);
                 if (updated == null) continue;
                 UpdateSummary summary = compare(cached, updated);
                 events.put(index, updated);
                 changed = true;
-                rescheduleReminders |= summary.timeChanged;
+                rescheduleReminders |= summary.scheduleChanged;
                 if (shouldNotify(cached, updated, currentUser, summary)) {
-                    postUpdate(context, updated, summary.body);
+                    notifications.add(new PendingUpdate(updated, summary.body));
                 }
             }
 
             if (changed) {
-                prefs.edit().putString(EVENTS_KEY, events.toString()).apply();
+                if (!prefs.edit().putString(EVENTS_KEY, events.toString()).commit()) {
+                    return Result.retry();
+                }
                 CalendarWidget.refreshAll(context);
                 if (rescheduleReminders) NotificationWorker.enqueueImmediate(context);
+                for (PendingUpdate notification : notifications) {
+                    postUpdate(context, notification.event, notification.body);
+                }
             }
             return Result.success();
         } catch (Exception error) {
@@ -103,35 +117,58 @@ public class EventUpdateWorker extends Worker {
         }
     }
 
-    private void queryLatest(OkHttpClient client, JSONObject cached, List<String> defaults,
-                             Map<String, JSONObject> latest) {
-        List<String> relays = new ArrayList<>();
-        String hint = cached.optString("relayHint", "");
-        if (!hint.isEmpty()) relays.add(hint);
-        for (String relay : defaults) if (!relays.contains(relay)) relays.add(relay);
-        JSONObject filter = new JSONObject();
-        try {
-            filter.put("kinds", new JSONArray().put(cached.getInt("kind")));
-            filter.put("authors", new JSONArray().put(cached.getString("user")));
-            filter.put("#d", new JSONArray().put(cached.getString("id")));
-        } catch (Exception ignored) {
-            return;
+    private void queryLatest(OkHttpClient client, List<JSONObject> events, List<String> defaults,
+                             Set<String> expectedCoordinates, Map<String, JSONObject> latest) {
+        Set<String> relaySet = new LinkedHashSet<>();
+        for (JSONObject event : events) {
+            String hint = event.optString("relayHint", "");
+            if (!hint.isEmpty()) relaySet.add(hint);
         }
-        String expected = coordinate(cached);
+        relaySet.addAll(defaults);
+        List<String> relays = new ArrayList<>(relaySet);
+        JSONArray filters = buildFilters(events);
+        if (filters.length() == 0) return;
         for (int index = 0; index < Math.min(MAX_RELAYS, relays.size()); index++) {
-            RelayQueryUtils.queryEvents(client, relays.get(index), "event_update", filter,
+            RelayQueryUtils.queryEvents(client, relays.get(index), "event_update", filters,
                     RELAY_TIMEOUT_SECONDS, TAG, event -> {
-                        if (!expected.equals(coordinate(event))) return;
-                        JSONObject known = latest.get(expected);
+                        String eventCoordinate = coordinate(event);
+                        if (!expectedCoordinates.contains(eventCoordinate)) return;
+                        JSONObject known = latest.get(eventCoordinate);
                         if (known == null || event.optLong("created_at") > known.optLong("created_at")) {
-                            latest.put(expected, event);
+                            latest.put(eventCoordinate, event);
                         }
                     });
         }
     }
 
+    private static JSONArray buildFilters(List<JSONObject> events) {
+        Map<String, JSONObject> grouped = new LinkedHashMap<>();
+        for (JSONObject event : events) {
+            int kind = event.optInt("kind");
+            String author = event.optString("user");
+            String identifier = event.optString("id");
+            if (kind == 0 || author.isEmpty() || identifier.isEmpty()) continue;
+            String groupKey = kind + ":" + author;
+            try {
+                JSONObject filter = grouped.get(groupKey);
+                if (filter == null) {
+                    filter = new JSONObject()
+                            .put("kinds", new JSONArray().put(kind))
+                            .put("authors", new JSONArray().put(author))
+                            .put("#d", new JSONArray());
+                    grouped.put(groupKey, filter);
+                }
+                filter.getJSONArray("#d").put(identifier);
+            } catch (Exception ignored) {}
+        }
+        JSONArray filters = new JSONArray();
+        for (JSONObject filter : grouped.values()) filters.put(filter);
+        return filters;
+    }
+
     private static boolean isEligible(JSONObject event) {
-        if (event == null || "device".equals(event.optString("source")) || event.optBoolean("isInvitation")) return false;
+        if (event == null || !event.optBoolean("isPrivateEvent") || "device".equals(event.optString("source"))
+                || event.optBoolean("isInvitation") || event.optString("viewKey").isEmpty()) return false;
         String id = event.optString("id");
         String author = event.optString("user");
         String rrule = event.optJSONObject("repeat") == null ? ""
@@ -146,44 +183,34 @@ public class EventUpdateWorker extends Worker {
         return event.optInt("kind") + ":" + event.optString("pubkey", event.optString("user")) + ":" + dTag;
     }
 
-    private static JSONObject parsePublicEvent(JSONObject event, JSONObject cached) {
-        if (event.optInt("kind") != 31923 || event.optString("id").isEmpty()) return null;
-        try {
-            JSONObject parsed = new JSONObject(cached.toString());
-            JSONArray tags = event.getJSONArray("tags");
-            parsed.put("eventId", event.getString("id"));
-            parsed.put("createdAt", event.getLong("created_at"));
-            parsed.put("user", event.getString("pubkey"));
-            parsed.put("id", tag(tags, "d"));
-            parsed.put("title", firstTag(tags, "title", "name"));
-            parsed.put("description", event.optString("content"));
-            parsed.put("begin", secondsToMillis(tag(tags, "start")));
-            parsed.put("end", secondsToMillis(tag(tags, "end")));
-            parsed.put("image", tag(tags, "image"));
-            parsed.put("location", tagsFor(tags, "location"));
-            parsed.put("participants", tagsFor(tags, "p"));
-            parsed.put("categories", tagsFor(tags, "t"));
-            return parsed.optLong("begin") > 0 && parsed.optLong("end") > 0 ? parsed : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
     private static JSONObject parsePrivateEvent(JSONObject event, JSONObject cached) {
         try {
             JSONArray tags = new JSONArray(Nip44.decrypt(cached.getString("viewKey"), event.getString("content")));
             JSONObject parsed = new JSONObject(cached.toString());
             parsed.put("eventId", event.getString("id"));
             parsed.put("createdAt", event.getLong("created_at"));
-            parsed.put("title", tag(tags, "title"));
+            parsed.put("kind", event.getInt("kind"));
+            parsed.put("user", event.getString("pubkey"));
+            parsed.put("id", tag(tags, "d"));
+            parsed.put("title", firstTag(tags, "title", "name"));
             parsed.put("description", tag(tags, "description"));
             parsed.put("begin", secondsToMillis(tag(tags, "start")));
             parsed.put("end", secondsToMillis(tag(tags, "end")));
+            parsed.put("allDay", isAllDay(parsed.optLong("begin"), parsed.optLong("end")));
             parsed.put("image", tag(tags, "image"));
             parsed.put("location", tagsFor(tags, "location"));
             parsed.put("participants", tagsFor(tags, "p"));
-            String rrule = tag(tags, "l");
-            if (!rrule.isEmpty()) parsed.put("repeat", new JSONObject().put("rrule", rrule));
+            parsed.put("categories", tagsFor(tags, "t"));
+            parsed.put("reference", tagsFor(tags, "r"));
+            parsed.put("forms", formsFor(tags));
+            String rrule = recurrenceRule(tags);
+            parsed.put("repeat", new JSONObject().put("rrule", rrule.isEmpty() ? JSONObject.NULL : rrule));
+            String notificationPreference = tag(tags, "notification");
+            if ("enabled".equals(notificationPreference) || "disabled".equals(notificationPreference)) {
+                parsed.put("notificationPreference", notificationPreference);
+            } else {
+                parsed.remove("notificationPreference");
+            }
             return parsed.optLong("begin") > 0 && parsed.optLong("end") > 0 ? parsed : null;
         } catch (Exception error) {
             android.util.Log.w(TAG, "Failed to decrypt private event update", error);
@@ -200,14 +227,27 @@ public class EventUpdateWorker extends Worker {
         compareValue(previous, fresh, "description", "description", changed);
         compareArray(previous, fresh, "location", "location", changed);
         compareValue(previous, fresh, "image", "image", changed);
+        boolean recurrenceChanged = !repeatRule(previous).equals(repeatRule(fresh));
+        if (recurrenceChanged) changed.add("recurrence");
         compareArray(previous, fresh, "categories", "categories", changed);
+        compareArray(previous, fresh, "reference", "references", changed);
+        if (!formSet(previous.optJSONArray("forms")).equals(formSet(fresh.optJSONArray("forms")))) {
+            changed.add("forms");
+        }
+        boolean notificationPreferenceChanged = !previous.optString("notificationPreference")
+                .equals(fresh.optString("notificationPreference"));
+        if (notificationPreferenceChanged) changed.add("notification preference");
         Set<String> oldParticipants = set(previous.optJSONArray("participants"));
         Set<String> newParticipants = set(fresh.optJSONArray("participants"));
         newParticipants.removeAll(oldParticipants);
         if (!newParticipants.isEmpty()) changed.add("participants");
         String body = timeChanged ? "New time: " + formatRange(fresh.optLong("begin"), fresh.optLong("end"))
+                : newParticipants.size() > 0 && changed.size() == 1
+                ? newParticipants.size() == 1 ? "A participant was added"
+                : newParticipants.size() + " participants were added"
                 : changed.isEmpty() ? "" : "Updated: " + android.text.TextUtils.join(", ", changed);
-        return new UpdateSummary(changed, timeChanged, body);
+        return new UpdateSummary(changed, timeChanged,
+                timeChanged || recurrenceChanged || notificationPreferenceChanged, body);
     }
 
     private static boolean shouldNotify(JSONObject previous, JSONObject fresh, String currentUser, UpdateSummary summary) {
@@ -270,6 +310,57 @@ public class EventUpdateWorker extends Worker {
         for (int i = 0; i < tags.length(); i++) { JSONArray tag = tags.optJSONArray(i); if (tag != null && name.equals(tag.optString(0))) values.put(tag.optString(1)); }
         return values;
     }
+    private static JSONArray formsFor(JSONArray tags) {
+        JSONArray forms = new JSONArray();
+        if (tags == null) return forms;
+        for (int i = 0; i < tags.length(); i++) {
+            JSONArray current = tags.optJSONArray(i);
+            if (current == null || !"form".equals(current.optString(0)) || current.optString(1).isEmpty()) continue;
+            JSONObject form = new JSONObject();
+            try {
+                form.put("naddr", current.optString(1));
+                if (!current.optString(2).isEmpty()) form.put("viewKey", current.optString(2));
+                forms.put(form);
+            } catch (Exception ignored) {}
+        }
+        return forms;
+    }
+    private static String recurrenceRule(JSONArray tags) {
+        if (tags == null) return "";
+        for (int i = 0; i + 1 < tags.length(); i++) {
+            JSONArray label = tags.optJSONArray(i);
+            JSONArray value = tags.optJSONArray(i + 1);
+            if (label != null && value != null && "L".equals(label.optString(0))
+                    && "rrule".equals(label.optString(1)) && "l".equals(value.optString(0))) {
+                return value.optString(1);
+            }
+        }
+        return "";
+    }
+    private static String repeatRule(JSONObject event) {
+        JSONObject repeat = event.optJSONObject("repeat");
+        return repeat == null ? "" : repeat.optString("rrule");
+    }
+    private static Set<String> formSet(JSONArray forms) {
+        Set<String> values = new HashSet<>();
+        if (forms == null) return values;
+        for (int index = 0; index < forms.length(); index++) {
+            JSONObject form = forms.optJSONObject(index);
+            if (form != null && !form.optString("naddr").isEmpty()) {
+                values.add(form.optString("naddr") + "\u0000" + form.optString("viewKey"));
+            }
+        }
+        return values;
+    }
+    private static boolean isAllDay(long begin, long end) {
+        if (end <= begin) return false;
+        Calendar start = Calendar.getInstance();
+        Calendar finish = Calendar.getInstance();
+        start.setTimeInMillis(begin);
+        finish.setTimeInMillis(end);
+        return start.get(Calendar.HOUR_OF_DAY) == 0 && start.get(Calendar.MINUTE) == 0
+                && finish.get(Calendar.HOUR_OF_DAY) == 0 && finish.get(Calendar.MINUTE) == 0;
+    }
     private static long secondsToMillis(String value) { try { return Long.parseLong(value) * 1000L; } catch (Exception ignored) { return 0; } }
     private static List<String> readStrings(String raw) {
         List<String> values = new ArrayList<>();
@@ -281,7 +372,13 @@ public class EventUpdateWorker extends Worker {
                 + " - " + DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault()).format(new Date(end));
     }
     private static final class UpdateSummary {
-        final List<String> changed; final boolean timeChanged; final String body;
-        UpdateSummary(List<String> changed, boolean timeChanged, String body) { this.changed = changed; this.timeChanged = timeChanged; this.body = body; }
+        final List<String> changed; final boolean timeChanged; final boolean scheduleChanged; final String body;
+        UpdateSummary(List<String> changed, boolean timeChanged, boolean scheduleChanged, String body) {
+            this.changed = changed; this.timeChanged = timeChanged; this.scheduleChanged = scheduleChanged; this.body = body;
+        }
+    }
+    private static final class PendingUpdate {
+        final JSONObject event; final String body;
+        PendingUpdate(JSONObject event, String body) { this.event = event; this.body = body; }
     }
 }
