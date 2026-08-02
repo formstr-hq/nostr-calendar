@@ -183,7 +183,13 @@ public class CalendarWidgetConfigureActivity extends AppCompatActivity {
         CheckBox checkBox = new CheckBox(this);
         checkBox.setText(label);
         checkBox.setChecked(checked);
-        checkBox.setButtonDrawable(R.drawable.widget_config_checkbox);
+        checkBox.setButtonDrawable(null);
+        checkBox.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.widget_config_checkbox,
+                0,
+                0,
+                0
+        );
         checkBox.setBackground(null);
         checkBox.setGravity(Gravity.CENTER_VERTICAL);
         checkBox.setTextColor(ContextCompat.getColor(this, R.color.widget_config_text));
