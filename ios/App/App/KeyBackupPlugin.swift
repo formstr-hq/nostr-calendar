@@ -31,9 +31,16 @@ public class KeyBackupPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let controller = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
-        controller.modalPresentationStyle = .formSheet
-        bridge?.viewController?.present(controller, animated: true)
-        call.resolve(["uri": fileURL.absoluteString, "mimeType": mimeType])
+        DispatchQueue.main.async { [weak self] in
+            guard let viewController = self?.bridge?.viewController else {
+                call.reject("Could not present file exporter")
+                return
+            }
+
+            let controller = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
+            controller.modalPresentationStyle = .formSheet
+            viewController.present(controller, animated: true)
+            call.resolve(["uri": fileURL.absoluteString, "mimeType": mimeType])
+        }
     }
 }

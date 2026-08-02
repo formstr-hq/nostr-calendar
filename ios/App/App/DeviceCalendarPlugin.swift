@@ -18,11 +18,11 @@ public class DeviceCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let store = IOSDeviceCalendarStore.shared
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc override public func checkPermissions(_ call: CAPPluginCall) {
         call.resolve(["calendar": store.permissionStatus()])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
         store.requestAccess { status in
             call.resolve(["calendar": status])
         }

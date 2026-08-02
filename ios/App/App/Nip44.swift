@@ -34,7 +34,7 @@ enum Nip44 {
     }
 
     private static func hmac(key: Data, data: Data) -> Data {
-        Data(HMAC<SHA256>.authenticationCode(for: data, using: SymmetricKey(data: key)))
+        Data(CryptoKit.HMAC<CryptoKit.SHA256>.authenticationCode(for: data, using: CryptoKit.SymmetricKey(data: key)))
     }
 
     private static func hkdfExpand(key: Data, info: Data, length: Int) -> Data {

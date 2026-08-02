@@ -124,9 +124,9 @@ actor IOSEventUpdatePoller {
         parsed["begin"] = begin
         parsed["end"] = end
         parsed["image"] = tag(tags, name: "image") ?? ""
-        parsed["location"] = tags(named: "location", in: tags)
-        parsed["participants"] = tags(named: "p", in: tags)
-        parsed["categories"] = tags(named: "t", in: tags)
+        parsed["location"] = tagValues(named: "location", in: tags)
+        parsed["participants"] = tagValues(named: "p", in: tags)
+        parsed["categories"] = tagValues(named: "t", in: tags)
         return parsed
     }
 
@@ -149,8 +149,8 @@ actor IOSEventUpdatePoller {
         parsed["begin"] = begin
         parsed["end"] = end
         parsed["image"] = tag(tags, name: "image") ?? ""
-        parsed["location"] = tags(named: "location", in: tags)
-        parsed["participants"] = tags(named: "p", in: tags)
+        parsed["location"] = tagValues(named: "location", in: tags)
+        parsed["participants"] = tagValues(named: "p", in: tags)
         if let rrule = tag(tags, name: "l"), !rrule.isEmpty {
             parsed["repeat"] = ["rrule": rrule]
         }
@@ -219,7 +219,7 @@ actor IOSEventUpdatePoller {
     private func string(_ value: Any?) -> String { value as? String ?? "" }
     private func seconds(_ value: String?) -> Double? { value.flatMap(Double.init).map { $0 * 1_000 } }
     private func tag(_ tags: [[Any]], name: String) -> String? { tags.first { ($0.first as? String) == name }?[safe: 1] as? String }
-    private func tags(named name: String, in tags: [[Any]]) -> [String] { tags.compactMap { ($0.first as? String) == name ? $0[safe: 1] as? String : nil } }
+    private func tagValues(named name: String, in tags: [[Any]]) -> [String] { tags.compactMap { ($0.first as? String) == name ? $0[safe: 1] as? String : nil } }
     private func set(_ value: Any?) -> Set<String> { Set((value as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty }) }
     private func unique(_ values: [String]) -> [String] { Array(NSOrderedSet(array: values).compactMap { $0 as? String }) }
     private func formatRange(begin: Double, end: Double) -> String { let formatter = DateFormatter(); formatter.dateStyle = .medium; formatter.timeStyle = .short; return "\(formatter.string(from: Date(timeIntervalSince1970: begin / 1_000))) - \(DateFormatter.localizedString(from: Date(timeIntervalSince1970: end / 1_000), dateStyle: .none, timeStyle: .short))" }
