@@ -26,6 +26,8 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 
 <!-- newest first: date — phase — what was done — e2e status -->
 
+- 2026-08-02 — Existing-participant invitation fix — Private-event edits now require the caller's original participant list, and applying an RSVP time suggestion preserves it instead of re-sending invitations to every participant. The invitation inbox also reconciles active and buffered invitations against all calendar lists so events accepted through shared links cannot retain an "Add to Calendar" action.
+
 - 2026-08-02 — Timed event accessibility — Day and week event cards now render at a minimum height equivalent to 20 minutes while retaining their true times, positions, overlap semantics, and unchanged sizing for longer events.
 
 - 2026-08-02 — F-BOOK-INBOX selector polish — Replaced the booking inbox's sharp-edged, locally styled MUI tabs with the shared token-based `SegmentedControl` and updated the booking E2E selector for its radio semantics.
