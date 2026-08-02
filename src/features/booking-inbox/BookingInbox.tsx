@@ -16,8 +16,6 @@ import {
   Select,
   Skeleton,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography,
   useMediaQuery,
@@ -33,6 +31,7 @@ import { useGetParticipant } from "../../stores/participants";
 import { useBusyList } from "../../stores/busyList";
 import { CalendarListSelect } from "../../components/CalendarListSelect";
 import { FormAttachmentRow } from "../../components/FormAttachmentRow";
+import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { verifyNip05 } from "../../nostr/nip05";
 import { ROUTES } from "../../utils/routingHelper";
 import { getRelays } from "../../common/relayConfig";
@@ -166,23 +165,18 @@ export function BookingInbox() {
         mb={2}
         alignItems={mobile ? "stretch" : "center"}
       >
-        <Tabs
+        <SegmentedControl
+          aria-label="Booking direction"
           value={tab}
-          onChange={(_, v) => setTab(v)}
-          sx={{
-            minHeight: 44,
-            "& .MuiTab-root.Mui-selected": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+          onChange={setTab}
+          options={[
+            {
+              value: "incoming",
+              label: `Incoming${incomingRequests.filter((r) => r.status === "pending").length ? ` (${incomingRequests.filter((r) => r.status === "pending").length})` : ""}`,
             },
-          }}
-        >
-          <Tab
-            value="incoming"
-            label={`Incoming${incomingRequests.filter((r) => r.status === "pending").length ? ` (${incomingRequests.filter((r) => r.status === "pending").length})` : ""}`}
-          />
-          <Tab value="outgoing" label="Outgoing" />
-        </Tabs>
+            { value: "outgoing", label: "Outgoing" },
+          ]}
+        />
         {tab === "incoming" && (
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel id="booking-page-filter">Booking page</InputLabel>

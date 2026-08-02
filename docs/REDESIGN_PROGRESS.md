@@ -26,6 +26,8 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 
 <!-- newest first: date — phase — what was done — e2e status -->
 
+- 2026-08-02 — F-BOOK-INBOX selector polish — Replaced the booking inbox's sharp-edged, locally styled MUI tabs with the shared token-based `SegmentedControl` and updated the booking E2E selector for its radio semantics.
+
 - 2026-08-02 — Android widget checkbox spacing — Rendered widget-configuration checkbox indicators as stateful start compound drawables so the existing 12dp drawable-padding token now separates each indicator from its calendar name. Android resource/Java validation passes.
 
 - 2026-08-01 — Native widget scrolling and appearance — Converted the Android widget's fixed five-row agenda into an uncapped `RemoteViewsService` collection so the event area scrolls independently beneath the fixed date header, removed the `+N more` cap, added light/dark widget and configuration resource palettes with configuration-change refreshes, and gave configuration checkboxes explicit card-edge margins. The iOS WidgetKit view now tries the complete event list first and supports the large family, while retaining adaptive overflow because WidgetKit does not support scrollable home-screen content; semantic system colors are explicit for primary content. Fixed the sidebar device-calendar connection button's dark-mode text/border contrast through active theme tokens. Production web build and Android resource/Java compilation pass. Android unit tests remain 5/6 because the pre-existing monthly recurrence test changes its March UTC hour across local DST; iOS compilation still requires macOS/Xcode.
