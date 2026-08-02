@@ -26,6 +26,8 @@ Tracker for [REDESIGN_MASTER_PLAN.md](REDESIGN_MASTER_PLAN.md). Update at the en
 
 <!-- newest first: date — phase — what was done — e2e status -->
 
+- 2026-08-02 — Timed event accessibility — Day and week event cards now render at a minimum height equivalent to 20 minutes while retaining their true times, positions, overlap semantics, and unchanged sizing for longer events.
+
 - 2026-08-02 — F-BOOK-INBOX selector polish — Replaced the booking inbox's sharp-edged, locally styled MUI tabs with the shared token-based `SegmentedControl` and updated the booking E2E selector for its radio semantics.
 
 - 2026-08-02 — Android widget checkbox spacing — Rendered widget-configuration checkbox indicators as stateful start compound drawables so the existing 12dp drawable-padding token now separates each indicator from its calendar name. Android resource/Java validation passes.
