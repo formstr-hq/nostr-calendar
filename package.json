@@ -12,6 +12,7 @@
     "lint": "eslint . --quiet",
     "preview": "vite preview",
     "simulate-android": "pnpm build && pnpm cap run android",
+    "build-android": "bash ./scripts/build-debug-apk.sh",
     "release-android": "./scripts/build-release.sh",
     "create-release": "./scripts/create-release.sh",
     "simulate-ios": "pnpm cap run ios",
