@@ -169,7 +169,7 @@ export function BookingInbox() {
           aria-label="Booking direction"
           value={tab}
           wrapperSx={{
-            width: "fit-content"
+            width: "fit-content",
           }}
           onChange={setTab}
           options={[

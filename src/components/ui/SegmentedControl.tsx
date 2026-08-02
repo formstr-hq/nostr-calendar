@@ -11,7 +11,7 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   "aria-label"?: string;
-  wrapperSx?: BoxProps["sx"]
+  wrapperSx?: BoxProps["sx"];
 }
 
 /** N-way pill switch — the "ViewSwitcher" primitive in the redesign mockups. */
