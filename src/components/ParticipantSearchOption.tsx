@@ -11,7 +11,7 @@ const ResultRow = styled(MenuItem)({
   minHeight: spacing * 7,
   gap: spacing * 1.5,
   padding: `${spacing}px ${spacing * 1.5}px`,
-});
+}) as typeof MenuItem;
 
 const ResultAvatar = styled(Avatar)({
   width: spacing * 4,
