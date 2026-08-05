@@ -6,20 +6,36 @@ import P256K
 enum Nip44 {
     static func decrypt(nsec: String, payload: String) throws -> String {
         let secret = try decodeNsec(nsec)
-        let privateKey = try P256K.Signing.PrivateKey(dataRepresentation: secret)
-        let publicKey = privateKey.publicKey.dataRepresentation
-        guard publicKey.count == 33 else { throw Error.invalidKey }
-        let conversationKey = hmac(
-            key: Data("nip44-v2".utf8),
-            data: Data(publicKey.dropFirst()),
-        )
+
+        // Self-encryption idiom (see nostr-calendar's selfEncrypt/selfDecrypt on the
+        // JS side): the "other party" in the ECDH is this same key's own public
+        // point. Delegating to P256K.KeyAgreement's sharedSecretFromKeyAgreement
+        // (secp256k1_ecdh) rather than hashing the public key directly avoids
+        // mistaking the public key itself for the ECDH shared secret.
+        let privateKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: secret)
+        let sharedSecret = privateKey.sharedSecretFromKeyAgreement(with: privateKey.publicKey)
+        // Compressed shared point is [0x02/0x03 prefix][32-byte X]; NIP-44 only
+        // wants the X coordinate, matching nostr-tools' getSharedSecret(...).subarray(1, 33).
+        let sharedX = sharedSecret.withUnsafeBytes { Data($0).dropFirst() }
+
         guard let decoded = Data(base64Encoded: payload), decoded.count >= 99, decoded[0] == 2 else {
             throw Error.invalidPayload
         }
         let nonce = decoded[1 ..< 33]
         let ciphertext = decoded[33 ..< decoded.count - 32]
         let mac = decoded.suffix(32)
-        let keys = hkdfExpand(key: conversationKey, info: Data(nonce), length: 76)
+
+        // conversation_key = hkdf_extract(salt="nip44-v2", ikm=sharedX)
+        // keys            = hkdf_expand(prk=conversation_key, info=nonce, length=76)
+        // CryptoSwift's HKDF performs both RFC 5869 steps in one call.
+        let keys = try HKDF(
+            password: Array(sharedX),
+            salt: Array("nip44-v2".utf8),
+            info: Array(nonce),
+            keyLength: 76,
+            variant: .sha2(.sha256)
+        ).calculate()
+
         let calculatedMac = hmac(key: Data(keys[44 ..< 76]), data: Data(nonce) + Data(ciphertext))
         guard calculatedMac == Data(mac) else { throw Error.invalidMac }
         let cipher = try ChaCha20(key: Array(keys[0 ..< 32]), iv: Array(keys[32 ..< 44]))
@@ -35,15 +51,6 @@ enum Nip44 {
 
     private static func hmac(key: Data, data: Data) -> Data {
         Data(CryptoKit.HMAC<CryptoKit.SHA256>.authenticationCode(for: data, using: CryptoKit.SymmetricKey(data: key)))
-    }
-
-    private static func hkdfExpand(key: Data, info: Data, length: Int) -> Data {
-        var output = Data(); var previous = Data(); var counter: UInt8 = 1
-        while output.count < length {
-            previous = hmac(key: key, data: previous + info + Data([counter]))
-            output.append(previous); counter += 1
-        }
-        return output.prefix(length)
     }
 
     private static func decodeNsec(_ value: String) throws -> Data {
