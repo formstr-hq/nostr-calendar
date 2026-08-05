@@ -3,22 +3,22 @@ description: Your calendar is one of the most personal things you own — it kno
 summary: A private, decentralized calendar powered by Nostr. Your schedule, your keys.
 website: https://calendar.formstr.app
 images:
-  - assets/event-view.png
-  - assets/booking-request.png
-  - assets/booking-create-1.png
-  - assets/booking-create-2.png
-  - assets/booking-notifications.png
-  - assets/login.png
-  - assets/month-view.png
-  - assets/week-view.png
-  - assets/day-view.png
-  - assets/setup.png
-  - assets/calendar-list.png
-  - assets/calendar-management.png
-  - assets/invitation-event.png
-  - assets/invitations.png
-  - assets/event-view-2.png
-  - assets/event-create.png
+  - store-assets/zapstore/event-view.png
+  - store-assets/zapstore/week-view.png
+  - store-assets/zapstore/calendar-list.png
+  - store-assets/zapstore/booking-request.png
+  - store-assets/zapstore/booking-create-1.png
+  - store-assets/zapstore/booking-create-2.png
+  - store-assets/zapstore/booking-notifications.png
+  - store-assets/zapstore/login.png
+  - store-assets/zapstore/month-view.png
+  - store-assets/zapstore/day-view.png
+  - store-assets/zapstore/setup.png
+  - store-assets/zapstore/calendar-management.png
+  - store-assets/zapstore/invitation-event.png
+  - store-assets/zapstore/invitations.png
+  - store-assets/zapstore/event-view-2.png
+  - store-assets/zapstore/event-create.png
 blossom_servers:
   - https://cdn.zapstore.dev
   - https://blossom.band
