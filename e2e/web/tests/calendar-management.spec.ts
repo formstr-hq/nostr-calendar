@@ -15,7 +15,7 @@ test("user creates, renames and deletes a calendar from the sidebar", async ({
   const renamed = `${name} v2`;
 
   await openSidebar(page);
-  // The add button next to the "Calendars" heading.
+  // The add button next to the "Synced" heading.
   await page
     .getByRole("button", { name: "create calendar", exact: true })
     .click();

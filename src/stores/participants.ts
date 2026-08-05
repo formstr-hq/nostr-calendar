@@ -1,22 +1,29 @@
 import { create } from "zustand";
-import { fetchUserProfile } from "../nostr/profiles";
+import { fetchUserProfile, parseUserProfile } from "../nostr/profiles";
+import { useParticipantHistory } from "./participantHistory";
 
 export interface IParticipant {
   publicKey: string;
   picture?: string;
   name?: string;
+  displayName?: string;
   /** Profile-declared NIP-05 identifier; callers must verify it before trust. */
   nip05?: string;
   createdAt?: number;
   fetching: boolean;
 }
 
+let participantGeneration = 0;
+
 export const useParticipants = create<{
   participants: Record<string, IParticipant>;
   fetchParticipant: (participant: IParticipant["publicKey"]) => void;
+  clearParticipants: () => void;
 }>((set) => ({
   participants: {},
   fetchParticipant: async (participantPubKey) => {
+    const generation = participantGeneration;
+    const accountPubkey = useParticipantHistory.getState().accountPubkey;
     set(({ participants }) => ({
       participants: {
         ...participants,
@@ -27,38 +34,55 @@ export const useParticipants = create<{
       },
     }));
 
-    const event = await fetchUserProfile(participantPubKey);
+    try {
+      const event = await fetchUserProfile(participantPubKey);
+      if (generation !== participantGeneration) return;
+      const profile = event ? parseUserProfile(event) : null;
+      if (!profile) return;
 
-    if (event) {
-      const { name, picture, nip05 } = JSON.parse(event.content) as {
-        name: string;
-        picture: string;
-        nip05?: string;
-      };
       set(({ participants }) => ({
         participants: {
           ...participants,
           [participantPubKey]: {
-            name,
-            picture,
-            nip05,
-            publicKey: event.pubkey,
-            createdAt: event.created_at,
+            name: profile.name,
+            displayName: profile.displayName,
+            picture: profile.picture,
+            nip05: profile.nip05,
+            publicKey: profile.pubkey,
+            createdAt: profile.createdAt,
             fetching: false,
           },
         },
       }));
-    } else {
-      set(({ participants }) => ({
-        participants: {
-          ...participants,
-          [participantPubKey]: {
-            publicKey: participantPubKey,
-            fetching: false,
+      useParticipantHistory
+        .getState()
+        .updateProfileSnapshot(accountPubkey, participantPubKey, {
+          name: profile.name,
+          displayName: profile.displayName,
+          picture: profile.picture,
+          nip05: profile.nip05,
+          profileCreatedAt: profile.createdAt,
+        });
+    } catch {
+      // A profile miss or relay failure leaves the participant as pubkey-only.
+    } finally {
+      if (generation === participantGeneration) {
+        set(({ participants }) => ({
+          participants: {
+            ...participants,
+            [participantPubKey]: {
+              ...participants[participantPubKey],
+              publicKey: participantPubKey,
+              fetching: false,
+            },
           },
-        },
-      }));
+        }));
+      }
     }
+  },
+  clearParticipants: () => {
+    participantGeneration += 1;
+    set({ participants: {} });
   },
 }));
 

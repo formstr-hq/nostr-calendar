@@ -168,7 +168,7 @@ export function CalendarEvent({
       end: (record.suggestedEnd ?? nextStartSecs + eventDurationSecs) * 1000,
     };
 
-    await editPrivateCalendarEvent(updated, calendar.id);
+    await editPrivateCalendarEvent(updated, calendar.id, event.participants);
     updateEvent(updated);
   };
 

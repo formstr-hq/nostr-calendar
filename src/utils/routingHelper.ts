@@ -7,6 +7,7 @@ import {
 export enum ROUTES {
   EventPage = "/event/:naddr",
   EditEventPage = "/event/edit/:naddr",
+  EditDeviceEventPage = "/event/edit/device/:eventId",
   DuplicateEventPage = "/event/duplicate/:naddr",
   WeekCalendar = "/w/:year/:startDayOfWeek",
   DayCalendar = "/d/:year/:month/:day",
@@ -44,6 +45,10 @@ export function getEditEventPage(naddr: string, viewKey?: string) {
     urlParam.append("viewKey", viewKey);
   }
   return `/event/edit/${naddr}?${urlParam.toString()}`;
+}
+
+export function getEditDeviceEventPage(eventId: string) {
+  return `/event/edit/device/${encodeURIComponent(eventId)}`;
 }
 
 export function getDuplicateEventPage(naddr: string, viewKey?: string) {

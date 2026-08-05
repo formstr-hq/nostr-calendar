@@ -100,6 +100,30 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
    * 3. Adds it as a pending invitation
    */
   fetchInvitations: async () => {
+    // Calendar membership can change while this standing subscription is
+    // active (for example, accepting through a shared event link). Reconcile
+    // before the early return so accepted events cannot remain in the inbox.
+    const existingEventIds = new Set(
+      useCalendarLists.getState().getAllEventIds(),
+    );
+    if (existingEventIds.size > 0) {
+      pendingBuffer = pendingBuffer.filter(
+        (invitation) => !existingEventIds.has(invitation.eventId),
+      );
+      set((state) => {
+        const updated = state.invitations.filter(
+          (invitation) => !existingEventIds.has(invitation.eventId),
+        );
+        if (updated.length === state.invitations.length) return state;
+
+        const unreadCount = updated.filter(
+          (invitation) => invitation.status === "pending",
+        ).length;
+        saveInvitationsToStorage(updated);
+        return { invitations: updated, unreadCount };
+      });
+    }
+
     // No-op if already listening
     if (isListening) return;
 
@@ -118,7 +142,13 @@ export const useInvitations = create<InvitationsState>((set, get) => ({
         Math.floor(Date.now() / 1000),
       );
 
-      const batch = pendingBuffer.splice(0);
+      const currentEventIds = new Set(
+        useCalendarLists.getState().getAllEventIds(),
+      );
+      const batch = pendingBuffer
+        .splice(0)
+        .filter((invitation) => !currentEventIds.has(invitation.eventId));
+      if (batch.length === 0) return;
 
       const mergeBatchIntoStore = () => {
         set((state) => {

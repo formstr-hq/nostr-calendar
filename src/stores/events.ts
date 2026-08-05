@@ -50,6 +50,8 @@ import {
 import type { ObserveHandle } from "@formstr/local-relay";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
 import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
+import { useUser } from "./user";
+import { useParticipantHistory } from "./participantHistory";
 
 export const EVENTS_STORAGE_KEY = "cal:events";
 
@@ -98,6 +100,13 @@ const syncEventNotifications = async (
 };
 
 let publicSubscription: ObserveHandle | undefined;
+
+const recordParticipantHistory = (events: ICalendarEvent[]) => {
+  const accountPubkey = useUser.getState().user?.pubkey;
+  if (accountPubkey) {
+    useParticipantHistory.getState().recordEvents(accountPubkey, events);
+  }
+};
 
 export { ICalendarEvent };
 
@@ -181,12 +190,15 @@ const processPrivateEvent = (
   }
   if (!changed) return;
 
+  recordParticipantHistory([parsedEvent]);
   void syncEventNotifications(parsedEvent);
   const updatedEvents = denormalize(store);
-  saveEventsToStorage(updatedEvents);
   useTimeBasedEvents.setState({
     eventById: store.byKey,
     events: updatedEvents,
+  });
+  void saveEventsToStorage(updatedEvents).catch((error) => {
+    console.warn("Failed to persist event update", error);
   });
 };
 
@@ -223,15 +235,18 @@ export const useTimeBasedEvents = create<{
   refreshNotificationPreferencesForCalendar: (calendarId: string) => void;
 }>((set) => ({
   addEvent: (newEvent) => {
+    let added = false;
     set(({ events }) => {
       const store = normalize(events);
       if (store.allKeys.includes(newEvent.id))
         return { events, eventById: store.byKey };
       const updated = appendOne(store, newEvent.id, newEvent);
+      added = true;
       const updatedEvents = denormalize(updated);
       saveEventsToStorage(updatedEvents);
       return { eventById: updated.byKey, events: updatedEvents };
     });
+    if (added) recordParticipantHistory([newEvent]);
     void syncEventNotifications(newEvent);
   },
   updateEvent: (updatedEvent) => {
@@ -248,6 +263,7 @@ export const useTimeBasedEvents = create<{
         events: updatedEvents,
       };
     });
+    recordParticipantHistory([updatedEvent]);
     void syncEventNotifications(updatedEvent, { cancelExisting: true });
   },
   removeEvent: (id) => {
@@ -283,16 +299,19 @@ export const useTimeBasedEvents = create<{
   eventById: {},
   isCacheLoaded: false,
   loadCachedEvents: async () => {
+    const accountPubkey = useUser.getState().user?.pubkey;
     const cached = await getSecureItem<ICalendarEvent[]>(
       EVENTS_STORAGE_KEY,
       [],
     );
+    if (useUser.getState().user?.pubkey !== accountPubkey) return;
     if (cached.length > 0) {
       set({
         events: cached,
         eventById: Object.fromEntries(cached.map((e) => [e.id, e])),
         isCacheLoaded: true,
       });
+      recordParticipantHistory(cached);
     } else {
       set({ isCacheLoaded: true });
     }
@@ -462,15 +481,20 @@ export const useTimeBasedEvents = create<{
           ) {
             return { events, eventById };
           }
+          let changed = false;
           if (store.allKeys.includes(parsedEvent.id)) {
             const previousEvent = store.byKey[parsedEvent.id];
             if (parsedEvent.createdAt > previousEvent.createdAt) {
               store = removeOne(store, parsedEvent.id);
               store = appendOne(store, parsedEvent.id, parsedEvent);
+              changed = true;
             }
           } else {
             store = appendOne(store, parsedEvent.id, parsedEvent);
+            changed = true;
           }
+          if (!changed) return { events, eventById };
+          recordParticipantHistory([parsedEvent]);
           void syncEventNotifications(parsedEvent);
           const updatedEvents = denormalize(store);
           saveEventsToStorage(updatedEvents);

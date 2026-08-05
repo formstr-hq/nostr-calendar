@@ -62,6 +62,7 @@ export function CalendarEventCard({
           title={title}
           color={color}
           isPublic={isPublic}
+          isDevice={event.source === "device"}
           time={time}
           onClick={handleClick}
           sx={{ height: "100%", alignItems: "flex-start" }}
@@ -115,6 +116,7 @@ export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
           title={title}
           color={color}
           isPublic={isPublic}
+          isDevice={event.source === "device"}
           onClick={handleClick}
         />
       </Box>

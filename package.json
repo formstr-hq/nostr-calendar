@@ -1,6 +1,6 @@
 {
   "name": "nostr-calendar",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "repository": {
     "url": "https://github.com/formstr-hq/nostr-calendar"
@@ -12,6 +12,7 @@
     "lint": "eslint . --quiet",
     "preview": "vite preview",
     "simulate-android": "pnpm build && pnpm cap run android",
+    "build-android": "bash ./scripts/build-debug-apk.sh",
     "release-android": "./scripts/build-release.sh",
     "create-release": "./scripts/create-release.sh",
     "simulate-ios": "pnpm cap run ios",
@@ -34,7 +35,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource/inter": "^5.3.0",
-    "@formstr/local-relay": "0.5.1",
+    "@formstr/local-relay": "0.6.0",
     "@formstr/sdk": "^0.2.7",
     "@formstr/signer": "^0.2.2",
     "@khadarvsk/capacitor-secure-storage": "0.0.3",

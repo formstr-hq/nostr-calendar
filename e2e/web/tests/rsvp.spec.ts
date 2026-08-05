@@ -142,4 +142,12 @@ test("host applies a participant's suggested time", async ({
   await expect(
     alice.getByRole("button", { name: "view suggested time" }),
   ).not.toBeVisible();
+
+  // Applying an update must not re-invite a participant who already accepted
+  // the event into a calendar.
+  await navigate(bob, "/notifications", TEST_KEYS.bob);
+  await bob.waitForTimeout(6_000);
+  await expect(
+    bob.getByTestId("invitation-card").filter({ hasText: title }),
+  ).not.toBeVisible();
 });

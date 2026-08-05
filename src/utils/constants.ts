@@ -1,4 +1,5 @@
 export const PX_PER_MINUTE = 1;
+export const MIN_TIMED_EVENT_DURATION_MINUTES = 20;
 
 export const ANONYMOUS_USER_NAME = "Anon...";
 

@@ -51,9 +51,9 @@ const getRSVPIcon = (response: RSVPStatus, theme: Theme) => {
 const truncateText = (text: string, maxLength: number = 20) => {
   if (text.length <= maxLength) return text;
 
-  // For npub, show first 8 and last 4 characters
+  // Keep the identity recognizable while fitting narrow participant rows.
   if (text.startsWith("npub")) {
-    return `${text.slice(0, 8)}...${text.slice(-4)}`;
+    return `${text.slice(0, 7)}....${text.slice(-3)}`;
   }
 
   // For regular names, truncate with ellipsis
@@ -73,7 +73,7 @@ export const Participant = ({
     intl.formatMessage({ id: "participant.clickToCopy" }),
   );
 
-  const displayName = participant?.name || npub;
+  const displayName = participant?.displayName || participant?.name || npub;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();

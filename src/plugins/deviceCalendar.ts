@@ -4,7 +4,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
  * Bridge to the device's native calendar database.
  *
  * Android: backed by `CalendarContract` (Calendars + Instances + Events).
- * iOS: not implemented yet — `isAvailable()` returns false on non-Android.
+ * iOS: backed by EventKit (`EKEventStore`).
  * Web: not implemented — calls reject; UI must gate on `isAvailable()`.
  */
 
@@ -58,6 +58,35 @@ export interface ListEventsOptions {
   endMs: number;
 }
 
+export interface CreateDeviceEventOptions {
+  calendarId: string;
+  title: string;
+  description: string;
+  location: string;
+  beginMs: number;
+  endMs: number;
+  allDay: boolean;
+  rrule?: string;
+}
+
+export interface UpdateDeviceEventOptions {
+  /** The composite id as returned by listEvents (e.g. "instanceId:eventId"). */
+  id: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  beginMs?: number;
+  endMs?: number;
+  allDay?: boolean;
+  /** Pass an empty string to clear recurrence. */
+  rrule?: string;
+}
+
+export interface UpdateCalendarColorResult {
+  /** False when the OS/account rejected the write (e.g. some Google-synced calendars). */
+  applied: boolean;
+}
+
 export interface DeviceCalendarPluginShape {
   checkPermissions(): Promise<DeviceCalendarPermissionStatus>;
   requestPermissions(): Promise<DeviceCalendarPermissionStatus>;
@@ -65,6 +94,13 @@ export interface DeviceCalendarPluginShape {
   listEvents(
     options: ListEventsOptions,
   ): Promise<{ events: DeviceCalendarEvent[] }>;
+  createEvent(options: CreateDeviceEventOptions): Promise<{ eventId: string }>;
+  updateEvent(options: UpdateDeviceEventOptions): Promise<void>;
+  deleteEvent(options: { id: string }): Promise<void>;
+  updateCalendarColor(options: {
+    calendarId: string;
+    color: string;
+  }): Promise<UpdateCalendarColorResult>;
 }
 
 const deviceCalendar =
@@ -72,7 +108,7 @@ const deviceCalendar =
 
 /** True only on platforms where the native plugin is implemented. */
 export function isAvailable(): boolean {
-  return Capacitor.getPlatform() === "android";
+  return ["android", "ios"].includes(Capacitor.getPlatform());
 }
 
 export const DeviceCalendar = {
@@ -94,5 +130,25 @@ export const DeviceCalendar = {
     if (!isAvailable()) return [];
     const result = await deviceCalendar.listEvents(options);
     return result.events ?? [];
+  },
+  async createEvent(options: CreateDeviceEventOptions): Promise<string> {
+    if (!isAvailable()) throw new Error("Device calendar is not available");
+    const result = await deviceCalendar.createEvent(options);
+    return result.eventId;
+  },
+  async updateEvent(options: UpdateDeviceEventOptions): Promise<void> {
+    if (!isAvailable()) throw new Error("Device calendar is not available");
+    await deviceCalendar.updateEvent(options);
+  },
+  async deleteEvent(id: string): Promise<void> {
+    if (!isAvailable()) throw new Error("Device calendar is not available");
+    await deviceCalendar.deleteEvent({ id });
+  },
+  async updateCalendarColor(
+    calendarId: string,
+    color: string,
+  ): Promise<UpdateCalendarColorResult> {
+    if (!isAvailable()) return { applied: false };
+    return deviceCalendar.updateCalendarColor({ calendarId, color });
   },
 };

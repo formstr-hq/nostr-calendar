@@ -8,7 +8,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Tooltip,
   CircularProgress,
   Dialog,
@@ -121,17 +120,23 @@ export const SchedulingPagesList = ({
               sx={{
                 px: 0.5,
                 borderRadius: 1,
+                gap: 0.5,
                 "&:hover": { backgroundColor: "action.hover" },
               }}
             >
               <ListItemText
-                primary={page.title}
-                primaryTypographyProps={{ variant: "body2", noWrap: true }}
+                sx={{ minWidth: 0 }}
+                primary={
+                  <Tooltip title={page.title} placement="top">
+                    <Typography variant="body2" noWrap>
+                      {page.title}
+                    </Typography>
+                  </Tooltip>
+                }
               />
-              <ListItemSecondaryAction>
+              <Box sx={{ display: "flex", flexShrink: 0 }}>
                 <Tooltip title={formatMessage({ id: "scheduling.copyLink" })}>
                   <IconButton
-                    edge="end"
                     size="small"
                     aria-label="copy booking link"
                     onClick={() => handleCopyLink(page.id)}
@@ -169,7 +174,7 @@ export const SchedulingPagesList = ({
                     <DeleteIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-              </ListItemSecondaryAction>
+              </Box>
             </ListItem>
           ))}
         </List>

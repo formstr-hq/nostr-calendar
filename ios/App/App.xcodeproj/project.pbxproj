@@ -11,19 +11,61 @@
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		A19F5107218F7D0100000001 /* IOSNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		97FBD07F301E945F00A40FDD /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 97FBD07E301E945F00A40FDD /* CryptoSwift */; };
+		97FBD082301E950200A40FDD /* P256K in Frameworks */ = {isa = PBXBuildFile; productRef = 97FBD081301E950200A40FDD /* P256K */; };
+		97FBD08A301F5C1B00A40FDD /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FBD089301F5C1A00A40FDD /* MainViewController.swift */; };
+		A19F5107218F7D0100000001 /* IOSNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */; };
+		A19F5107218F7D0100000003 /* KeyBackupPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */; };
+		A19F5107218F7D0100000005 /* IOSRelayQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */; };
+		A19F5107218F7D0100000007 /* IOSIncomingNotificationPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */; };
+		A19F5107218F7D0100000009 /* IOSBackgroundNotificationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */; };
+		A19F5107218F7D0100000011 /* NotificationSchedulerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */; };
+		A19F5107218F7D0100000013 /* IOSWidgetDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000014 /* IOSWidgetDataBridge.swift */; };
+		A19F5107218F7D0100000015 /* DeviceCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000016 /* DeviceCalendarPlugin.swift */; };
+		A19F5107218F7D0100000017 /* IOSDeviceCalendarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000018 /* IOSDeviceCalendarStore.swift */; };
+		A19F5107218F7D0100000019 /* IOSRecurrenceRuleCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000020 /* IOSRecurrenceRuleCodec.swift */; };
+		A19F5107218F7D0100000021 /* Nip44.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000022 /* Nip44.swift */; };
+		A19F5107218F7D0100000023 /* IOSEventUpdatePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19F5107218F7D0100000024 /* IOSEventUpdatePoller.swift */; };
+		B10000000000000000000001 /* CalendarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CalendarWidget.swift */; };
+		B10000000000000000000002 /* CalendarWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* CalendarWidgetIntent.swift */; };
+		B10000000000000000000003 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* WidgetDataStore.swift */; };
+		B10000000000000000000004 /* WidgetRecurrence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* WidgetRecurrence.swift */; };
+		B10000000000000000000005 /* CalendarWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* CalendarWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B70000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B40000000000000000000001;
+			remoteInfo = CalendarWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B30000000000000000000004 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B10000000000000000000005 /* CalendarWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSNotificationScheduler.swift; sourceTree = "<group>"; };
 		504EC3091FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -31,6 +73,26 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		97FBD089301F5C1A00A40FDD /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSNotificationScheduler.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBackupPlugin.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRelayQueryClient.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSIncomingNotificationPoller.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSBackgroundNotificationCoordinator.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSchedulerPlugin.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000014 /* IOSWidgetDataBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSWidgetDataBridge.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000016 /* DeviceCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceCalendarPlugin.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000018 /* IOSDeviceCalendarStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDeviceCalendarStore.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000020 /* IOSRecurrenceRuleCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRecurrenceRuleCodec.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000022 /* Nip44.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Nip44.swift; sourceTree = "<group>"; };
+		A19F5107218F7D0100000024 /* IOSEventUpdatePoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSEventUpdatePoller.swift; sourceTree = "<group>"; };
+		B20000000000000000000001 /* CalendarWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidget.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* CalendarWidgetIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidgetIntent.swift; sourceTree = "<group>"; };
+		B20000000000000000000003 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* WidgetRecurrence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRecurrence.swift; sourceTree = "<group>"; };
+		B20000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B20000000000000000000006 /* CalendarWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CalendarWidget.entitlements; sourceTree = "<group>"; };
+		B20000000000000000000007 /* CalendarWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CalendarWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -38,7 +100,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				97FBD082301E950200A40FDD /* P256K in Frameworks */,
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				97FBD07F301E945F00A40FDD /* CryptoSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,6 +121,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				B20000000000000000000008 /* CalendarWidget */,
+				97FBD07D301E945F00A40FDD /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -58,6 +131,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				B20000000000000000000007 /* CalendarWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,6 +142,17 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A19F5107218F7D0100000002 /* IOSNotificationScheduler.swift */,
+				A19F5107218F7D0100000006 /* IOSRelayQueryClient.swift */,
+				A19F5107218F7D0100000008 /* IOSIncomingNotificationPoller.swift */,
+				A19F5107218F7D0100000010 /* IOSBackgroundNotificationCoordinator.swift */,
+				A19F5107218F7D0100000004 /* KeyBackupPlugin.swift */,
+				A19F5107218F7D0100000012 /* NotificationSchedulerPlugin.swift */,
+				A19F5107218F7D0100000014 /* IOSWidgetDataBridge.swift */,
+				A19F5107218F7D0100000016 /* DeviceCalendarPlugin.swift */,
+				A19F5107218F7D0100000018 /* IOSDeviceCalendarStore.swift */,
+				A19F5107218F7D0100000020 /* IOSRecurrenceRuleCodec.swift */,
+				A19F5107218F7D0100000022 /* Nip44.swift */,
+				A19F5107218F7D0100000024 /* IOSEventUpdatePoller.swift */,
 				504EC3091FED79650016851F /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -75,8 +160,29 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				97FBD089301F5C1A00A40FDD /* MainViewController.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		97FBD07D301E945F00A40FDD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B20000000000000000000008 /* CalendarWidget */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* CalendarWidget.swift */,
+				B20000000000000000000002 /* CalendarWidgetIntent.swift */,
+				B20000000000000000000003 /* WidgetDataStore.swift */,
+				B20000000000000000000004 /* WidgetRecurrence.swift */,
+				B20000000000000000000005 /* Info.plist */,
+				B20000000000000000000006 /* CalendarWidget.entitlements */,
+			);
+			path = CalendarWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -89,18 +195,41 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				B30000000000000000000004 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B50000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = App;
+			packageProductDependencies = (
+				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
+				97FBD07E301E945F00A40FDD /* CryptoSwift */,
+				97FBD081301E950200A40FDD /* P256K */,
+			);
+			productName = App;
+			productReference = 504EC3041FED79650016851F /* App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B40000000000000000000001 /* CalendarWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B60000000000000000000003 /* Build configuration list for PBXNativeTarget "CalendarWidget" */;
+			buildPhases = (
+				B30000000000000000000001 /* Sources */,
+				B30000000000000000000002 /* Frameworks */,
+				B30000000000000000000003 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = App;
+			name = CalendarWidget;
 			packageProductDependencies = (
-				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
 			);
-			productName = App;
-			productReference = 504EC3041FED79650016851F /* App.app */;
-			productType = "com.apple.product-type.application";
+			productName = CalendarWidget;
+			productReference = B20000000000000000000007 /* CalendarWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -116,6 +245,10 @@
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
 					};
+					B40000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -129,12 +262,15 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				9706ABCC301E929300DA2898 /* XCRemoteSwiftPackageReference "CryptoSwift" */,
+				97FBD080301E950200A40FDD /* XCRemoteSwiftPackageReference "swift-secp256k1" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				B40000000000000000000001 /* CalendarWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -153,6 +289,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -162,10 +305,41 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A19F5107218F7D0100000001 /* IOSNotificationScheduler.swift in Sources */,
+				A19F5107218F7D0100000005 /* IOSRelayQueryClient.swift in Sources */,
+				A19F5107218F7D0100000007 /* IOSIncomingNotificationPoller.swift in Sources */,
+				A19F5107218F7D0100000009 /* IOSBackgroundNotificationCoordinator.swift in Sources */,
+				A19F5107218F7D0100000003 /* KeyBackupPlugin.swift in Sources */,
+				A19F5107218F7D0100000011 /* NotificationSchedulerPlugin.swift in Sources */,
+				97FBD08A301F5C1B00A40FDD /* MainViewController.swift in Sources */,
+				A19F5107218F7D0100000013 /* IOSWidgetDataBridge.swift in Sources */,
+				A19F5107218F7D0100000015 /* DeviceCalendarPlugin.swift in Sources */,
+				A19F5107218F7D0100000017 /* IOSDeviceCalendarStore.swift in Sources */,
+				A19F5107218F7D0100000019 /* IOSRecurrenceRuleCodec.swift in Sources */,
+				A19F5107218F7D0100000021 /* Nip44.swift in Sources */,
+				A19F5107218F7D0100000023 /* IOSEventUpdatePoller.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000001 /* CalendarWidget.swift in Sources */,
+				B10000000000000000000002 /* CalendarWidgetIntent.swift in Sources */,
+				B10000000000000000000003 /* WidgetDataStore.swift in Sources */,
+				B10000000000000000000004 /* WidgetRecurrence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B50000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B40000000000000000000001 /* CalendarWidget */;
+			targetProxy = B70000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -305,7 +479,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -328,7 +502,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = NADT9U5T9G;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -339,6 +514,56 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.formstr.calendar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B60000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = CalendarWidget/CalendarWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CalendarWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.formstr.calendar.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B60000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = CalendarWidget/CalendarWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NADT9U5T9G;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CalendarWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.formstr.calendar.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -365,6 +590,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		B60000000000000000000003 /* Build configuration list for PBXNativeTarget "CalendarWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B60000000000000000000001 /* Debug */,
+				B60000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -374,11 +608,40 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		9706ABCC301E929300DA2898 /* XCRemoteSwiftPackageReference "CryptoSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.10.0;
+			};
+		};
+		97FBD080301E950200A40FDD /* XCRemoteSwiftPackageReference "swift-secp256k1" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/21-DOT-DEV/swift-secp256k1";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.23.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		97FBD07E301E945F00A40FDD /* CryptoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9706ABCC301E929300DA2898 /* XCRemoteSwiftPackageReference "CryptoSwift" */;
+			productName = CryptoSwift;
+		};
+		97FBD081301E950200A40FDD /* P256K */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 97FBD080301E950200A40FDD /* XCRemoteSwiftPackageReference "swift-secp256k1" */;
+			productName = P256K;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

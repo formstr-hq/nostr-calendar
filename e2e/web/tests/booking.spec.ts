@@ -84,7 +84,7 @@ test("booker requests a slot and the host approves it", async ({
 
   // Booker sees the approval in their Outgoing tab.
   await openBookingsViaSidebar(bob);
-  await bob.getByRole("tab", { name: "Outgoing" }).click();
+  await bob.getByRole("radio", { name: "Outgoing" }).click();
   const sentCard = bob
     .getByTestId("booking-request-card")
     .filter({ hasText: meetingTitle });
@@ -122,7 +122,7 @@ test("booker requests a slot and the host declines it with a reason", async ({
 
   // Booker sees the decline in their Outgoing tab.
   await openBookingsViaSidebar(bob);
-  await bob.getByRole("tab", { name: "Outgoing" }).click();
+  await bob.getByRole("radio", { name: "Outgoing" }).click();
   const sentCard = bob
     .getByTestId("booking-request-card")
     .filter({ hasText: meetingTitle });

@@ -154,3 +154,6 @@ keystore.properties
 playwright-report/
 test-results/
 .e2e-tsbuild/
+*debug-android.zip
+
+.idea

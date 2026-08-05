@@ -13,6 +13,11 @@ import { getRelays } from "../../../common/relayConfig";
 import { EventKinds } from "../../../nostr/kinds";
 import { useTimeBasedEvents } from "../../../stores/events";
 import { useCalendarLists } from "../../../stores/calendarLists";
+import { useDeviceCalendars } from "../../../stores/deviceCalendars";
+import {
+  deviceEventStableId,
+  stripDeviceCalendarPrefix,
+} from "../../../utils/deviceCalendarAdapter";
 import { parseEventRef } from "../../../utils/calendarListTypes";
 import { uniqueParticipants } from "../../../utils/participants";
 import { isAllDayEvent } from "../../../utils/dateHelper";
@@ -91,6 +96,45 @@ export function useEventSave({
         allDay: isAllDayEvent(eventDetails.begin, eventDetails.end),
       };
       let savedEvent: ICalendarEvent = eventToSave;
+
+      // Device events have no Nostr identity: fully bypass publish machinery,
+      // useTimeBasedEvents, and useCalendarLists (no calendar move — the picker
+      // is locked read-only for device events). Notification scheduling still
+      // runs below, keyed by the stable device id rather than savedEvent.id.
+      if (eventDetails.source === "device") {
+        await useDeviceCalendars.getState().updateDeviceEvent(eventToSave);
+
+        const stableId = deviceEventStableId(
+          eventToSave.id,
+          stripDeviceCalendarPrefix(eventToSave.calendarId),
+        );
+
+        if (
+          areNotificationOffsetsEqual(
+            normalizedNotificationOffsets,
+            DEFAULT_NOTIFICATION_OFFSETS,
+          )
+        ) {
+          await clearNotificationPreference(stableId);
+        } else {
+          await setNotificationPreference(
+            stableId,
+            normalizedNotificationOffsets,
+          );
+        }
+
+        await cancelEventNotifications(stableId);
+        useNotifications.getState().removeNotifications(stableId);
+        const notifications = await scheduleEventNotifications({
+          ...eventToSave,
+          id: stableId,
+        });
+        useNotifications.getState().setNotifications(stableId, notifications);
+
+        onClose();
+        return;
+      }
+
       const hasParticipants = eventToSave.participants.length > 0;
 
       const stepDefs: PublishStepDefinition[] = [];

@@ -30,6 +30,10 @@
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).notification-refresh</string>
 	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>See and manage events from your phone's calendar alongside your Nostr events.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>See and manage events from your phone's calendar alongside your Nostr events.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

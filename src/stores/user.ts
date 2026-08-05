@@ -19,6 +19,8 @@ import { useBookingRequests } from "./bookingRequests";
 import { useSchedulingPages } from "./schedulingPages";
 import { restartDataLayerWiped } from "../dataLayer/bootstrap";
 import { useSettings } from "./settings";
+import { useParticipantHistory } from "./participantHistory";
+import { useParticipants } from "./participants";
 import {
   BG_KEY_USER_PUBKEY,
   BG_KEY_RELAYS,
@@ -48,7 +50,7 @@ export const useUser = create<{
   showLoginModal: boolean;
   updateLoginModal: (show: boolean) => void;
   updateUser: (user: IUser) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   initializeUser: () => Promise<void>;
 }>((set) => ({
   showLoginModal: false,
@@ -66,7 +68,7 @@ export const useUser = create<{
   },
   logout: async () => {
     logger.log("logout: start");
-    signerManager.logout();
+    await signerManager.logout();
     logger.log("logout: signer logged out");
     cancelAllNotifications();
     logger.log("logout: notifications cancelled");
@@ -79,6 +81,12 @@ export const useUser = create<{
     await useInvitations.getState().clearCachedInvitations();
     await useBookingRequests.getState().clearCached();
     await useSchedulingPages.getState().clearCachedPages();
+    useParticipants.getState().clearParticipants();
+    try {
+      await useParticipantHistory.getState().wipe();
+    } catch (error) {
+      console.warn("Failed to wipe participant history", error);
+    }
     // Clear background worker keys
     logger.log("logout: cached invitations cleared");
     await removeSecureItem(BG_KEY_USER_PUBKEY);
@@ -136,12 +144,18 @@ const onUserChange = async () => {
       logger.log("onUserChange: new user detected, resetting private events");
       const eventManager = useTimeBasedEvents.getState();
       eventManager.resetPrivateEvents();
+      useParticipants.getState().clearParticipants();
+      await useParticipantHistory
+        .getState()
+        .initializeAccount(cachedUser.pubkey);
+      if (signerManager.getUser()?.pubkey !== cachedUser.pubkey) return;
       logger.log("onUserChange: loading cached calendars and invitations");
       await Promise.all([
         useRelayStore.getState().loadCachedRelays(),
         useCalendarLists.getState().loadCachedCalendars(),
         useTimeBasedEvents.getState().loadCachedEvents(),
       ]);
+      if (signerManager.getUser()?.pubkey !== cachedUser.pubkey) return;
     } else {
       logger.log("onUserChange: same user, no re-initialization needed");
     }

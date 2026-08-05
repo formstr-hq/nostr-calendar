@@ -7,6 +7,7 @@ import {
   type Theme,
 } from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
+import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import { publicTint, getContrastText, radius } from "../../theme/tokens";
 import { isMobile } from "../../common/utils";
 
@@ -15,6 +16,8 @@ interface EventChipProps {
   color: string;
   time?: string;
   isPublic?: boolean;
+  /** Device (OS-calendar) event — same solid-fill shape as private, phone icon instead of no icon. */
+  isDevice?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   sx?: SxProps<Theme>;
 }
@@ -22,10 +25,14 @@ interface EventChipProps {
 /**
  * Public = tinted background (12%/16%) + globe + colored bold text.
  * Private = solid fill + contrast text.
+ * Device = solid fill (same shape as private) + phone icon + contrast text.
  * Used across Month/Week/Day event rendering and the EventQuickPeek popover.
  */
 export const EventChip = forwardRef<HTMLElement, EventChipProps>(
-  function EventChip({ title, color, time, isPublic, onClick, sx }, ref) {
+  function EventChip(
+    { title, color, time, isPublic, isDevice, onClick, sx },
+    ref,
+  ) {
     const { mode, systemMode } = useColorScheme();
     const resolvedMode = mode === "system" ? systemMode : mode;
     const tint = resolvedMode === "dark" ? publicTint.dark : publicTint.light;
@@ -61,6 +68,7 @@ export const EventChip = forwardRef<HTMLElement, EventChipProps>(
         ]}
       >
         {isPublic && <PublicIcon sx={{ fontSize: 13, flexShrink: 0 }} />}
+        {isDevice && <PhoneIphoneIcon sx={{ fontSize: 13, flexShrink: 0 }} />}
         {time && !isMobile && (
           <Box component="span" sx={{ opacity: 0.85, flexShrink: 0 }}>
             {time}

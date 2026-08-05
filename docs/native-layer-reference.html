@@ -280,6 +280,7 @@
     <ul>
       <li><a href="#i-appdelegate">AppDelegate</a></li>
       <li><a href="#i-scheduler">IOSNotificationScheduler</a></li>
+      <li><a href="#i-widget">CalendarWidget</a></li>
       <li><a href="#i-gaps">What isn't there</a></li>
     </ul>
 
@@ -308,7 +309,7 @@
 
     <section class="category" id="substrate">
       <h2>The shared substrate</h2>
-      <p class="category-note">Native code and the web app never call each other directly for calendar data. They meet through one thing: Capacitor's Preferences plugin, which is <code>localStorage</code> to the JS layer and a plain key/value file to native code — <code>SharedPreferences</code> file <code>CapacitorStorage</code> on Android, <code>UserDefaults</code> keys prefixed <code>CapacitorStorage.</code> on iOS. No ContentProvider, no shared database, no other IPC exists between the two worlds.</p>
+      <p class="category-note">Native code and the web app never call each other directly for calendar data. They meet through Capacitor's Preferences plugin, which is <code>localStorage</code> to the JS layer and a plain key/value file to native code — <code>SharedPreferences</code> file <code>CapacitorStorage</code> on Android, <code>UserDefaults</code> keys prefixed <code>CapacitorStorage.</code> on iOS. iOS additionally mirrors the widget-safe subset into the <code>group.app.formstr.calendar</code> App Group because extensions cannot read the app's private defaults container.</p>
 
       <div class="substrate">
         <div class="substrate-row">
@@ -371,7 +372,7 @@
 
       <article class="flow" id="js-fork">
         <h3>Platform fork <span class="chip file">notifications.ts</span></h3>
-        <p>Every exported function in <code>src/utils/notifications.ts</code> — <code>scheduleEventNotifications</code>, <code>requestNotificationPermission</code>, <code>cancelEventNotifications</code>, <code>cancelAllNotifications</code>, <code>addNotificationClickListener</code> — opens with <code>if (!isNative) return …</code>. From there it splits again on <code>isAndroidNative()</code>:</p>
+        <p>Every exported function in <code>src/utils/notifications.ts</code> — <code>scheduleEventNotifications</code>, <code>requestNotificationPermission</code>, <code>cancelEventNotifications</code>, <code>cancelAllNotifications</code>, <code>addNotificationClickListener</code> — opens with <code>if (!isNative) return …</code>. Native scheduling is then delegated through the platform's <code>NotificationScheduler</code> plugin:</p>
         <table class="tagtable">
           <tr><th>Platform</th><th>What actually schedules</th></tr>
           <tr><td class="tagname"><span class="chip android">Android</span></td><td><code>scheduleEventNotifications</code> computes a candidate list purely to show the user a "next reminder" preview, then just calls <code>reconcile()</code> — the real <code>AlarmManager</code> call happens entirely inside <code>NotificationWorker.doWork()</code>, re-reading the cache and re-expanding recurrence a second time with its own engine.</td></tr>
@@ -404,7 +405,7 @@
             <li><strong>Internal <code>openRoute</code> extra</strong> — the string every notification and widget tap uses to jump to a specific screen (<code>/bookings</code>, <code>/notifications</code>, <code>/notification-event/&lt;id&gt;</code>).</li>
           </ul>
         </div>
-        <div class="field"><span class="label">The cold-start race</span><p>All three funnel into <code>window.dispatchEvent(new CustomEvent(...))</code> calls injected via <code>evaluateJavascript</code> — but only once the JS layer has called the <code>AppReady</code> plugin's <code>notifyReady()</code>. Until then, routes and ICS content sit in <code>pendingRoute</code>/<code>pendingIcsContent</code> and flush the moment the app signals it's ready. This is the fix for a deep link firing before React has mounted its listeners.</p></div>
+        <div class="field"><span class="label">The cold-start race</span><p>All three funnel into <code>window.dispatchEvent(new CustomEvent(...))</code> calls injected via <code>evaluateJavascript</code> — but only once the JS layer has called the <code>AppReady</code> plugin's <code>notifyReady()</code>. Until then, routes and ICS content sit in <code>pendingRoute</code>/<code>pendingIcsContent</code> and flush the moment the app signals it's ready. The shared JS <code>ICSListener</code> passively listens for <code>icsFileReceived</code> on every platform; Android is currently the only native producer. This is the fix for a deep link firing before React has mounted its listeners.</p></div>
       </article>
 
       <article class="flow" id="a-workers">
@@ -413,9 +414,19 @@
           <tr><th>Worker</th><th>Cadence</th><th>Constraints</th><th>Reads network?</th><th>Decrypts?</th></tr>
           <tr><td class="k">NotificationWorker</td><td>Every 6h, + once immediately on launch</td><td>none</td><td>No — local cache only</td><td>No</td></tr>
           <tr><td class="k">InvitationWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
-          <tr><td class="k">BookingWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
-        </table>
-        <p class="trigger" style="margin-top:14px;">All three are <code>androidx.work.Worker</code> jobs, so the OS can run them even with the app fully killed, subject to Doze/battery restrictions.</p>
+           <tr><td class="k">BookingWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — up to 3 relays</td><td>No — counts only</td></tr>
+           <tr><td class="k">EventUpdateWorker</td><td>Every 15 min</td><td>Network connected</td><td>Yes — cached event coordinates, up to 3 relays</td><td>Private event payloads via their cached NIP-44 view key</td></tr>
+         </table>
+        <p class="trigger" style="margin-top:14px;">All four are <code>androidx.work.Worker</code> jobs, so the OS can run them even with the app fully killed, subject to Doze/battery restrictions.</p>
+      </article>
+
+      <article class="flow" id="a-event-update-worker">
+        <h3>EventUpdateWorker <span class="chip file">EventUpdateWorker.java</span> <span class="chip android">Android only</span></h3>
+        <p>Every 15 minutes while network-connected, the worker reads <code>cal:events</code> once and selects only private events that are still in the future or have an RRULE. Public events, device events, invitations, and entries without a cached NIP-44 view key are ignored. Following NIP-01's filter semantics, it sends one <code>REQ</code> per relay containing one or more OR filters grouped by exact kind and author; each filter carries the complete list of d-tags for that group. This avoids the false kind/author/d-tag combinations a single cross-product filter would admit. Every response is also validated against the exact cached coordinates before the newest replacement is retained.</p>
+        <p>Each accepted private replacement is NIP-44-decrypted with its cached nsec view key. The worker compares time, title, description, location, image, recurrence, categories, references, forms, notification preference, and participant additions. Participant removals alone do not alert; additions do. The event author and a participant who was removed are not notified. The foreground WebView still accepts and caches relay replacements but does not independently post update notifications.</p>
+        <p>All accepted replacements are committed to <code>cal:events</code> before reminders are reconciled or any <strong>Event updates</strong> channel notification is posted. Each notification opens <code>/notification-event/&lt;d-tag&gt;</code>.</p>
+        <p>When start, end, recurrence, or notification preference changes, it immediately enqueues NotificationWorker. Its existing desired-schedule diff cancels stale alarms and creates reminders at the new times using the user's saved offsets. Every cache update also calls <code>CalendarWidget.refreshAll()</code>.</p>
+        <p>Debug logging under the <code>EventUpdateWorker</code> tag records every major checkpoint: cache/user/relay loading, eligibility and filter counts, each relay query and retained coordinate, replacement parsing/comparison and notification decisions, cache persistence, widget/reminder reconciliation, notification posting, and the final run summary.</p>
       </article>
 
       <article class="flow" id="a-notifworker">
@@ -456,12 +467,12 @@
 
       <article class="flow" id="a-relay">
         <h3>RelayQueryUtils <span class="chip file">RelayQueryUtils.java · 113 lines</span></h3>
-        <p>The entire Nostr client the background workers need — and nothing more. Raw OkHttp WebSockets, no signing, no relay pool, no reconnect/backoff. Rewrites <code>wss://</code>/<code>ws://</code> to <code>https://</code>/<code>http://</code> for OkHttp's request builder, sends one <code>["REQ", subId, filter]</code>, streams <code>EVENT</code> frames to a caller callback, sends <code>CLOSE</code> and disconnects the moment <code>EOSE</code> arrives — all bounded by a 15-second <code>CountDownLatch</code> timeout shared by both workers.</p>
+        <p>The entire Nostr client the background workers need — and nothing more. Raw OkHttp WebSockets, no signing, no relay pool, no reconnect/backoff. Rewrites <code>wss://</code>/<code>ws://</code> to <code>https://</code>/<code>http://</code> for OkHttp's request builder, sends one NIP-01 <code>["REQ", subId, filter1, filter2, ...]</code> with either one or several filters, streams <code>EVENT</code> frames to a caller callback, sends <code>CLOSE</code> and disconnects the moment <code>EOSE</code> arrives — all bounded by a 15-second <code>CountDownLatch</code> timeout shared by the workers.</p>
       </article>
 
       <article class="flow" id="a-widget">
-        <h3>CalendarWidget <span class="chip file">CalendarWidget.java · 214 lines</span> <span class="chip android">Android only</span></h3>
-        <p>A home-screen <code>AppWidgetProvider</code> showing up to 3 upcoming events. Refreshed both by the OS's own <code>APPWIDGET_UPDATE</code> tick and explicitly at the end of every NotificationWorker run. Reads the same <code>cal:events</code> cache, independently re-deriving each recurring event's next occurrence — a third call site for RecurrenceUtils, alongside NotificationWorker and the JS calendar view itself — over a fixed 3-day lookahead. Row times render as a clock time (today), "Tomorrow", or a weekday abbreviation. Tapping anywhere launches MainActivity.</p>
+        <h3>CalendarWidget <span class="chip file">CalendarWidget.java</span></h3>
+        <p>A home-screen <code>AppWidgetProvider</code> showing upcoming events from a configurable set of Nostr and device calendars over seven local calendar days (today plus the next six days). Refreshed both by the OS's own <code>APPWIDGET_UPDATE</code> tick and explicitly after background event updates. Reads <code>cal:events</code> for Nostr data, queries selected device calendars through <code>CalendarContract.Instances</code>, and independently re-derives each recurring Nostr event's next occurrence in the display window. Today's events appear directly below the widget's date header; later events are grouped under full weekday/date headings and every row starts with a clock time or "All day". The resizable layout shows up to five events as height permits and reports any remainder as <code>+N more</code>. Tapping anywhere launches MainActivity.</p>
       </article>
 
       <article class="flow" id="a-plugins">
@@ -488,7 +499,7 @@
     <!-- ================= IOS ================= -->
     <section class="category wide" id="cat-ios">
       <h2>iOS <span class="chip ios">App</span></h2>
-      <p class="category-note">Two custom files exist under <code>ios/App/App/</code>, against Android's twelve. What's built mirrors Android closely; what's missing is most of it.</p>
+      <p class="category-note">The Capacitor app target owns notification, relay-polling, device-calendar, and widget-cache bridges. A separate WidgetKit extension under <code>ios/App/CalendarWidget/</code> renders home-screen data without starting the WebView.</p>
 
       <article class="flow" id="i-appdelegate">
         <h3>AppDelegate <span class="chip file">AppDelegate.swift · 52 lines</span></h3>
@@ -503,13 +514,22 @@
         <div class="field"><span class="label">Where the platforms genuinely diverge</span><p>No <code>AlarmManager</code> equivalent exists on iOS, so scheduling uses <code>UNCalendarNotificationTrigger</code> fired by the system, and refresh runs opportunistically via <code>BGAppRefreshTaskRequest</code> rather than on a guaranteed cadence — iOS decides when it actually gets to run, not the app. The scheduler also caps itself at 64 pending notifications total and explicitly reserves headroom for any non-event notifications already pending — a real, system-enforced iOS ceiling Android's AlarmManager has no analog for.</p></div>
       </article>
 
+      <article class="flow" id="i-event-update-poller">
+        <h3>IOSEventUpdatePoller <span class="chip file">IOSEventUpdatePoller.swift</span></h3>
+        <p>Runs before iOS reminder reconciliation on launch, foreground, and an OS-granted background refresh. It mirrors Android's private-only eligibility, one batched <code>REQ</code> per relay with exact kind/author filters and grouped d-tag lists, NIP-44 parsing, exact-coordinate validation, and field comparison, then writes every accepted replacement to the cache before posting an immediate notification in the <code>event_updates</code> thread with a Capacitor <code>openRoute</code> payload.</p>
+        <p>Time, recurrence, or notification-preference changes call <code>IOSNotificationScheduler.reconcileAsync()</code> after the cache write, removing obsolete pending reminders and adding replacements. iOS background refresh timing is controlled by the OS, so this is not guaranteed delivery.</p>
+      </article>
+
+      <article class="flow" id="i-widget">
+        <h3>CalendarWidget <span class="chip ios">iOS 17+</span></h3>
+        <p>A WidgetKit App Intent extension that mirrors Android's compact date header and grouped event list in small and medium families. Its configuration offers the cached Nostr and device calendars, and its timeline reads only App Group snapshots copied by <code>IOSWidgetDataBridge</code>. An empty initial selection preserves the default all-Nostr behavior; an explicit selection filters both sources by calendar ID.</p>
+        <p>The provider uses a seven-local-calendar-day window (today plus the next six days), evaluates recurring Nostr RRULEs, treats EventKit snapshots as already-expanded occurrences, refreshes every 30 minutes, and reloads immediately after app-side event/calendar reconciliation or a native background event update. Today's rows have no redundant heading; later dates receive full weekday/date headings, every event starts with a time or "All day", and <code>ViewThatFits</code> chooses up to five events while reporting hidden rows as <code>+N more</code>. Tapping the widget opens the app's universal-link root.</p>
+      </article>
+
       <article class="flow" id="i-gaps">
         <h3>What isn't there <span class="chip gap">iOS gap</span></h3>
         <ul>
-          <li><strong>No InvitationWorker / BookingWorker equivalent</strong> — no relay polling at all when the app isn't foregrounded, so no background notifications for new invitations or bookings on iOS, ever.</li>
-          <li><strong>No DeviceCalendarPlugin equivalent</strong> — no EventKit bridge exists in Swift, so the device-calendar-import feature (<code>src/plugins/deviceCalendar.ts</code>) has nothing to call into on iOS today.</li>
-          <li><strong>No KeyBackupPlugin equivalent</strong> — the ncryptsec clipboard-copy / file-save flow has no native iOS implementation.</li>
-          <li><strong>No CalendarWidget equivalent</strong> — no WidgetKit extension target exists in the Xcode project at all.</li>
+          <li><strong>No guaranteed invitation / booking polling</strong> — <code>IOSIncomingNotificationPoller</code> can query relays on launch, foreground, and an OS-granted background refresh, but iOS may defer or skip background work. Reliable closed-app delivery still requires a push service.</li>
           <li><strong>No .ics "Open with" registration</strong> — <code>Info.plist</code> declares no <code>CFBundleDocumentTypes</code> / <code>UTExportedTypeDeclarations</code> for <code>.ics</code> or <code>text/calendar</code>, so "Open in Calendar by Form*" for a calendar-file attachment isn't offered by iOS at all.</li>
         </ul>
       </article>
@@ -523,13 +543,13 @@
         <table class="matrix">
           <tr><th>Capability</th><th class="plat">Android</th><th class="plat">iOS</th></tr>
           <tr><td>Local event reminders, app closed</td><td class="plat status-yes">✅<span class="status-note">AlarmManager, exact when permitted</span></td><td class="plat status-yes">✅<span class="status-note">UNCalendarNotificationTrigger, same math</span></td></tr>
-          <tr><td>Invitation background notifications</td><td class="plat status-yes">✅<span class="status-note">InvitationWorker, 15-min poll</span></td><td class="plat status-no">❌<span class="status-note">no equivalent</span></td></tr>
-          <tr><td>Booking background notifications</td><td class="plat status-yes">✅<span class="status-note">BookingWorker, 15-min poll</span></td><td class="plat status-no">❌<span class="status-note">no equivalent</span></td></tr>
-          <tr><td>Home-screen widget</td><td class="plat status-yes">✅<span class="status-note">CalendarWidget, 3 upcoming</span></td><td class="plat status-no">❌<span class="status-note">no WidgetKit target</span></td></tr>
+          <tr><td>Invitation background notifications</td><td class="plat status-yes">✅<span class="status-note">InvitationWorker, 15-min poll</span></td><td class="plat status-partial">⚠️<span class="status-note">opportunistic BG refresh</span></td></tr>
+          <tr><td>Booking background notifications</td><td class="plat status-yes">✅<span class="status-note">BookingWorker, 15-min poll</span></td><td class="plat status-partial">⚠️<span class="status-note">opportunistic BG refresh</span></td></tr>
+          <tr><td>Home-screen widget</td><td class="plat status-yes">✅<span class="status-note">AppWidget, selected calendars</span></td><td class="plat status-yes">✅<span class="status-note">WidgetKit, selected calendars, iOS 17+</span></td></tr>
           <tr><td>Deep link → in-app route</td><td class="plat status-yes">✅<span class="status-note">native parse + JS bridge event</span></td><td class="plat status-partial">⚠️<span class="status-note">OS intercepts; no native route translation</span></td></tr>
           <tr><td>.ics file "Open with"</td><td class="plat status-yes">✅<span class="status-note">3 manifest filters, native read</span></td><td class="plat status-no">❌<span class="status-note">no document-type registration</span></td></tr>
-          <tr><td>Device calendar import</td><td class="plat status-yes">✅<span class="status-note">DeviceCalendarPlugin, read-only</span></td><td class="plat status-no">❌<span class="status-note">no native plugin</span></td></tr>
-          <tr><td>Key backup export</td><td class="plat status-yes">✅<span class="status-note">clipboard + Downloads file</span></td><td class="plat status-no">❌<span class="status-note">no native plugin</span></td></tr>
+          <tr><td>Device calendar import</td><td class="plat status-yes">✅<span class="status-note">CalendarContract bridge</span></td><td class="plat status-yes">✅<span class="status-note">EventKit bridge</span></td></tr>
+          <tr><td>Key backup export</td><td class="plat status-yes">✅<span class="status-note">clipboard + Downloads file</span></td><td class="plat status-yes">✅<span class="status-note">clipboard + share sheet</span></td></tr>
           <tr><td>Secure key storage</td><td class="plat status-yes">✅<span class="status-note">Keystore-backed</span></td><td class="plat status-yes">✅<span class="status-note">same plugin, Keychain-backed</span></td></tr>
           <tr><td>NIP-55 external signer</td><td class="plat status-yes">✅<span class="status-note">real ecosystem (Amber, etc.)</span></td><td class="plat status-partial">⚠️<span class="status-note">plugin linked, no iOS signer apps exist</span></td></tr>
           <tr><td>Guaranteed scheduling</td><td class="plat status-partial">⚠️<span class="status-note">degrades if exact-alarm revoked</span></td><td class="plat status-partial">⚠️<span class="status-note">opportunistic — OS decides timing</span></td></tr>

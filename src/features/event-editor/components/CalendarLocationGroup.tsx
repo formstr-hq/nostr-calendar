@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, TextField, Typography } from "@mui/material";
 import { useIntl } from "react-intl";
 import { CalendarListSelect } from "../../../components/CalendarListSelect";
+import { DeviceCalendarStaticRow } from "./DeviceCalendarStaticRow";
 import { GroupCard, GroupRow } from "./styled";
 
 interface CalendarLocationGroupProps {
@@ -10,6 +11,8 @@ interface CalendarLocationGroupProps {
   calendarsEmpty: boolean;
   location: string[];
   onLocationChange: (location: string[]) => void;
+  /** Locks the calendar picker to a static read-only row for device events. */
+  isDeviceEvent?: boolean;
 }
 
 /** Mobile-only: Calendar + tap-to-edit Location, clubbed into one group card (deviations #6/#7). */
@@ -19,6 +22,7 @@ export function CalendarLocationGroup({
   calendarsEmpty,
   location,
   onLocationChange,
+  isDeviceEvent = false,
 }: CalendarLocationGroupProps) {
   const intl = useIntl();
   const [editingLocation, setEditingLocation] = useState(false);
@@ -56,11 +60,15 @@ export function CalendarLocationGroup({
               justifyContent: "flex-end",
             }}
           >
-            <CalendarListSelect
-              value={selectedCalendarId}
-              onChange={onCalendarChange}
-              variant="row"
-            />
+            {isDeviceEvent ? (
+              <DeviceCalendarStaticRow calendarId={selectedCalendarId} />
+            ) : (
+              <CalendarListSelect
+                value={selectedCalendarId}
+                onChange={onCalendarChange}
+                variant="row"
+              />
+            )}
           </Box>
         </Box>
         {calendarsEmpty && (

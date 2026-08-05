@@ -9,7 +9,7 @@ import {
 } from "@formstr/local-relay";
 import type { EventTemplate } from "nostr-tools";
 import { signerManager } from "../common/signer";
-import { getRelays } from "../common/relayConfig";
+import { getRelays, searchRelays } from "../common/relayConfig";
 import { useRelayStore } from "../stores/relays";
 import { notifyRelayRefresh } from "./relayRefresh";
 import { withLegacyTombstones } from "./legacyTombstones";
@@ -83,6 +83,12 @@ function spawn(): void {
     },
   });
   applyUserRelays();
+  // Optional until the restored API is published; 0.5.x safely falls back to
+  // ordinary relay routing for search interests.
+  const searchClient = client as LocalRelayClient & {
+    setSearchRelays?: (relays: string[]) => void;
+  };
+  searchClient.setSearchRelays?.(searchRelays);
 
   const resilient = withResilientObserve(new DataLayer({ client, sign }));
   disposeResilient = resilient.dispose;

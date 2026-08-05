@@ -4,5 +4,18 @@
     <string name="title_activity_main">Calendar by Form*</string>
     <string name="package_name">app.formstr.calendar</string>
     <string name="custom_url_scheme">app.formstr.calendar</string>
-    <string name="widget_description">Shows your upcoming Nostr calendar events</string>
+    <string name="widget_description">Shows upcoming events from your selected calendars</string>
+    <string name="widget_config_title">Choose widget calendars</string>
+    <string name="widget_config_description">Select any Nostr and device calendars to include in this widget.</string>
+    <string name="widget_config_nostr_heading">Nostr calendars</string>
+    <string name="widget_config_device_heading">Device calendars</string>
+    <string name="widget_config_no_nostr_calendars">Open the app to load your Nostr calendars.</string>
+    <string name="widget_config_no_device_calendars">No device calendars are available.</string>
+    <string name="widget_config_device_permission_required">Enable device calendar access in the app to include device calendars.</string>
+    <string name="widget_config_device_calendar_label">%1$s - %2$s</string>
+    <string name="widget_config_cancel">Cancel</string>
+    <string name="widget_config_add">Add widget</string>
+    <string name="widget_untitled">Untitled</string>
+    <string name="widget_all_day">All day</string>
+    <string name="widget_no_upcoming_events">No upcoming events</string>
 </resources>

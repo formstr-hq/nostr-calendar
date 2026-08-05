@@ -3,7 +3,10 @@ import dayjs from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
-import { PX_PER_MINUTE } from "../utils/constants";
+import {
+  MIN_TIMED_EVENT_DURATION_MINUTES,
+  PX_PER_MINUTE,
+} from "../utils/constants";
 import { RefObject } from "react";
 import { getNextOccurrenceInRange } from "../utils/repeatingEventsHelper";
 
@@ -147,7 +150,9 @@ export function layoutDayEvents(
         col: colIndex,
         colSpan,
         top: dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute(),
-        height: clippedDuration * PX_PER_MINUTE,
+        height:
+          Math.max(clippedDuration, MIN_TIMED_EVENT_DURATION_MINUTES) *
+          PX_PER_MINUTE,
       };
     }),
   );

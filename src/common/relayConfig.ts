@@ -16,6 +16,11 @@ export const defaultRelays = import.meta.env.VITE_TEST_RELAY
       "wss://nostr21.com",
     ];
 
+/** Relays that implement NIP-50. Search falls back to user relays when empty. */
+export const searchRelays = import.meta.env.VITE_TEST_RELAY
+  ? [import.meta.env.VITE_TEST_RELAY as string]
+  : ["wss://relay.noswhere.com", "wss://nostr.wine"];
+
 /** The user's configured relays, falling back to the defaults. */
 export const getRelays = (): string[] => {
   const userRelays = useRelayStore.getState().relays;

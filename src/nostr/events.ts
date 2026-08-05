@@ -287,7 +287,7 @@ export async function publishPrivateCalendarEvent(
 export async function editPrivateCalendarEvent(
   event: ICalendarEvent,
   calendarId: string,
-  previousParticipants: string[] = [],
+  previousParticipants: string[],
   onAcceptedRelays?: (url: string) => void,
   onRelayComplete?: (url: string, success: boolean) => void,
   onInviteRelayComplete?: (url: string, success: boolean) => void,
