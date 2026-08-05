@@ -33,7 +33,6 @@ import type { ICalendarEvent } from "../utils/types";
 import {
   scheduleEventNotifications,
   cancelEventNotifications,
-  scheduleEventUpdateNotification,
 } from "../utils/notifications";
 import { useNotifications } from "./notifications";
 import { clearNotificationPreference } from "../utils/notificationPreferences";
@@ -51,7 +50,6 @@ import {
 import type { ObserveHandle } from "@formstr/local-relay";
 import { shouldScheduleNotifications } from "../utils/notificationPreferences";
 import { reconcileNotificationSchedule } from "../plugins/notificationScheduler";
-import { getEventUpdate, shouldNotifyEventUpdate } from "../utils/eventUpdates";
 import { useUser } from "./user";
 import { useParticipantHistory } from "./participantHistory";
 
@@ -99,12 +97,6 @@ const syncEventNotifications = async (
   } catch (error) {
     console.warn("Failed to sync event notifications", error);
   }
-};
-
-const notifyEventUpdate = (previous: ICalendarEvent, fresh: ICalendarEvent) => {
-  const currentUser = useUser.getState().user?.pubkey;
-  if (!shouldNotifyEventUpdate(previous, fresh, currentUser)) return;
-  void scheduleEventUpdateNotification(fresh, getEventUpdate(previous, fresh));
 };
 
 let publicSubscription: ObserveHandle | undefined;
@@ -180,14 +172,13 @@ const processPrivateEvent = (
   // genuinely new or newer version — otherwise we'd re-schedule notifications
   // and rewrite storage on every replay.
   let changed = false;
-  let previousEvent: ICalendarEvent | undefined;
   if (
     !isValid(new Date(parsedEvent.begin)) ||
     !isValid(new Date(parsedEvent.end))
   ) {
     console.warn("invalid date", parsedEvent, event);
   } else if (store.allKeys.includes(parsedEvent.id)) {
-    previousEvent = store.byKey[parsedEvent.id];
+    const previousEvent = store.byKey[parsedEvent.id];
     if (parsedEvent.createdAt > previousEvent.createdAt) {
       store = removeOne(store, parsedEvent.id);
       store = appendOne(store, parsedEvent.id, parsedEvent);
@@ -206,13 +197,9 @@ const processPrivateEvent = (
     eventById: store.byKey,
     events: updatedEvents,
   });
-  void saveEventsToStorage(updatedEvents)
-    .then(() => {
-      if (previousEvent) notifyEventUpdate(previousEvent, parsedEvent);
-    })
-    .catch((error) => {
-      console.warn("Failed to persist event update", error);
-    });
+  void saveEventsToStorage(updatedEvents).catch((error) => {
+    console.warn("Failed to persist event update", error);
+  });
 };
 
 // The single standing interest in the user's private calendar events, keyed by

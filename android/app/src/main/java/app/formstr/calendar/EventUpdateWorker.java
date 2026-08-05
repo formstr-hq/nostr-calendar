@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -54,65 +55,114 @@ public class EventUpdateWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
+        Log.d(TAG, "Event update poll starting");
         try {
             Context context = getApplicationContext();
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             JSONArray events = new JSONArray(prefs.getString(EVENTS_KEY, "[]"));
             String currentUser = RelayQueryUtils.parseJsonString(prefs.getString(USER_KEY, ""));
-            if (currentUser == null || currentUser.isEmpty()) return Result.success();
+            Log.d(TAG, "Loaded cached events. Count=" + events.length());
+            if (currentUser == null || currentUser.isEmpty()) {
+                Log.d(TAG, "No background user is configured; poll skipped");
+                return Result.success();
+            }
+            Log.d(TAG, "Loaded background user");
 
             List<String> defaultRelays = readStrings(prefs.getString(RELAYS_KEY, "[]"));
+            Log.d(TAG, "Loaded default relays. Count=" + defaultRelays.size());
             List<JSONObject> eligible = new ArrayList<>();
             for (int index = 0; index < events.length(); index++) {
                 JSONObject cached = events.optJSONObject(index);
                 if (isEligible(cached)) eligible.add(cached);
             }
-            if (eligible.isEmpty()) return Result.success();
+            Log.d(TAG, "Selected eligible private events. Count=" + eligible.size());
+            if (eligible.isEmpty()) {
+                Log.d(TAG, "No eligible private events; poll finished");
+                return Result.success();
+            }
 
             Map<String, JSONObject> freshByCoordinate = new HashMap<>();
             Set<String> expectedCoordinates = new HashSet<>();
             for (JSONObject cached : eligible) expectedCoordinates.add(coordinate(cached));
+            Log.d(TAG, "Built expected coordinate set. Count=" + expectedCoordinates.size());
             OkHttpClient client = RelayQueryUtils.createClient(RELAY_TIMEOUT_SECONDS);
 
             try {
+                Log.d(TAG, "Starting relay queries");
                 queryLatest(client, eligible, defaultRelays, expectedCoordinates, freshByCoordinate);
             } finally {
                 RelayQueryUtils.shutdownClient(client);
+                Log.d(TAG, "Relay client shut down");
             }
+            Log.d(TAG, "Relay queries finished. Latest replacements=" + freshByCoordinate.size());
 
             boolean changed = false;
             boolean rescheduleReminders = false;
+            int acceptedUpdates = 0;
             List<PendingUpdate> notifications = new ArrayList<>();
             for (int index = 0; index < events.length(); index++) {
                 JSONObject cached = events.optJSONObject(index);
                 if (!isEligible(cached)) continue;
-                JSONObject fresh = freshByCoordinate.get(coordinate(cached));
-                if (fresh == null || fresh.optLong("created_at") <= cached.optLong("createdAt")) continue;
+                String eventCoordinate = coordinate(cached);
+                JSONObject fresh = freshByCoordinate.get(eventCoordinate);
+                if (fresh == null) {
+                    Log.d(TAG, "No relay replacement for " + eventCoordinate);
+                    continue;
+                }
+                if (fresh.optLong("created_at") <= cached.optLong("createdAt")) {
+                    Log.d(TAG, "Relay replacement is not newer for " + eventCoordinate
+                            + ". Cached createdAt=" + cached.optLong("createdAt")
+                            + ", relay created_at=" + fresh.optLong("created_at"));
+                    continue;
+                }
 
+                Log.d(TAG, "Decrypting newer replacement for " + eventCoordinate);
                 JSONObject updated = parsePrivateEvent(fresh, cached);
-                if (updated == null) continue;
+                if (updated == null) {
+                    Log.d(TAG, "Replacement could not be parsed for " + eventCoordinate);
+                    continue;
+                }
                 UpdateSummary summary = compare(cached, updated);
+                Log.d(TAG, "Compared replacement for " + eventCoordinate + ". Changed=" + summary.changed);
                 events.put(index, updated);
                 changed = true;
+                acceptedUpdates++;
                 rescheduleReminders |= summary.scheduleChanged;
                 if (shouldNotify(cached, updated, currentUser, summary)) {
                     notifications.add(new PendingUpdate(updated, summary.body));
+                    Log.d(TAG, "Queued update notification for " + eventCoordinate);
+                } else {
+                    Log.d(TAG, "Update notification suppressed for " + eventCoordinate);
                 }
             }
 
             if (changed) {
+                Log.d(TAG, "Persisting accepted replacements. Count=" + acceptedUpdates);
                 if (!prefs.edit().putString(EVENTS_KEY, events.toString()).commit()) {
+                    Log.w(TAG, "Failed to persist accepted replacements; retrying worker");
                     return Result.retry();
                 }
+                Log.d(TAG, "Accepted replacements persisted");
                 CalendarWidget.refreshAll(context);
-                if (rescheduleReminders) NotificationWorker.enqueueImmediate(context);
+                Log.d(TAG, "Calendar widgets refreshed");
+                if (rescheduleReminders) {
+                    NotificationWorker.enqueueImmediate(context);
+                    Log.d(TAG, "Reminder reconciliation enqueued");
+                } else {
+                    Log.d(TAG, "Reminder reconciliation not required");
+                }
+                Log.d(TAG, "Posting update notifications. Count=" + notifications.size());
                 for (PendingUpdate notification : notifications) {
                     postUpdate(context, notification.event, notification.body);
                 }
+            } else {
+                Log.d(TAG, "No newer valid replacements were accepted");
             }
+            Log.d(TAG, "Event update poll finished. Accepted=" + acceptedUpdates
+                    + ", notifications=" + notifications.size());
             return Result.success();
         } catch (Exception error) {
-            android.util.Log.w(TAG, "Event update poll failed", error);
+            Log.w(TAG, "Event update poll failed", error);
             return Result.retry();
         }
     }
@@ -127,17 +177,36 @@ public class EventUpdateWorker extends Worker {
         relaySet.addAll(defaults);
         List<String> relays = new ArrayList<>(relaySet);
         JSONArray filters = buildFilters(events);
-        if (filters.length() == 0) return;
+        Log.d(TAG, "Prepared relay query. Candidate relays=" + relays.size()
+                + ", filters=" + filters.length());
+        if (filters.length() == 0) {
+            Log.d(TAG, "No valid filters could be built; relay queries skipped");
+            return;
+        }
+        if (relays.isEmpty()) {
+            Log.d(TAG, "No relay URLs are available; relay queries skipped");
+            return;
+        }
         for (int index = 0; index < Math.min(MAX_RELAYS, relays.size()); index++) {
-            RelayQueryUtils.queryEvents(client, relays.get(index), "event_update", filters,
+            String relay = relays.get(index);
+            int knownBefore = latest.size();
+            Log.d(TAG, "Querying relay " + (index + 1) + "/" + Math.min(MAX_RELAYS, relays.size())
+                    + ": " + relay);
+            RelayQueryUtils.queryEvents(client, relay, "event_update", filters,
                     RELAY_TIMEOUT_SECONDS, TAG, event -> {
                         String eventCoordinate = coordinate(event);
-                        if (!expectedCoordinates.contains(eventCoordinate)) return;
+                        if (!expectedCoordinates.contains(eventCoordinate)) {
+                            Log.d(TAG, "Ignoring unexpected relay coordinate " + eventCoordinate);
+                            return;
+                        }
                         JSONObject known = latest.get(eventCoordinate);
                         if (known == null || event.optLong("created_at") > known.optLong("created_at")) {
                             latest.put(eventCoordinate, event);
+                            Log.d(TAG, "Retained relay replacement for " + eventCoordinate);
                         }
                     });
+            Log.d(TAG, "Relay query finished: " + relay + ". New latest replacements="
+                    + (latest.size() - knownBefore));
         }
     }
 
@@ -211,9 +280,14 @@ public class EventUpdateWorker extends Worker {
             } else {
                 parsed.remove("notificationPreference");
             }
-            return parsed.optLong("begin") > 0 && parsed.optLong("end") > 0 ? parsed : null;
+            if (parsed.optLong("begin") <= 0 || parsed.optLong("end") <= 0) {
+                Log.w(TAG, "Decrypted event update has invalid start or end time");
+                return null;
+            }
+            Log.d(TAG, "Private event replacement decrypted and parsed");
+            return parsed;
         } catch (Exception error) {
-            android.util.Log.w(TAG, "Failed to decrypt private event update", error);
+            Log.w(TAG, "Failed to decrypt private event update", error);
             return null;
         }
     }
@@ -251,22 +325,47 @@ public class EventUpdateWorker extends Worker {
     }
 
     private static boolean shouldNotify(JSONObject previous, JSONObject fresh, String currentUser, UpdateSummary summary) {
-        if (summary.changed.isEmpty() || currentUser == null || currentUser.isEmpty()
-                || fresh.optString("user").equalsIgnoreCase(currentUser)) return false;
+        String eventCoordinate = coordinate(fresh);
+        if (summary.changed.isEmpty()) {
+            Log.d(TAG, "Notification skipped because no alertable attributes changed for " + eventCoordinate);
+            return false;
+        }
+        if (currentUser == null || currentUser.isEmpty()) {
+            Log.d(TAG, "Notification skipped because no current user is available for " + eventCoordinate);
+            return false;
+        }
+        if (fresh.optString("user").equalsIgnoreCase(currentUser)) {
+            Log.d(TAG, "Notification skipped because the current user authored " + eventCoordinate);
+            return false;
+        }
         Set<String> oldParticipants = set(previous.optJSONArray("participants"));
         Set<String> newParticipants = set(fresh.optJSONArray("participants"));
-        return !oldParticipants.contains(currentUser.toLowerCase()) || newParticipants.contains(currentUser.toLowerCase());
+        if (oldParticipants.contains(currentUser.toLowerCase())
+                && !newParticipants.contains(currentUser.toLowerCase())) {
+            Log.d(TAG, "Notification skipped because the current user was removed from " + eventCoordinate);
+            return false;
+        }
+        Log.d(TAG, "Notification is allowed for " + eventCoordinate);
+        return true;
     }
 
     private static void postUpdate(Context context, JSONObject event, String body) {
+        String eventCoordinate = coordinate(event);
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,
-                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "Notification permission is not granted; skipped " + eventCoordinate);
+            return;
+        }
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager == null) return;
+        if (manager == null) {
+            Log.w(TAG, "Notification manager unavailable; skipped " + eventCoordinate);
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL_ID) == null) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Event updates", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Notifications when calendar events are updated");
             manager.createNotificationChannel(channel);
+            Log.d(TAG, "Created event updates notification channel");
         }
         String key = "event-update:" + event.optInt("kind") + ":" + event.optString("user") + ":"
                 + event.optString("id") + ":" + event.optString("eventId");
@@ -281,6 +380,7 @@ public class EventUpdateWorker extends Worker {
                 .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true);
         if (pending != null) notification.setContentIntent(pending);
         manager.notify(Math.abs(key.hashCode()), notification.build());
+        Log.d(TAG, "Posted update notification for " + eventCoordinate);
     }
 
     private static void compareValue(JSONObject left, JSONObject right, String key, String label, List<String> changed) {
