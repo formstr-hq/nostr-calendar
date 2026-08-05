@@ -2,11 +2,19 @@ package app.formstr.calendar;
 
 import org.bouncycastle.asn1.sec.SECNamedCurves;
 import org.bouncycastle.asn1.x9.X9ECParameters;
+import org.bouncycastle.crypto.agreement.ECDHBasicAgreement;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.engines.ChaCha7539Engine;
+import org.bouncycastle.crypto.generators.HKDFBytesGenerator;
 import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.params.ECPublicKeyParameters;
+import org.bouncycastle.crypto.params.HKDFParameters;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.bouncycastle.math.ec.ECPoint;
+import org.bouncycastle.util.BigIntegers;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -28,14 +36,34 @@ final class Nip44 {
         if (secret.length != 32 || scalar.signum() <= 0 || scalar.compareTo(CURVE.getN()) >= 0) {
             throw new IllegalArgumentException("Invalid nsec view key");
         }
-        byte[] sharedX = CURVE.getG().multiply(scalar).normalize().getAffineXCoord().getEncoded();
+
+        // Self-encryption idiom (see nostr-calendar's selfEncrypt/selfDecrypt):
+        // the "other party" in the ECDH is this same key's own public point,
+        // so the shared secret is scalar * (scalar * G). Delegating the
+        // agreement itself to BouncyCastle's ECDHBasicAgreement rather than
+        // hand-multiplying points avoids re-deriving just the public key
+        // (scalar * G) and mistaking that for the shared secret.
+        ECDomainParameters domainParameters =
+                new ECDomainParameters(CURVE.getCurve(), CURVE.getG(), CURVE.getN(), CURVE.getH());
+        ECPrivateKeyParameters privateKey = new ECPrivateKeyParameters(scalar, domainParameters);
+        ECPoint publicPoint = domainParameters.getG().multiply(scalar).normalize();
+        ECPublicKeyParameters publicKey = new ECPublicKeyParameters(publicPoint, domainParameters);
+        ECDHBasicAgreement agreement = new ECDHBasicAgreement();
+        agreement.init(privateKey);
+        byte[] sharedX = BigIntegers.asUnsignedByteArray(32, agreement.calculateAgreement(publicKey));
+
         byte[] conversationKey = hmac("nip44-v2".getBytes(StandardCharsets.UTF_8), sharedX);
         byte[] decoded = Base64.getDecoder().decode(payload);
         if (decoded.length < 99 || decoded[0] != 2) throw new IllegalArgumentException("Unsupported NIP-44 payload");
         byte[] nonce = Arrays.copyOfRange(decoded, 1, 33);
         byte[] ciphertext = Arrays.copyOfRange(decoded, 33, decoded.length - 32);
         byte[] mac = Arrays.copyOfRange(decoded, decoded.length - 32, decoded.length);
-        byte[] keys = hkdfExpand(conversationKey, nonce, 76);
+
+        HKDFBytesGenerator hkdf = new HKDFBytesGenerator(new SHA256Digest());
+        hkdf.init(HKDFParameters.skipExtractParameters(conversationKey, nonce));
+        byte[] keys = new byte[76];
+        hkdf.generateBytes(keys, 0, 76);
+
         byte[] aad = new byte[nonce.length + ciphertext.length];
         System.arraycopy(nonce, 0, aad, 0, nonce.length);
         System.arraycopy(ciphertext, 0, aad, nonce.length, ciphertext.length);
@@ -56,15 +84,6 @@ final class Nip44 {
     private static byte[] hmac(byte[] key, byte[] data) {
         HMac mac = new HMac(new SHA256Digest()); mac.init(new KeyParameter(key)); mac.update(data, 0, data.length);
         byte[] output = new byte[mac.getMacSize()]; mac.doFinal(output, 0); return output;
-    }
-    private static byte[] hkdfExpand(byte[] key, byte[] info, int length) {
-        List<Byte> output = new ArrayList<>(); byte[] previous = new byte[0]; int counter = 1;
-        while (output.size() < length) {
-            byte[] input = new byte[previous.length + info.length + 1];
-            System.arraycopy(previous, 0, input, 0, previous.length); System.arraycopy(info, 0, input, previous.length, info.length);
-            input[input.length - 1] = (byte) counter++; previous = hmac(key, input); for (byte value : previous) output.add(value);
-        }
-        byte[] result = new byte[length]; for (int index = 0; index < length; index++) result[index] = output.get(index); return result;
     }
     private static byte[] decodeNsec(String nsec) {
         final String charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";

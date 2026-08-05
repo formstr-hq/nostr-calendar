@@ -45,6 +45,16 @@ test("searches, deduplicates, and persists event participants", async ({
     name: "Search name, NIP-05, or npub",
   });
 
+  // With no query, named contacts are promoted above unnamed pubkeys while
+  // retaining contact-list order within the named group.
+  await participantInput.focus();
+  const defaultOptions = page.getByRole("option");
+  await expect(defaultOptions.nth(0)).toContainText("Bob");
+  await expect(defaultOptions.nth(1)).toContainText("Carol");
+  await expect(defaultOptions.nth(2)).toContainText(
+    shortNpub(MISSING_PROFILE_NPUB),
+  );
+
   // Exact npub lookup still renders the resolved profile row.
   await participantInput.fill(TEST_KEYS.bob.npub);
   await expect(
@@ -54,10 +64,13 @@ test("searches, deduplicates, and persists event participants", async ({
   ).toBeVisible({ timeout: 1_000 });
   const exactBobOption = page.getByRole("option", { name: /Bob/ });
   await expect(exactBobOption).toBeVisible();
+  await expect(exactBobOption).toHaveCount(1);
   await expect(exactBobOption).toContainText(shortNpub(TEST_KEYS.bob.npub));
-  await expect(exactBobOption.locator(".MuiAvatar-root")).toHaveCSS(
-    "border-color",
-    "rgba(0, 0, 0, 0)",
+  await expect(
+    exactBobOption.getByTestId("participant-contact-icon"),
+  ).toBeVisible();
+  await expect(exactBobOption.getByTestId("participant-event-icon")).toHaveCount(
+    0,
   );
 
   // Exact NIP-05 resolution is fully intercepted and can be selected by Enter.
@@ -71,10 +84,15 @@ test("searches, deduplicates, and persists event participants", async ({
     .filter({ hasText: "Bob" });
   await expect(bobParticipant).toBeVisible();
 
-  // Selected participants are excluded from all subsequent result sources.
+  // Matching selected participants remain visible after selectable results.
+  await participantInput.fill("o");
+  await expect(page.getByRole("option").first()).toContainText("Carol");
+  const selectedBobOption = page.getByRole("option").last();
+  await expect(selectedBobOption).toContainText("Bob");
+  await expect(selectedBobOption).toBeDisabled();
+
   await participantInput.fill("Bob");
-  await expect(page.getByRole("option", { name: /Bob/ })).toHaveCount(0);
-  await expect(page.getByRole("status")).toHaveText("No profiles found");
+  await expect(page.getByRole("option", { name: /Bob/ })).toBeDisabled();
 
   await participantInput.fill(TEST_KEYS.carol.npub);
   const carolOption = page.getByRole("option", { name: /Carol/ });
@@ -136,35 +154,40 @@ test("searches, deduplicates, and persists event participants", async ({
     page.getByRole("listitem").filter({ hasText: "Bob" }),
   ).not.toBeVisible();
 
-  // Bob remains in local history. Empty focus and a local name match both
-  // expose the prior-contact avatar border after the saved event interaction.
+  // Bob remains in local history and is also in Alice's contact list. The
+  // merged row is deduplicated and exposes both provenance icons.
   const reopenedInput = page.getByRole("combobox", {
     name: "Search name, NIP-05, or npub",
   });
   await reopenedInput.focus();
   let priorBob = page.getByRole("option", { name: /Bob/ });
   await expect(priorBob).toBeVisible();
-  const textColor = await page.locator("body").evaluate((body) =>
-    getComputedStyle(body).color,
-  );
-  await expect(priorBob.locator(".MuiAvatar-root")).toHaveCSS(
-    "border-color",
-    textColor,
-  );
+  await expect(priorBob).toHaveCount(1);
+  await expect(priorBob.getByTestId("participant-event-icon")).toBeVisible();
+  await expect(priorBob.getByTestId("participant-contact-icon")).toBeVisible();
   await priorBob.hover();
   await expect(
-    page
-      .getByRole("tooltip")
-      .filter({ hasText: "You have shared an event with this person" }),
-  ).toBeVisible();
+    page.getByRole("tooltip").filter({
+      hasText: "You have shared an event with this person",
+    }),
+  ).toHaveCount(0);
+
+  // Carol is already a participant on this event. With an empty query she
+  // still appears (not filtered out), but pinned to the end, disabled, and
+  // labelled distinctly from the selectable suggestions above her.
+  const defaultOptionsAfterReopen = page.getByRole("option");
+  await expect(defaultOptionsAfterReopen.last()).toContainText("Carol");
+  const carolAlreadyInEvent = page.getByRole("option", { name: /Carol/ });
+  await expect(carolAlreadyInEvent).toBeDisabled();
+  await expect(carolAlreadyInEvent).toContainText("Already in the event");
+  await expect(priorBob).not.toBeDisabled();
+
   await reopenedInput.fill("Bob");
   priorBob = page.getByRole("option", { name: /Bob/ });
-  await expect(priorBob).toBeVisible();
+  await expect(priorBob).toHaveCount(1);
   await expect(priorBob).toContainText(shortNpub(TEST_KEYS.bob.npub));
-  await expect(priorBob.locator(".MuiAvatar-root")).toHaveCSS(
-    "border-color",
-    textColor,
-  );
+  await expect(priorBob.getByTestId("participant-event-icon")).toBeVisible();
+  await expect(priorBob.getByTestId("participant-contact-icon")).toBeVisible();
 });
 
 test("discards a stale NIP-05 result after the query changes", async ({

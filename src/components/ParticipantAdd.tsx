@@ -1,7 +1,6 @@
 import {
   Box,
   CircularProgress,
-  MenuList,
   Paper,
   Popper,
   TextField,
@@ -26,10 +25,30 @@ import { ParticipantSearchOption } from "./ParticipantSearchOption";
 const ResultsPaper = styled(Paper)(({ theme }) => ({
   width: "var(--participant-picker-width)",
   maxHeight: spacing * 36,
-  overflowY: "auto",
+  overflow: "hidden",
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: radius.popover,
   boxShadow: shadow.popover,
+}));
+
+const ResultsListbox = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  maxHeight: spacing * 36,
+});
+
+const SelectableOptions = styled("div")({
+  minHeight: 0,
+  overflowY: "auto",
+});
+
+const SelectedOptions = styled("div")(({ theme }) => ({
+  flexShrink: 0,
+  maxHeight: spacing * 14,
+  overflowY: "auto",
+  borderTop: `1px solid ${theme.palette.divider}`,
+  backgroundColor:
+    theme.vars?.palette.background.paper ?? theme.palette.background.paper,
 }));
 
 const EmptyStatus = styled(Typography)({
@@ -84,25 +103,36 @@ export const ParticipantAdd = ({
     },
   });
 
-  useEffect(() => setActiveIndex(0), [options]);
+  useEffect(
+    () => setActiveIndex(options.findIndex((option) => !option.isSelected)),
+    [options],
+  );
 
   const selectOption = (index: number) => {
     const option = options[index];
-    if (!option) return;
+    if (!option || option.isSelected) return;
     onAdd(option.pubkey);
     setQuery("");
     setFocused(false);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const enabledIndexes = options.flatMap((option, index) =>
+      option.isSelected ? [] : [index],
+    );
+    const enabledPosition = enabledIndexes.indexOf(activeIndex);
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setFocused(true);
-      setActiveIndex((index) => Math.min(index + 1, options.length - 1));
+      setActiveIndex(
+        enabledIndexes[
+          Math.min(enabledPosition + 1, enabledIndexes.length - 1)
+        ] ?? -1,
+      );
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((index) => Math.max(index - 1, 0));
-    } else if (event.key === "Enter" && options.length > 0) {
+      setActiveIndex(enabledIndexes[Math.max(enabledPosition - 1, 0)] ?? -1);
+    } else if (event.key === "Enter" && activeIndex >= 0) {
       event.preventDefault();
       selectOption(activeIndex);
     } else if (event.key === "Escape") {
@@ -117,6 +147,23 @@ export const ParticipantAdd = ({
     : query.trim()
       ? intl.formatMessage({ id: "participant.noResults" })
       : intl.formatMessage({ id: "participant.noHistory" });
+  const indexedOptions = options.map((option, index) => ({ option, index }));
+  const selectableOptions = indexedOptions.filter(
+    ({ option }) => !option.isSelected,
+  );
+  const selectedOptions = indexedOptions.filter(
+    ({ option }) => option.isSelected,
+  );
+  const renderOption = ({ option, index }: (typeof indexedOptions)[number]) => (
+    <ParticipantSearchOption
+      key={option.pubkey}
+      option={option}
+      listboxId={listboxId}
+      selected={!option.isSelected && index === activeIndex}
+      onActivate={() => setActiveIndex(index)}
+      onSelect={() => selectOption(index)}
+    />
+  );
 
   return (
     <Box ref={anchorRef}>
@@ -144,7 +191,7 @@ export const ParticipantAdd = ({
             "aria-expanded": open,
             "aria-controls": open ? listboxId : undefined,
             "aria-activedescendant":
-              open && options[activeIndex]
+              open && options[activeIndex] && !options[activeIndex].isSelected
                 ? `${listboxId}-${options[activeIndex].pubkey}`
                 : undefined,
           },
@@ -168,18 +215,18 @@ export const ParticipantAdd = ({
           }
         >
           {options.length > 0 ? (
-            <MenuList id={listboxId} role="listbox" disablePadding>
-              {options.map((option, index) => (
-                <ParticipantSearchOption
-                  key={option.pubkey}
-                  option={option}
-                  listboxId={listboxId}
-                  selected={index === activeIndex}
-                  onActivate={() => setActiveIndex(index)}
-                  onSelect={() => selectOption(index)}
-                />
-              ))}
-            </MenuList>
+            <ResultsListbox id={listboxId} role="listbox">
+              {selectableOptions.length > 0 && (
+                <SelectableOptions>
+                  {selectableOptions.map(renderOption)}
+                </SelectableOptions>
+              )}
+              {selectedOptions.length > 0 && (
+                <SelectedOptions>
+                  {selectedOptions.map(renderOption)}
+                </SelectedOptions>
+              )}
+            </ResultsListbox>
           ) : (
             <EmptyStatus role="status" variant="body2" color="text.secondary">
               {status}

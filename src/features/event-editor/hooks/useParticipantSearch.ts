@@ -10,6 +10,7 @@ import {
   resolveNip05,
   verifyNip05,
 } from "../../../nostr/nip05";
+import { useAuthorContacts } from "./useAuthorContacts";
 
 export interface ParticipantHistoryRecord {
   pubkey: string;
@@ -22,6 +23,8 @@ export interface ParticipantHistoryRecord {
 export interface ParticipantSearchResult extends ParticipantHistoryRecord {
   isNip05Verified: boolean;
   isPreviouslyMet: boolean;
+  isContact: boolean;
+  isSelected: boolean;
 }
 
 export interface UseParticipantSearchInput {
@@ -70,6 +73,7 @@ export function useParticipantSearch({
   onProfileResolved,
   limit = 10,
 }: UseParticipantSearchInput): UseParticipantSearchResult {
+  const contacts = useAuthorContacts(currentPubkey);
   const [options, setOptions] = useState<ParticipantSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -83,29 +87,66 @@ export function useParticipantSearch({
     let stopLoading: ReturnType<typeof setTimeout> | undefined;
     const profiles = new Map<string, UserProfile>();
     const exactPubkeys: string[] = [];
+    const discoveredPubkeys = new Set<string>();
     const exactNip05 = new Map<string, string>();
     const verification = new Map<string, boolean>();
     const verifying = new Set<string>();
     const trimmedQuery = query.trim();
     const normalizedQuery = trimmedQuery.toLowerCase();
-    const excluded = new Set(
+    const selected = new Set(
       selectedParticipants.map((pubkey) => pubkey.toLowerCase()),
     );
+    const excluded = new Set<string>();
     if (currentPubkey) excluded.add(currentPubkey.toLowerCase());
 
     const eligibleHistory = history.filter(
-      ({ pubkey }) => !excluded.has(pubkey.toLowerCase()),
+      ({ pubkey }) =>
+        !excluded.has(pubkey.toLowerCase()) &&
+        !selected.has(pubkey.toLowerCase()),
     );
-    const matchedHistory = trimmedQuery
-      ? eligibleHistory.filter(({ name, displayName }) =>
-          [name, displayName].some((value) =>
-            value?.toLowerCase().includes(normalizedQuery),
-          ),
-        )
-      : eligibleHistory;
     const historyByPubkey = new Map(
-      eligibleHistory.map((person) => [person.pubkey.toLowerCase(), person]),
+      history.map((person) => [person.pubkey.toLowerCase(), person]),
     );
+    const eligibleContacts = contacts.filter(
+      ({ pubkey }) =>
+        !excluded.has(pubkey.toLowerCase()) &&
+        !selected.has(pubkey.toLowerCase()),
+    );
+    const contactsByPubkey = new Map(
+      contacts.map((contact) => [contact.pubkey.toLowerCase(), contact]),
+    );
+
+    const matchesLocalCandidate = (
+      pubkey: string,
+      fallback?: ParticipantHistoryRecord,
+    ) => {
+      if (!trimmedQuery) return true;
+      const profile = profiles.get(pubkey);
+      const contact = contactsByPubkey.get(pubkey);
+      return [
+        profile?.name,
+        profile?.displayName,
+        profile?.nip05,
+        fallback?.name,
+        fallback?.displayName,
+        fallback?.nip05,
+        contact?.petname,
+      ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+    };
+
+    const sortName = (pubkey: string): string | null => {
+      const profile = profiles.get(pubkey);
+      const historyRecord = historyByPubkey.get(pubkey);
+      const contact = contactsByPubkey.get(pubkey);
+      return (
+        profile?.displayName ??
+        profile?.name ??
+        historyRecord?.displayName ??
+        historyRecord?.name ??
+        contact?.petname ??
+        null
+      );
+    };
 
     const verify = (nip05: string, pubkey: string) => {
       const key = `${nip05.trim().toLowerCase()}:${pubkey}`;
@@ -124,44 +165,95 @@ export function useParticipantSearch({
       fallback?: ParticipantHistoryRecord,
     ): ParticipantSearchResult => {
       const profile = profiles.get(pubkey);
+      const contact = contactsByPubkey.get(pubkey);
       const nip05 =
         exactNip05.get(pubkey) ?? (profile ? profile.nip05 : fallback?.nip05);
       if (nip05) verify(nip05, pubkey);
       return {
         pubkey,
-        name: profile ? profile.name : fallback?.name,
-        displayName: profile ? profile.displayName : fallback?.displayName,
-        picture: profile ? profile.picture : fallback?.picture,
+        name: profile?.name ?? fallback?.name ?? contact?.petname,
+        displayName: profile?.displayName ?? fallback?.displayName,
+        picture: profile?.picture ?? fallback?.picture,
         nip05,
         isNip05Verified: nip05
           ? verification.get(`${nip05.trim().toLowerCase()}:${pubkey}`) === true
           : false,
         isPreviouslyMet: historyByPubkey.has(pubkey),
+        isContact: contactsByPubkey.has(pubkey),
+        isSelected: selected.has(pubkey),
       };
     };
 
     function publish() {
       if (!active) return;
       const orderedPubkeys: string[] = [];
+      const addedPubkeys = new Set<string>();
       const add = (pubkey: string) => {
         const normalized = pubkey.toLowerCase();
-        if (!excluded.has(normalized) && !orderedPubkeys.includes(normalized)) {
+        if (
+          !excluded.has(normalized) &&
+          !selected.has(normalized) &&
+          !addedPubkeys.has(normalized)
+        ) {
+          addedPubkeys.add(normalized);
           orderedPubkeys.push(normalized);
         }
       };
-      matchedHistory.forEach(({ pubkey }) => add(pubkey));
+      eligibleHistory.forEach((person) => {
+        const pubkey = person.pubkey.toLowerCase();
+        if (matchesLocalCandidate(pubkey, person)) add(pubkey);
+      });
+      eligibleContacts.forEach((contact) => {
+        const pubkey = contact.pubkey.toLowerCase();
+        if (matchesLocalCandidate(pubkey, historyByPubkey.get(pubkey))) {
+          add(pubkey);
+        }
+      });
       exactPubkeys.forEach(add);
-      profiles.forEach((_profile, pubkey) => add(pubkey));
+      discoveredPubkeys.forEach(add);
+      // With no query, present the combined contact/history list sorted by
+      // name (people with a known name first). Once the user types, relay
+      // search results are shown in the order they were discovered.
+      if (!trimmedQuery) {
+        orderedPubkeys.sort((left, right) => {
+          const leftName = sortName(left);
+          const rightName = sortName(right);
+          if (leftName && !rightName) return -1;
+          if (!leftName && rightName) return 1;
+          if (leftName && rightName) {
+            return leftName.localeCompare(rightName, undefined, {
+              sensitivity: "base",
+            });
+          }
+          return 0;
+        });
+      }
+      const matchingSelected = selectedParticipants
+        .map((pubkey) => pubkey.toLowerCase())
+        .filter(
+          (pubkey, index, pubkeys) =>
+            !excluded.has(pubkey) &&
+            pubkeys.indexOf(pubkey) === index &&
+            (exactPubkeys.includes(pubkey) ||
+              discoveredPubkeys.has(pubkey) ||
+              matchesLocalCandidate(pubkey, historyByPubkey.get(pubkey))),
+        );
       setOptions(
-        orderedPubkeys
-          .slice(0, Math.max(0, limit))
-          .map((pubkey) => toResult(pubkey, historyByPubkey.get(pubkey))),
+        [
+          ...orderedPubkeys.slice(0, Math.max(0, limit)),
+          ...matchingSelected,
+        ].map((pubkey) => toResult(pubkey, historyByPubkey.get(pubkey))),
       );
     }
 
-    const onProfile = (profile: UserProfile) => {
+    const onProfile = (profile: UserProfile, discovered = false) => {
       const pubkey = profile.pubkey.toLowerCase();
-      if (!isNewer(profile, profiles.get(pubkey))) return;
+      const newlyDiscovered = discovered && !discoveredPubkeys.has(pubkey);
+      if (discovered) discoveredPubkeys.add(pubkey);
+      if (!isNewer(profile, profiles.get(pubkey))) {
+        if (newlyDiscovered) publish();
+        return;
+      }
       profiles.set(pubkey, profile);
       notifyProfileResolved(profile);
       setLoading(false);
@@ -176,20 +268,24 @@ export function useParticipantSearch({
 
     publish();
     setError(null);
+    const localCandidatePubkeys = Array.from(
+      new Set([
+        ...eligibleHistory.map(({ pubkey }) => pubkey.toLowerCase()),
+        ...eligibleContacts.map(({ pubkey }) => pubkey.toLowerCase()),
+        ...(trimmedQuery
+          ? selectedParticipants.map((pubkey) => pubkey.toLowerCase())
+          : []),
+      ]),
+    ).filter((pubkey) => !excluded.has(pubkey));
+    if (localCandidatePubkeys.length > 0) {
+      handles.push(
+        observeUserProfiles(localCandidatePubkeys, {
+          onProfile: (profile) => onProfile(profile),
+        }),
+      );
+    }
     if (!trimmedQuery) {
-      const historyPubkeys = eligibleHistory.map(({ pubkey }) => pubkey);
-      if (historyPubkeys.length > 0) {
-        handles.push(
-          observeUserProfiles(historyPubkeys, {
-            onProfile,
-            onEose: () => {
-              if (active) setLoading(false);
-            },
-          }),
-        );
-      } else {
-        setLoading(false);
-      }
+      setLoading(false);
       return cleanup;
     }
 
@@ -198,7 +294,11 @@ export function useParticipantSearch({
       exactPubkeys.push(exactPubkey);
       setLoading(false);
       publish();
-      handles.push(observeUserProfiles([exactPubkey], { onProfile }));
+      handles.push(
+        observeUserProfiles([exactPubkey], {
+          onProfile: (profile) => onProfile(profile),
+        }),
+      );
       return cleanup;
     }
 
@@ -208,7 +308,7 @@ export function useParticipantSearch({
 
       handles.push(
         observeProfileSearch(trimmedQuery, {
-          onProfile,
+          onProfile: (profile) => onProfile(profile, true),
         }),
       );
       stopLoading = setTimeout(() => {
@@ -230,7 +330,7 @@ export function useParticipantSearch({
           publish();
           handles.push(
             observeUserProfiles([resolved], {
-              onProfile,
+              onProfile: (profile) => onProfile(profile),
             }),
           );
         });
@@ -241,7 +341,7 @@ export function useParticipantSearch({
       clearTimeout(debounceTimer);
       cleanup();
     };
-  }, [currentPubkey, history, limit, query, selectedParticipants]);
+  }, [contacts, currentPubkey, history, limit, query, selectedParticipants]);
 
   return { options, loading, error };
 }

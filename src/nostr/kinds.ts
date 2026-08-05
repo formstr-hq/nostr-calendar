@@ -20,8 +20,9 @@ export enum EventKinds {
   PublicCalendarEvent = 31923,
   PublicRSVPEvent = 31925,
 
-  // User Profile
+  // User Profile and NIP-02 contact list
   UserProfile = 0,
+  ContactList = 3,
 
   // Calendar List (custom kind for private calendar collections)
   PrivateCalendarList = 32123,
