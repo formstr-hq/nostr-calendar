@@ -52,9 +52,10 @@ export function CalendarEventCard({
           position: "absolute",
           top: `calc(${event.top}px + ${offset})`,
           left: `${(event.col / event.colSpan) * 100}%`,
-          width: `${100 / event.colSpan}%`,
+          width: `${(100 / event.colSpan) * event.widthScale}%`,
           height: event.height,
           overflow: "hidden",
+          zIndex: event.stackOrder,
         }}
       >
         <EventChip
