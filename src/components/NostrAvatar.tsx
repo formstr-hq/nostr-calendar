@@ -21,8 +21,14 @@ export const NostrAvatar: FC<NostrAvatarProps> = memo(({ user }) => {
   }
 
   return (
-    <Avatar sx={{ bgcolor: "transparent" }}>
-      <UserIcon sx={{ color: "grey.700" }} />
+    <Avatar
+      sx={{
+        bgcolor: "action.selected",
+        border: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <UserIcon />
     </Avatar>
   );
 });

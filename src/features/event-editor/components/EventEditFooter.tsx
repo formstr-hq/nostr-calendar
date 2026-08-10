@@ -59,7 +59,7 @@ export function EventEditFooter({
           color="text.secondary"
           sx={{ lineHeight: 1.5 }}
         >
-          <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
+          <Box component="span" sx={{ fontWeight: 600 }}>
             {intl.formatMessage({ id: "event.eventSaved" })}:{" "}
           </Box>
           {intl.formatMessage(

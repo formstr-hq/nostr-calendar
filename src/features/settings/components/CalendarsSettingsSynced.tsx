@@ -129,7 +129,6 @@ export function CalendarsSettingsSynced() {
                   borderRadius: 1,
                   bgcolor: "background.default",
                   fontSize: 12,
-                  color: "text.secondary",
                 }}
               >
                 {calendar.color.toUpperCase()}

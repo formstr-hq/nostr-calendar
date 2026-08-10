@@ -50,7 +50,6 @@ export function EventEditHeaderDesktop({
               display: "flex",
               alignItems: "center",
               gap: 0.5,
-              color: "text.secondary",
             }}
           >
             <LockIcon fontSize="small" />

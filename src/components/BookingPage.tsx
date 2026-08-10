@@ -681,7 +681,6 @@ export const BookingPage = () => {
                         (slot) => !slot.unavailable,
                       );
                       const isSelected = day.isSame(selectedDate, "day");
-                      const outsideMonth = !day.isSame(monthStart, "month");
                       const isPast = day.isBefore(dayjs(), "day");
                       return (
                         <Button
@@ -691,16 +690,12 @@ export const BookingPage = () => {
                           onClick={() => selectDate(day)}
                           disabled={isPast || !hasOpenSlot}
                           aria-label={day.format("dddd, MMMM D")}
+                          variant={isSelected ? "contained" : "text"}
                           sx={{
                             minWidth: 0,
                             height: 34,
                             p: 0,
                             borderRadius: 2,
-                            color: isSelected
-                              ? "primary.contrastText"
-                              : outsideMonth
-                                ? "text.disabled"
-                                : "text.primary",
                             bgcolor: isSelected
                               ? "primary.main"
                               : "transparent",
@@ -765,6 +760,7 @@ export const BookingPage = () => {
                         data-date={dateKey}
                         onClick={() => selectDate(day)}
                         disabled={isPast || !hasOpenSlot}
+                        variant={isSelected ? "contained" : "outlined"}
                         sx={{
                           minWidth: 0,
                           p: 0.5,
@@ -775,9 +771,6 @@ export const BookingPage = () => {
                           bgcolor: isSelected
                             ? "primary.main"
                             : "background.paper",
-                          color: isSelected
-                            ? "primary.contrastText"
-                            : "text.primary",
                           flexDirection: "column",
                           position: "relative",
                           ...(!hasOpenSlot && {

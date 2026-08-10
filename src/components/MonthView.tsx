@@ -262,7 +262,6 @@ export function MonthView({ events }: MonthViewProps) {
                       textAlign: "left",
                       font: "inherit",
                       fontWeight: 600,
-                      color: "text.secondary",
                     }}
                   >
                     +{overflowCount}{" "}
@@ -370,6 +369,7 @@ export function MonthView({ events }: MonthViewProps) {
                 fullWidth
                 sx={{ mt: 2 }}
                 variant="outlined"
+                color="inherit"
                 onClick={() => {
                   setMobileSheetOpen(false);
                   setDate(mobileAgendaDay, "day");

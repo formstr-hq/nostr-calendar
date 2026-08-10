@@ -134,7 +134,7 @@ export function WeekView({ events, date }: ViewProps) {
             justifyContent="center"
             flexShrink={0}
           >
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption">
               {intl.formatMessage({ id: "event.allDayLabel" })}
             </Typography>
           </Box>

@@ -40,7 +40,7 @@ export function AppLoadingBar() {
           textAlign: "center",
         }}
       >
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        <Typography variant="caption">
           {intl.formatMessage({ id: "startup.loadingNotice" })}
         </Typography>
       </Box>

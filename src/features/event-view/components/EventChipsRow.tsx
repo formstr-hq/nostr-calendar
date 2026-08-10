@@ -6,7 +6,7 @@ import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import { useIntl } from "react-intl";
 import { ICalendarEvent } from "../../../utils/types";
 import type { ICalendarList } from "../../../utils/calendarListTypes";
-import { radius } from "../../../theme/tokens";
+import { isBlackOrWhite, radius } from "../../../theme/tokens";
 
 /** Public/private + calendar + saved-status chips (mockups 12/20/21). */
 export function EventChipsRow({
@@ -29,7 +29,6 @@ export function EventChipsRow({
           sx={{
             borderRadius: `${radius.pill}px`,
             bgcolor: theme.palette.action.selected,
-            color: theme.palette.text.secondary,
             fontWeight: 600,
           }}
         />
@@ -59,7 +58,7 @@ export function EventChipsRow({
               calendar.color,
               theme.palette.mode === "dark" ? 0.2 : 0.12,
             ),
-            color: calendar.color,
+            color: isBlackOrWhite(calendar.color) ? undefined : calendar.color,
             fontWeight: 600,
             "& .MuiChip-label": {
               display: "flex",

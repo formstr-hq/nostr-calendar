@@ -1,4 +1,4 @@
-import { createTheme, alpha } from "@mui/material/styles";
+import { createTheme } from "@mui/material/styles";
 import {
   lightTokens,
   darkTokens,
@@ -110,9 +110,13 @@ export const theme = createTheme({
           boxShadow: "none",
           "&:hover": { boxShadow: "none" },
         },
-        outlined: ({ theme }) => ({
+        outlined: ({ theme, ownerState }) => ({
           borderWidth: 1.5,
           borderColor: theme.vars.palette.divider,
+          color:
+            ownerState.color === "primary"
+              ? theme.vars.palette.text.primary
+              : undefined,
           "&:hover": { borderWidth: 1.5 },
         }),
         text: {
@@ -130,10 +134,10 @@ export const theme = createTheme({
         {
           props: { variant: "highlighted" },
           style: ({ theme }) => ({
-            background: theme.vars.palette.primary.main,
-            color: theme.vars.palette.primary.contrastText,
+            background: theme.vars.palette.text.primary,
+            color: theme.vars.palette.background.paper,
             "&:hover": {
-              background: alpha(theme.palette.primary.main, 0.3),
+              background: theme.vars.palette.text.primary,
             },
           }),
         },
@@ -255,8 +259,13 @@ export const theme = createTheme({
           fontSize: 12.5,
           "& .MuiOutlinedInput-notchedOutline": {
             borderWidth: 1.5,
-            borderColor: theme.vars.palette.divider,
+            borderColor: lightTokens.borderStrong,
           },
+          ...theme.applyStyles("dark", {
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderColor: darkTokens.borderStrong,
+            },
+          }),
           "&:hover .MuiOutlinedInput-notchedOutline": {
             borderColor: theme.vars.palette.text.secondary,
           },

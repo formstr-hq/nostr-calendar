@@ -3,14 +3,20 @@ import { ThemeProvider, useColorScheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { theme } from "./theme";
 import { useSettings } from "../stores/settings";
-import { accentPresets, AccentPresetName, getContrastText } from "./tokens";
+import {
+  accentPresets,
+  AccentPresetName,
+  darkTokens,
+  getContrastText,
+  isBlackOrWhite,
+} from "./tokens";
 
 function isPreset(accent: string): accent is AccentPresetName {
   return accent in accentPresets;
 }
 
 function ColorSchemeSync() {
-  const { setMode } = useColorScheme();
+  const { mode, setMode, systemMode } = useColorScheme();
   const themeMode = useSettings((s) => s.settings.themeMode);
   const accent = useSettings((s) => s.settings.accent);
 
@@ -27,14 +33,17 @@ function ColorSchemeSync() {
 
   useEffect(() => {
     const hex = isPreset(accent) ? accentPresets[accent] : accent;
+    const resolvedMode = mode === "system" ? systemMode : mode;
+    const primary =
+      resolvedMode === "dark" && isBlackOrWhite(hex) ? darkTokens.text : hex;
     const root = document.documentElement.style;
     root.setProperty("--cal-accent", hex);
-    root.setProperty("--mui-palette-primary-main", hex);
+    root.setProperty("--mui-palette-primary-main", primary);
     root.setProperty(
       "--mui-palette-primary-contrastText",
-      getContrastText(hex),
+      getContrastText(primary),
     );
-  }, [accent]);
+  }, [accent, mode, systemMode]);
 
   return null;
 }

@@ -81,7 +81,7 @@ export function DayView({ events, date }: ViewProps) {
             alignItems="center"
             justifyContent="center"
           >
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption">
               {intl.formatMessage({ id: "event.allDayLabel" })}
             </Typography>
           </Box>

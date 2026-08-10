@@ -122,3 +122,28 @@ export function getContrastText(hex: string): string {
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.6 ? "#0b0b0c" : "#ffffff";
 }
+
+export function isBlackOrWhite(color: string): boolean {
+  const normalized = color.trim().toLowerCase().replace(/\s/g, "");
+  if (normalized === "black" || normalized === "white") return true;
+
+  const match = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (!match) return false;
+
+  const full =
+    match[1].length === 3
+      ? match[1]
+          .split("")
+          .map((value) => value + value)
+          .join("")
+      : match[1];
+  const channels = [0, 2, 4].map((offset) =>
+    parseInt(full.slice(offset, offset + 2), 16),
+  );
+  const spread = Math.max(...channels) - Math.min(...channels);
+
+  return (
+    spread <= 12 &&
+    (Math.max(...channels) <= 24 || Math.min(...channels) >= 232)
+  );
+}

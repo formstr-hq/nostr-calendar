@@ -135,7 +135,6 @@ export function EventQuickPeek(props: EventQuickPeekProps) {
             p: 0.5,
             font: "inherit",
             fontWeight: 600,
-            color: "primary.main",
           }}
         >
           {intl.formatMessage({ id: "navigation.openDayView" })} →
@@ -250,7 +249,6 @@ function EventPeekBody({
                   onClick={(e) => e.stopPropagation()}
                   variant="body2"
                   sx={{
-                    color: "primary.main",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
