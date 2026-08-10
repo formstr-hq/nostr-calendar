@@ -38,6 +38,8 @@ dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
+const WEEK_HEADER_HEIGHT = 76;
+
 export const WeekHeader = ({ date }: { date: Dayjs }) => {
   const weekStart = useSettings((state) => state.settings.general.weekStart);
   const start = startOfConfiguredWeek(date, weekStart);
@@ -48,6 +50,8 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
     <StyledSecondaryHeader
       zIndex={1}
       topOffset={isMobile ? MOBILE_TOPBAR_ROW2_HEIGHT : 0}
+      height={WEEK_HEADER_HEIGHT}
+      boxSizing="border-box"
       textAlign="center"
       display="grid"
       gridTemplateColumns="repeat(7, 1fr)"
@@ -75,6 +79,8 @@ export const WeekHeader = ({ date }: { date: Dayjs }) => {
 
 export function WeekView({ events, date }: ViewProps) {
   const intl = useIntl();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { weekStart, timeFormat, workingHours } = useSettings(
     (state) => state.settings.general,
   );
@@ -117,8 +123,12 @@ export function WeekView({ events, date }: ViewProps) {
   return (
     <>
       {hasAnyAllDay && (
-        <Box
+        <StyledSecondaryHeader
           display="flex"
+          topOffset={
+            WEEK_HEADER_HEIGHT + (isMobile ? MOBILE_TOPBAR_ROW2_HEIGHT : 0)
+          }
+          nativeTopOffset={WEEK_HEADER_HEIGHT}
           sx={{
             borderBottom: "1px solid",
             borderColor: "divider",
@@ -152,15 +162,19 @@ export function WeekView({ events, date }: ViewProps) {
                 sx={{ borderColor: "divider", minWidth: 0, overflow: "hidden" }}
               >
                 {allDayForDay(day.startOf("day").valueOf()).map((evt) => (
-                  <AllDayEventChip key={`${evt.id}:${evt.begin}`} event={evt} />
+                  <AllDayEventChip
+                    key={`${evt.id}:${evt.begin}`}
+                    event={evt}
+                    compactOnMobile
+                  />
                 ))}
               </Box>
             ))}
           </Box>
-        </Box>
+        </StyledSecondaryHeader>
       )}
       <DndContext>
-        <Box display="flex" height={24 * 60}>
+        <Box display="flex" height={24 * 60} sx={{ isolation: "isolate" }}>
           {/* Time column */}
           <Box width={60} position={"relative"}>
             <TimeMarker />
@@ -224,7 +238,11 @@ export function WeekView({ events, date }: ViewProps) {
                     </Box>
                   ))}
                   {laidOut.map((e) => (
-                    <CalendarEventCard key={e.renderKey} event={e} />
+                    <CalendarEventCard
+                      key={e.renderKey}
+                      event={e}
+                      compactOnMobile
+                    />
                   ))}
                 </Box>
               );

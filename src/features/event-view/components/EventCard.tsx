@@ -19,11 +19,13 @@ import { formatCalendarTime } from "../../../utils/calendarSettings";
 interface CalendarEventCardProps {
   event: PositionedEvent;
   offset?: string;
+  compactOnMobile?: boolean;
 }
 
 export function CalendarEventCard({
   event,
   offset = "0px",
+  compactOnMobile = false,
 }: CalendarEventCardProps) {
   const chipRef = useRef<HTMLElement>(null);
   const [peekOpen, setPeekOpen] = useState(false);
@@ -66,7 +68,24 @@ export function CalendarEventCard({
           isDevice={event.source === "device"}
           time={time}
           onClick={handleClick}
-          sx={{ height: "100%", alignItems: "flex-start" }}
+          sx={{
+            height: "100%",
+            alignItems: "flex-start",
+            fontSize: compactOnMobile ? { xs: 10, sm: 12.5 } : undefined,
+            whiteSpace: compactOnMobile
+              ? { xs: "normal", sm: "nowrap" }
+              : undefined,
+            textOverflow: compactOnMobile
+              ? { xs: "clip", sm: "ellipsis" }
+              : undefined,
+            "& > span:last-of-type": compactOnMobile
+              ? {
+                  whiteSpace: { xs: "normal", sm: "nowrap" },
+                  textOverflow: { xs: "clip", sm: "ellipsis" },
+                  overflowWrap: "normal",
+                }
+              : undefined,
+          }}
         />
       </Box>
       {!isMobile && (
@@ -95,7 +114,13 @@ export function CalendarEventCard({
 }
 
 /** Compact pill used in the all-day banner row of Day and Week views. */
-export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
+export function AllDayEventChip({
+  event,
+  compactOnMobile = false,
+}: {
+  event: ICalendarEvent;
+  compactOnMobile?: boolean;
+}) {
   const chipRef = useRef<HTMLElement>(null);
   const [peekOpen, setPeekOpen] = useState(false);
   const modal = useEventModal();
@@ -119,6 +144,22 @@ export function AllDayEventChip({ event }: { event: ICalendarEvent }) {
           isPublic={isPublic}
           isDevice={event.source === "device"}
           onClick={handleClick}
+          sx={{
+            fontSize: compactOnMobile ? { xs: 10, sm: 12.5 } : undefined,
+            whiteSpace: compactOnMobile
+              ? { xs: "normal", sm: "nowrap" }
+              : undefined,
+            textOverflow: compactOnMobile
+              ? { xs: "clip", sm: "ellipsis" }
+              : undefined,
+            "& > span:last-of-type": compactOnMobile
+              ? {
+                  whiteSpace: { xs: "normal", sm: "nowrap" },
+                  textOverflow: { xs: "clip", sm: "ellipsis" },
+                  overflowWrap: "normal",
+                }
+              : undefined,
+          }}
         />
       </Box>
       {!isMobile && (
