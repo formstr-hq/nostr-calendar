@@ -1,4 +1,7 @@
 import { test, expect } from "../fixtures/index.js";
+import { SimplePool } from "nostr-tools/pool";
+import { TEST_KEYS } from "../../relay/seed/keys.js";
+import { testRelayUrl } from "../../relay/seed/publish.js";
 
 // All list edits happen on local state until "Save" — the tests below cancel
 // out unless explicitly testing save, so the app keeps talking to the test
@@ -70,6 +73,7 @@ test("reset to defaults repopulates the relay list", async ({
 
 test("saving publishes the relay list", async ({ authedPage: page }) => {
   const panel = await openRelayManager(page);
+  const relayUrl = testRelayUrl();
 
   // Save the list unchanged (still pointing at the test relay) — this
   // exercises the NIP-65 publish path without repointing the app.
@@ -77,4 +81,28 @@ test("saving publishes the relay list", async ({ authedPage: page }) => {
   await expect(page.getByText("Relay list saved and published")).toBeVisible({
     timeout: 20_000,
   });
+
+  const pool = new SimplePool();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const events = await pool.querySync([relayUrl], {
+            kinds: [10002],
+            authors: [TEST_KEYS.alice.pubkey],
+          });
+          return events
+            .at(0)
+            ?.tags.filter(([name]) => name === "r")
+            .map(([, url]) => url);
+        },
+        {
+          message: `expected Alice's relay list on ${relayUrl}`,
+          timeout: 20_000,
+        },
+      )
+      .toContain(relayUrl);
+  } finally {
+    pool.close([relayUrl]);
+  }
 });

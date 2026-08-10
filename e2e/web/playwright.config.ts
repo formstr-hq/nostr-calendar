@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(import.meta.dirname, "../.env.test") });
 // Must match the mock relay started in global-setup.ts (port 7780).
 const relayUrl = process.env.VITE_TEST_RELAY ?? "ws://localhost:7780";
 const rootDir = path.resolve(import.meta.dirname, "../..");
+const appUrl = "http://localhost:4173";
 
 export default defineConfig({
   testDir: "./tests",
@@ -21,7 +22,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
 
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: appUrl,
     screenshot: "only-on-failure",
     trace: "on-first-retry",
     video: "retain-on-failure",
@@ -43,17 +44,16 @@ export default defineConfig({
   globalSetup: "./global-setup.ts",
 
   webServer: {
-    command: `cd ${rootDir} && vite build --mode test && vite preview --port 5173`,
-    url: "http://localhost:5173",
-    reuseExistingServer: !process.env.CI,
+    command: `cd ${rootDir} && vite build --mode test && vite preview --port 4173 --strictPort`,
+    url: appUrl,
+    // Reusing a dev server bypasses the test build's VITE_TEST_RELAY and can
+    // send E2E events to the production defaults.
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       VITE_TEST_RELAY: relayUrl,
     },
   },
 
-  reporter: [
-    ["html", { outputFolder: "../../playwright-report" }],
-    ["list"],
-  ],
+  reporter: [["html", { outputFolder: "../../playwright-report" }], ["list"]],
 });
