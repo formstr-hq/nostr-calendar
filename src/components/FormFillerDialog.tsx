@@ -535,7 +535,6 @@ export function FormFillerDialog({
             rel="noopener noreferrer"
             sx={{
               textTransform: "none",
-              color: "text.secondary",
               flexShrink: 0,
             }}
           >
@@ -604,7 +603,6 @@ function buildFormSx(theme: Theme) {
     "& .form-intro .form-name": { display: "none" },
     "& .form-intro .form-description": {
       fontSize: "0.875rem",
-      color: theme.palette.text.secondary,
       lineHeight: 1.7,
     },
 
@@ -629,7 +627,6 @@ function buildFormSx(theme: Theme) {
     "& .option-group .option-label": {
       fontSize: "0.875rem",
       fontWeight: 700,
-      color: theme.palette.text.primary,
       lineHeight: 1.4,
       marginBottom: "4px",
     },
@@ -642,7 +639,6 @@ function buildFormSx(theme: Theme) {
       gap: "8px",
       fontSize: "0.875rem",
       fontWeight: 400,
-      color: theme.palette.text.primary,
       cursor: "pointer",
       lineHeight: 1.4,
     },
@@ -651,7 +647,6 @@ function buildFormSx(theme: Theme) {
     "& .form-section > label": {
       fontSize: "0.875rem",
       fontWeight: 700,
-      color: theme.palette.text.primary,
       marginTop: "22px",
       marginBottom: "6px",
       cursor: "default",
@@ -671,7 +666,6 @@ function buildFormSx(theme: Theme) {
       fontSize: "1rem",
       fontFamily: "inherit",
       fontWeight: 400,
-      color: theme.palette.text.primary,
       backgroundColor: "transparent",
       outline: "none",
       transition: "border-color 150ms, box-shadow 150ms",
@@ -703,7 +697,6 @@ function buildFormSx(theme: Theme) {
       gap: "6px",
       fontSize: "0.875rem",
       fontWeight: 700,
-      color: theme.palette.text.primary,
     },
     "& form fieldset br": { display: "none" },
     "& form fieldset label": {
@@ -712,7 +705,6 @@ function buildFormSx(theme: Theme) {
       alignItems: "center",
       gap: "8px",
       fontWeight: 400,
-      color: theme.palette.text.primary,
       cursor: "pointer",
     },
   } as const;

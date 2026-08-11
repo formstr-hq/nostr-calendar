@@ -30,6 +30,8 @@ export interface PositionedEvent extends CalendarEventSegment {
   height: number;
   col: number;
   colSpan: number;
+  stackOrder: number;
+  widthScale: number;
 }
 
 // Convert an event occurrence into the slice that should be drawn inside one
@@ -108,54 +110,61 @@ export function layoutDayEvents(
   const sorted = [...events].sort(
     (a, b) => dayjs(a.renderBegin).valueOf() - dayjs(b.renderBegin).valueOf(),
   );
-  const columns: CalendarEventSegment[][] = [];
+  const startGroups: CalendarEventSegment[][] = [];
+  const startThresholdMs = MIN_TIMED_EVENT_DURATION_MINUTES * 60 * 1000;
 
   sorted.forEach((event) => {
-    let placed = false;
-    // Greedy placement: reuse the first column whose last event has already
-    // ended, otherwise open a new parallel column for overlapping events.
-    for (const col of columns) {
-      if (
-        dayjs(col[col.length - 1].renderEnd).isSameOrBefore(
-          dayjs(event.renderBegin),
-        )
-      ) {
-        col.push(event);
-        placed = true;
-        break;
-      }
+    const currentGroup = startGroups[startGroups.length - 1];
+    const previousEvent = currentGroup?.[currentGroup.length - 1];
+
+    if (
+      !previousEvent ||
+      event.renderBegin - previousEvent.renderBegin > startThresholdMs
+    ) {
+      startGroups.push([event]);
+    } else {
+      currentGroup.push(event);
     }
-    if (!placed) columns.push([event]);
   });
 
-  const colSpan = columns.length;
+  const positionByEvent = new Map<
+    CalendarEventSegment,
+    { col: number; colSpan: number }
+  >();
+  startGroups.forEach((group) => {
+    group.forEach((event, col) => {
+      positionByEvent.set(event, { col, colSpan: group.length });
+    });
+  });
 
-  return columns.flatMap((col, colIndex) =>
-    col.map((e) => {
-      const startMinutes =
-        dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute();
-      const rawDuration = dayjs(e.renderEnd).diff(
-        dayjs(e.renderBegin),
-        "minute",
-      );
+  return sorted.map((e, stackOrder) => {
+    const position = positionByEvent.get(e)!;
+    const overlapsEarlierEvent = sorted.some(
+      (earlierEvent) =>
+        earlierEvent.renderBegin < e.renderBegin &&
+        earlierEvent.renderEnd > e.renderBegin,
+    );
+    const startMinutes =
+      dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute();
+    const rawDuration = dayjs(e.renderEnd).diff(dayjs(e.renderBegin), "minute");
 
-      // renderEnd may be exactly at the next midnight, so clamp the drawn
-      // height to the current day to avoid spilling into the next column.
-      const clippedDuration = Math.max(
-        0,
-        Math.min(rawDuration, DAY_MINUTES - startMinutes),
-      );
-      return {
-        ...e,
-        col: colIndex,
-        colSpan,
-        top: dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute(),
-        height:
-          Math.max(clippedDuration, MIN_TIMED_EVENT_DURATION_MINUTES) *
-          PX_PER_MINUTE,
-      };
-    }),
-  );
+    // renderEnd may be exactly at the next midnight, so clamp the drawn
+    // height to the current day to avoid spilling into the next column.
+    const clippedDuration = Math.max(
+      0,
+      Math.min(rawDuration, DAY_MINUTES - startMinutes),
+    );
+    return {
+      ...e,
+      ...position,
+      stackOrder,
+      widthScale: overlapsEarlierEvent ? 0.95 : 1,
+      top: dayjs(e.renderBegin).hour() * 60 + dayjs(e.renderBegin).minute(),
+      height:
+        Math.max(clippedDuration, MIN_TIMED_EVENT_DURATION_MINUTES) *
+        PX_PER_MINUTE,
+    };
+  });
 }
 
 export const getTimeFromCell = (

@@ -44,6 +44,7 @@ export function BottomSheet({
             borderTopLeftRadius: radius.modal,
             borderTopRightRadius: radius.modal,
             backgroundColor: `var(--mui-palette-background-${background})`,
+            color: "var(--mui-palette-text-primary)",
             zIndex: 1301,
             outline: "none",
           }}

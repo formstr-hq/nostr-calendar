@@ -98,13 +98,11 @@ export function Sidebar({ onNewEvent, onImportEvent }: SidebarProps) {
             </Tooltip>
             <Button
               fullWidth
+              variant="contained"
               onClick={onNewEvent}
               sx={{
                 height: buttonHeight.md,
                 borderRadius: `${radius.card}px`,
-                bgcolor: "text.primary",
-                color: "background.paper",
-                "&:hover": { bgcolor: "text.primary" },
               }}
             >
               + New event

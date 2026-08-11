@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
 import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
-import { publicTint, getContrastText, radius } from "../../theme/tokens";
+import { getContrastText, publicTint, radius } from "../../theme/tokens";
 import { isMobile } from "../../common/utils";
 
 interface EventChipProps {
@@ -62,7 +62,7 @@ export const EventChip = forwardRef<HTMLElement, EventChipProps>(
             whiteSpace: "nowrap",
             textOverflow: "ellipsis",
             bgcolor: isPublic ? alpha(color, tint) : color,
-            color: isPublic ? color : getContrastText(color),
+            color: getContrastText(color),
           },
           ...(Array.isArray(sx) ? sx : [sx]),
         ]}

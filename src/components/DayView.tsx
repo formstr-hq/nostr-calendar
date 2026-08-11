@@ -1,4 +1,10 @@
-import { Box, Divider, Typography } from "@mui/material";
+import {
+  Box,
+  Divider,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import dayjs from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
@@ -18,6 +24,8 @@ import { useIntl } from "react-intl";
 import { useSettings } from "../stores/settings";
 import { hourLabel, parseHour } from "../utils/calendarSettings";
 import { getOccurrencesInRange } from "../utils/repeatingEventsHelper";
+import { StyledSecondaryHeader } from "./StyledComponents";
+import { MOBILE_TOPBAR_ROW2_HEIGHT } from "./ui/TopBar";
 
 dayjs.extend(weekday);
 dayjs.extend(isSameOrBefore);
@@ -25,6 +33,8 @@ dayjs.extend(isSameOrAfter);
 
 export function DayView({ events, date }: ViewProps) {
   const intl = useIntl();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { timeFormat, workingHours } = useSettings(
     (state) => state.settings.general,
   );
@@ -65,8 +75,9 @@ export function DayView({ events, date }: ViewProps) {
   return (
     <>
       {allDayEvents.length > 0 && (
-        <Box
+        <StyledSecondaryHeader
           display="flex"
+          topOffset={isMobile ? MOBILE_TOPBAR_ROW2_HEIGHT : 0}
           sx={{
             borderBottom: "1px solid",
             borderColor: "divider",
@@ -81,7 +92,7 @@ export function DayView({ events, date }: ViewProps) {
             alignItems="center"
             justifyContent="center"
           >
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption">
               {intl.formatMessage({ id: "event.allDayLabel" })}
             </Typography>
           </Box>
@@ -90,10 +101,10 @@ export function DayView({ events, date }: ViewProps) {
               <AllDayEventChip key={`${evt.id}:${evt.begin}`} event={evt} />
             ))}
           </Box>
-        </Box>
+        </StyledSecondaryHeader>
       )}
       <DndContext>
-        <Box display="flex" height={24 * 60}>
+        <Box display="flex" height={24 * 60} sx={{ isolation: "isolate" }}>
           {/* Time column */}
           <Box
             width={60}

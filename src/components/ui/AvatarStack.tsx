@@ -56,7 +56,6 @@ export function AvatarStack({ items, size = 32, max = 4 }: AvatarStackProps) {
             borderColor: "background.paper",
             ml: `-${size * 0.3}px`,
             bgcolor: "action.selected",
-            color: "text.secondary",
           }}
         >
           +{overflow}

@@ -55,9 +55,8 @@ export function SegmentedControl<T extends string>({
               fontFamily: "inherit",
               borderRadius: `${radius.pill}px`,
               bgcolor: active ? "background.paper" : "transparent",
-              color: active ? "text.primary" : "text.secondary",
               boxShadow: active ? 1 : "none",
-              transition: "background-color 0.15s, color 0.15s",
+              transition: "background-color 0.15s",
             }}
           >
             {option.label}

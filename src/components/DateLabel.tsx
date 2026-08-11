@@ -31,7 +31,6 @@ export function DateLabel({
   return (
     <IconButton
       variant={isToday ? "highlighted" : undefined}
-      color="primary"
       size="small"
       onClick={onDateClick}
       style={{
@@ -39,12 +38,7 @@ export function DateLabel({
         height: `${size}px`,
       }}
     >
-      <Typography
-        fontSize={`${fontSize}rem`}
-        variant="body1"
-        fontWeight={600}
-        sx={{ color: isToday ? "primary.contrastText" : "text.primary" }}
-      >
+      <Typography fontSize={`${fontSize}rem`} variant="body1" fontWeight={600}>
         {day.date()}
       </Typography>
     </IconButton>

@@ -81,7 +81,6 @@ export function TopBar({
         fontWeight: 700,
         fontFamily: "inherit",
         cursor: "pointer",
-        color: "text.primary",
         flexShrink: 0,
       }}
     >
@@ -114,12 +113,12 @@ export function TopBar({
           component={RouterLink}
           to="/"
           underline="none"
+          color="inherit"
           sx={{
             display: "flex",
             alignItems: "center",
             gap: 1,
             flexShrink: 0,
-            color: "text.primary",
           }}
         >
           {!isMobile && (

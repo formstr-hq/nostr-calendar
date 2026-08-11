@@ -101,6 +101,7 @@ export function SidebarContent({
         {showNewEvent && (
           <Button
             fullWidth
+            variant="contained"
             onClick={() => {
               onNewEvent();
               onNavigate?.();
@@ -108,9 +109,6 @@ export function SidebarContent({
             sx={{
               height: buttonHeight.md,
               borderRadius: `${radius.card}px`,
-              bgcolor: "text.primary",
-              color: "background.paper",
-              "&:hover": { bgcolor: "text.primary" },
             }}
           >
             + New event
@@ -159,7 +157,6 @@ export function SidebarContent({
               navigate("/settings");
               onNavigate?.();
             }}
-            sx={{ color: "text.secondary" }}
           >
             {intl.formatMessage({ id: "sidebar.settingsLink" })}
           </Button>
@@ -187,7 +184,7 @@ export function SidebarContent({
               href="https://about.formstr.app"
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ color: "text.secondary", textDecoration: "none" }}
+              sx={{ textDecoration: "none" }}
             >
               {intl.formatMessage({ id: "sidebar.about" })}
             </Typography>
@@ -197,7 +194,7 @@ export function SidebarContent({
               href="https://about.formstr.app/privacy-policy"
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ color: "text.secondary", textDecoration: "none" }}
+              sx={{ textDecoration: "none" }}
             >
               {intl.formatMessage({ id: "sidebar.privacyPolicy" })}
             </Typography>
@@ -205,7 +202,7 @@ export function SidebarContent({
               variant="caption"
               component="span"
               onClick={() => setContactFormOpen(true)}
-              sx={{ color: "text.secondary", cursor: "pointer" }}
+              sx={{ cursor: "pointer" }}
             >
               {intl.formatMessage({ id: "sidebar.contactUs" })}
             </Typography>

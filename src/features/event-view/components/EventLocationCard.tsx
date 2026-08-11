@@ -38,7 +38,7 @@ export function EventLocationCard({ location }: { location: string }) {
           target="_blank"
           rel="noopener noreferrer"
           variant="body2"
-          sx={{ color: "primary.main", textDecoration: "none" }}
+          sx={{ textDecoration: "none" }}
         >
           {intl.formatMessage({ id: "event.directions" })} →
         </Typography>

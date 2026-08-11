@@ -67,7 +67,6 @@ export function CollapsibleGroup({
             fontWeight: 700,
             letterSpacing: "1px",
             lineHeight: 1.4,
-            color: "text.secondary",
           }}
         >
           {title}

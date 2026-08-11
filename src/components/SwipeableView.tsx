@@ -102,9 +102,9 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
 
   return (
     <Box
-      overflow="hidden"
       width="100%"
       position="relative"
+      sx={{ overflowX: "clip" }}
       onTouchStartCapture={handleTouchStart}
       onTouchEndCapture={handleTouchEnd}
     >

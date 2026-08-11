@@ -1,4 +1,20 @@
-import { test, expect } from "../fixtures/index.js";
+import { test, expect, injectAuth } from "../fixtures/index.js";
+import { createMockRelay } from "nostr-mock-relay";
+import { getPublicKey } from "nostr-tools";
+import { SimplePool } from "nostr-tools/pool";
+import { TEST_KEYS } from "../../relay/seed/keys.js";
+import { testRelayUrl } from "../../relay/seed/publish.js";
+import { createEventViaDialog } from "../helpers.js";
+
+const RELAY_TEST_SECRET_HEX =
+  "dddd0000dddd0000dddd0000dddd0000dddd0000dddd0000dddd0000dddd0004";
+const RELAY_TEST_KEY = {
+  secretHex: RELAY_TEST_SECRET_HEX,
+  pubkey: getPublicKey(
+    Uint8Array.from(Buffer.from(RELAY_TEST_SECRET_HEX, "hex")),
+  ),
+};
+const PRIVATE_CALENDAR_EVENT_KIND = 32678;
 
 // All list edits happen on local state until "Save" — the tests below cancel
 // out unless explicitly testing save, so the app keeps talking to the test
@@ -70,6 +86,7 @@ test("reset to defaults repopulates the relay list", async ({
 
 test("saving publishes the relay list", async ({ authedPage: page }) => {
   const panel = await openRelayManager(page);
+  const relayUrl = testRelayUrl();
 
   // Save the list unchanged (still pointing at the test relay) — this
   // exercises the NIP-65 publish path without repointing the app.
@@ -77,4 +94,104 @@ test("saving publishes the relay list", async ({ authedPage: page }) => {
   await expect(page.getByText("Relay list saved and published")).toBeVisible({
     timeout: 20_000,
   });
+
+  const pool = new SimplePool();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const events = await pool.querySync([relayUrl], {
+            kinds: [10002],
+            authors: [TEST_KEYS.alice.pubkey],
+          });
+          return events
+            .at(0)
+            ?.tags.filter(([name]) => name === "r")
+            .map(([, url]) => url);
+        },
+        {
+          message: `expected Alice's relay list on ${relayUrl}`,
+          timeout: 20_000,
+        },
+      )
+      .toContain(relayUrl);
+  } finally {
+    pool.close([relayUrl]);
+  }
+});
+
+test("publishes events to a newly added relay", async ({ browser }) => {
+  const relay = createMockRelay({ host: "127.0.0.1", port: 0 });
+  await relay.start();
+
+  try {
+    if (!relay.url) throw new Error("Secondary mock relay did not start");
+    const relayUrl = relay.url;
+    const context = await browser.newContext();
+
+    try {
+      await injectAuth(context, RELAY_TEST_KEY, "Relay Test User");
+
+      const page = await context.newPage();
+      await page.goto("/");
+      await page
+        .getByTestId("user-avatar")
+        .last()
+        .waitFor({ state: "visible", timeout: 15_000 });
+
+      const panel = await openRelayManager(page);
+      await panel.getByPlaceholder("wss://relay.example.com").fill(relayUrl);
+      await panel.getByRole("button", { name: "Add", exact: true }).click();
+      await expect(
+        panel.getByTestId("relay-row").filter({ hasText: relayUrl }),
+      ).toBeVisible();
+      await panel.getByRole("button", { name: "Save", exact: true }).click();
+
+      await expect
+        .poll(
+          () =>
+            relay
+              .getEvents()
+              .find(
+                (event) =>
+                  event.kind === 10002 &&
+                  event.pubkey === RELAY_TEST_KEY.pubkey,
+              )
+              ?.tags.filter(([name]) => name === "r")
+              .map(([, url]) => url),
+          {
+            message: `expected relay list on newly added relay ${relayUrl}`,
+            timeout: 20_000,
+          },
+        )
+        .toContain(relayUrl);
+
+      await createEventViaDialog(page, {
+        date: "2027-08-20",
+        title: "Secondary Relay Event",
+        calendarName: "Secondary Relay Calendar",
+      });
+
+      await expect
+        .poll(
+          () =>
+            relay
+              .getEvents()
+              .some(
+                (event) =>
+                  event.kind === PRIVATE_CALENDAR_EVENT_KIND &&
+                  event.pubkey === RELAY_TEST_KEY.pubkey,
+              ),
+          {
+            message: `expected private calendar event on ${relayUrl}`,
+            timeout: 20_000,
+          },
+        )
+        .toBe(true);
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await relay.stop();
+  }
 });

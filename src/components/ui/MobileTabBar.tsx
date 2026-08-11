@@ -81,7 +81,6 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
               border: "none",
               bgcolor: "transparent",
               cursor: "pointer",
-              color: active ? "text.primary" : "text.disabled",
             }}
           >
             {key === "alerts" ? (
