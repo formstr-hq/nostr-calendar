@@ -1,6 +1,6 @@
 {
   "name": "nostr-calendar",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "repository": {
     "url": "https://github.com/formstr-hq/nostr-calendar"
