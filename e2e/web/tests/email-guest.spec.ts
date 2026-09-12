@@ -6,8 +6,13 @@ const TEST_DATE = "2027-06-20";
 const BRIDGE_PUBKEY = "ab".repeat(32);
 
 // The email-guest flow discovers the bridge and proves From-address ownership
-// over NIP-05 (`_smtp@<domain>` and `<alias>@<domain>`). Intercept both.
-async function interceptMailNip05(page: import("@playwright/test").Page) {
+// over NIP-05 (`_smtp@<domain>` and `<alias>@<domain>`). It also asks the
+// Formstr account API which aliases the npub owns; intercept both so the test
+// is hermetic and the "no alias" state is deterministic.
+async function interceptMailNip05(
+  page: import("@playwright/test").Page,
+  { ownedAliases = [] as string[] } = {},
+) {
   await page.route(
     "https://mailstr.app/.well-known/nostr.json?*",
     async (route) => {
@@ -21,12 +26,21 @@ async function interceptMailNip05(page: import("@playwright/test").Page) {
       });
     },
   );
+  // Account-API alias lookup: 404 means "owns none" (authoritative negative,
+  // which is what surfaces the gated notice); a populated array means owned.
+  await page.route("https://api.formstr.app/api/nip-05/get-nip05", (route) =>
+    route.fulfill({
+      status: ownedAliases.length ? 200 : 404,
+      contentType: "application/json",
+      body: JSON.stringify(ownedAliases),
+    }),
+  );
 }
 
 test("invites an external guest by email and persists the guest", async ({
   authedPage: page,
 }) => {
-  await interceptMailNip05(page);
+  await interceptMailNip05(page, { ownedAliases: ["alice@mailstr.app"] });
 
   await createEventViaDialog(page, {
     date: TEST_DATE,
@@ -36,7 +50,7 @@ test("invites an external guest by email and persists the guest", async ({
   await openEventEditor(page, "Email Guest Offsite");
 
   const participantInput = page.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
 
   // A plain email with no Nostr match surfaces the invite-by-email row.
@@ -51,9 +65,11 @@ test("invites an external guest by email and persists the guest", async ({
   await expect(emailGuest).toBeVisible();
   await expect(emailGuest).toContainText("friend@gmail.com");
   await expect(page.getByTestId("mail-alias-picker")).toBeVisible();
-
-  // Type the From address the organizer owns.
-  await page.getByTestId("mail-alias-input").fill("alice@mailstr.app");
+  // The account already owns an alias, so the gated notice must NOT appear.
+  await expect(page.getByTestId("mail-alias-notice")).toHaveCount(0);
+  await expect(page.getByTestId("mail-alias-input")).toHaveValue(
+    "alice@mailstr.app",
+  );
 
   await page.getByRole("button", { name: "Save Event" }).click();
   await expect(page.getByTestId("event-title")).not.toBeVisible({
@@ -96,7 +112,7 @@ test("blocks the email invite with a clear error when no mail address is set", a
   await openEventEditor(page, "No Alias Email Event");
 
   const participantInput = page.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
   await participantInput.fill("guest@example.com");
   await page.getByTestId("email-invite-option").click();

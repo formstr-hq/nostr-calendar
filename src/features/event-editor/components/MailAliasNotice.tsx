@@ -2,31 +2,25 @@ import { Button, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { useIntl } from "react-intl";
 import { MAIL_LANDING_URL } from "../../../nostr/mailBridge";
-import { mailTokens, radius, spacing } from "../../../theme/tokens";
+import { radius, spacing } from "../../../theme/tokens";
+import { mailModeStyles } from "../../../theme/mailStyles";
 
-const Notice = styled("div")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Notice = styled("div")(({ theme }) =>
+  mailModeStyles(theme, (tokens) => ({
     display: "flex",
     flexDirection: "column",
     gap: spacing,
     padding: spacing * 1.5,
     borderRadius: radius.card,
-    border: `1px solid ${mode.noticeBorder}`,
-    backgroundColor: mode.noticeSurface,
-  };
-});
+    border: `1px solid ${tokens.noticeBorder}`,
+    backgroundColor: tokens.noticeSurface,
+  })),
+);
 
-const Title = styled(Typography)(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
-    ...theme.typography.body2,
-    fontWeight: 700,
-    color: mode.noticeText,
-  };
-});
+const Title = styled(Typography)(({ theme }) => [
+  { ...theme.typography.body2, fontWeight: 700 },
+  ...mailModeStyles(theme, (tokens) => ({ color: tokens.noticeText })),
+]);
 
 /**
  * Gated state: an email guest exists but the organizer has no known mail

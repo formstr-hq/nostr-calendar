@@ -31,7 +31,7 @@ const dictionary: NestedObject = {
       description: "Description",
       location: "Location",
       participants: "Participants",
-      addParticipants: "Search name, NIP-05, or npub",
+      addParticipants: "Search name, NIP-05, npub, or email",
       rsvpDetails: "RSVP Details",
       privateEvent: "Private Event",
       privateEventCaption:

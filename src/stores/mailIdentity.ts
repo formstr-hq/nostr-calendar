@@ -21,7 +21,8 @@ interface MailIdentityState {
   /** Last known owned aliases (from the API or manual entry). */
   aliases: string[];
   loadingAliases: boolean;
-  aliasesError: string | null;
+  /** True once an alias lookup has completed (success OR authoritative none). */
+  aliasesLoaded: boolean;
   setAlias: (alias: string) => void;
   setBridgeOverride: (value: string) => void;
   addAlias: (alias: string) => void;
@@ -37,17 +38,15 @@ const persist = (state: {
   aliases: string[];
 }) => setItem(STORAGE_KEY, state);
 
-const normalizeAlias = (alias: string): string => qualifyMailAddress(alias);
-
 export const useMailIdentity = create<MailIdentityState>((set, get) => ({
   alias: stored.alias ?? "",
   bridgeOverride: stored.bridgeOverride ?? "",
   aliases: stored.aliases ?? [],
   loadingAliases: false,
-  aliasesError: null,
+  aliasesLoaded: false,
 
   // Store what the user typed. Qualifying a bare localpart with the default
-  // domain happens at the boundary (`qualifyMailAddress`) so typing a name
+  // domain happens at the send boundary (`qualifyMailAddress`) so typing a name
   // isn't fought by the controlled input rewriting it mid-keystroke.
   setAlias: (alias) => {
     set({ alias });
@@ -68,7 +67,7 @@ export const useMailIdentity = create<MailIdentityState>((set, get) => ({
   },
 
   addAlias: (alias) => {
-    const normalized = normalizeAlias(alias);
+    const normalized = qualifyMailAddress(alias);
     if (!normalized) return;
     const aliases = Array.from(new Set([...get().aliases, normalized]));
     set({ aliases });
@@ -78,21 +77,31 @@ export const useMailIdentity = create<MailIdentityState>((set, get) => ({
       aliases,
     });
   },
+
   loadAliases: async () => {
-    set({ loadingAliases: true, aliasesError: null });
+    if (get().loadingAliases) return;
+    set({ loadingAliases: true });
     const { ok, addresses } = await fetchOwnedMailAliases();
     if (!ok) {
+      // Could not reach the API — leave existing aliases/manual entry alone
+      // and do NOT mark loaded (so the "no address" notice stays withheld).
       set({ loadingAliases: false });
       return;
     }
     const aliases = Array.from(new Set([...addresses, ...get().aliases]));
     const alias = get().alias || aliases[0] || "";
-    set({ aliases, alias, loadingAliases: false });
+    set({ aliases, alias, loadingAliases: false, aliasesLoaded: true });
     persist({ alias, bridgeOverride: get().bridgeOverride, aliases });
   },
 
   reset: () => {
-    set({ alias: "", bridgeOverride: "", aliases: [], aliasesError: null });
+    set({
+      alias: "",
+      bridgeOverride: "",
+      aliases: [],
+      loadingAliases: false,
+      aliasesLoaded: false,
+    });
     persist({ alias: "", bridgeOverride: "", aliases: [] });
   },
 }));

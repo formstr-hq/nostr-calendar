@@ -26,7 +26,7 @@ export function EventParticipants({
   const intl = useIntl();
   const displayParticipants = uniqueParticipants(participants);
   const alias = useMailIdentity((state) => state.alias);
-  const aliases = useMailIdentity((state) => state.aliases);
+  const aliasesLoaded = useMailIdentity((state) => state.aliasesLoaded);
 
   const addEmail = (email: string) => {
     if (!onGuestEmailsChange) return;
@@ -51,7 +51,7 @@ export function EventParticipants({
 
       {guestEmails.length > 0 && (
         <>
-          {!alias && aliases.length === 0 && <MailAliasNotice />}
+          {!alias && aliasesLoaded && <MailAliasNotice />}
           <MailAliasPicker />
         </>
       )}

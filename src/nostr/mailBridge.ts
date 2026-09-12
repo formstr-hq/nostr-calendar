@@ -25,11 +25,14 @@ export const DEFAULT_MAIL_DOMAIN =
   import.meta.env.VITE_MAIL_DOMAIN ?? "mailstr.app";
 
 /**
- * Optional Formstr account API that lists a user's registered aliases.
- * Empty string disables the lookup entirely — the app then relies on manual
- * entry only.
+ * Formstr account API that lists a user's registered aliases. Defaults to the
+ * production backend; override with `VITE_MAIL_API_BASE_URL` (or set it empty
+ * to disable the lookup and rely on manual entry only). Verified live: the
+ * endpoint exists at `api.formstr.app` (401 without NIP-98 auth), NOT at
+ * `mailstr.app` (404) — only its `.well-known/nostr.json` is served there.
  */
-export const MAIL_API_BASE_URL = import.meta.env.VITE_MAIL_API_BASE_URL ?? "";
+export const MAIL_API_BASE_URL =
+  import.meta.env.VITE_MAIL_API_BASE_URL ?? "https://api.formstr.app";
 
 /** Where users go to claim a mail address when they own none yet. */
 export const MAIL_LANDING_URL =
@@ -160,36 +163,59 @@ export async function resolveMailBridgePubkey(
   return probeNip05Pubkey(`${MAIL_BRIDGE_NIP05_NAME}@${domain}`);
 }
 
-/** Normalize any plausible get-nip05 response body into full addresses. */
+/**
+ * Normalize any plausible account-API response body into full aliases.
+ *
+ * Handles both endpoints' shapes:
+ *   - `GET /api/nip-05/get-nip05` → `[{ nip05, domain?, ... }]` — a record's
+ *     `nip05` is only the localpart, so qualify it with that record's `domain`
+ *     when present (falling back to the default mail domain).
+ *   - `GET /api/mails/mailbox` → `{ nip05Addresses: ["you@mailstr.app", …] }`
+ *     already full.
+ */
 export function normalizeOwnedAliases(body: unknown): string[] {
-  const qualify = (alias: string) =>
-    alias.includes("@")
-      ? alias.trim().toLowerCase()
-      : `${alias.trim().toLowerCase()}@${DEFAULT_MAIL_DOMAIN}`;
+  const qualify = (alias: string, domain?: string) => {
+    const trimmed = alias.trim().toLowerCase();
+    if (trimmed.includes("@")) return trimmed;
+    return `${trimmed}@${(domain ?? DEFAULT_MAIL_DOMAIN).toLowerCase()}`;
+  };
+
+  const fromEntry = (entry: unknown): string[] => {
+    if (typeof entry === "string") return entry.includes("@") ? [entry] : [];
+    if (entry && typeof entry === "object") {
+      const obj = entry as Record<string, unknown>;
+      const domain = typeof obj.domain === "string" ? obj.domain : undefined;
+      if (typeof obj.nip05 === "string") return [qualify(obj.nip05, domain)];
+      if (typeof obj.name === "string") return [qualify(obj.name, domain)];
+    }
+    return [];
+  };
 
   let raw: string[] = [];
-  if (typeof body === "string") raw = [body];
+  if (typeof body === "string") raw = [qualify(body)];
   else if (Array.isArray(body)) {
-    raw = body.flatMap((entry): string[] => {
-      if (typeof entry === "string") return [entry];
-      if (entry && typeof entry === "object") {
-        const obj = entry as Record<string, unknown>;
-        if (typeof obj.nip05 === "string") return [obj.nip05];
-        if (typeof obj.name === "string") return [obj.name];
-      }
+    raw = body.flatMap((entry) => {
+      const qualified = fromEntry(entry);
+      // A bare string array entry is already a full-ish address.
+      if (qualified.length) return qualified;
+      if (typeof entry === "string") return [qualify(entry)];
       return [];
     });
   } else if (body && typeof body === "object") {
     const obj = body as Record<string, unknown>;
-    if (typeof obj.nip05 === "string") raw = [obj.nip05];
-    else if (Array.isArray(obj.nip05Addresses)) {
-      raw = obj.nip05Addresses.filter(
-        (v): v is string => typeof v === "string",
-      );
+    if (Array.isArray(obj.nip05Addresses)) {
+      raw = obj.nip05Addresses.flatMap((entry) => fromEntry(entry));
+    } else if (typeof obj.nip05 === "string") {
+      raw = [
+        qualify(
+          obj.nip05,
+          typeof obj.domain === "string" ? obj.domain : undefined,
+        ),
+      ];
     }
   }
 
-  return Array.from(new Set(raw.map(qualify).filter(isEmailAddress)));
+  return Array.from(new Set(raw.filter(isEmailAddress)));
 }
 
 async function buildNip98Header(
@@ -211,8 +237,12 @@ async function buildNip98Header(
 /**
  * Best-effort lookup of the signed-in account's registered aliases from the
  * Formstr account API (NIP-98 authenticated). Convenience only: aliases can
- * always be typed manually, and a deployment with no API configured simply
- * gets `{ ok: false }`. Never throws.
+ * always be typed manually.
+ *
+ * `ok: true` with an empty list means the API answered authoritatively that
+ * the account owns no aliases (e.g. 404). `ok: false` means the lookup could
+ * not complete (network / auth), and callers must NOT conclude "no aliases".
+ * Never throws.
  */
 export async function fetchOwnedMailAliases(): Promise<{
   ok: boolean;
@@ -225,6 +255,8 @@ export async function fetchOwnedMailAliases(): Promise<{
     const response = await fetch(url, {
       headers: { Authorization: await buildNip98Header(signer, url) },
     });
+    // 404 = no records for this key; a definitive "none", not a failure.
+    if (response.status === 404) return { ok: true, addresses: [] };
     if (!response.ok) return { ok: false, addresses: [] };
     return {
       ok: true,

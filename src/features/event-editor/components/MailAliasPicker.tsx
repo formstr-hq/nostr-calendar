@@ -4,21 +4,20 @@ import { styled } from "@mui/material/styles";
 import { useIntl } from "react-intl";
 import { useEffect } from "react";
 import { useMailIdentity } from "../../../stores/mailIdentity";
-import { mailTokens, radius, spacing } from "../../../theme/tokens";
+import { radius, spacing } from "../../../theme/tokens";
+import { mailModeStyles } from "../../../theme/mailStyles";
 
-const Card = styled("div")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Card = styled("div")(({ theme }) =>
+  mailModeStyles(theme, (tokens) => ({
     display: "flex",
     flexDirection: "column",
     gap: spacing * 1.25,
     padding: spacing * 1.5,
     borderRadius: radius.card,
-    border: `1px solid ${mode.border}`,
-    backgroundColor: mode.surface,
-  };
-});
+    border: `1px solid ${tokens.border}`,
+    backgroundColor: tokens.surface,
+  })),
+);
 
 const Header = styled("div")({
   display: "flex",
@@ -26,10 +25,8 @@ const Header = styled("div")({
   gap: spacing,
 });
 
-const Tile = styled("span")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Tile = styled("span")(({ theme }) =>
+  mailModeStyles(theme, (tokens) => ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -37,22 +34,20 @@ const Tile = styled("span")(({ theme }) => {
     height: spacing * 4.25,
     flexShrink: 0,
     borderRadius: radius.sm + 2,
-    backgroundColor: mode.tile,
-    color: mode.text,
-  };
-});
+    backgroundColor: tokens.tile,
+    color: tokens.text,
+  })),
+);
 
-const Label = styled(Typography)(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Label = styled(Typography)(({ theme }) => [
+  {
     ...theme.typography.caption,
     fontWeight: 700,
     letterSpacing: 0.4,
     textTransform: "uppercase",
-    color: mode.text,
-  };
-});
+  },
+  ...mailModeStyles(theme, (tokens) => ({ color: tokens.text })),
+]);
 
 /**
  * "Send email invites from" picker. Only rendered once an email guest exists.

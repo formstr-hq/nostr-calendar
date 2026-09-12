@@ -2,27 +2,24 @@ import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import { Box, Button, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { useIntl } from "react-intl";
-import { mailTokens, radius, spacing } from "../../../theme/tokens";
+import { radius, spacing } from "../../../theme/tokens";
+import { mailModeStyles } from "../../../theme/mailStyles";
 
-const Row = styled("li")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Row = styled("li")(({ theme }) =>
+  mailModeStyles(theme, (tokens) => ({
     display: "flex",
     alignItems: "center",
     gap: spacing * 1.25,
     padding: `${spacing}px ${spacing * 1.5}px`,
     borderRadius: radius.card,
-    border: `1px solid ${mode.border}`,
-    backgroundColor: mode.surface,
+    border: `1px solid ${tokens.border}`,
+    backgroundColor: tokens.surface,
     minWidth: 0,
-  };
-});
+  })),
+);
 
-const Tile = styled("span")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Tile = styled("span")(({ theme }) =>
+  mailModeStyles(theme, (tokens) => ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -30,24 +27,24 @@ const Tile = styled("span")(({ theme }) => {
     height: spacing * 4,
     flexShrink: 0,
     borderRadius: radius.sm + 2,
-    backgroundColor: mode.tile,
-    color: mode.text,
-  };
-});
+    backgroundColor: tokens.tile,
+    color: tokens.text,
+  })),
+);
 
-const Tag = styled("span")(({ theme }) => {
-  const mode =
-    theme.palette.mode === "dark" ? mailTokens.dark : mailTokens.light;
-  return {
+const Tag = styled("span")(({ theme }) => [
+  {
     flexShrink: 0,
     padding: `${spacing / 4}px ${spacing}px`,
     borderRadius: radius.pill,
-    backgroundColor: mode.tag,
-    color: mode.text,
-    ...theme.typography.caption,
     fontWeight: 600,
-  };
-});
+    ...theme.typography.caption,
+  },
+  ...mailModeStyles(theme, (tokens) => ({
+    backgroundColor: tokens.tag,
+    color: tokens.text,
+  })),
+]);
 
 const Address = styled(Typography)({
   fontWeight: 600,
