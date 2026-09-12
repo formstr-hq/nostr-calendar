@@ -196,6 +196,7 @@
       <li><a href="#f-rsvp-priv">RSVP: private</a></li>
       <li><a href="#f-rsvp-pub">RSVP: public</a></li>
       <li><a href="#f-invite">Invitations (gift wrap)</a></li>
+      <li><a href="#f-email-invite">Email guest invitations (bridge)</a></li>
       <li><a href="#f-report">Reporting</a></li>
       <li><a href="#f-callist">Calendar lists</a></li>
       <li><a href="#f-forms">Attached forms</a></li>
@@ -294,12 +295,13 @@
             <tr><td class="tagname">L / l</td><td><code>"rrule"</code> label / rrule string, if recurring</td><td><span class="req no">optional</span></td></tr>
             <tr><td class="tagname">notification</td><td>reminder preference</td><td><span class="req no">optional</span></td></tr>
             <tr><td class="tagname">form</td><td><code>naddr</code>, plus form's read-only view key (never the edit key) — one per attached form</td><td><span class="req no">optional, repeats</span></td></tr>
-            <tr><td class="tagname">location</td><td>free text, repeats</td><td><span class="req no">optional</span></td></tr>
-            <tr><td class="tagname">p</td><td>creator first, then one per invited participant</td><td><span class="req yes">required</span></td></tr>
+          <tr><td class="tagname">location</td><td>free text, repeats</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">guest_email</td><td>external email guest address, repeats. Invited by mail through the bridge; never gift-wrapped</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">p</td><td>creator first, then one per invited participant</td><td><span class="req yes">required</span></td></tr>
           </table>
         </div>
         <div class="field"><span class="label">Encryption</span><p><code>selfEncrypt</code>: NIP-44 to a freshly generated per-event view keypair (encrypt-to-self with a throwaway key, not the user's real identity). Only holders of the nsec-encoded view key can read the event.</p></div>
-        <div class="field"><span class="label">Participants</span><p>Each participant (creator included) gets a NIP-59 gift wrap invitation — see <a href="#f-invite">Invitations</a>.</p></div>
+        <div class="field"><span class="label">Participants</span><p>Each participant (creator included) gets a NIP-59 gift wrap invitation — see <a href="#f-invite">Invitations</a>. Email guests (<code>guest_email</code>) are instead invited by mail through the bridge — see <a href="#f-email-invite">Email guest invitations</a>.</p></div>
         <div class="field"><span class="label">Relays</span><p><code>publishSignedEvent</code> → worker routing (user relays ∪ author outbox ∪ recipient inbox). NIP-65 lists for invited pubkeys are fetched first to warm outbox routing before the gift wraps go out.</p></div>
       </article>
 
@@ -314,9 +316,10 @@
           <tr><td class="tagname">image</td><td>—</td><td><span class="req no">optional</span></td></tr>
           <tr><td class="tagname">location</td><td>repeats</td><td><span class="req no">optional</span></td></tr>
           <tr><td class="tagname">p</td><td>participant, no role/relation qualifier, repeats</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">guest_email</td><td>external email guest address, repeats (public on a public event)</td><td><span class="req no">optional</span></td></tr>
         </table>
         <div class="field"><span class="label">Content</span><p>Plaintext description string (not JSON). No encryption.</p></div>
-        <div class="field"><span class="label">Participants</span><p>Listed only as public <code>p</code> tags — <strong>no</strong> gift-wrap invitation is sent for public events; that mechanism is private-event-only.</p></div>
+        <div class="field"><span class="label">Participants</span><p>Listed only as public <code>p</code> tags — <strong>no</strong> gift-wrap invitation is sent for public events; that mechanism is private-event-only. <code>guest_email</code> guests are invited by mail through the bridge — see <a href="#f-email-invite">Email guest invitations</a>.</p></div>
       </article>
 
       <article class="flow" id="f-priv-edit">
@@ -385,6 +388,23 @@
         <div class="field"><span class="label">Accept</span><p>Adds an <code>a</code>-tag ref to the chosen calendar list (32123). Nothing is published back to the sender — acceptance is local only.</p></div>
         <div class="field"><span class="label">Dismiss</span><p>New-style invites: self-signed kind-5 deletion under the embedded ephemeral key. Legacy invites (no <code>signing_nsec</code>): the user's own signer publishes a kind-5 tagging <code>k:1059/1052</code> — this can't actually delete someone else's signed event, so it only suppresses it client-side.</p></div>
         <div class="field"><span class="label">Report</span><p>Runs <a href="#f-report">Reporting</a> against the resolved event coordinate, then dismisses the same way.</p></div>
+      </article>
+
+      <article class="flow" id="f-email-invite">
+        <h3>Email guest invitations — bridge <span class="kind-badge">kind 1059</span> <span class="kind-badge">rumor 1301</span> <span class="kind-badge legacy">seal 13</span></h3>
+        <p class="trigger">Triggered by: saving an event that has one or more <code>guest_email</code> guests. Runs as a separate publish step after the event itself; on edit, only newly-added addresses are invited.</p>
+        <div class="field"><span class="label">Why not a normal invite</span><p>Email guests have no Nostr key, so there is no pubkey to gift-wrap to. The app instead composes a full RFC 2822 message and hands it to a Nostr↔SMTP <strong>mail bridge</strong> (the mailstr "nail" bridge), which authorizes the sender and injects the message into SMTP. This deliberately mirrors that bridge's own wire protocol — see the sister <code>nail</code> repo, <em>docs/ARCHITECTURE.md</em> §4–§5 — so the same bridge serves both clients.</p></div>
+        <div class="field"><span class="label">Wire shape (mailstr protocol)</span>
+          <pre>kind 1059  gift wrap    ephemeral key; p = bridge pubkey, k = "1301"
+  └ kind 13  seal       signed by the organizer's real key
+      └ kind 1301 rumor UNSIGNED. pubkey = organizer. content = RFC 2822
+                        (as a "byte string": one code unit per octet)
+                        tags: ["p", bridgePubkey], ["deliver", guest]…</pre>
+          One wrap carries <em>every</em> email guest as a <code>deliver</code> tag — never one wrap per guest. The bridge reads its routing from <code>deliver</code> tags, not the <code>To:</code> header.</p></div>
+        <div class="field"><span class="label">Bridge discovery</span><p>The bridge pubkey is discovered over NIP-05 at <code>_smtp@&lt;the From address's domain&gt;</code>. An explicit override — npub, hex pubkey, NIP-05 address, or bare domain — can be supplied via the mail-identity store (<code>bridgeOverride</code>) for self-hosters. No address→bridge map is hardcoded, so any mailstr-compatible deployment works.</p></div>
+        <div class="field"><span class="label">Authorization (enforced by the bridge, guarded here)</span><p>The bridge authorizes against <code>seal.pubkey</code>, never the rumor's (attacker-controlled) pubkey. A From address is accepted only if its NIP-05 record resolves to the sealing key. The app replays the same NIP-05 ownership check before publishing so a bad From fails fast with a clear message instead of a silent bounce.</p></div>
+        <div class="field"><span class="label">Alias suggestion</span><p>The "send from" picker reads the account's registered aliases from the Formstr API when <code>VITE_MAIL_API_BASE_URL</code> is configured. That API is a convenience only: aliases can always be typed manually, and the authoritative check is always the NIP-05 record.</p></div>
+        <div class="callout"><span class="label">New tag on the event</span><p><code>guest_email</code> persists the invited addresses on the calendar event itself (encrypted content for private events, public tag for public ones) so the guest list survives reloads. This is a wire-format addition; readers ignore the tag if unaware.</p></div>
       </article>
 
       <article class="flow" id="f-report">

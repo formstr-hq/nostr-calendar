@@ -136,6 +136,10 @@ async function preparePrivateCalendarEvent(
     eventData.push(["location", loc]);
   });
 
+  event.guestEmails?.forEach((email) => {
+    if (email) eventData.push(["guest_email", email]);
+  });
+
   const userPublicKey = await getUserPublicKey();
   eventData.push(["p", userPublicKey]);
   event.participants.forEach((participant) => {
@@ -611,6 +615,12 @@ export const publishPublicCalendarEvent = async (
       tags.push(["p", participant]);
     });
   }
+
+  // Email guests are public on a public event (the whole event is public).
+  event.guestEmails?.forEach((email) => {
+    if (email) tags.push(["guest_email", email]);
+  });
+
   const unsigned: UnsignedEvent = {
     kind: EventKinds.PublicCalendarEvent,
     pubkey: pubKey,

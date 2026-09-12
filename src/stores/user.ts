@@ -21,6 +21,7 @@ import { restartDataLayerWiped } from "../dataLayer/bootstrap";
 import { useSettings } from "./settings";
 import { useParticipantHistory } from "./participantHistory";
 import { useParticipants } from "./participants";
+import { useMailIdentity } from "./mailIdentity";
 import {
   BG_KEY_USER_PUBKEY,
   BG_KEY_RELAYS,
@@ -145,6 +146,7 @@ const onUserChange = async () => {
       const eventManager = useTimeBasedEvents.getState();
       eventManager.resetPrivateEvents();
       useParticipants.getState().clearParticipants();
+      useMailIdentity.getState().reset();
       await useParticipantHistory
         .getState()
         .initializeAccount(cachedUser.pubkey);

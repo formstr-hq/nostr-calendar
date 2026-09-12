@@ -64,6 +64,16 @@ export interface ICalendarEvent {
   createdAt: number;
   categories: string[];
   participants: string[];
+  /**
+   * External guests invited by plain email rather than a Nostr pubkey.
+   *
+   * Persisted as a `["guest_email", <address>]` tag (inside the encrypted
+   * content for private events, as a public tag for public ones). These are
+   * delivered through the mail bridge, not the gift-wrap invitation path —
+   * see `src/nostr/emailInvites.ts`. Kept separate from `participants`, which
+   * is strictly pubkeys.
+   */
+  guestEmails?: string[];
   rsvpResponses: IParticipantRSVP[];
   reference: string[];
   image?: string;

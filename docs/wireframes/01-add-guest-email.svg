@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="400" viewBox="0 0 700 400" font-family="Inter, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0b0b0c" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="700" height="400" fill="#f4f4f3"/>
+
+  <!-- title -->
+  <text x="32" y="34" font-size="13" font-weight="700" letter-spacing="0.6" fill="#686865">GUESTS</text>
+
+  <!-- search input (email typed) -->
+  <rect x="32" y="50" width="576" height="46" rx="8" fill="#ffffff" stroke="#d8d8d6"/>
+  <text x="48" y="79" font-size="15" fill="#0b0b0c">friend@gmail.com</text>
+  <rect x="182" y="63" width="1.5" height="20" fill="#111111"/>
+  <!-- magnifier -->
+  <circle cx="582" cy="73" r="7" fill="none" stroke="#9a9a97" stroke-width="1.6"/>
+  <line x1="587" y1="78" x2="592" y2="83" stroke="#9a9a97" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- dropdown panel -->
+  <rect x="32" y="104" width="576" height="118" rx="10" fill="#ffffff" stroke="#e4e4e2" filter="url(#sh)"/>
+
+  <!-- email invite row -->
+  <rect x="48" y="120" width="34" height="34" rx="8" fill="#f0f0ef"/>
+  <!-- envelope glyph -->
+  <rect x="56" y="129" width="18" height="14" rx="2.5" fill="none" stroke="#686865" stroke-width="1.5"/>
+  <polyline points="56,131 65,138 74,131" fill="none" stroke="#686865" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <text x="94" y="134" font-size="14.5" font-weight="600" fill="#0b0b0c">Invite friend@gmail.com by email</text>
+  <text x="94" y="152" font-size="12" fill="#9a9a97">External guest · delivered to their inbox as email</text>
+
+  <!-- invite pill -->
+  <rect x="516" y="122" width="76" height="30" rx="15" fill="#111111"/>
+  <text x="554" y="141" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">Invite</text>
+
+  <!-- divider -->
+  <line x1="48" y1="176" x2="592" y2="176" stroke="#eeeeec"/>
+  <text x="48" y="200" font-size="12" fill="#9a9a97">No Nostr profile matches this address — it will be invited over email.</text>
+
+  <!-- annotation -->
+  <line x1="360" y1="222" x2="360" y2="258" stroke="#b8b8b5" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <rect x="120" y="258" width="480" height="104" rx="10" fill="#ffffff" stroke="#b8b8b5" stroke-width="1.2" stroke-dasharray="4 4"/>
+  <text x="140" y="286" font-size="13" font-weight="700" fill="#111111">NEW — email detected in the guest box</text>
+  <text x="140" y="308" font-size="12.5" fill="#686865">The existing search still resolves npub / NIP-05 / name to Nostr guests.</text>
+  <text x="140" y="326" font-size="12.5" fill="#686865">When the query is a plain email with no Nostr match, we offer an</text>
+  <text x="140" y="344" font-size="12.5" fill="#686865">“invite by email” action — the bridge relays it as the organizer’s mail.</text>
+</svg>

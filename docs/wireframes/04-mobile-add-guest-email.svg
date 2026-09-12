@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="460" viewBox="0 0 390 460" font-family="Inter, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0b0b0c" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- device screen -->
+  <rect x="0.5" y="0.5" width="389" height="459" rx="30" fill="#f4f4f3" stroke="#d8d8d6"/>
+  <!-- status bar -->
+  <text x="26" y="34" font-size="12.5" font-weight="700" fill="#0b0b0c">9:41</text>
+  <rect x="344" y="24" width="20" height="11" rx="2.5" fill="none" stroke="#0b0b0c" stroke-width="1.2"/>
+  <rect x="346" y="26.5" width="13" height="6" rx="1" fill="#0b0b0c"/>
+
+  <!-- label -->
+  <text x="24" y="72" font-size="12.5" font-weight="700" letter-spacing="0.6" fill="#686865">GUESTS</text>
+
+  <!-- input -->
+  <rect x="24" y="84" width="342" height="46" rx="8" fill="#ffffff" stroke="#d8d8d6"/>
+  <text x="38" y="113" font-size="15" fill="#0b0b0c">friend@gmail.com</text>
+  <rect x="172" y="97" width="1.5" height="20" fill="#111111"/>
+  <circle cx="346" cy="107" r="7" fill="none" stroke="#9a9a97" stroke-width="1.6"/>
+  <line x1="351" y1="112" x2="356" y2="117" stroke="#9a9a97" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- dropdown -->
+  <rect x="24" y="138" width="342" height="118" rx="12" fill="#ffffff" stroke="#e4e4e2" filter="url(#sh)"/>
+  <rect x="38" y="154" width="38" height="38" rx="9" fill="#f0f0ef"/>
+  <rect x="47" y="165" width="20" height="16" rx="2.5" fill="none" stroke="#686865" stroke-width="1.5"/>
+  <polyline points="47,167 57,175 67,167" fill="none" stroke="#686865" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <text x="86" y="169" font-size="14" font-weight="600" fill="#0b0b0c">Invite friend@gmail.com</text>
+  <text x="86" y="187" font-size="12" fill="#9a9a97">by email · no Nostr match found</text>
+  <!-- trailing add -->
+  <circle cx="342" cy="173" r="14" fill="#111111"/>
+  <line x1="342" y1="167" x2="342" y2="179" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="336" y1="173" x2="348" y2="173" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
+
+  <line x1="38" y1="214" x2="352" y2="214" stroke="#eeeeec"/>
+  <text x="38" y="238" font-size="11.5" fill="#9a9a97">Delivered to their inbox as email</text>
+
+  <!-- annotation -->
+  <rect x="24" y="288" width="342" height="150" rx="12" fill="#ffffff" stroke="#b8b8b5" stroke-width="1.2" stroke-dasharray="4 4"/>
+  <text x="40" y="316" font-size="12.5" font-weight="700" fill="#111111">Mobile — same guest box</text>
+  <text x="40" y="338" font-size="12" fill="#686865">The single search field keeps resolving npub /</text>
+  <text x="40" y="356" font-size="12" fill="#686865">NIP-05 / name to Nostr guests. A plain email with</text>
+  <text x="40" y="374" font-size="12" fill="#686865">no match surfaces this one full-width “invite by</text>
+  <text x="40" y="392" font-size="12" fill="#686865">email” row — tap the + to add the external guest.</text>
+  <text x="40" y="416" font-size="12" fill="#686865">No new field; nothing changes for Nostr-only events.</text>
+</svg>

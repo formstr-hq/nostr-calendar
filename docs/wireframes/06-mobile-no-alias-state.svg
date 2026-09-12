@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="440" viewBox="0 0 390 440" font-family="Inter, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <!-- device screen -->
+  <rect x="0.5" y="0.5" width="389" height="439" rx="30" fill="#f4f4f3" stroke="#d8d8d6"/>
+  <!-- status bar -->
+  <text x="26" y="34" font-size="12.5" font-weight="700" fill="#0b0b0c">9:41</text>
+  <rect x="344" y="24" width="20" height="11" rx="2.5" fill="none" stroke="#0b0b0c" stroke-width="1.2"/>
+  <rect x="346" y="26.5" width="13" height="6" rx="1" fill="#0b0b0c"/>
+
+  <text x="24" y="72" font-size="12.5" font-weight="700" letter-spacing="0.6" fill="#686865">GUESTS</text>
+
+  <!-- input placeholder -->
+  <rect x="24" y="84" width="342" height="46" rx="8" fill="#ffffff" stroke="#d8d8d6"/>
+  <text x="38" y="113" font-size="14.5" fill="#9a9a97">Add guest — npub, name, or email…</text>
+  <circle cx="346" cy="107" r="7" fill="none" stroke="#9a9a97" stroke-width="1.6"/>
+  <line x1="351" y1="112" x2="356" y2="117" stroke="#9a9a97" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- notice card -->
+  <rect x="24" y="140" width="342" height="164" rx="12" fill="#fbf5f2" stroke="#ecd4cb"/>
+  <circle cx="46" cy="170" r="13" fill="none" stroke="#b06a55" stroke-width="1.6"/>
+  <line x1="46" y1="165" x2="46" y2="166" stroke="#b06a55" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46" y1="170" x2="46" y2="177" stroke="#b06a55" stroke-width="2" stroke-linecap="round"/>
+  <text x="70" y="167" font-size="13.5" font-weight="700" fill="#0b0b0c">A mail address is needed</text>
+  <text x="70" y="185" font-size="13.5" font-weight="700" fill="#0b0b0c">to invite guests by email</text>
+
+  <text x="40" y="214" font-size="12" fill="#686865">Email invites are sent from your own mailstr</text>
+  <text x="40" y="232" font-size="12" fill="#686865">address, tied to the npub you’re signed in with.</text>
+  <text x="40" y="250" font-size="12" fill="#686865">Your Nostr guests are invited as usual.</text>
+
+  <!-- CTA full width -->
+  <rect x="40" y="262" width="310" height="40" rx="8" fill="#111111"/>
+  <text x="195" y="287" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Get a mailstr address</text>
+
+  <!-- annotation -->
+  <rect x="24" y="326" width="342" height="94" rx="12" fill="#ffffff" stroke="#b8b8b5" stroke-width="1.2" stroke-dasharray="4 4"/>
+  <text x="40" y="352" font-size="12.5" font-weight="700" fill="#111111">No manual address</text>
+  <text x="40" y="374" font-size="12" fill="#686865">The From must be an alias the signed-in npub owns —</text>
+  <text x="40" y="392" font-size="12" fill="#686865">the bridge authorizes on the seal’s key, so a typed</text>
+  <text x="40" y="410" font-size="12" fill="#686865">address would just be rejected. Claiming one is the only path.</text>
+</svg>

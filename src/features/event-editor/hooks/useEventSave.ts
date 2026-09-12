@@ -41,6 +41,10 @@ import {
 } from "../../../stores/publishActivity";
 import { useBusyList, setBusyListDefaultOptIn } from "../../../stores/busyList";
 import { getRelayPublishCounts } from "../../../utils/relayPublishStatus";
+import { useMailIdentity } from "../../../stores/mailIdentity";
+import { buildEmailInviteWrap } from "../../../nostr/emailInvites";
+import { uniqueEmails } from "../../../utils/participants";
+import type { Event } from "nostr-tools";
 
 const EVENT_SAVE_FLOW_ID = "event-save";
 
@@ -92,6 +96,7 @@ export function useEventSave({
         calendarId: selectedCalendarId,
         isPrivateEvent: isPrivate,
         participants: uniqueParticipants(eventDetails.participants),
+        guestEmails: uniqueEmails(eventDetails.guestEmails ?? []),
         repeat: { rrule: draftRecurrenceRule },
         allDay: isAllDayEvent(eventDetails.begin, eventDetails.end),
       };
@@ -363,6 +368,52 @@ export function useEventSave({
               isPrivateEvent: false,
             };
             useTimeBasedEvents.getState().updateEvent(savedEvent);
+          },
+        });
+      }
+
+      // Email guests are invited by mail through the configured bridge, not by
+      // gift wrap. On edit, only newly-added addresses are invited (matches the
+      // participant-invite semantics). The wrap carries every new address as a
+      // `deliver` tag, so this is one publish regardless of guest count.
+      const previousEmailSet = new Set(initialEvent?.guestEmails ?? []);
+      const newGuestEmails =
+        mode === "edit"
+          ? eventToSave.guestEmails.filter((e) => !previousEmailSet.has(e))
+          : eventToSave.guestEmails;
+      const needsEmailInvites =
+        eventToSave.source !== "device" && newGuestEmails.length > 0;
+
+      if (needsEmailInvites) {
+        let emailWrap: Event | null = null;
+        let emailStepStarted = false;
+        stepDefs.push({
+          id: "invite-email-guests",
+          labelId: "event.step.inviteEmailGuests",
+          relays: relaysToPublish,
+          blocking: true,
+          run: async (callbacks) => {
+            if (!emailStepStarted) {
+              emailStepStarted = true;
+              const { alias, bridgeOverride, addAlias } =
+                useMailIdentity.getState();
+              const result = await buildEmailInviteWrap({
+                event: savedEvent,
+                fromAddress: alias,
+                recipients: newGuestEmails,
+                bridgeOverride,
+              });
+              if (result.errors.length > 0) {
+                throw new Error(result.errors.join("; "));
+              }
+              if (!result.wrap) return;
+              emailWrap = result.wrap;
+              addAlias(alias);
+            }
+            if (!emailWrap) return;
+            await publishSignedEvent(emailWrap, {
+              onRelayComplete: callbacks.onRelayComplete,
+            });
           },
         });
       }

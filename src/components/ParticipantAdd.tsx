@@ -20,6 +20,8 @@ import { useParticipantSearch } from "../features/event-editor/hooks/useParticip
 import { useParticipantHistory } from "../stores/participantHistory";
 import { useUser } from "../stores/user";
 import { radius, shadow, spacing } from "../theme/tokens";
+import { isEmailAddress } from "../nostr/mailBridge";
+import { EmailInviteRow } from "../features/event-editor/components/EmailInviteRow";
 import { ParticipantSearchOption } from "./ParticipantSearchOption";
 
 const ResultsPaper = styled(Paper)(({ theme }) => ({
@@ -57,10 +59,14 @@ const EmptyStatus = styled(Typography)({
 
 export const ParticipantAdd = ({
   onAdd,
+  onAddEmail,
   participants = [],
+  guestEmails = [],
 }: {
   onAdd: (pubKey: string) => void;
+  onAddEmail?: (email: string) => void;
   participants?: string[];
+  guestEmails?: string[];
 }) => {
   const intl = useIntl();
   const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -116,7 +122,44 @@ export const ParticipantAdd = ({
     setFocused(false);
   };
 
+  // A complete email with no Nostr match is offered as an email guest. While
+  // the query is still resolving (loading) we hold the row back so a NIP-05 /
+  // profile match isn't pre-empted; once results settle, an email query with
+  // no resolution becomes invitable.
+  const trimmedQuery = query.trim();
+  const alreadyEmailGuest = guestEmails.some(
+    (email) => email.toLowerCase() === trimmedQuery.toLowerCase(),
+  );
+  const showEmailInvite =
+    !!onAddEmail &&
+    isEmailAddress(trimmedQuery) &&
+    !loading &&
+    options.length === 0 &&
+    !alreadyEmailGuest;
+
+  const selectEmail = () => {
+    if (!onAddEmail) return;
+    onAddEmail(trimmedQuery);
+    setQuery("");
+    setFocused(false);
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (showEmailInvite) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        selectEmail();
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "Escape") {
+        setFocused(false);
+        return;
+      }
+    }
     const enabledIndexes = options.flatMap((option, index) =>
       option.isSelected ? [] : [index],
     );
@@ -171,9 +214,11 @@ export const ParticipantAdd = ({
         fullWidth
         size="small"
         inputRef={inputRef}
-        error={!!error}
+        error={!!error && !showEmailInvite}
         helperText={
-          error ? intl.formatMessage({ id: "participant.invalid" }) : undefined
+          error && !showEmailInvite
+            ? intl.formatMessage({ id: "participant.invalid" })
+            : undefined
         }
         placeholder={intl.formatMessage({ id: "navigation.addParticipants" })}
         value={query}
@@ -214,8 +259,16 @@ export const ParticipantAdd = ({
             } as CSSProperties
           }
         >
-          {options.length > 0 ? (
+          {options.length > 0 || showEmailInvite ? (
             <ResultsListbox id={listboxId} role="listbox">
+              {showEmailInvite && (
+                <EmailInviteRow
+                  email={trimmedQuery}
+                  active
+                  onActivate={() => undefined}
+                  onSelect={selectEmail}
+                />
+              )}
               {selectableOptions.length > 0 && (
                 <SelectableOptions>
                   {selectableOptions.map(renderOption)}
