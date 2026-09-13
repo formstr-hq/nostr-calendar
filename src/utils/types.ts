@@ -68,12 +68,23 @@ export interface ICalendarEvent {
    * External guests invited by plain email rather than a Nostr pubkey.
    *
    * Persisted as a `["guest_email", <address>]` tag (inside the encrypted
-   * content for private events, as a public tag for public ones). These are
+   * content for private events; a public tag for public ones). These are
    * delivered through the mail bridge, not the gift-wrap invitation path —
    * see `src/nostr/emailInvites.ts`. Kept separate from `participants`, which
    * is strictly pubkeys.
    */
   guestEmails?: string[];
+  /**
+   * For each email guest, the hex pubkey of the one-time identity they use to
+   * sign an RSVP. Persisted as the third element of the `guest_email` tag
+   * (`["guest_email", address, guestPubkey]`), inside encrypted content.
+   *
+   * Only the pubkey is stored — never the secret. The matching `nsec` travels
+   * solely in the guest's invite link (`#nkeys1...`). All event participants
+   * share the viewKey and can read the decrypted content, so embedding the
+   * secret here would let any of them impersonate the guest.
+   */
+  guestPubkeys?: Record<string, string>;
   rsvpResponses: IParticipantRSVP[];
   reference: string[];
   image?: string;

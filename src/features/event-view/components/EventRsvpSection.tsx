@@ -10,8 +10,12 @@ import { RSVPParticipantList } from "./RSVPParticipantList";
 interface EventRsvpSectionProps {
   event: ICalendarEvent;
   isAuthor: boolean;
-  /** RSVPBar (Yes/Maybe/No) only renders once the event is in a calendar. */
+  /** RSVPBar (Yes/Maybe/No) only renders once the event is in a calendar,
+   *  or when the viewer is an email guest holding a one-time identity. */
   showRsvpBar: boolean;
+  /** Viewer is an email guest rather than a logged-in account. */
+  isGuest?: boolean;
+  guestEmail?: string | null;
   byPubkey: Record<string, RSVPRecord>;
   allParticipants: string[];
   myRsvp?: RSVPRecord;
@@ -34,6 +38,8 @@ export function EventRsvpSection({
   event,
   isAuthor,
   showRsvpBar,
+  isGuest = false,
+  guestEmail,
   byPubkey,
   allParticipants,
   myRsvp,
@@ -45,18 +51,36 @@ export function EventRsvpSection({
   const intl = useIntl();
   const [participantsExpanded, setParticipantsExpanded] = useState(false);
 
-  const going = allParticipants.filter(
+  // Email guests never appear in `event.participants` (that would leak their
+  // identity via p-tagged gift wraps), so surface their one-time pubkeys from
+  // the event's guest mapping for the host's participant list.
+  const guestPubkeys = event.guestPubkeys
+    ? Object.values(event.guestPubkeys)
+    : [];
+  const displayParticipants = Array.from(
+    new Set([...allParticipants, ...guestPubkeys]),
+  );
+
+  const going = displayParticipants.filter(
     (pk) => byPubkey[pk]?.status === RSVPStatus.accepted,
   ).length;
-  const maybe = allParticipants.filter(
+  const maybe = displayParticipants.filter(
     (pk) => byPubkey[pk]?.status === RSVPStatus.tentative,
   ).length;
-  const avatarItems = allParticipants
+  const avatarItems = displayParticipants
     .filter((pk) => byPubkey[pk]?.status === RSVPStatus.accepted)
     .map((pk) => ({ name: pk }));
 
   return (
     <Stack spacing={2}>
+      {isGuest && guestEmail && (
+        <Typography variant="body2" color="text.secondary">
+          {intl.formatMessage(
+            { id: "rsvp.guestViewingAs" },
+            { email: guestEmail },
+          )}
+        </Typography>
+      )}
       {showRsvpBar && (
         <RSVPBar
           isAuthor={isAuthor}
@@ -67,7 +91,7 @@ export function EventRsvpSection({
         />
       )}
 
-      {allParticipants.length > 0 && (
+      {displayParticipants.length > 0 && (
         <Box>
           <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
             {avatarItems.length > 0 && (
@@ -97,7 +121,7 @@ export function EventRsvpSection({
               </Typography>
               <RSVPParticipantList
                 event={event}
-                participants={allParticipants}
+                participants={displayParticipants}
                 recordsByPubkey={byPubkey}
                 canApplySuggestions={canApplySuggestions}
                 onApplySuggestion={onApplySuggestion}

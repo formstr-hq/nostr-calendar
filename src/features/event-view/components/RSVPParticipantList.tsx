@@ -8,6 +8,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CommentIcon from "@mui/icons-material/Comment";
 import dayjs from "dayjs";
@@ -15,6 +16,7 @@ import { useIntl } from "react-intl";
 import { RSVPStatus, type ICalendarEvent } from "../../../utils/types";
 import type { RSVPRecord } from "../../../nostr/rsvp";
 import { Participant } from "../../../components/Participant";
+import { guestEmailByPubkey, guestRsvpLabelId } from "../lib/guestRsvp";
 
 function getRSVPDetails(record: RSVPRecord | undefined, event: ICalendarEvent) {
   if (!record) {
@@ -58,6 +60,7 @@ export function RSVPParticipantList({
   const intl = useIntl();
   const [expandedPubkey, setExpandedPubkey] = useState<string | null>(null);
   const [applyingPubkey, setApplyingPubkey] = useState<string | null>(null);
+  const guestEmails = guestEmailByPubkey(event);
 
   const handleApplySuggestion = async (record: RSVPRecord) => {
     if (!onApplySuggestion) return;
@@ -76,6 +79,7 @@ export function RSVPParticipantList({
         const details = getRSVPDetails(record, event);
         const hasDetails = details.hasComment || details.hasSuggestedTime;
         const expanded = expandedPubkey === pubkey;
+        const guestEmail = guestEmails[pubkey.toLowerCase()];
 
         return (
           <Box key={pubkey} width="100%">
@@ -87,11 +91,36 @@ export function RSVPParticipantList({
               minWidth={0}
               maxWidth="100%"
             >
-              <Participant
-                pubKey={pubkey}
-                isAuthor={pubkey === event.user}
-                rsvpResponse={record?.status ?? RSVPStatus.pending}
-              />
+              {guestEmail ? (
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  gap={0.75}
+                  data-testid="guest-rsvp-participant"
+                >
+                  <MailOutlineIcon
+                    fontSize="small"
+                    color="disabled"
+                    aria-hidden
+                  />
+                  <Typography variant="body2" fontWeight={600}>
+                    {guestEmail}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {record
+                      ? intl.formatMessage({
+                          id: guestRsvpLabelId(record.status),
+                        })
+                      : intl.formatMessage({ id: "emailGuest.viaEmail" })}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Participant
+                  pubKey={pubkey}
+                  isAuthor={pubkey === event.user}
+                  rsvpResponse={record?.status ?? RSVPStatus.pending}
+                />
+              )}
               {hasDetails ? (
                 <Stack direction="row" gap={0.25}>
                   {details.hasSuggestedTime ? (

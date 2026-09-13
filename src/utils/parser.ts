@@ -45,6 +45,7 @@ export const nostrEventToCalendar = (
     geoHash: [],
     participants: [],
     guestEmails: [],
+    guestPubkeys: {},
     viewKey: viewKey,
     isPrivateEvent: !!isPrivateEvent,
     relayHint: relayHint,
@@ -88,7 +89,15 @@ export const nostrEventToCalendar = (
         parsedEvent.participants.push(value);
         break;
       case "guest_email":
-        if (value) parsedEvent.guestEmails!.push(value);
+        if (value) {
+          parsedEvent.guestEmails!.push(value);
+          const guestPubkey = event.tags[index]?.[2];
+          if (guestPubkey) {
+            if (!parsedEvent.guestPubkeys) parsedEvent.guestPubkeys = {};
+            parsedEvent.guestPubkeys[value.toLowerCase()] =
+              guestPubkey.toLowerCase();
+          }
+        }
         break;
       case "g":
         parsedEvent.geoHash.push(value);

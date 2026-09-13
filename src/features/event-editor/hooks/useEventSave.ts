@@ -42,8 +42,10 @@ import {
 import { useBusyList, setBusyListDefaultOptIn } from "../../../stores/busyList";
 import { getRelayPublishCounts } from "../../../utils/relayPublishStatus";
 import { useMailIdentity } from "../../../stores/mailIdentity";
-import { buildEmailInviteWrap } from "../../../nostr/emailInvites";
+import { buildEmailInviteWraps } from "../../../nostr/emailInvites";
 import { uniqueEmails } from "../../../utils/participants";
+import { ensureGuestKey } from "../../../utils/emailGuestKeys";
+import { encodeGuestFragment } from "../../../utils/emailGuestLink";
 import type { Event } from "nostr-tools";
 
 const EVENT_SAVE_FLOW_ID = "event-save";
@@ -91,12 +93,33 @@ export function useEventSave({
     try {
       const normalizedNotificationOffsets =
         normalizeNotificationOffsets(notificationOffsets);
+
+      // Private events get a one-time RSVP identity per email guest, so the
+      // guest can sign an RSVP without a Nostr account. The pubkey rides on
+      // the event (encrypted content); the nsec stays local and travels only
+      // in that guest's invite link. Public events remain invite-only.
+      const guestPubkeys: Record<string, string> = {};
+      const guestFragments: Record<string, string> = {};
+      if (isPrivate && eventDetails.source !== "device") {
+        for (const email of uniqueEmails(eventDetails.guestEmails ?? [])) {
+          const key =
+            ensureGuestKey(email, initialEvent?.guestPubkeys?.[email]) ?? null;
+          if (!key) continue;
+          guestPubkeys[email] = key.pubkey;
+          guestFragments[email] = encodeGuestFragment({
+            nsec: key.nsec,
+            email,
+          });
+        }
+      }
+
       const eventToSave = {
         ...eventDetails,
         calendarId: selectedCalendarId,
         isPrivateEvent: isPrivate,
         participants: uniqueParticipants(eventDetails.participants),
         guestEmails: uniqueEmails(eventDetails.guestEmails ?? []),
+        guestPubkeys,
         repeat: { rrule: draftRecurrenceRule },
         allDay: isAllDayEvent(eventDetails.begin, eventDetails.end),
       };
@@ -374,8 +397,8 @@ export function useEventSave({
 
       // Email guests are invited by mail through the configured bridge, not by
       // gift wrap. On edit, only newly-added addresses are invited (matches the
-      // participant-invite semantics). The wrap carries every new address as a
-      // `deliver` tag, so this is one publish regardless of guest count.
+      // participant-invite semantics). Guests with a one-time RSVP key each get
+      // their own message (unique link); the rest share one wrap.
       const previousEmailSet = new Set(initialEvent?.guestEmails ?? []);
       const newGuestEmails =
         mode === "edit"
@@ -385,7 +408,7 @@ export function useEventSave({
         eventToSave.source !== "device" && newGuestEmails.length > 0;
 
       if (needsEmailInvites) {
-        let emailWrap: Event | null = null;
+        let emailWraps: Event[] = [];
         let emailStepStarted = false;
         stepDefs.push({
           id: "invite-email-guests",
@@ -397,23 +420,28 @@ export function useEventSave({
               emailStepStarted = true;
               const { alias, bridgeOverride, addAlias } =
                 useMailIdentity.getState();
-              const result = await buildEmailInviteWrap({
+              const result = await buildEmailInviteWraps({
                 event: savedEvent,
                 fromAddress: alias,
                 recipients: newGuestEmails,
+                guestFragments,
                 bridgeOverride,
               });
               if (result.errors.length > 0) {
                 throw new Error(result.errors.join("; "));
               }
-              if (!result.wrap) return;
-              emailWrap = result.wrap;
+              if (result.wraps.length === 0) return;
+              emailWraps = result.wraps;
               addAlias(alias);
             }
-            if (!emailWrap) return;
-            await publishSignedEvent(emailWrap, {
-              onRelayComplete: callbacks.onRelayComplete,
-            });
+            if (emailWraps.length === 0) return;
+            await Promise.all(
+              emailWraps.map((wrap) =>
+                publishSignedEvent(wrap, {
+                  onRelayComplete: callbacks.onRelayComplete,
+                }),
+              ),
+            );
           },
         });
       }

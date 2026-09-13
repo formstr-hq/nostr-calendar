@@ -249,6 +249,7 @@ const dictionary: NestedObject = {
       goingSummary: "{going} going · {maybe} maybe",
       showParticipants: "Show participants",
       hideParticipants: "Hide participants",
+      guestViewingAs: "You're responding as {email} (email guest).",
     },
     deleteEvent: {
       title: "Delete Event",

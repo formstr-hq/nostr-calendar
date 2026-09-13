@@ -296,7 +296,7 @@
             <tr><td class="tagname">notification</td><td>reminder preference</td><td><span class="req no">optional</span></td></tr>
             <tr><td class="tagname">form</td><td><code>naddr</code>, plus form's read-only view key (never the edit key) — one per attached form</td><td><span class="req no">optional, repeats</span></td></tr>
           <tr><td class="tagname">location</td><td>free text, repeats</td><td><span class="req no">optional</span></td></tr>
-          <tr><td class="tagname">guest_email</td><td>external email guest address, repeats. Invited by mail through the bridge; never gift-wrapped</td><td><span class="req no">optional</span></td></tr>
+          <tr><td class="tagname">guest_email</td><td>external email guest address, repeats. Invited by mail through the bridge; never gift-wrapped. Third element (private events only) is the guest's one-time RSVP pubkey</td><td><span class="req no">optional</span></td></tr>
           <tr><td class="tagname">p</td><td>creator first, then one per invited participant</td><td><span class="req yes">required</span></td></tr>
           </table>
         </div>
@@ -365,6 +365,7 @@
           <tr><td class="tagname">d</td><td>deterministic RSVP id</td><td><span class="req yes">required</span></td></tr>
         </table>
         <div class="field"><span class="label">Content (self-encrypted with the event's own view key)</span><p><code>{ status, suggestedStart?, suggestedEnd?, comment? }</code> — <code>status</code> ∈ <code>accepted | declined | tentative</code>. Anyone who can decrypt the event can decrypt its RSVPs (shared secret).</p></div>
+        <div class="field"><span class="label">Email guests</span><p>An email guest holding a one-time identity from their invite link publishes this same kind, signed by that key rather than a logged-in account. The organizer labels it by matching the responder pubkey to the <code>guest_email</code> mapping. See <a href="#f-email-invite">Email guest invitations → Guest RSVP identity</a>.</p></div>
       </article>
 
       <article class="flow" id="f-rsvp-pub">
@@ -400,10 +401,11 @@
       └ kind 1301 rumor UNSIGNED. pubkey = organizer. content = RFC 2822
                         (as a "byte string": one code unit per octet)
                         tags: ["p", bridgePubkey], ["deliver", guest]…</pre>
-          One wrap carries <em>every</em> email guest as a <code>deliver</code> tag — never one wrap per guest. The bridge reads its routing from <code>deliver</code> tags, not the <code>To:</code> header.</p></div>
+          Guests <em>without</em> an RSVP key share one wrap carrying every address as a <code>deliver</code> tag. A guest <em>with</em> a one-time RSVP key gets their own wrap (one <code>deliver</code> tag, one unique body) because their link is theirs alone. The bridge reads routing from <code>deliver</code> tags, not the <code>To:</code> header.</p></div>
         <div class="field"><span class="label">Bridge discovery</span><p>The bridge pubkey is discovered over NIP-05 at <code>_smtp@&lt;the From address's domain&gt;</code>. An explicit override — npub, hex pubkey, NIP-05 address, or bare domain — can be supplied via the mail-identity store (<code>bridgeOverride</code>) for self-hosters. No address→bridge map is hardcoded, so any mailstr-compatible deployment works.</p></div>
         <div class="field"><span class="label">Authorization (enforced by the bridge, guarded here)</span><p>The bridge authorizes against <code>seal.pubkey</code>, never the rumor's (attacker-controlled) pubkey. A From address is accepted only if its NIP-05 record resolves to the sealing key. The app replays the same NIP-05 ownership check before publishing so a bad From fails fast with a clear message instead of a silent bounce.</p></div>
         <div class="field"><span class="label">Alias suggestion</span><p>The "send from" picker reads the account's registered aliases from the Formstr account API (<code>GET /api/nip-05/get-nip05</code>, NIP-98 authed, default <code>https://api.formstr.app</code>, override with <code>VITE_MAIL_API_BASE_URL</code>). This is a convenience only: aliases can always be typed manually, the authoritative check is always the NIP-05 record, and the gated "no address" notice is only shown after a definitive negative (404) — never while the lookup is still in flight.</p></div>
+        <div class="field"><span class="label">Guest RSVP identity (private events only)</span><p>An email guest has no Nostr key, so RSVPing requires one. The organizer generates a <strong>one-time keypair per guest</strong>; the guest's <em>pubkey</em> is written as the third element of the <code>guest_email</code> tag (inside encrypted content), while the <em>nsec</em> is kept only locally and handed to that guest in their invite link as an <code>#nkeys1…</code> fragment (<code>{ nsec, email }</code>, the same bech32-TLV envelope Formstr uses). The secret is never placed on the event — every participant can decrypt the content, so doing so would let any of them impersonate the guest. A guest who opens their link adopts the identity in memory only and publishes a normal private RSVP (32069) signed by that key; the host resolves the responder pubkey back to the address via the same tag. The guest is deliberately never added to <code>participants</code>/<code>p</code> tags — that would emit a <code>#p</code>-tagged gift wrap to their one-time key, leaking the identity on relays. Public events remain invite-only (no RSVP identity).</p></div>
         <div class="callout"><span class="label">New tag on the event</span><p><code>guest_email</code> persists the invited addresses on the calendar event itself (encrypted content for private events, public tag for public ones) so the guest list survives reloads. This is a wire-format addition; readers ignore the tag if unaware.</p></div>
       </article>
 

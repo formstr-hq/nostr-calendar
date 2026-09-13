@@ -9,6 +9,7 @@ import {
 import { signerManager } from "../common/signer";
 import { buildPrivateCalendarEventUrl } from "./events";
 import { fetchRelayLists } from "./relays";
+import { withGuestFragment } from "../utils/emailGuestLink";
 import {
   isEmailAddress,
   qualifyMailAddress,
@@ -98,26 +99,36 @@ export function buildEmailInviteRfc2822({
   return lines.join("\r\n");
 }
 
+/**
+ * Canonical URL a guest should open for this event. Private events carry the
+ * viewKey query (so the guest can decrypt); the caller appends an `#nkeys1…`
+ * fragment per guest that also grants them an RSVP identity.
+ */
+export function buildEventInviteUrl(event: ICalendarEvent): string {
+  if (event.isPrivateEvent && event.viewKey) {
+    return buildPrivateCalendarEventUrl({
+      kind: event.kind,
+      pubkey: event.user,
+      dTag: event.id,
+      viewKey: event.viewKey,
+      relayHint: event.relayHint ?? "",
+    });
+  }
+  return event.id
+    ? `${window.location.origin}/event/${event.eventId || event.id}`
+    : window.location.origin;
+}
+
 export function buildEmailInviteBody({
   hostName,
   event,
+  inviteUrl,
 }: {
   hostName: string;
   event: ICalendarEvent;
+  inviteUrl: string;
 }): string {
   const when = new Date(event.begin).toLocaleString();
-  const url =
-    event.isPrivateEvent && event.viewKey
-      ? buildPrivateCalendarEventUrl({
-          kind: event.kind,
-          pubkey: event.user,
-          dTag: event.id,
-          viewKey: event.viewKey,
-          relayHint: event.relayHint ?? "",
-        })
-      : event.id
-        ? `${window.location.origin}/event/${event.eventId || event.id}`
-        : window.location.origin;
   return [
     `${hostName} has invited you to an event.`,
     "",
@@ -126,7 +137,7 @@ export function buildEmailInviteBody({
     event.location.length ? `Where: ${event.location.join(", ")}` : null,
     event.description ? `Notes: ${event.description}` : null,
     "",
-    `View details: ${url}`,
+    `View details and RSVP: ${inviteUrl}`,
   ]
     .filter((line): line is string => line !== null)
     .join("\r\n");
@@ -178,33 +189,47 @@ export interface EmailInviteParams {
   fromAddress: string;
   /** Guests to invite by email. */
   recipients: string[];
+  /**
+   * Per-guest `nkeys1…` fragment (carrying their one-time RSVP nsec) keyed by
+   * lowercased email. When present for a guest, that guest gets their own
+   * message with their own link — the fragment cannot be shared across
+   * recipients, since each grants a distinct signing identity.
+   */
+  guestFragments?: Record<string, string>;
   /** Optional Settings override for bridge discovery. */
   bridgeOverride?: string;
 }
 
 export interface EmailInviteResult {
-  wrap: Event | null;
+  /** One wrap per distinct recipient body; often just one. */
+  wraps: Event[];
   bridgePubkey: string | null;
   errors: string[];
 }
 
 /**
- * Build the single bridge gift wrap carrying every email guest as a
- * `deliver` tag (one wrap, N envelope recipients — never one per guest).
- * Returns `errors` rather than throwing so the caller can surface a clear
- * message and skip the step.
+ * Build the bridge gift wrap(s) that invite email guests.
+ *
+ * A guest who has a one-time RSVP key needs a link only they may use, so they
+ * get an individual message (one `deliver` tag, one unique body). Guests
+ * without such a key share a single wrap carrying every address as `deliver`
+ * tags — one wrap, N envelope recipients. Returns `errors` rather than
+ * throwing so the caller can surface a clear message and skip the step.
  */
-export async function buildEmailInviteWrap({
+export async function buildEmailInviteWraps({
   event,
   fromAddress,
   recipients,
+  guestFragments = {},
   bridgeOverride,
 }: EmailInviteParams): Promise<EmailInviteResult> {
   const uniqueRecipients = Array.from(
-    new Set(recipients.map((r) => r.trim()).filter(isEmailAddress)),
+    new Set(
+      recipients.map((r) => r.trim().toLowerCase()).filter(isEmailAddress),
+    ),
   );
   if (uniqueRecipients.length === 0) {
-    return { wrap: null, bridgePubkey: null, errors: [] };
+    return { wraps: [], bridgePubkey: null, errors: [] };
   }
 
   // The UI holds raw From input (a bare localpart is allowed while typing);
@@ -213,7 +238,7 @@ export async function buildEmailInviteWrap({
   const parts = splitMailAddress(from);
   if (!parts) {
     return {
-      wrap: null,
+      wraps: [],
       bridgePubkey: null,
       errors: [`"${fromAddress}" is not a valid email address.`],
     };
@@ -222,7 +247,7 @@ export async function buildEmailInviteWrap({
   const senderPubkey = await getSenderPubkey();
   if (!(await senderOwnsFromAddress(from, senderPubkey))) {
     return {
-      wrap: null,
+      wraps: [],
       bridgePubkey: null,
       errors: [
         `You do not own "${from}", so it cannot be used to send email invites.`,
@@ -236,7 +261,7 @@ export async function buildEmailInviteWrap({
   );
   if (!bridgePubkey) {
     return {
-      wrap: null,
+      wraps: [],
       bridgePubkey: null,
       errors: [
         `No mail bridge is configured for "${parts.domain}", so email guests cannot be invited.`,
@@ -251,33 +276,68 @@ export async function buildEmailInviteWrap({
 
   const signer = await signerManager.getSigner();
   const senderName = await resolveSenderName();
-  const rfc2822 = buildEmailInviteRfc2822({
-    from,
-    to: uniqueRecipients,
-    subject: `Invitation: ${event.title}`,
-    body: buildEmailInviteBody({ hostName: senderName, event }),
-  });
-  const content = bytesToMessageString(ENCODER.encode(rfc2822));
+  const inviteUrl = buildEventInviteUrl(event);
 
-  const rumor = {
-    kind: KIND_MAIL,
-    pubkey: senderPubkey,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", bridgePubkey],
-      ...uniqueRecipients.map((address) => ["deliver", address]),
-    ],
-    content,
+  // Group into: (a) guests with a unique link, each their own wrap, and
+  // (b) everyone else, sharing one wrap.
+  const individualized = uniqueRecipients.filter((email) =>
+    Boolean(guestFragments[email]),
+  );
+  const shared = uniqueRecipients.filter((email) => !guestFragments[email]);
+
+  const buildWrap = async (
+    addresses: string[],
+    body: string,
+  ): Promise<Event> => {
+    const rfc2822 = buildEmailInviteRfc2822({
+      from,
+      to: addresses,
+      subject: `Invitation: ${event.title}`,
+      body,
+    });
+    const content = bytesToMessageString(ENCODER.encode(rfc2822));
+    const rumor = {
+      kind: KIND_MAIL,
+      pubkey: senderPubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ["p", bridgePubkey],
+        ...addresses.map((address) => ["deliver", address]),
+      ],
+      content,
+    };
+    const rumorWithId: Rumor = { ...rumor, id: getEventHash(rumor) };
+    return sealAndWrapForBridge(rumorWithId, bridgePubkey, signer);
   };
-  const rumorWithId: Rumor = { ...rumor, id: getEventHash(rumor) };
 
   try {
-    const wrap = await sealAndWrapForBridge(rumorWithId, bridgePubkey, signer);
-    return { wrap, bridgePubkey, errors: [] };
+    const wraps: Event[] = [];
+    for (const email of individualized) {
+      const guestUrl = withGuestFragment(inviteUrl, guestFragments[email]);
+      wraps.push(
+        await buildWrap(
+          [email],
+          buildEmailInviteBody({
+            hostName: senderName,
+            event,
+            inviteUrl: guestUrl,
+          }),
+        ),
+      );
+    }
+    if (shared.length > 0) {
+      wraps.push(
+        await buildWrap(
+          shared,
+          buildEmailInviteBody({ hostName: senderName, event, inviteUrl }),
+        ),
+      );
+    }
+    return { wraps, bridgePubkey, errors: [] };
   } catch (error) {
     logger.error("Failed to build email invite wrap", error);
     return {
-      wrap: null,
+      wraps: [],
       bridgePubkey,
       errors: ["Could not encrypt the email invite."],
     };

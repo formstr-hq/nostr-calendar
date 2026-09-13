@@ -137,7 +137,16 @@ async function preparePrivateCalendarEvent(
   });
 
   event.guestEmails?.forEach((email) => {
-    if (email) eventData.push(["guest_email", email]);
+    if (!email) return;
+    // For private events the guest's one-time RSVP pubkey rides as the third
+    // element of the same tag, inside the encrypted content. Never the nsec —
+    // every participant can decrypt this content.
+    const guestPubkey = event.guestPubkeys?.[email.toLowerCase()];
+    if (guestPubkey) {
+      eventData.push(["guest_email", email, guestPubkey]);
+    } else {
+      eventData.push(["guest_email", email]);
+    }
   });
 
   const userPublicKey = await getUserPublicKey();

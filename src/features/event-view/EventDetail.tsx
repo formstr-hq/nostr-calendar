@@ -21,6 +21,7 @@ import {
   getCalendarEventCoordinate,
 } from "../../utils/calendarListTypes";
 import { useEventRsvps } from "../../hooks/useEventRsvps";
+import { getGuestSigner, useGuestSession } from "../../stores/guestSession";
 import { EventCalendarListManagement } from "../../components/EventCalendarListManagement";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { getEventDisplayTitle } from "./lib/getEventDisplayTitle";
@@ -107,6 +108,14 @@ export function CalendarEvent({
   const calendar = findCalendarForEvent(calendars, event);
   const isEditable = !!user && event.user === user.pubkey;
 
+  // An email guest who opened their invite link has a one-time identity but no
+  // login. Resolve pubkey eagerly (adoption is synchronous) and use their
+  // signer for RSVP submission.
+  const guestPubkey = useGuestSession((s) => s.pubkey);
+  const guestEmail = useGuestSession((s) => s.email);
+  const guestSigner = getGuestSigner();
+  const guestActive = !user && !!guestPubkey;
+
   // Subscribe once at this level so both the participants section and the
   // RSVP bar render off the same RSVP record set without duplicating relay
   // subscriptions.
@@ -116,7 +125,10 @@ export function CalendarEvent({
     myRsvp,
     isSubmitting: isRsvpSubmitting,
     submit: submitRsvp,
-  } = useEventRsvps(event);
+  } = useEventRsvps(event, {
+    guestSigner: guestActive ? guestSigner : null,
+    guestPubkey: guestActive ? guestPubkey : null,
+  });
   const standaloneForms = calendar ? (event.forms ?? []) : [];
 
   const handleCalendarUpdate = async (nextCalendarId: string) => {
@@ -191,7 +203,7 @@ export function CalendarEvent({
         {!isDeviceEvent && <EventHostRow hostPubkey={event.user} />}
         <Divider />
 
-        {!calendar && !isDeviceEvent && (
+        {!calendar && !isDeviceEvent && !guestActive && (
           <>
             <RespondPanel event={event} />
             <Divider />
@@ -209,7 +221,9 @@ export function CalendarEvent({
           <EventRsvpSection
             event={event}
             isAuthor={event.user === user?.pubkey}
-            showRsvpBar={!!calendar}
+            showRsvpBar={!!calendar || guestActive}
+            isGuest={guestActive}
+            guestEmail={guestEmail}
             byPubkey={rsvpByPubkey}
             allParticipants={rsvpAllParticipants}
             myRsvp={myRsvp}
