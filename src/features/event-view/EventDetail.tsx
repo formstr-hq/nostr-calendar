@@ -108,13 +108,14 @@ export function CalendarEvent({
   const calendar = findCalendarForEvent(calendars, event);
   const isEditable = !!user && event.user === user.pubkey;
 
-  // An email guest who opened their invite link has a one-time identity but no
-  // login. Resolve pubkey eagerly (adoption is synchronous) and use their
-  // signer for RSVP submission.
+  // An email guest who opened their invite link carries a one-time identity.
+  // It takes precedence over any logged-in account for RSVP purposes: the
+  // fragment is an explicit "respond as this guest" instruction, so a browser
+  // that happens to be signed in must not RSVP as the wrong person.
   const guestPubkey = useGuestSession((s) => s.pubkey);
   const guestEmail = useGuestSession((s) => s.email);
   const guestSigner = getGuestSigner();
-  const guestActive = !user && !!guestPubkey;
+  const guestActive = !!guestPubkey;
 
   // Subscribe once at this level so both the participants section and the
   // RSVP bar render off the same RSVP record set without duplicating relay

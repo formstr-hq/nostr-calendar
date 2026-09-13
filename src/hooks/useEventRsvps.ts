@@ -52,7 +52,10 @@ export function useEventRsvps(
   } = {},
 ): UseEventRsvpsResult {
   const { user } = useUser();
-  const myPubkey = user?.pubkey ?? options.guestPubkey ?? undefined;
+  // A guest fragment is an explicit instruction to respond as that guest, so
+  // it outranks a signed-in account — opening an invite link in a logged-in
+  // browser must still RSVP as the guest, not the account.
+  const myPubkey = options.guestPubkey ?? user?.pubkey ?? undefined;
   const guestSigner = options.guestSigner ?? null;
   const [byPubkey, setByPubkey] = useState<Record<string, RSVPRecord>>({});
   const [isLoading, setIsLoading] = useState(false);

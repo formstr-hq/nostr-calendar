@@ -1,4 +1,4 @@
-import { test, expect, navigate } from "../fixtures/index.js";
+import { test, expect, navigate, injectAuth } from "../fixtures/index.js";
 import { TEST_KEYS } from "../../relay/seed/keys.js";
 import {
   createEventViaDialog,
@@ -152,6 +152,47 @@ test("host sees the email guest's RSVP labelled by address", async ({
   // Host reopens the event standalone and expands participants. The row is
   // labelled with the address, and its status only reads "Yes" because the
   // guest's RSVP actually resolved back to that pubkey.
+  await navigate(host, href);
+  await expect(host.getByText(title)).toBeVisible({ timeout: 20_000 });
+  await host.getByRole("button", { name: "Show participants" }).click();
+  const guestRow = host.getByTestId("guest-rsvp-participant");
+  await expect(guestRow).toContainText(GUEST_EMAIL, { timeout: 20_000 });
+  await expect(guestRow).toContainText("Yes", { timeout: 20_000 });
+});
+
+test("guest link wins over a signed-in account", async ({
+  authedPage: host,
+  browser,
+}) => {
+  await interceptMail(host);
+  const { title, href } = await createEmailGuestEvent(host, 62);
+  const guest = await guestFragmentFromHost(host, GUEST_EMAIL);
+
+  // Open the invite link in a browser that is already logged in as a
+  // DIFFERENT account (Bob). The fragment is an explicit "respond as this
+  // guest" instruction, so the RSVP must be signed by the guest key, not Bob.
+  const context = await browser.newContext();
+  await injectAuth(context, TEST_KEYS.bob, "Bob");
+  await context.route(
+    "https://mailstr.app/.well-known/nostr.json?*",
+    (route) =>
+      route.fulfill({ contentType: "application/json", body: '{"names":{}}' }),
+  );
+  const page = await context.newPage();
+  await page.goto(`${href}#${guest.fragment}`);
+
+  await expect(page.getByText(title)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(`You're responding as ${GUEST_EMAIL}`)).toBeVisible(
+    { timeout: 20_000 },
+  );
+  await page.getByTestId("rsvp-yes").click();
+  await expect(page.getByTestId("rsvp-yes")).toHaveClass(/MuiButton-contained/, {
+    timeout: 20_000,
+  });
+  await context.close();
+
+  // The host sees the response attributed to the guest address — proving it
+  // was signed by the guest key, not Bob's account.
   await navigate(host, href);
   await expect(host.getByText(title)).toBeVisible({ timeout: 20_000 });
   await host.getByRole("button", { name: "Show participants" }).click();
