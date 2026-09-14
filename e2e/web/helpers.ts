@@ -109,7 +109,7 @@ export async function addParticipantByNpub(
   npub: string,
 ): Promise<void> {
   const input = scope.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
   await input.fill(npub);
 

@@ -65,6 +65,34 @@ export const publicTint = {
   dark: 0.16,
 };
 
+/**
+ * Warm palette for email-guest affordances, so "invited by email" is visually
+ * distinct from Nostr guests (wireframes 01/02/04/05). Kept separate from the
+ * accent so it never collides with a user's chosen accent color.
+ */
+export const mailTokens = {
+  light: {
+    surface: "#faf6ef",
+    border: "#e8dcc6",
+    tile: "#f0e7d5",
+    text: "#8a7a55",
+    tag: "#efe4cd",
+    noticeSurface: "#fbf5f2",
+    noticeBorder: "#ecd4cb",
+    noticeText: "#b06a55",
+  },
+  dark: {
+    surface: "#2a2418",
+    border: "#4a3f28",
+    tile: "#3a3020",
+    text: "#d6bd85",
+    tag: "#3a3020",
+    noticeSurface: "#2c2320",
+    noticeBorder: "#4f3a33",
+    noticeText: "#d99a82",
+  },
+};
+
 export const typography = {
   fontFamily: [
     "Inter",

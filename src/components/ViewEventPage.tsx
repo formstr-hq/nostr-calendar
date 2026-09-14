@@ -1,12 +1,13 @@
 import { NAddr } from "nostr-tools/nip19";
 import React from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useLocation, useParams, useSearchParams } from "react-router";
 import type { ICalendarEvent } from "../utils/types";
 import { fetchCalendarEvent, viewPrivateEvent } from "../nostr/events";
 import { nostrEventToCalendar } from "../utils/parser";
 import { Alert, Box, CircularProgress } from "@mui/material";
 import { CalendarEventView } from "./CalendarEvent";
 import { useIntl } from "react-intl";
+import { useGuestSession } from "../stores/guestSession";
 import {
   applyEventOccurrenceRange,
   getEventOccurrenceRangeFromQuery,
@@ -69,11 +70,21 @@ const LoaderRenderer = () => {
 export const ViewEventPage = () => {
   const { naddr } = useParams<{ naddr: string }>();
   const [queryParams] = useSearchParams();
+  const location = useLocation();
   const viewKey = queryParams.get("viewKey");
   const occurrenceStartParam = queryParams.get(OCCURRENCE_START_PARAM);
   const occurrenceEndParam = queryParams.get(OCCURRENCE_END_PARAM);
+  const adoptFromFragment = useGuestSession((s) => s.adoptFromFragment);
   const [calendarEventLoadState, updateCalendarEventLoadState] =
     React.useState<ILoadState>(getInitialLoadState);
+
+  // A guest invite link carries a one-time RSVP identity in the `#nkeys1…`
+  // fragment (never sent to a server). Adopt it before the event renders so
+  // the RSVP bar / participant list resolve against the guest pubkey.
+  React.useEffect(() => {
+    const fragment = location.hash.replace(/^#/, "");
+    if (fragment) adoptFromFragment(fragment);
+  }, [location.hash, adoptFromFragment]);
 
   React.useEffect(() => {
     updateCalendarEventLoadState(getInitialLoadState);

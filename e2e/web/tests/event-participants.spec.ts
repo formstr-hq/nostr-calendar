@@ -42,7 +42,7 @@ test("searches, deduplicates, and persists event participants", async ({
   await openEventEditor(page, "Team Offsite");
 
   const participantInput = page.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
 
   // With no query, named contacts are promoted above unnamed pubkeys while
@@ -157,7 +157,7 @@ test("searches, deduplicates, and persists event participants", async ({
   // Bob remains in local history and is also in Alice's contact list. The
   // merged row is deduplicated and exposes both provenance icons.
   const reopenedInput = page.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
   await reopenedInput.focus();
   let priorBob = page.getByRole("option", { name: /Bob/ });
@@ -226,7 +226,7 @@ test("discards a stale NIP-05 result after the query changes", async ({
   await openEventEditor(page, "Stale Search Event");
 
   const participantInput = page.getByRole("combobox", {
-    name: "Search name, NIP-05, or npub",
+    name: "Search name, NIP-05, npub, or email",
   });
   await participantInput.fill("slow@profiles.test");
   await requestSeen;

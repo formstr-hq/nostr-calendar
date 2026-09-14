@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="600" viewBox="0 0 390 600" font-family="Inter, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <!-- device screen -->
+  <rect x="0.5" y="0.5" width="389" height="599" rx="30" fill="#f4f4f3" stroke="#d8d8d6"/>
+  <!-- status bar -->
+  <text x="26" y="34" font-size="12.5" font-weight="700" fill="#0b0b0c">9:41</text>
+  <rect x="344" y="24" width="20" height="11" rx="2.5" fill="none" stroke="#0b0b0c" stroke-width="1.2"/>
+  <rect x="346" y="26.5" width="13" height="6" rx="1" fill="#0b0b0c"/>
+
+  <text x="24" y="72" font-size="12.5" font-weight="700" letter-spacing="0.6" fill="#686865">GUESTS</text>
+
+  <!-- input placeholder -->
+  <rect x="24" y="84" width="342" height="46" rx="8" fill="#ffffff" stroke="#d8d8d6"/>
+  <text x="38" y="113" font-size="14.5" fill="#9a9a97">Add guest — npub, name, or email…</text>
+  <circle cx="346" cy="107" r="7" fill="none" stroke="#9a9a97" stroke-width="1.6"/>
+  <line x1="351" y1="112" x2="356" y2="117" stroke="#9a9a97" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- alias card (stacked for mobile) -->
+  <rect x="24" y="140" width="342" height="106" rx="12" fill="#faf6ef" stroke="#e8dcc6"/>
+  <rect x="38" y="154" width="34" height="34" rx="8" fill="#f0e7d5"/>
+  <rect x="46" y="163" width="18" height="14" rx="2.5" fill="none" stroke="#8a7a55" stroke-width="1.5"/>
+  <polyline points="46,165 55,172 64,165" fill="none" stroke="#8a7a55" stroke-width="1.5" stroke-linejoin="round"/>
+  <text x="84" y="167" font-size="11" font-weight="700" letter-spacing="0.4" fill="#8a7a55">SEND EMAIL INVITES FROM</text>
+  <text x="84" y="184" font-size="11" fill="#b39a6a">2 aliases on this npub</text>
+
+  <rect x="38" y="198" width="314" height="34" rx="6" fill="#ffffff" stroke="#d8d8d6"/>
+  <text x="50" y="219" font-size="14" fill="#0b0b0c">hello@mailstr.app</text>
+  <path d="M332 211 l5 5 l5 -5" fill="none" stroke="#686865" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- guests -->
+  <text x="24" y="278" font-size="11.5" font-weight="600" fill="#9a9a97">3 GUESTS</text>
+
+  <!-- Row A nostr verified -->
+  <rect x="24" y="288" width="342" height="56" rx="8" fill="#f0f0ef"/>
+  <circle cx="54" cy="316" r="16" fill="#dfe3ea"/>
+  <text x="54" y="321" font-size="13" font-weight="600" fill="#5a6472" text-anchor="middle">A</text>
+  <text x="82" y="311" font-size="14.5" font-weight="600" fill="#0b0b0c">Alice</text>
+  <text x="82" y="329" font-size="12" fill="#686865">alice@nostrplebs.com</text>
+  <circle cx="220" cy="325" r="7" fill="#111111"/>
+  <path d="M217 325 l2 2 l4 -4" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="350" y="321" font-size="12.5" fill="#b23b3b" text-anchor="end">Remove</text>
+
+  <!-- Row B nostr key -->
+  <rect x="24" y="352" width="342" height="56" rx="8" fill="#f0f0ef"/>
+  <circle cx="54" cy="380" r="16" fill="#e2dfea"/>
+  <text x="54" y="385" font-size="13" font-weight="600" fill="#6a5f7a" text-anchor="middle">B</text>
+  <text x="82" y="375" font-size="14.5" font-weight="600" fill="#0b0b0c">npub1q9k…4f7z</text>
+  <text x="82" y="393" font-size="12" fill="#9a9a97">Nostr guest · gift-wrap</text>
+  <text x="350" y="385" font-size="12.5" fill="#b23b3b" text-anchor="end">Remove</text>
+
+  <!-- Row C email -->
+  <rect x="24" y="416" width="342" height="56" rx="8" fill="#faf6ef" stroke="#e8dcc6"/>
+  <rect x="38" y="428" width="32" height="32" rx="8" fill="#f0e7d5"/>
+  <rect x="45" y="437" width="18" height="14" rx="2.5" fill="none" stroke="#8a7a55" stroke-width="1.5"/>
+  <polyline points="45,439 54,446 63,439" fill="none" stroke="#8a7a55" stroke-width="1.5" stroke-linejoin="round"/>
+  <text x="82" y="439" font-size="14.5" font-weight="600" fill="#0b0b0c">friend@gmail.com</text>
+  <text x="82" y="457" font-size="12" fill="#9a9a97">Invited by email</text>
+  <rect x="222" y="430" width="72" height="20" rx="10" fill="#efe4cd"/>
+  <text x="258" y="444" font-size="11" font-weight="600" fill="#8a7a55" text-anchor="middle">via email</text>
+  <text x="350" y="449" font-size="12.5" fill="#b23b3b" text-anchor="end">Remove</text>
+
+  <!-- annotations -->
+  <text x="24" y="508" font-size="12" fill="#686865">• Alias picker shows only once an email guest exists.</text>
+  <text x="24" y="530" font-size="12" fill="#686865">• Aliases come from the signed-in npub’s mailboxes.</text>
+  <text x="24" y="552" font-size="12" fill="#686865">• Save: Nostr → gift-wrap; email → wrap → send-wrap.</text>
+</svg>

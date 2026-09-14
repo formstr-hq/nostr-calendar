@@ -134,8 +134,12 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         </SectionLabel>
         <EventParticipants
           participants={eventDetails.participants}
+          guestEmails={eventDetails.guestEmails ?? []}
           authorPubkey={eventDetails.user}
           onChange={(participants) => updateField("participants", participants)}
+          onGuestEmailsChange={(guestEmails) =>
+            updateField("guestEmails", guestEmails)
+          }
         />
       </Box>
 

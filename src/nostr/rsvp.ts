@@ -5,6 +5,8 @@ import { getUserPublicKey, selfEncrypt, selfDecrypt } from "./crypto";
 import { buildAndSign, publishSignedEvent, makeDTag } from "./core";
 import { RSVPStatus } from "../utils/types";
 import type { NSec } from "nostr-tools/nip19";
+import { signerManager } from "../common/signer";
+import type { ActiveSigner } from "@formstr/signer";
 
 export interface RSVPPayload {
   status: RSVPStatus; // accepted | declined | tentative
@@ -140,8 +142,11 @@ export async function publishPrivateRSVPEvent(params: {
   relayHint?: string;
   viewKey: string;
   payload: RSVPPayload;
+  /** Override signer (email guests sign with their one-time identity). */
+  signer?: ActiveSigner;
 }) {
-  const responderPubkey = await getUserPublicKey();
+  const signer = params.signer ?? (await signerManager.getSigner());
+  const responderPubkey = await signer.getPublicKey();
   const tags: string[][] = [
     params.relayHint
       ? [
@@ -157,13 +162,16 @@ export async function publishPrivateRSVPEvent(params: {
   ];
   const viewPrivateKey = nip19.decode(params.viewKey as NSec).data;
   const encryptedContent = selfEncrypt(viewPrivateKey, params.payload);
-  const signed = await buildAndSign({
-    pubkey: responderPubkey,
-    created_at: Math.floor(Date.now() / 1000),
-    kind: EventKinds.PrivateRSVPEvent,
-    content: encryptedContent,
-    tags,
-  });
+  const signed = await buildAndSign(
+    {
+      pubkey: responderPubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      kind: EventKinds.PrivateRSVPEvent,
+      content: encryptedContent,
+      tags,
+    },
+    signer,
+  );
 
   await publishSignedEvent(signed);
 }

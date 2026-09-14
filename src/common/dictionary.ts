@@ -31,7 +31,7 @@ const dictionary: NestedObject = {
       description: "Description",
       location: "Location",
       participants: "Participants",
-      addParticipants: "Search name, NIP-05, or npub",
+      addParticipants: "Search name, NIP-05, npub, or email",
       rsvpDetails: "RSVP Details",
       privateEvent: "Private Event",
       privateEventCaption:
@@ -111,6 +111,7 @@ const dictionary: NestedObject = {
       step: {
         publishEvent: "Publishing event",
         inviteParticipants: "Inviting participants",
+        inviteEmailGuests: "Inviting email guests",
         addToCalendar: "Adding to calendar",
         updateAvailability: "Updating availability",
         publishDeletion: "Publishing deletion",
@@ -180,6 +181,20 @@ const dictionary: NestedObject = {
       endsLabel: "Ends",
       endsOnLabel: "Ends on",
     },
+    emailGuest: {
+      inviteByEmail: "Invite {email} by email",
+      deliveryHint: "External guest · delivered to their inbox as email",
+      invitedByEmail: "Invited by email",
+      viaEmail: "via email",
+      sendFrom: "Send email invites from",
+      aliasPlaceholder: "you@mailstr.app",
+      aliasHint:
+        "Must be a mail address owned by the npub you're signed in with.",
+      noAliasTitle: "Add a mail address to invite guests by email",
+      noAliasBody:
+        "Email invites are sent from your own mail address, tied to the npub you're signed in with. Your Nostr guests are invited as usual.",
+      getAddress: "Get a mailstr address",
+    },
     form: {
       attachments: "Forms",
       inputPlaceholder: "Paste form URL",
@@ -234,6 +249,7 @@ const dictionary: NestedObject = {
       goingSummary: "{going} going · {maybe} maybe",
       showParticipants: "Show participants",
       hideParticipants: "Hide participants",
+      guestViewingAs: "You're responding as {email} (email guest).",
     },
     deleteEvent: {
       title: "Delete Event",

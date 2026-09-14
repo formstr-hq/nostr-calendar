@@ -3,15 +3,22 @@ import { dataLayer, type PublishResult } from "@formstr/local-relay";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { signerManager } from "../common/signer";
+import type { ActiveSigner } from "@formstr/signer";
 
 /**
- * Signs an unsigned event with the current signer and stamps the correct
- * event id (some signers return an id computed differently than the wire
- * format expects, so we always recompute it from the unsigned template).
+ * Signs an unsigned event, stamping the correct event id (some signers return
+ * an id computed differently than the wire format expects, so we always
+ * recompute it from the unsigned template).
+ *
+ * `signer` overrides the logged-in user's signer — used by email guests, who
+ * sign an RSVP with their in-memory one-time identity rather than a session.
  */
-export async function buildAndSign(unsigned: UnsignedEvent): Promise<Event> {
-  const signer = await signerManager.getSigner();
-  const signed = await signer.signEvent(unsigned);
+export async function buildAndSign(
+  unsigned: UnsignedEvent,
+  signer?: ActiveSigner,
+): Promise<Event> {
+  const active = signer ?? (await signerManager.getSigner());
+  const signed = await active.signEvent(unsigned);
   signed.id = getEventHash(unsigned);
   return signed;
 }
