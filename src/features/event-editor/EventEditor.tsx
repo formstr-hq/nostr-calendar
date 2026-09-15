@@ -31,6 +31,11 @@ import { EventEditDesktopForm } from "./components/EventEditDesktopForm";
 import { EventEditMobileForm } from "./components/EventEditMobileForm";
 import type { EventEditFormProps } from "./components/types";
 import { useSettings } from "../../stores/settings";
+import { useDeviceCalendars } from "../../stores/deviceCalendars";
+import {
+  DEVICE_CALENDAR_ID_PREFIX,
+  deviceCalendarIdFor,
+} from "../../utils/deviceCalendarAdapter";
 
 interface EventEditorProps {
   open: boolean;
@@ -59,31 +64,64 @@ export function EventEditor({
   const { user } = useUser();
   const existingEvents = useTimeBasedEvents((state) => state.events);
   const { calendars } = useCalendarLists();
+  const deviceCalendarsState = useDeviceCalendars();
+  const deviceCalendarsAvailable =
+    deviceCalendarsState.available &&
+    deviceCalendarsState.permission === "granted";
+  const firstVisibleDeviceCalendarId = deviceCalendarsAvailable
+    ? deviceCalendarsState.calendars.find(
+        (calendar) =>
+          (deviceCalendarsState.visibility[calendar.id] ?? true) &&
+          calendar.canWrite,
+      )?.id
+    : undefined;
   const generalSettings = useSettings((state) => state.settings.general);
   const configuredCalendarExists = calendars.some(
     (calendar) => calendar.id === generalSettings.defaultCalendarId,
   );
-  const [selectedCalendarId, setSelectedCalendarId] = useState<string>(
-    // Duplicates are drafts (without an event id), so they cannot be found
-    // through calendar event refs. Preserve their explicitly supplied owner.
-    initialEvent?.calendarId ||
-      (initialEvent && findCalendarForEvent(calendars, initialEvent)?.id) ||
-      (configuredCalendarExists ? generalSettings.defaultCalendarId : "") ||
-      calendars[0]?.id ||
-      "",
-  );
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>(() => {
+    // Existing event — its calendar is authoritative, including device ids.
+    if (initialEvent?.calendarId) return initialEvent.calendarId;
+    const fromNostrCalendarRef =
+      initialEvent && findCalendarForEvent(calendars, initialEvent)?.id;
+    if (fromNostrCalendarRef) return fromNostrCalendarRef;
+    // Create — Nostr default (if configured), else first Nostr calendar.
+    // Falls back to the first writable device calendar only when there are
+    // no Nostr calendars at all (e.g. fresh user who connected their phone).
+    if (configuredCalendarExists) return generalSettings.defaultCalendarId;
+    if (calendars[0]?.id) return calendars[0].id;
+    if (firstVisibleDeviceCalendarId)
+      return deviceCalendarIdFor(firstVisibleDeviceCalendarId);
+    return "";
+  });
 
   useEffect(() => {
-    if (!selectedCalendarId && calendars.length > 0) {
-      setSelectedCalendarId(
-        calendars.some(
-          (calendar) => calendar.id === generalSettings.defaultCalendarId,
-        )
-          ? generalSettings.defaultCalendarId
-          : calendars[0].id,
-      );
+    if (selectedCalendarId) return;
+    if (configuredCalendarExists) {
+      setSelectedCalendarId(generalSettings.defaultCalendarId);
+      return;
     }
-  }, [calendars, generalSettings.defaultCalendarId, selectedCalendarId]);
+    if (calendars[0]?.id) {
+      setSelectedCalendarId(calendars[0].id);
+      return;
+    }
+    if (firstVisibleDeviceCalendarId) {
+      setSelectedCalendarId(deviceCalendarIdFor(firstVisibleDeviceCalendarId));
+    }
+  }, [
+    calendars,
+    configuredCalendarExists,
+    firstVisibleDeviceCalendarId,
+    generalSettings.defaultCalendarId,
+    selectedCalendarId,
+  ]);
+
+  // Whether the live `selectedCalendarId` points at a device calendar.
+  // On edit, the source on the loaded event is also authoritative for read-
+  // only flows even if calendarId was cleared during normalization.
+  const isDeviceTarget =
+    selectedCalendarId.startsWith(DEVICE_CALENDAR_ID_PREFIX) ||
+    initialEvent?.source === "device";
 
   const [eventDetails, setEventDetails] = useState<ICalendarEvent>(() => {
     if (initialEvent) {
@@ -144,6 +182,30 @@ export function EventEditor({
     value: ICalendarEvent[K],
   ) => {
     setEventDetails((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // When the user picks a different calendar in create mode, fields that
+  // don't apply to the new source get cleared so we never persist stale
+  // data (e.g. a Nostr invitee list on a device event).
+  const handleCalendarChange = (nextCalendarId: string) => {
+    setSelectedCalendarId(nextCalendarId);
+    if (mode !== "create") return;
+    const wasDevice = isDeviceTarget;
+    const isNowDevice = nextCalendarId.startsWith(DEVICE_CALENDAR_ID_PREFIX);
+    if (wasDevice === isNowDevice) return;
+    setEventDetails((prev) => {
+      if (isNowDevice) {
+        return {
+          ...prev,
+          source: "device",
+          participants: [],
+          forms: [],
+        };
+      }
+      const next = { ...prev };
+      delete next.source;
+      return next;
+    });
   };
 
   const recurrence = useRecurrenceState(
@@ -285,8 +347,10 @@ export function EventEditor({
     updateField,
     isPrivate,
     selectedCalendarId,
-    setSelectedCalendarId,
+    setSelectedCalendarId: handleCalendarChange,
     calendars,
+    isDeviceTarget,
+    includeDeviceCalendars: mode === "create",
     allDay: dateTime.allDay,
     onToggleAllDay: dateTime.handleToggleAllDay,
     beginDate: dateTime.beginDate,

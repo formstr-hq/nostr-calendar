@@ -18,4 +18,5 @@
     <string name="widget_untitled">Untitled</string>
     <string name="widget_all_day">All day</string>
     <string name="widget_no_upcoming_events">No upcoming events</string>
+    <string name="widget_refresh">Refresh widget</string>
 </resources>

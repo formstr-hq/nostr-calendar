@@ -24,6 +24,14 @@ export interface EventEditFormProps {
   selectedCalendarId: string;
   setSelectedCalendarId: (id: string) => void;
   calendars: ICalendarList[];
+  /** Whether the current `selectedCalendarId` is a device calendar. */
+  isDeviceTarget: boolean;
+  /**
+   * When true, the calendar picker's dropdown also lists device calendars.
+   * Only meaningful for create flows; once an event is loaded the source is
+   * fixed and the user can't move it between Nostr and device calendars.
+   */
+  includeDeviceCalendars: boolean;
 
   allDay: boolean;
   onToggleAllDay: (checked: boolean) => void;

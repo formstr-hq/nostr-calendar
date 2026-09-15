@@ -17,6 +17,9 @@ import android.util.Log;
 import android.widget.RemoteViews;
 
 import androidx.core.content.ContextCompat;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -30,12 +33,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class CalendarWidget extends AppWidgetProvider {
 
     private static final String TAG = "CalendarWidget";
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String EVENTS_KEY = "cal:events";
+    private static final String ACTION_REFRESH = "app.formstr.calendar.action.REFRESH_WIDGET";
+    private static final String REFRESH_WORK_NAME = "calendar_widget_refresh";
     static final class WidgetEvent {
         final String title;
         final long displayBegin;
@@ -50,9 +56,20 @@ public class CalendarWidget extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        schedulePeriodicRefresh(context);
         for (int appWidgetId : appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId);
         }
+    }
+
+    @Override
+    public void onEnabled(Context context) {
+        schedulePeriodicRefresh(context);
+    }
+
+    @Override
+    public void onDisabled(Context context) {
+        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(REFRESH_WORK_NAME);
     }
 
     @Override
@@ -75,9 +92,38 @@ public class CalendarWidget extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+        String action = intent.getAction();
+        if (ACTION_REFRESH.equals(action)) {
+            int appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+                refreshAll(context);
+            } else {
+                updateAppWidget(context, manager, appWidgetId);
+            }
+            EventUpdateWorker.enqueueImmediate(context);
+        } else if (Intent.ACTION_CONFIGURATION_CHANGED.equals(action)
+                || Intent.ACTION_DATE_CHANGED.equals(action)
+                || Intent.ACTION_TIME_CHANGED.equals(action)
+                || Intent.ACTION_TIMEZONE_CHANGED.equals(action)) {
             refreshAll(context);
         }
+    }
+
+    private static void schedulePeriodicRefresh(Context context) {
+        PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
+                CalendarWidgetRefreshWorker.class,
+                15,
+                TimeUnit.MINUTES
+        ).build();
+        WorkManager.getInstance(context.getApplicationContext()).enqueueUniquePeriodicWork(
+                REFRESH_WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request
+        );
     }
 
     /** Called by NotificationWorker whenever the event cache is fresh. */
@@ -101,6 +147,17 @@ public class CalendarWidget extends AppWidgetProvider {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_root, launchPending);
             views.setPendingIntentTemplate(R.id.widget_event_list, launchPending);
+
+            Intent refreshIntent = new Intent(context, CalendarWidget.class)
+                    .setAction(ACTION_REFRESH)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            PendingIntent refreshPending = PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId,
+                    refreshIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending);
 
             // Date header: day name (small) + date (large)
             Date now = new Date();

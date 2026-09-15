@@ -27,8 +27,11 @@ export function EventEditMobileForm(props: EventEditFormProps) {
     notificationOffsets,
     setNotificationOffsets,
     handleClose,
+    isDeviceTarget,
+    includeDeviceCalendars,
   } = props;
   const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
+  const hideNostrFeatures = isDeviceTarget || eventDetails.source === "device";
 
   return (
     <Box
@@ -44,6 +47,7 @@ export function EventEditMobileForm(props: EventEditFormProps) {
           mode={mode}
           display={display}
           isPrivate={isPrivate}
+          isDeviceTarget={hideNostrFeatures}
           onClose={handleClose}
         />
       </Box>
@@ -106,10 +110,13 @@ export function EventEditMobileForm(props: EventEditFormProps) {
         <CalendarLocationGroup
           selectedCalendarId={selectedCalendarId}
           onCalendarChange={setSelectedCalendarId}
-          calendarsEmpty={mode === "create" && calendars.length === 0}
+          calendarsEmpty={
+            mode === "create" && !hideNostrFeatures && calendars.length === 0
+          }
           location={eventDetails.location}
           onLocationChange={(location) => updateField("location", location)}
-          isDeviceEvent={eventDetails.source === "device"}
+          isDeviceEvent={hideNostrFeatures}
+          includeDeviceCalendars={includeDeviceCalendars}
         />
 
         <GroupCard sx={{ p: 2 }}>

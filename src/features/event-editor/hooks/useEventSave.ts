@@ -15,7 +15,9 @@ import { useTimeBasedEvents } from "../../../stores/events";
 import { useCalendarLists } from "../../../stores/calendarLists";
 import { useDeviceCalendars } from "../../../stores/deviceCalendars";
 import {
+  calendarEventToDeviceFields,
   deviceEventStableId,
+  DEVICE_CALENDAR_ID_PREFIX,
   stripDeviceCalendarPrefix,
 } from "../../../utils/deviceCalendarAdapter";
 import { parseEventRef } from "../../../utils/calendarListTypes";
@@ -97,17 +99,40 @@ export function useEventSave({
       };
       let savedEvent: ICalendarEvent = eventToSave;
 
+      const isDeviceTarget =
+        selectedCalendarId.startsWith(DEVICE_CALENDAR_ID_PREFIX) ||
+        eventToSave.source === "device";
+
       // Device events have no Nostr identity: fully bypass publish machinery,
       // useTimeBasedEvents, and useCalendarLists (no calendar move — the picker
       // is locked read-only for device events). Notification scheduling still
       // runs below, keyed by the stable device id rather than savedEvent.id.
-      if (eventDetails.source === "device") {
-        await useDeviceCalendars.getState().updateDeviceEvent(eventToSave);
+      if (isDeviceTarget) {
+        const deviceState = useDeviceCalendars.getState();
+        let stableId: string;
 
-        const stableId = deviceEventStableId(
-          eventToSave.id,
-          stripDeviceCalendarPrefix(eventToSave.calendarId),
-        );
+        if (mode === "create") {
+          const created = await deviceState.createDeviceEvent(
+            calendarEventToDeviceFields(eventToSave),
+          );
+          if (!created) {
+            const code =
+              useDeviceCalendars.getState().error ??
+              "deviceCalendar.errorWriteFailed";
+            throw new Error(intl.formatMessage({ id: code }));
+          }
+          savedEvent = created;
+          stableId = deviceEventStableId(
+            created.id,
+            stripDeviceCalendarPrefix(created.calendarId),
+          );
+        } else {
+          await deviceState.updateDeviceEvent(eventToSave);
+          stableId = deviceEventStableId(
+            eventToSave.id,
+            stripDeviceCalendarPrefix(eventToSave.calendarId),
+          );
+        }
 
         if (
           areNotificationOffsetsEqual(
@@ -126,7 +151,7 @@ export function useEventSave({
         await cancelEventNotifications(stableId);
         useNotifications.getState().removeNotifications(stableId);
         const notifications = await scheduleEventNotifications({
-          ...eventToSave,
+          ...savedEvent,
           id: stableId,
         });
         useNotifications.getState().setNotifications(stableId, notifications);

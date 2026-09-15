@@ -13,6 +13,8 @@ interface CalendarLocationGroupProps {
   onLocationChange: (location: string[]) => void;
   /** Locks the calendar picker to a static read-only row for device events. */
   isDeviceEvent?: boolean;
+  /** Forwarded to `<CalendarListSelect>` to also surface device calendars. */
+  includeDeviceCalendars?: boolean;
 }
 
 /** Mobile-only: Calendar + tap-to-edit Location, clubbed into one group card (deviations #6/#7). */
@@ -23,6 +25,7 @@ export function CalendarLocationGroup({
   location,
   onLocationChange,
   isDeviceEvent = false,
+  includeDeviceCalendars = false,
 }: CalendarLocationGroupProps) {
   const intl = useIntl();
   const [editingLocation, setEditingLocation] = useState(false);
@@ -67,6 +70,7 @@ export function CalendarLocationGroup({
                 value={selectedCalendarId}
                 onChange={onCalendarChange}
                 variant="row"
+                includeDeviceCalendars={includeDeviceCalendars}
               />
             )}
           </Box>

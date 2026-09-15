@@ -102,6 +102,9 @@ const dictionary: NestedObject = {
       selectCalendar: "Select calendar",
       calendarRequired:
         "You need to create a calendar before you can create an event.",
+      calendarPickerWarning:
+        "Add a Nostr calendar to save events you want to share with others on Nostr.",
+      saveToDevice: "Save to device calendar",
       eventType: "Event Type",
       private: "Private",
       public: "Public",
@@ -337,6 +340,11 @@ const dictionary: NestedObject = {
         "We could not delete this event from your device calendar. Please try again.",
       errorUnknown:
         "Something went wrong while reading your device calendars. Please try again.",
+      picker: {
+        sectionNostr: "Nostr calendars",
+        sectionDevice: "Device calendars",
+        noDeviceCalendars: "No device calendars available",
+      },
     },
     addToCalendar: {
       addToCalendar: "Add to Calendar",
@@ -702,6 +710,9 @@ const dictionary: NestedObject = {
       selectCalendar: "Kalender auswählen",
       calendarRequired:
         "Sie müssen zuerst einen Kalender erstellen, um einen Termin anlegen zu können.",
+      calendarPickerWarning:
+        "Fügen Sie einen Nostr-Kalender hinzu, um Termine zu speichern, die Sie mit anderen auf Nostr teilen möchten.",
+      saveToDevice: "Im Gerätekalender speichern",
       eventType: "Termintyp",
       private: "Privat",
       public: "Öffentlich",
@@ -907,6 +918,11 @@ const dictionary: NestedObject = {
         "Der Termin konnte nicht aus Ihrem Gerätekalender gelöscht werden. Bitte versuchen Sie es erneut.",
       errorUnknown:
         "Beim Lesen Ihrer Gerätekalender ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+      picker: {
+        sectionNostr: "Nostr-Kalender",
+        sectionDevice: "Gerätekalender",
+        noDeviceCalendars: "Keine Gerätekalender verfügbar",
+      },
     },
     addToCalendar: {
       addToCalendar: "Zum Kalender hinzufügen",

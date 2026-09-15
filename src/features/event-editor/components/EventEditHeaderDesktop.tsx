@@ -2,12 +2,14 @@ import { Box, IconButton, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 import LockIcon from "@mui/icons-material/Lock";
+import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import { useIntl } from "react-intl";
 
 interface EventEditHeaderDesktopProps {
   mode: "create" | "edit";
   display: "modal" | "page";
   isPrivate: boolean;
+  isDeviceTarget: boolean;
   onClose: () => void;
 }
 
@@ -15,6 +17,7 @@ export function EventEditHeaderDesktop({
   mode,
   display,
   isPrivate,
+  isDeviceTarget,
   onClose,
 }: EventEditHeaderDesktopProps) {
   const intl = useIntl();
@@ -44,7 +47,22 @@ export function EventEditHeaderDesktop({
         </Typography>
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        {isPrivate && (
+        {isDeviceTarget && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              color: "text.secondary",
+            }}
+          >
+            <PhoneIphoneIcon fontSize="small" />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {intl.formatMessage({ id: "event.saveToDevice" })}
+            </Typography>
+          </Box>
+        )}
+        {!isDeviceTarget && isPrivate && (
           <Box
             sx={{
               display: "flex",

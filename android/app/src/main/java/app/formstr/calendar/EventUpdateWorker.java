@@ -14,8 +14,13 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import androidx.work.Constraints;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+import androidx.work.WorkManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -47,9 +52,24 @@ public class EventUpdateWorker extends Worker {
     private static final String CHANNEL_ID = "event_updates";
     private static final long RELAY_TIMEOUT_SECONDS = 15;
     private static final int MAX_RELAYS = 3;
+    private static final String IMMEDIATE_WORK_NAME = "event_update_manual_refresh";
 
     public EventUpdateWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
+    }
+
+    static void enqueueImmediate(Context context) {
+        Constraints constraints = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(EventUpdateWorker.class)
+                .setConstraints(constraints)
+                .build();
+        WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(
+                IMMEDIATE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                request
+        );
     }
 
     @NonNull

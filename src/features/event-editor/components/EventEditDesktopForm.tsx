@@ -28,8 +28,11 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
     notificationOffsets,
     setNotificationOffsets,
     handleClose,
+    isDeviceTarget,
+    includeDeviceCalendars,
   } = props;
   const attachedForms: IFormAttachment[] = eventDetails.forms ?? [];
+  const hideNostrFeatures = isDeviceTarget || eventDetails.source === "device";
 
   return (
     <Box
@@ -48,6 +51,7 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
           mode={mode}
           display={display}
           isPrivate={isPrivate}
+          isDeviceTarget={hideNostrFeatures}
           onClose={handleClose}
         />
       </Box>
@@ -108,7 +112,7 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         supportsBusyListPublish={props.supportsBusyListPublish}
         onPublishBusyChange={props.onPublishBusyChange}
         calendarSlot={
-          eventDetails.source === "device" ? (
+          hideNostrFeatures ? (
             <DeviceCalendarStaticRow calendarId={selectedCalendarId} />
           ) : (
             <CalendarListSelect
@@ -116,11 +120,12 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
               onChange={setSelectedCalendarId}
               variant="pill"
               label={intl.formatMessage({ id: "event.calendar" })}
+              includeDeviceCalendars={includeDeviceCalendars}
             />
           )
         }
         calendarHelper={
-          mode === "create" && calendars.length === 0 ? (
+          mode === "create" && !hideNostrFeatures && calendars.length === 0 ? (
             <Typography variant="caption" color="warning.main">
               {intl.formatMessage({ id: "event.calendarRequired" })}
             </Typography>
@@ -128,16 +133,20 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         }
       />
 
-      <Box sx={{ mb: 3 }}>
-        <SectionLabel sx={sectionLabelSx}>
-          {intl.formatMessage({ id: "event.people" })}
-        </SectionLabel>
-        <EventParticipants
-          participants={eventDetails.participants}
-          authorPubkey={eventDetails.user}
-          onChange={(participants) => updateField("participants", participants)}
-        />
-      </Box>
+      {!hideNostrFeatures && (
+        <Box sx={{ mb: 3 }}>
+          <SectionLabel sx={sectionLabelSx}>
+            {intl.formatMessage({ id: "event.people" })}
+          </SectionLabel>
+          <EventParticipants
+            participants={eventDetails.participants}
+            authorPubkey={eventDetails.user}
+            onChange={(participants) =>
+              updateField("participants", participants)
+            }
+          />
+        </Box>
+      )}
 
       <Box sx={{ mb: 3 }}>
         <SectionLabel sx={sectionLabelSx}>
@@ -157,7 +166,7 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         />
       </Box>
 
-      {isPrivate && eventDetails.source !== "device" && (
+      {isPrivate && !hideNostrFeatures && (
         <EventAttachmentsSection
           variant="desktop"
           attachedForms={attachedForms}

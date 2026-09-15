@@ -11,6 +11,8 @@ public class NotificationSchedulerPlugin extends Plugin {
 
     @PluginMethod
     public void reconcile(PluginCall call) {
+        // Event/cache writes must refresh widgets even when notification permission is denied.
+        CalendarWidget.refreshAll(getContext());
         NotificationWorker.enqueueImmediate(getContext());
         call.resolve();
     }
