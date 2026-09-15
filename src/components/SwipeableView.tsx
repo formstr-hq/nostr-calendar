@@ -64,7 +64,19 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
   // cells, whereas the week view uses plain elements. Keep the drag handler
   // for the normal path and provide an equivalent touch fallback for controls
   // nested inside a view.
+  // Portal-rendered overlays (MUI dialogs, bottom sheets) propagate touch
+  // events through the React tree, so capture handlers still see them even
+  // though the overlay visually covers this container. A gesture that did
+  // not originate inside this container's DOM belongs to the overlay and
+  // must not page the calendar.
+  const isOwnTouch = (event: React.TouchEvent<HTMLDivElement>) =>
+    event.currentTarget.contains(event.target as Node);
+
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isOwnTouch(event)) {
+      touchStartRef.current = null;
+      return;
+    }
     const touch = event.touches[0];
     touchStartRef.current = touch
       ? { x: touch.clientX, y: touch.clientY }
@@ -72,6 +84,10 @@ export function SwipeableView({ events, View }: SwipeableViewProps) {
   };
 
   const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isOwnTouch(event)) {
+      touchStartRef.current = null;
+      return;
+    }
     const start = touchStartRef.current;
     touchStartRef.current = null;
     const touch = event.changedTouches[0];
