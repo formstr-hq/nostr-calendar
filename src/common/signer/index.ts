@@ -4,6 +4,7 @@ import {
   hexToBytes,
   type ActiveSigner,
   type AndroidSignerAppInfo,
+  type Nip55WebSupport,
 } from "@formstr/signer";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
 import { nip19, SimplePool } from "nostr-tools";
@@ -92,9 +93,10 @@ class SignerManager {
               this.refreshUserProfile(active.pubkey);
             }
             break;
-          case "android": {
-            // unlock() reconstructs AndroidSigner from stored pubkey/npub/packageName
-            // without calling plugin.getPublicKey(), so the signer app is not opened.
+          case "android":
+          case "nip55-web": {
+            // unlock() reconstructs AndroidSigner (or the browser NIP-55
+            // signer) from the stored pubkey without opening the signer app.
             const unlocked = await packageSigner.unlock();
             if (unlocked) this.refreshUserProfile(active.pubkey);
             break;
@@ -342,6 +344,30 @@ class SignerManager {
 
   async listNip55SignerApps(): Promise<AndroidSignerAppInfo[]> {
     return packageSigner.listAndroidSignerApps();
+  }
+
+  /**
+   * Browser NIP-55: pair with an Android signer app from the browser, with
+   * no Capacitor bridge. Only works where {@link supportsNip55Web} is true.
+   */
+  async loginWithNip55Web(): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithNip55Web();
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  /** Whether the browser NIP-55 flow can run here (Android browser, not native). */
+  supportsNip55Web(): boolean {
+    return packageSigner.supportsNip55Web();
+  }
+
+  /**
+   * Whether to offer the browser NIP-55 row, plus the warning Firefox for
+   * Android needs (it cannot read the clipboard).
+   */
+  nip55WebSupport(): Nip55WebSupport {
+    return packageSigner.nip55WebSupport();
   }
 
   async loginWithNsec(nsec: string): Promise<void> {
