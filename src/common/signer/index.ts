@@ -92,9 +92,10 @@ class SignerManager {
               this.refreshUserProfile(active.pubkey);
             }
             break;
-          case "android": {
-            // unlock() reconstructs AndroidSigner from stored pubkey/npub/packageName
-            // without calling plugin.getPublicKey(), so the signer app is not opened.
+          case "android":
+          case "nip55-web": {
+            // unlock() reconstructs AndroidSigner (or the browser NIP-55
+            // signer) from the stored pubkey without opening the signer app.
             const unlocked = await packageSigner.unlock();
             if (unlocked) this.refreshUserProfile(active.pubkey);
             break;
@@ -342,6 +343,22 @@ class SignerManager {
 
   async listNip55SignerApps(): Promise<AndroidSignerAppInfo[]> {
     return packageSigner.listAndroidSignerApps();
+  }
+
+  /**
+   * Browser NIP-55: pair with an Android signer app from the browser, with
+   * no Capacitor bridge. Only works where {@link supportsNip55Web} is true.
+   */
+  async loginWithNip55Web(): Promise<void> {
+    this.localSigner = null;
+    const account = await packageSigner.loginWithNip55Web();
+    await this.fetchAndCacheUser(account.pubkey);
+    this.notify();
+  }
+
+  /** Whether the browser NIP-55 flow can run here (Android browser, not native). */
+  supportsNip55Web(): boolean {
+    return packageSigner.supportsNip55Web();
   }
 
   async loginWithNsec(nsec: string): Promise<void> {
