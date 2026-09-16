@@ -4,6 +4,7 @@ import {
   hexToBytes,
   type ActiveSigner,
   type AndroidSignerAppInfo,
+  type Nip55WebSupport,
 } from "@formstr/signer";
 import { NostrSignerPlugin } from "nostr-signer-capacitor-plugin";
 import { nip19, SimplePool } from "nostr-tools";
@@ -359,6 +360,14 @@ class SignerManager {
   /** Whether the browser NIP-55 flow can run here (Android browser, not native). */
   supportsNip55Web(): boolean {
     return packageSigner.supportsNip55Web();
+  }
+
+  /**
+   * Whether to offer the browser NIP-55 row, plus the warning Firefox for
+   * Android needs (it cannot read the clipboard).
+   */
+  nip55WebSupport(): Nip55WebSupport {
+    return packageSigner.nip55WebSupport();
   }
 
   async loginWithNsec(nsec: string): Promise<void> {

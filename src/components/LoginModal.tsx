@@ -47,8 +47,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const [nip55WebLoading, setNip55WebLoading] = useState(false);
   // Browser NIP-55 is a capability check (Android browser + clipboard), so it
   // is safe to read synchronously here — unlike the native app list, which
-  // needs a plugin round-trip.
-  const canUseNip55Web = !isNative && signerManager.supportsNip55Web();
+  // needs a plugin round-trip. `visible` gates the row; `warning` (Firefox
+  // for Android, which cannot read the clipboard) does not disable it.
+  const nip55Web = isNative
+    ? ({ visible: false } as const)
+    : signerManager.nip55WebSupport();
 
   useEffect(() => {
     if (!open) {
@@ -214,18 +217,27 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
                 disabled={nip07Loading}
               />
             )}
-            {canUseNip55Web && (
-              <AuthOption
-                icon={<PhonelinkLockOutlinedIcon />}
-                title={intl.formatMessage({ id: "login.signInWithSignerApp" })}
-                description={intl.formatMessage({
-                  id: "login.nip55WebDescription",
-                })}
-                onClick={() => void loginNip55Web()}
-                loading={nip55WebLoading}
-                disabled={nip55WebLoading}
-                testId="login-btn-nip55-web"
-              />
+            {nip55Web.visible && (
+              <>
+                <AuthOption
+                  icon={<PhonelinkLockOutlinedIcon />}
+                  title={intl.formatMessage({
+                    id: "login.signInWithSignerApp",
+                  })}
+                  description={intl.formatMessage({
+                    id: "login.nip55WebDescription",
+                  })}
+                  onClick={() => void loginNip55Web()}
+                  loading={nip55WebLoading}
+                  disabled={nip55WebLoading}
+                  testId="login-btn-nip55-web"
+                />
+                {nip55Web.warning && (
+                  <Alert severity="warning" sx={{ mx: 2, mb: 1 }}>
+                    {nip55Web.warning}
+                  </Alert>
+                )}
+              </>
             )}
             {isAndroidNative() &&
               nip55Apps.map((app) => (
