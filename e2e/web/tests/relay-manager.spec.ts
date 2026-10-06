@@ -31,18 +31,36 @@ async function openRelayManager(page: import("@playwright/test").Page) {
   return panel;
 }
 
+test("header relay status opens the relay manager dialog", async ({
+  authedPage: page,
+}) => {
+  await page.getByRole("button", { name: "Manage Relays" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: /Manage Relays|Relays & sync/i }),
+  ).toBeVisible();
+  await expect(dialog.getByTestId("relay-row").first()).toBeVisible();
+  await expect(page).not.toHaveURL(/\/settings\/relays$/);
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).not.toBeVisible();
+});
+
 test("user adds and removes a relay in the list", async ({
   authedPage: page,
 }) => {
   const panel = await openRelayManager(page);
   const url = "wss://relay.example-e2e.com";
 
+  await panel.getByRole("button", { name: "Add New Relay" }).click();
   await panel.getByPlaceholder("wss://relay.example.com").fill(url);
   await panel.getByRole("button", { name: "Add", exact: true }).click();
   const entry = panel.getByTestId("relay-row").filter({ hasText: url });
   await expect(entry).toBeVisible();
 
   // Duplicates are rejected.
+  await panel.getByRole("button", { name: "Add New Relay" }).click();
   await panel.getByPlaceholder("wss://relay.example.com").fill(url);
   await panel.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("Relay already in list")).toBeVisible();
@@ -55,6 +73,7 @@ test("user adds and removes a relay in the list", async ({
 test("relay URLs must be websocket URLs", async ({ authedPage: page }) => {
   const panel = await openRelayManager(page);
 
+  await panel.getByRole("button", { name: "Add New Relay" }).click();
   await panel
     .getByPlaceholder("wss://relay.example.com")
     .fill("https://not-a-relay.com");
@@ -140,6 +159,7 @@ test("publishes events to a newly added relay", async ({ browser }) => {
         .waitFor({ state: "visible", timeout: 15_000 });
 
       const panel = await openRelayManager(page);
+      await panel.getByRole("button", { name: "Add New Relay" }).click();
       await panel.getByPlaceholder("wss://relay.example.com").fill(relayUrl);
       await panel.getByRole("button", { name: "Add", exact: true }).click();
       await expect(
@@ -195,3 +215,76 @@ test("publishes events to a newly added relay", async ({ browser }) => {
     await relay.stop();
   }
 });
+
+test("tests individual relay connection and updates status indicator", async ({
+  authedPage: page,
+}) => {
+  const panel = await openRelayManager(page);
+  const row = panel.getByTestId("relay-row").first();
+  await expect(row).toBeVisible();
+
+  // Each row has a status indicator dot
+  const indicator = row.getByTestId("relay-status-indicator");
+  await expect(indicator).toBeVisible();
+
+  // Click individual test button
+  const testButton = row.getByTestId("test-relay-button");
+  await expect(testButton).toBeVisible();
+  await testButton.click();
+
+  // Expect indicator to show status (ok/slow/error)
+  await expect(indicator).toHaveAttribute("data-status", /ok|slow|error|testing/);
+});
+
+test("test all connections button triggers tests for all relays", async ({
+  authedPage: page,
+}) => {
+  const panel = await openRelayManager(page);
+  const testAllBtn = panel.getByTestId("test-all-connections-button");
+  await expect(testAllBtn).toBeVisible();
+  await testAllBtn.click();
+
+  const rows = panel.getByTestId("relay-row");
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
+
+  // All rows should have status indicators
+  for (let i = 0; i < count; i++) {
+    const row = rows.nth(i);
+    await expect(row.getByTestId("relay-status-indicator")).toBeVisible();
+  }
+});
+
+test("user edits a relay URL in the list", async ({ authedPage: page }) => {
+  const panel = await openRelayManager(page);
+  const url = "wss://relay.edit-test.com";
+
+  await panel.getByRole("button", { name: "Add New Relay" }).click();
+  await panel.getByPlaceholder("wss://relay.example.com").fill(url);
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  const entry = panel.locator(`[data-testid="relay-row"][data-relay="${url}"]`);
+  await expect(entry).toBeVisible();
+
+  // Click edit button
+  await entry.getByTestId("edit-relay-button").click();
+  const editInput = entry.getByRole("textbox");
+  await expect(editInput).toHaveValue(url);
+
+  const updatedUrl = "wss://relay.edited-target.com";
+  await editInput.fill(updatedUrl);
+  await entry.getByRole("button", { name: "save relay edit" }).click();
+
+  // Old URL should no longer be in the list, new URL should be present
+  await expect(
+    panel.locator(`[data-testid="relay-row"][data-relay="${url}"]`),
+  ).not.toBeVisible();
+  const updatedEntry = panel.locator(
+    `[data-testid="relay-row"][data-relay="${updatedUrl}"]`,
+  );
+  await expect(updatedEntry).toBeVisible();
+
+  // Clean up
+  await updatedEntry.getByRole("button", { name: "remove relay" }).click();
+  await expect(updatedEntry).not.toBeVisible();
+});
+

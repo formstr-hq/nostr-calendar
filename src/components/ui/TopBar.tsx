@@ -33,6 +33,7 @@ interface TopBarProps {
   onToday?: () => void;
   unreadCount: number;
   onBellClick: () => void;
+  onRelayStatusClick: () => void;
   onOpenCalendars?: () => void;
   relays: RelayStatusEntry[];
   avatarSlot: ReactNode;
@@ -51,6 +52,7 @@ export function TopBar({
   onToday,
   unreadCount,
   onBellClick,
+  onRelayStatusClick,
   onOpenCalendars,
   relays,
   avatarSlot,
@@ -185,7 +187,9 @@ export function TopBar({
           </IconButton>
         )}
 
-        {!isMobile && <RelayStatusDots relays={relays} />}
+        {!isMobile && (
+          <RelayStatusDots relays={relays} onClick={onRelayStatusClick} />
+        )}
 
         {avatarSlot}
       </Box>
