@@ -97,21 +97,49 @@ END:VCALENDAR`;
   URL.revokeObjectURL(url);
 };
 
-export const isMobile = window.innerWidth <= 800 && window.innerHeight <= 1000;
+export const isMobile =
+  typeof window !== "undefined" &&
+  window.innerWidth <= 800 &&
+  window.innerHeight <= 1000;
 
 function unfoldICSLines(raw: string): string {
-  return raw.replace(/\r\n[ \t]/g, "").replace(/\r/g, "");
+  return raw
+    .replace(/\r\n[ \t]/g, "")
+    .replace(/\n[ \t]/g, "")
+    .replace(/\r/g, "");
+}
+
+function parseICSDuration(value: string): number {
+  const match = value.match(
+    /P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/i,
+  );
+  if (!match) return 0;
+  const weeks = parseInt(match[1] || "0", 10);
+  const days = parseInt(match[2] || "0", 10);
+  const hours = parseInt(match[3] || "0", 10);
+  const minutes = parseInt(match[4] || "0", 10);
+  const seconds = parseInt(match[5] || "0", 10);
+  return (
+    weeks * 7 * 86400000 +
+    days * 86400000 +
+    hours * 3600000 +
+    minutes * 60000 +
+    seconds * 1000
+  );
 }
 
 function parseICSDate(value: string): number {
   // Handle formats: 20250101T120000Z, 20250101T120000, 20250101
   const clean = value.replace(/[^0-9TZ]/g, "");
-  const year = parseInt(clean.substring(0, 4));
-  const month = parseInt(clean.substring(4, 6)) - 1;
-  const day = parseInt(clean.substring(6, 8));
-  const hour = clean.length >= 13 ? parseInt(clean.substring(9, 11)) : 0;
-  const minute = clean.length >= 13 ? parseInt(clean.substring(11, 13)) : 0;
-  const second = clean.length >= 15 ? parseInt(clean.substring(13, 15)) : 0;
+  if (clean.length < 8) return 0;
+  const year = parseInt(clean.substring(0, 4), 10);
+  const month = parseInt(clean.substring(4, 6), 10) - 1;
+  const day = parseInt(clean.substring(6, 8), 10);
+  const hour = clean.length >= 11 ? parseInt(clean.substring(9, 11), 10) : 0;
+  const minute = clean.length >= 13 ? parseInt(clean.substring(11, 13), 10) : 0;
+  const second = clean.length >= 15 ? parseInt(clean.substring(13, 15), 10) : 0;
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return 0;
 
   if (clean.endsWith("Z")) {
     return Date.UTC(year, month, day, hour, minute, second);
@@ -119,29 +147,27 @@ function parseICSDate(value: string): number {
   return new Date(year, month, day, hour, minute, second).getTime();
 }
 
-export function parseICS(icsContent: string): ICalendarEvent | null {
-  const text = unfoldICSLines(icsContent);
-  const lines = text.split("\n");
+interface ParsedVEventResult {
+  event: Omit<ICalendarEvent, "id">;
+  uid?: string;
+  recurrenceId?: string;
+}
 
-  let inEvent = false;
+function parseVEvent(eventLines: string[]): ParsedVEventResult | null {
   let title = "";
   let description = "";
   let begin = 0;
   let end = 0;
+  let durationMs = 0;
   let location: string[] = [];
   let rrule: string | null = null;
   let image: string | undefined;
+  let uid = "";
+  let recurrenceId = "";
+  let isAllDay = false;
 
-  for (const line of lines) {
+  for (const line of eventLines) {
     const trimmed = line.trim();
-    if (trimmed === "BEGIN:VEVENT") {
-      inEvent = true;
-      continue;
-    }
-    if (trimmed === "END:VEVENT") {
-      break;
-    }
-    if (!inEvent) continue;
 
     // Split on first colon, but handle properties with parameters (e.g. DTSTART;TZID=...)
     const colonIdx = trimmed.indexOf(":");
@@ -152,22 +178,43 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
     const propName = key.split(";")[0].toUpperCase();
 
     switch (propName) {
+      case "STATUS":
+        if (value.trim().toUpperCase() === "CANCELLED") return null;
+        break;
+      case "UID":
+        uid = value.trim();
+        break;
+      case "RECURRENCE-ID":
+        recurrenceId = value.trim();
+        break;
       case "SUMMARY":
-        title = value;
+        title = value
+          .replace(/\\,/g, ",")
+          .replace(/\\;/g, ";")
+          .replace(/\\\\/g, "\\");
         break;
       case "DESCRIPTION":
         description = value.replace(/\\n/g, "\n").replace(/\\,/g, ",");
         break;
       case "DTSTART":
+        if (
+          value.replace(/[^0-9TZ]/g, "").length === 8 ||
+          key.toUpperCase().includes("VALUE=DATE")
+        ) {
+          isAllDay = true;
+        }
         begin = parseICSDate(value);
         break;
       case "DTEND":
         end = parseICSDate(value);
         break;
+      case "DURATION":
+        durationMs = parseICSDuration(value);
+        break;
       case "LOCATION":
         location = value
           .split(",")
-          .map((l) => l.trim())
+          .map((l) => l.replace(/\\,/g, ",").trim())
           .filter(Boolean);
         break;
       case "RRULE":
@@ -180,32 +227,111 @@ export function parseICS(icsContent: string): ICalendarEvent | null {
   }
 
   if (!begin) return null;
-  if (!end) end = begin + 60 * 60 * 1000;
+  if (!end) {
+    if (durationMs > 0) end = begin + durationMs;
+    else if (isAllDay) end = begin + 24 * 60 * 60 * 1000;
+    else end = begin + 60 * 60 * 1000;
+  }
+  if (end <= begin) {
+    end = begin + (isAllDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000);
+  }
 
-  const event = {
-    begin,
-    end,
-    id: "",
-    eventId: "",
-    kind: 0,
-    calendarId: "",
-    title: title || "Imported Event",
-    createdAt: Date.now(),
-    description,
-    location,
-    categories: [],
-    reference: [],
-    geoHash: [],
-    participants: [],
-    rsvpResponses: [],
-    website: "",
-    user: "",
-    isPrivateEvent: true,
-    image,
-    repeat: { rrule },
+  return {
+    uid: uid || undefined,
+    recurrenceId: recurrenceId || undefined,
+    event: {
+      begin,
+      end,
+      allDay: isAllDay,
+      eventId: "",
+      kind: 0,
+      calendarId: "",
+      title: title || "Imported Event",
+      createdAt: Date.now(),
+      description,
+      location,
+      categories: [],
+      reference: [],
+      geoHash: [],
+      participants: [],
+      rsvpResponses: [],
+      website: "",
+      user: "",
+      isPrivateEvent: true,
+      image,
+      repeat: { rrule },
+    },
   };
-  const dTagRoot = `${JSON.stringify(event)}-${Date.now()}`;
+}
+
+export function parseICS(icsContent: string): ICalendarEvent | null {
+  const text = unfoldICSLines(icsContent);
+  const lines = text.split("\n");
+
+  // Collect lines for the first VEVENT block
+  let inEvent = false;
+  const eventLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "BEGIN:VEVENT") {
+      inEvent = true;
+      continue;
+    }
+    if (trimmed === "END:VEVENT") break;
+    if (inEvent) eventLines.push(line);
+  }
+
+  const parsed = parseVEvent(eventLines);
+  if (!parsed) return null;
+
+  const event: ICalendarEvent = { ...parsed.event, id: "" };
+  const dTagRoot = parsed.uid
+    ? `ics-${parsed.uid}`
+    : `${JSON.stringify(event)}-${Date.now()}`;
   const dTag = bytesToHex(sha256(utf8ToBytes(dTagRoot))).substring(0, 30);
   event.id = dTag;
   return event;
+}
+
+export function parseICSMultiple(icsContent: string): ICalendarEvent[] {
+  const text = unfoldICSLines(icsContent);
+  const lines = text.split("\n");
+
+  // Collect line ranges for every VEVENT block
+  const veventBlocks: string[][] = [];
+  let currentBlock: string[] | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "BEGIN:VEVENT") {
+      currentBlock = [];
+      continue;
+    }
+    if (trimmed === "END:VEVENT") {
+      if (currentBlock) veventBlocks.push(currentBlock);
+      currentBlock = null;
+      continue;
+    }
+    if (currentBlock) currentBlock.push(line);
+  }
+
+  const now = Date.now();
+  const events: ICalendarEvent[] = [];
+
+  for (let i = 0; i < veventBlocks.length; i++) {
+    const parsed = parseVEvent(veventBlocks[i]);
+    if (!parsed) continue;
+
+    const event: ICalendarEvent = { ...parsed.event, id: "" };
+    const seed = parsed.uid
+      ? parsed.recurrenceId
+        ? `ics-${parsed.uid}-${parsed.recurrenceId}`
+        : `ics-${parsed.uid}`
+      : `${JSON.stringify(event)}-${now}-${i}`;
+    const dTag = bytesToHex(sha256(utf8ToBytes(seed))).substring(0, 30);
+    event.id = dTag;
+    events.push(event);
+  }
+
+  return events;
 }

@@ -60,9 +60,31 @@ export async function publishSignedEvent(
   callbacks?: {
     onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
+    timeoutMs?: number;
   },
 ): Promise<PublishResult> {
-  const result = await dataLayer.publishEvent(signed);
+  const timeoutMs = callbacks?.timeoutMs;
+  const publishPromise = dataLayer.publishEvent(signed);
+  let result: PublishResult;
+
+  if (timeoutMs && timeoutMs > 0) {
+    const timeoutPromise = new Promise<PublishResult>((resolve) => {
+      setTimeout(
+        () =>
+          resolve({
+            ok: false,
+            accepted: 0,
+            total: 0,
+            relayResults: [],
+          }),
+        timeoutMs,
+      );
+    });
+    result = await Promise.race([publishPromise, timeoutPromise]);
+  } else {
+    result = await publishPromise;
+  }
+
   for (const outcome of result.relayResults) {
     const ok = outcome.status === "accepted";
     if (ok) callbacks?.onAcceptedRelays?.(outcome.relay);

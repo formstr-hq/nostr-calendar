@@ -224,6 +224,7 @@ export const useTimeBasedEvents = create<{
     daysAfter?: number;
   }) => void;
   addEvent: (event: ICalendarEvent) => void;
+  addEvents: (events: ICalendarEvent[]) => void;
   updateEvent: (event: ICalendarEvent) => void;
   removeEvent: (id: string) => void;
   resetPrivateEvents: () => void;
@@ -248,6 +249,30 @@ export const useTimeBasedEvents = create<{
     });
     if (added) recordParticipantHistory([newEvent]);
     void syncEventNotifications(newEvent);
+  },
+  addEvents: (newEvents) => {
+    if (newEvents.length === 0) return;
+    const addedEvents: ICalendarEvent[] = [];
+    set(({ events }) => {
+      let store = normalize(events);
+      for (const newEvent of newEvents) {
+        if (!store.allKeys.includes(newEvent.id)) {
+          store = appendOne(store, newEvent.id, newEvent);
+          addedEvents.push(newEvent);
+        } else {
+          store = removeOne(store, newEvent.id);
+          store = appendOne(store, newEvent.id, newEvent);
+          addedEvents.push(newEvent);
+        }
+      }
+      const updatedEvents = denormalize(store);
+      saveEventsToStorage(updatedEvents);
+      return { eventById: store.byKey, events: updatedEvents };
+    });
+    if (addedEvents.length > 0) recordParticipantHistory(addedEvents);
+    for (const evt of addedEvents) {
+      void syncEventNotifications(evt);
+    }
   },
   updateEvent: (updatedEvent) => {
     set(({ events }) => {

@@ -71,3 +71,54 @@ test("user downloads an event as .ics", async ({ authedPage: page }) => {
   expect(content).toContain("BEGIN:VEVENT");
   expect(content).toContain(title);
 });
+
+test("user imports a .zip file containing .ics events into the calendar", async ({
+  authedPage: page,
+}) => {
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const eventTitle = uniqueName("Zip Meeting");
+  zip.file(
+    "calendar.ics",
+    `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+BEGIN:VEVENT
+UID:${uniqueName("zip-uid")}@google.com
+DTSTART:20270510T100000Z
+DTEND:20270510T110000Z
+SUMMARY:${eventTitle}
+DESCRIPTION:Bulk imported from ZIP archive
+LOCATION:Room 404
+END:VEVENT
+END:VCALENDAR`,
+  );
+
+  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  const tmpZipPath = path.resolve(
+    import.meta.dirname,
+    `../assets/${uniqueName("test-import")}.zip`,
+  );
+  await fs.writeFile(tmpZipPath, zipBuffer);
+
+  try {
+    await page.getByRole("button", { name: "Import .ics file" }).click();
+    await page.locator('input[type="file"]').setInputFiles(tmpZipPath);
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Import Events")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(dialog.getByText(eventTitle)).toBeVisible();
+
+    await dialog.getByRole("button", { name: /Import 1 event/i }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 25_000 });
+
+    await page.goto("/d/2027/5/10");
+    await expect(page.getByText(eventTitle).first()).toBeVisible({
+      timeout: 20_000,
+    });
+  } finally {
+    await fs.unlink(tmpZipPath).catch(() => {});
+  }
+});

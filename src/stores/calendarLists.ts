@@ -24,6 +24,7 @@ import {
   fetchCalendarLists,
   publishCalendarList,
   addEventToCalendarList as addEventToCalList,
+  addEventsToCalendarList as addEventsToCalList,
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
   createCalendar,
@@ -92,6 +93,11 @@ interface CalendarListsState {
   addEventToCalendar: (
     calendarId: string,
     eventRef: string[],
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<void>;
+  addEventsToCalendar: (
+    calendarId: string,
+    eventRefs: string[][],
     callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
   ) => Promise<void>;
   removeEventFromCalendar: (
@@ -339,6 +345,26 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
     }
 
     const updated = await addEventToCalList(calendar, eventRef, callbacks);
+
+    set((state) => {
+      const calendars = state.calendars.map((c) =>
+        c.id === calendarId ? updated : c,
+      );
+      saveCalendarsToStorage(calendars);
+      return { calendars };
+    });
+  },
+
+  /**
+   * Adds multiple event references to a specific calendar and republishes once.
+   */
+  addEventsToCalendar: async (calendarId, eventRefs, callbacks) => {
+    const calendar = get().calendars.find((c) => c.id === calendarId);
+    if (!calendar) {
+      throw new Error(`Calendar not found: ${calendarId}`);
+    }
+
+    const updated = await addEventsToCalList(calendar, eventRefs, callbacks);
 
     set((state) => {
       const calendars = state.calendars.map((c) =>

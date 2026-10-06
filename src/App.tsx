@@ -24,6 +24,7 @@ import {
   BG_KEY_LAST_INVITATION_FETCH_TIME,
 } from "./utils/constants";
 import { ICSListener } from "./components/ICSListener";
+import { BulkImportDialog } from "./features/bulk-import";
 import { ICalendarEvent } from "./utils/types";
 import { useCalendarLists } from "./stores/calendarLists";
 import { notifyAppReady } from "./plugins/appReady";
@@ -240,6 +241,7 @@ function Application() {
         onClose={() => setImportedEvent(null)}
         onImportEvent={setImportedEvent}
       />
+      <BulkImportDialog />
       <LoginModal
         open={showLoginModal}
         onClose={() => updateLoginModal(false)}

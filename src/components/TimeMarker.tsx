@@ -24,14 +24,14 @@ export const TimeMarker = ({
 
   useEffect(() => {
     if (intervalId.current) {
-      clearInterval(intervalId.current);
+      window.clearInterval(intervalId.current);
     }
-    intervalId.current = setInterval(() => {
+    intervalId.current = window.setInterval(() => {
       updateCurrentTimeInHour(getCurrentTimeInHour);
     }, 1000);
     return () => {
       if (intervalId.current) {
-        clearInterval(intervalId.current);
+        window.clearInterval(intervalId.current);
       }
     };
   }, []);

@@ -51,6 +51,7 @@
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.1",
     "framer-motion": "^12.29.2",
+    "jszip": "^3.10.2",
     "nostr-signer-capacitor-plugin": "^0.0.5",
     "nostr-tools": "^2.15.0",
     "qrcode.react": "^4.2.0",

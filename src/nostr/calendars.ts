@@ -238,6 +238,30 @@ export async function addEventToCalendarList(
 }
 
 /**
+ * Adds multiple event references to a calendar list and republishes the updated list once.
+ */
+export async function addEventsToCalendarList(
+  calendarList: ICalendarList,
+  newEventRefs: string[][],
+  callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+): Promise<ICalendarList> {
+  const existingCoords = new Set(calendarList.eventRefs.map((ref) => ref[0]));
+  const toAdd = newEventRefs.filter((ref) => !existingCoords.has(ref[0]));
+
+  if (toAdd.length === 0) {
+    return calendarList;
+  }
+
+  const updated: ICalendarList = {
+    ...calendarList,
+    eventRefs: [...calendarList.eventRefs, ...toAdd],
+  };
+
+  const publishedEvent = await publishCalendarList(updated, callbacks);
+  return { ...updated, createdAt: publishedEvent.created_at };
+}
+
+/**
  * Removes an event reference from a calendar list and republishes the updated list.
  */
 export async function removeEventFromCalendarList(

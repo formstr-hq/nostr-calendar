@@ -616,6 +616,25 @@ const dictionary: NestedObject = {
       detailsConfigured: "Details added",
       detailsEmpty: "Add details",
     },
+    bulkImport: {
+      title: "Import Events",
+      importing: "Importing events…",
+      selectAll: "Select all",
+      deselectAll: "Deselect all",
+      importSelected:
+        "Import {count} {count, plural, one {event} other {events}}",
+      importSuccess:
+        "{count} {count, plural, one {event} other {events}} imported successfully",
+      importError: "Failed to import some events",
+      noEventsFound: "No events found in the uploaded file",
+      parsingFile: "Reading file…",
+      invalidFile:
+        "Could not read the file. Please upload a .ics or .zip file.",
+      eventsFound: "{count} {count, plural, one {event} other {events}} found",
+    },
+    ics: {
+      importTooltip: "Import .ics or .zip file",
+    },
   },
   "de-DE": {
     navigation: {
@@ -1168,6 +1187,26 @@ const dictionary: NestedObject = {
       daysCount: "{count} Tag(e)",
       detailsConfigured: "Details hinzugefügt",
       detailsEmpty: "Details hinzufügen",
+    },
+    bulkImport: {
+      title: "Termine importieren",
+      importing: "Termine werden importiert…",
+      selectAll: "Alle auswählen",
+      deselectAll: "Alle abwählen",
+      importSelected:
+        "{count} {count, plural, one {Termin} other {Termine}} importieren",
+      importSuccess:
+        "{count} {count, plural, one {Termin} other {Termine}} erfolgreich importiert",
+      importError: "Einige Termine konnten nicht importiert werden",
+      noEventsFound: "Keine Termine in der hochgeladenen Datei gefunden",
+      parsingFile: "Datei wird gelesen…",
+      invalidFile:
+        "Die Datei konnte nicht gelesen werden. Bitte laden Sie eine .ics- oder .zip-Datei hoch.",
+      eventsFound:
+        "{count} {count, plural, one {Termin} other {Termine}} gefunden",
+    },
+    ics: {
+      importTooltip: ".ics- oder .zip-Datei importieren",
     },
   },
 };
