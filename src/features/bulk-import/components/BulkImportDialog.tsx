@@ -32,14 +32,23 @@ export function BulkImportDialog() {
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [wasCancelled, setWasCancelled] = useState(false);
 
-  const { isImporting, progress, error, importEvents } = useBulkImportSave();
+  const {
+    isImporting,
+    isCancelling,
+    progress,
+    error,
+    importEvents,
+    cancelImport,
+  } = useBulkImportSave();
 
   // Initialize or reset selections when events change
   useEffect(() => {
     if (events.length > 0) {
       setSelectedIds(new Set(events.map((e) => e.id)));
       setSuccessMessage(null);
+      setWasCancelled(false);
     }
   }, [events]);
 
@@ -85,17 +94,20 @@ export function BulkImportDialog() {
   const handleImport = async () => {
     if (!selectedCalendarId || selectedEvents.length === 0) return;
 
-    await importEvents(selectedEvents, selectedCalendarId, () => {
-      setSuccessMessage(
-        intl.formatMessage(
-          { id: "bulkImport.importSuccess" },
-          { count: selectedEvents.length },
-        ),
-      );
-      setTimeout(() => {
-        close();
-      }, 1500);
-    });
+    await importEvents(
+      selectedEvents,
+      selectedCalendarId,
+      () => {
+        setSuccessMessage(
+          intl.formatMessage(
+            { id: "bulkImport.importSuccess" },
+            { count: selectedEvents.length },
+          ),
+        );
+        setWasCancelled(false);
+      },
+      () => setWasCancelled(true),
+    );
   };
 
   const handleClose = () => {
@@ -155,6 +167,11 @@ export function BulkImportDialog() {
       >
         {error && <Alert severity="error">{error}</Alert>}
         {successMessage && <Alert severity="success">{successMessage}</Alert>}
+        {wasCancelled && (
+          <Alert severity="info">
+            {intl.formatMessage({ id: "bulkImport.importCancelled" })}
+          </Alert>
+        )}
 
         {isImporting && (
           <Box sx={{ my: 1 }}>
@@ -267,33 +284,57 @@ export function BulkImportDialog() {
       </DialogContent>
 
       <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1 }}>
-        <Button
-          onClick={handleClose}
-          disabled={isImporting}
-          variant="outlined"
-          sx={{ borderRadius: `${radius.card}px` }}
-        >
-          {intl.formatMessage({ id: "event.cancel" })}
-        </Button>
-        <Button
-          onClick={handleImport}
-          disabled={isImporting || selectedEvents.length === 0}
-          variant="contained"
-          sx={{
-            borderRadius: `${radius.card}px`,
-            height: buttonHeight.sm,
-            minWidth: 140,
-          }}
-        >
-          {isImporting ? (
-            <CircularProgress size={20} color="inherit" />
-          ) : (
-            intl.formatMessage(
-              { id: "bulkImport.importSelected" },
-              { count: selectedEvents.length },
-            )
-          )}
-        </Button>
+        {successMessage || wasCancelled ? (
+          <Button
+            onClick={handleClose}
+            disabled={isImporting}
+            variant="contained"
+            sx={{
+              borderRadius: `${radius.card}px`,
+              height: buttonHeight.sm,
+            }}
+          >
+            {intl.formatMessage({
+              id: successMessage ? "bulkImport.finish" : "bulkImport.close",
+            })}
+          </Button>
+        ) : (
+          <>
+            <Button
+              onClick={isImporting ? cancelImport : handleClose}
+              disabled={isImporting && isCancelling}
+              variant="outlined"
+              sx={{ borderRadius: `${radius.card}px` }}
+            >
+              {isImporting
+                ? intl.formatMessage({
+                    id: isCancelling
+                      ? "bulkImport.cancelling"
+                      : "bulkImport.cancelImport",
+                  })
+                : intl.formatMessage({ id: "navigation.cancel" })}
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={isImporting || selectedEvents.length === 0}
+              variant="contained"
+              sx={{
+                borderRadius: `${radius.card}px`,
+                height: buttonHeight.sm,
+                minWidth: 140,
+              }}
+            >
+              {isImporting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                intl.formatMessage(
+                  { id: "bulkImport.importSelected" },
+                  { count: selectedEvents.length },
+                )
+              )}
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );

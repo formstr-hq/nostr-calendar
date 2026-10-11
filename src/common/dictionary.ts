@@ -625,6 +625,12 @@ const dictionary: NestedObject = {
         "Import {count} {count, plural, one {event} other {events}}",
       importSuccess:
         "{count} {count, plural, one {event} other {events}} imported successfully",
+      cancelImport: "Cancel import",
+      cancelling: "Cancelling…",
+      importCancelled:
+        "Import cancelled. Events already imported have been kept.",
+      finish: "Finish",
+      close: "Close",
       importError: "Failed to import some events",
       noEventsFound: "No events found in the uploaded file",
       parsingFile: "Reading file…",
@@ -1206,6 +1212,12 @@ const dictionary: NestedObject = {
         "{count} {count, plural, one {Termin} other {Termine}} importieren",
       importSuccess:
         "{count} {count, plural, one {Termin} other {Termine}} erfolgreich importiert",
+      cancelImport: "Import abbrechen",
+      cancelling: "Wird abgebrochen…",
+      importCancelled:
+        "Import abgebrochen. Bereits importierte Termine bleiben erhalten.",
+      finish: "Fertig",
+      close: "Schließen",
       importError: "Einige Termine konnten nicht importiert werden",
       noEventsFound: "Keine Termine in der hochgeladenen Datei gefunden",
       parsingFile: "Datei wird gelesen…",

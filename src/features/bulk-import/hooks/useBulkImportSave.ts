@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { publishPrivateCalendarEvent } from "../../../nostr/events";
 import { getUserPublicKey } from "../../../nostr/crypto";
 import { useCalendarLists } from "../../../stores/calendarLists";
@@ -19,14 +19,26 @@ export function useBulkImportSave() {
     total: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+
+  const cancelImport = () => {
+    if (isImporting) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+    }
+  };
 
   const importEvents = async (
     events: ICalendarEvent[],
     targetCalendarId: string,
     onSuccess?: () => void,
+    onCancelled?: () => void,
   ) => {
     if (events.length === 0) return;
+    cancelRequestedRef.current = false;
     setIsImporting(true);
+    setIsCancelling(false);
     setError(null);
     setProgress({ current: 0, total: events.length });
 
@@ -40,6 +52,8 @@ export function useBulkImportSave() {
       const BATCH_SIZE = 6;
 
       for (let i = 0; i < events.length; i += BATCH_SIZE) {
+        if (cancelRequestedRef.current) break;
+
         const batch = events.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
           batch.map(async (event) => {
@@ -98,23 +112,28 @@ export function useBulkImportSave() {
         useTimeBasedEvents.getState().addEvents(allSavedEvents);
       }
 
-      if (allSavedEvents.length === 0 && events.length > 0) {
-        setError("Failed to import events");
-      } else {
+      if (cancelRequestedRef.current && completedCount < events.length) {
+        onCancelled?.();
+      } else if (allSavedEvents.length === events.length) {
         onSuccess?.();
+      } else {
+        setError("Failed to import events");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
     } finally {
       setIsImporting(false);
+      setIsCancelling(false);
     }
   };
 
   return {
     isImporting,
+    isCancelling,
     progress,
     error,
     importEvents,
+    cancelImport,
   };
 }
