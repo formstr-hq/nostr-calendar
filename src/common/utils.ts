@@ -97,10 +97,7 @@ END:VCALENDAR`;
   URL.revokeObjectURL(url);
 };
 
-export const isMobile =
-  typeof window !== "undefined" &&
-  window.innerWidth <= 800 &&
-  window.innerHeight <= 1000;
+export const isMobile = window.innerWidth <= 800 && window.innerHeight <= 1000;
 
 function unfoldICSLines(raw: string): string {
   return raw

@@ -29,64 +29,66 @@ export const ICSUpload = ({
       file.type.includes("zip") ||
       file.type.includes("compressed");
 
-    if (isZip) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        try {
-          const buffer = ev.target?.result as ArrayBuffer;
-          const icsFiles = await extractICSFromZip(buffer);
-          let allEvents: ICalendarEvent[] = [];
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const icsContents = isZip
+          ? (await extractICSFromZip(ev.target?.result as ArrayBuffer)).map(
+              (item) => item.content,
+            )
+          : [ev.target?.result as string];
 
-          for (const item of icsFiles) {
-            const parsed = parseICSMultiple(item.content);
-            allEvents = allEvents.concat(parsed);
-          }
-
-          if (allEvents.length === 0) {
-            setErrorMessage(
-              intl.formatMessage({ id: "bulkImport.noEventsFound" }),
-            );
-            return;
-          }
-
-          useBulkImport.getState().openWithEvents(allEvents, file.name);
-        } catch (err) {
-          console.error("Failed to extract zip file:", err);
-          setErrorMessage(intl.formatMessage({ id: "bulkImport.invalidFile" }));
+        if (isZip && icsContents.length === 0) {
+          setErrorMessage(
+            intl.formatMessage({ id: "bulkImport.zipContainsNoICSFiles" }),
+          );
+          return;
         }
-      };
-      reader.onerror = () => {
-        setErrorMessage(intl.formatMessage({ id: "bulkImport.invalidFile" }));
-      };
+
+        const events = icsContents.flatMap((content) =>
+          parseICSMultiple(content),
+        );
+
+        if (events.length === 0) {
+          setErrorMessage(
+            intl.formatMessage({
+              id: isZip
+                ? "bulkImport.zipNoEventsFound"
+                : "bulkImport.icsNoEventsFound",
+            }),
+          );
+          return;
+        }
+
+        // Single .ics files keep the existing one-event workflow.
+        if (!isZip && events.length === 1 && onImportEvent) {
+          onImportEvent(events[0]);
+        } else {
+          useBulkImport.getState().openWithEvents(events, file.name);
+        }
+      } catch (err) {
+        console.error(
+          isZip ? "Failed to extract zip file:" : "Failed to parse ICS file:",
+          err,
+        );
+        setErrorMessage(
+          intl.formatMessage({
+            id: isZip ? "bulkImport.invalidZip" : "bulkImport.invalidICS",
+          }),
+        );
+      }
+    };
+    reader.onerror = () => {
+      setErrorMessage(
+        intl.formatMessage({
+          id: isZip ? "bulkImport.invalidZip" : "bulkImport.invalidICS",
+        }),
+      );
+    };
+
+    if (isZip) {
       reader.readAsArrayBuffer(file);
     } else {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const content = ev.target?.result as string;
-          const events = parseICSMultiple(content);
-
-          if (events.length === 0) {
-            setErrorMessage(
-              intl.formatMessage({ id: "bulkImport.noEventsFound" }),
-            );
-            return;
-          }
-
-          // Single event: keep existing one-event workflow if callback provided
-          if (events.length === 1 && onImportEvent) {
-            onImportEvent(events[0]);
-          } else {
-            useBulkImport.getState().openWithEvents(events, file.name);
-          }
-        } catch (err) {
-          console.error("Failed to parse ICS file:", err);
-          setErrorMessage(intl.formatMessage({ id: "bulkImport.invalidFile" }));
-        }
-      };
-      reader.onerror = () => {
-        setErrorMessage(intl.formatMessage({ id: "bulkImport.invalidFile" }));
-      };
       reader.readAsText(file);
     }
 

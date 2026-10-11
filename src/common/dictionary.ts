@@ -630,6 +630,15 @@ const dictionary: NestedObject = {
       parsingFile: "Reading file…",
       invalidFile:
         "Could not read the file. Please upload a .ics or .zip file.",
+      invalidICS:
+        "Could not read this .ics file. Check that it is a valid calendar file.",
+      invalidZip:
+        "Could not open this ZIP archive. Check that it is a valid .zip file.",
+      zipContainsNoICSFiles:
+        "This ZIP archive does not contain any .ics files.",
+      icsNoEventsFound: "No calendar events were found in this .ics file.",
+      zipNoEventsFound:
+        "No calendar events were found in the .ics files in this ZIP archive.",
       eventsFound: "{count} {count, plural, one {event} other {events}} found",
     },
     ics: {
@@ -1202,6 +1211,15 @@ const dictionary: NestedObject = {
       parsingFile: "Datei wird gelesen…",
       invalidFile:
         "Die Datei konnte nicht gelesen werden. Bitte laden Sie eine .ics- oder .zip-Datei hoch.",
+      invalidICS:
+        "Diese .ics-Datei konnte nicht gelesen werden. Prüfen Sie, ob sie eine gültige Kalenderdatei ist.",
+      invalidZip:
+        "Dieses ZIP-Archiv konnte nicht geöffnet werden. Prüfen Sie, ob es eine gültige .zip-Datei ist.",
+      zipContainsNoICSFiles: "Dieses ZIP-Archiv enthält keine .ics-Dateien.",
+      icsNoEventsFound:
+        "In dieser .ics-Datei wurden keine Kalendertermine gefunden.",
+      zipNoEventsFound:
+        "In den .ics-Dateien dieses ZIP-Archivs wurden keine Kalendertermine gefunden.",
       eventsFound:
         "{count} {count, plural, one {Termin} other {Termine}} gefunden",
     },

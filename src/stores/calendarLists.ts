@@ -23,7 +23,6 @@ import {
 import {
   fetchCalendarLists,
   publishCalendarList,
-  addEventToCalendarList as addEventToCalList,
   addEventsToCalendarList as addEventsToCalList,
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
@@ -336,23 +335,10 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   },
 
   /**
-   * Adds an event reference to a specific calendar and republishes.
+   * Adds one event reference through the bulk-add path.
    */
   addEventToCalendar: async (calendarId, eventRef, callbacks) => {
-    const calendar = get().calendars.find((c) => c.id === calendarId);
-    if (!calendar) {
-      throw new Error(`Calendar not found: ${calendarId}`);
-    }
-
-    const updated = await addEventToCalList(calendar, eventRef, callbacks);
-
-    set((state) => {
-      const calendars = state.calendars.map((c) =>
-        c.id === calendarId ? updated : c,
-      );
-      saveCalendarsToStorage(calendars);
-      return { calendars };
-    });
+    await get().addEventsToCalendar(calendarId, [eventRef], callbacks);
   },
 
   /**
