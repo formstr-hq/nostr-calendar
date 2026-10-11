@@ -1,11 +1,5 @@
 import { ReactNode, useState } from "react";
-import {
-  Box,
-  Dialog,
-  DialogContent,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import { Box, useMediaQuery, useTheme } from "@mui/material";
 import { useNavigate } from "react-router";
 import { Sidebar } from "./ui/Sidebar";
 import { TopBar } from "./ui/TopBar";
@@ -19,7 +13,6 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useRelayStatusPlaceholder } from "../hooks/useRelayStatusPlaceholder";
 import { useInvitations } from "../stores/invitations";
 import { ICalendarEvent } from "../utils/types";
-import { RelaySettingsPage } from "../features/settings/RelaySettingsPage";
 
 interface AppShellProps {
   children: ReactNode;
@@ -35,7 +28,6 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
   const topBar = useCalendarTopBarProps();
 
   const [newEventOpen, setNewEventOpen] = useState(false);
-  const [relaySettingsOpen, setRelaySettingsOpen] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
   const openNewEvent = () => setNewEventOpen(true);
@@ -74,7 +66,6 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
           isMobile={isMobile}
           unreadCount={unreadCount}
           onBellClick={() => navigate("/notifications")}
-          onRelayStatusClick={() => setRelaySettingsOpen(true)}
           onOpenCalendars={
             isMobile ? () => setMobileSheetOpen(true) : undefined
           }
@@ -121,30 +112,6 @@ export function AppShell({ children, onImportEvent }: AppShellProps) {
           />
         </BottomSheet>
       )}
-
-      <Dialog
-        open={relaySettingsOpen}
-        onClose={() => setRelaySettingsOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        fullScreen={isMobile}
-        aria-labelledby="relay-settings-heading"
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: { xs: 0, sm: 3 },
-              p: { xs: 1, sm: 2 },
-            },
-          },
-        }}
-      >
-        <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-          <RelaySettingsPage
-            isDialog
-            onClose={() => setRelaySettingsOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
 
       {newEventOpen && (
         <CalendarEventEdit
