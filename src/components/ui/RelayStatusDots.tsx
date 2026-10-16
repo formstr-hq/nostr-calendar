@@ -1,18 +1,13 @@
 import { Box, Tooltip } from "@mui/material";
 import { useIntl } from "react-intl";
+import { relayStatusColors } from "../../theme/tokens";
 
-export type RelayStatus = "ok" | "pending" | "error";
+export type RelayStatus = "ok" | "pending" | "error" | "untested";
 
 export interface RelayStatusEntry {
   url: string;
   status: RelayStatus;
 }
-
-const STATUS_COLOR: Record<RelayStatus, string> = {
-  ok: "#10b981",
-  pending: "#f4a83a",
-  error: "#f43f5e",
-};
 
 interface RelayStatusDotsProps {
   relays: RelayStatusEntry[];
@@ -67,7 +62,7 @@ export function RelayStatusDots({ relays, onClick }: RelayStatusDotsProps) {
               width: 7,
               height: 7,
               borderRadius: "50%",
-              bgcolor: STATUS_COLOR[relay.status],
+              bgcolor: relayStatusColors[relay.status],
             }}
           />
         ))}

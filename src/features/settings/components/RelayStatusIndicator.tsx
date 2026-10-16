@@ -1,14 +1,7 @@
 import { Box, CircularProgress, Tooltip } from "@mui/material";
 import { useIntl } from "react-intl";
 import type { ConnectionStatus } from "../../../nostr/relayConnection";
-
-const STATUS_COLORS: Record<ConnectionStatus, string> = {
-  untested: "#9a9a97", // neutral grey
-  testing: "#f4a83a", // amber/yellow
-  ok: "#10b981", // green
-  slow: "#f4a83a", // amber/yellow
-  error: "#f43f5e", // red
-};
+import { relayStatusColors } from "../../../theme/tokens";
 
 interface RelayStatusIndicatorProps {
   status: ConnectionStatus;
@@ -40,15 +33,14 @@ export function RelayStatusIndicator({
           { latency: latencyMs ?? 0 },
         );
       case "error":
-        return errorMessage
-          ? intl.formatMessage(
-              { id: "relay.statusError" },
-              { error: errorMessage },
-            )
-          : intl.formatMessage(
-              { id: "relay.statusError" },
-              { error: "Unknown error" },
-            );
+        return intl.formatMessage(
+          { id: "relay.statusError" },
+          {
+            error:
+              errorMessage ||
+              intl.formatMessage({ id: "relay.statusErrorUnknown" }),
+          },
+        );
     }
   })();
 
@@ -63,7 +55,7 @@ export function RelayStatusIndicator({
           <CircularProgress
             size={10}
             thickness={6}
-            sx={{ color: STATUS_COLORS.testing }}
+            sx={{ color: relayStatusColors.testing }}
           />
         </Box>
       </Tooltip>
@@ -79,7 +71,7 @@ export function RelayStatusIndicator({
           width: 10,
           height: 10,
           borderRadius: "50%",
-          bgcolor: STATUS_COLORS[status],
+          bgcolor: relayStatusColors[status],
           flexShrink: 0,
           transition: "background-color 0.25s ease",
         }}

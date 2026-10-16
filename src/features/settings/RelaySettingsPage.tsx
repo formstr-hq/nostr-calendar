@@ -40,22 +40,28 @@ export function RelaySettingsPage({
     severity: "success" | "error";
   } | null>(null);
 
-  const { getStatus, isTestingAll, testSingleRelay, testAllRelays } =
-    useRelayConnectionTest();
+  const {
+    getStatus,
+    isTestingAll,
+    syncWorkerHealth,
+    testSingleRelay,
+    testAllRelays,
+    removeConnectionStatus,
+  } = useRelayConnectionTest();
 
   // Load configured relays
   useEffect(() => {
     setRelays([...getRelays()]);
   }, [storeRelays]);
 
-  // Auto-test connections on mount once relays are populated
-  const hasAutoTested = useRef(false);
+  // Query live connection health from the worker on mount (read-only, zero sockets opened)
+  const hasSyncedHealth = useRef(false);
   useEffect(() => {
-    if (!hasAutoTested.current && relays.length > 0) {
-      hasAutoTested.current = true;
-      testAllRelays(relays);
+    if (!hasSyncedHealth.current && relays.length > 0) {
+      hasSyncedHealth.current = true;
+      syncWorkerHealth();
     }
-  }, [relays, testAllRelays]);
+  }, [relays, syncWorkerHealth]);
 
   const validateRelayUrl = (url: string, currentList: string[]) => {
     if (!url.startsWith("wss://") && !url.startsWith("ws://")) {
@@ -88,17 +94,25 @@ export function RelaySettingsPage({
     const otherRelays = relays.filter((r) => r !== oldUrl);
     if (!validateRelayUrl(newUrl, otherRelays)) return false;
     setRelays((current) => current.map((r) => (r === oldUrl ? newUrl : r)));
+    removeConnectionStatus(oldUrl);
     testSingleRelay(newUrl);
     return true;
   };
 
   const handleRemoveRelay = (relayToRemove: string) => {
     setRelays((current) => current.filter((value) => value !== relayToRemove));
+    removeConnectionStatus(relayToRemove);
   };
 
   const handleResetToDefaults = () => {
     const defaults = [...defaultRelays];
     setRelays(defaults);
+    const defaultsSet = new Set(defaults);
+    for (const url of relays) {
+      if (!defaultsSet.has(url)) {
+        removeConnectionStatus(url);
+      }
+    }
     testAllRelays(defaults);
   };
 

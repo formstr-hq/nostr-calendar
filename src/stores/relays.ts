@@ -17,6 +17,7 @@ export const useRelayStore = create<{
   setRelays: (relays: string[]) => void;
   resetRelays: () => void;
   setConnectionStatus: (url: string, info: RelayConnectionInfo) => void;
+  removeConnectionStatus: (url: string) => void;
   setAllConnectionStatuses: (
     statuses: Record<string, RelayConnectionInfo>,
   ) => void;
@@ -29,12 +30,38 @@ export const useRelayStore = create<{
   loadCachedRelays: async () => {
     const cached = await getSecureItem<string[]>(RELAYS_STORAGE_KEY, []);
     if (cached.length > 0) {
-      set({ relays: cached, isLoaded: true });
+      set((state) => {
+        const allowed = new Set(cached);
+        const prunedStatuses: Record<string, RelayConnectionInfo> = {};
+        for (const [url, info] of Object.entries(state.connectionStatuses)) {
+          if (allowed.has(url)) {
+            prunedStatuses[url] = info;
+          }
+        }
+        return {
+          relays: cached,
+          isLoaded: true,
+          connectionStatuses: prunedStatuses,
+        };
+      });
     }
   },
   setRelays: (relays) => {
     setSecureItem(RELAYS_STORAGE_KEY, relays);
-    set({ relays, isLoaded: true });
+    set((state) => {
+      const allowed = new Set(relays);
+      const prunedStatuses: Record<string, RelayConnectionInfo> = {};
+      for (const [url, info] of Object.entries(state.connectionStatuses)) {
+        if (allowed.has(url)) {
+          prunedStatuses[url] = info;
+        }
+      }
+      return {
+        relays,
+        isLoaded: true,
+        connectionStatuses: prunedStatuses,
+      };
+    });
   },
   resetRelays: () => {
     removeSecureItem(RELAYS_STORAGE_KEY);
@@ -47,6 +74,13 @@ export const useRelayStore = create<{
         [url]: info,
       },
     }));
+  },
+  removeConnectionStatus: (url) => {
+    set((state) => {
+      if (!(url in state.connectionStatuses)) return state;
+      const { [url]: _, ...rest } = state.connectionStatuses;
+      return { connectionStatuses: rest };
+    });
   },
   setAllConnectionStatuses: (statuses) => {
     set((state) => ({
