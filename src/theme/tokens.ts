@@ -65,6 +65,16 @@ export const publicTint = {
   dark: 0.16,
 };
 
+/** Connection status colors for relay health dots and indicators. */
+export const relayStatusColors = {
+  ok: "#10b981",
+  pending: "#f4a83a",
+  slow: "#f4a83a",
+  testing: "#f4a83a",
+  error: "#f43f5e",
+  untested: "#9a9a97",
+} as const;
+
 /**
  * Warm palette for email-guest affordances, so "invited by email" is visually
  * distinct from Nostr guests (wireframes 01/02/04/05). Kept separate from the

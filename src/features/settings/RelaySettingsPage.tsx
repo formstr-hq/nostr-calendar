@@ -1,28 +1,38 @@
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   Box,
   Button,
   IconButton,
   List,
-  ListItem,
-  ListItemText,
   Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { defaultRelays, getRelays } from "../../common/relayConfig";
 import { publishRelayList } from "../../nostr/relays";
 import { useRelayStore } from "../../stores/relays";
+import { RelayRow } from "./components/RelayRow";
 import { SettingsCard } from "./components/SettingsCard";
+import { useRelayConnectionTest } from "./hooks/useRelayConnectionTest";
 
-export function RelaySettingsPage() {
+interface RelaySettingsPageProps {
+  isDialog?: boolean;
+  onClose?: () => void;
+}
+
+export function RelaySettingsPage({
+  isDialog = false,
+  onClose,
+}: RelaySettingsPageProps) {
   const intl = useIntl();
   const storeRelays = useRelayStore((state) => state.relays);
   const [relays, setRelays] = useState<string[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [newRelay, setNewRelay] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{
@@ -30,28 +40,84 @@ export function RelaySettingsPage() {
     severity: "success" | "error";
   } | null>(null);
 
+  const {
+    getStatus,
+    isTestingAll,
+    syncWorkerHealth,
+    testSingleRelay,
+    testAllRelays,
+    removeConnectionStatus,
+  } = useRelayConnectionTest();
+
+  // Load configured relays
   useEffect(() => {
     setRelays([...getRelays()]);
   }, [storeRelays]);
 
-  const addRelay = () => {
-    const url = newRelay.trim();
+  // Query live connection health from the worker on mount (read-only, zero sockets opened)
+  const hasSyncedHealth = useRef(false);
+  useEffect(() => {
+    if (!hasSyncedHealth.current && relays.length > 0) {
+      hasSyncedHealth.current = true;
+      syncWorkerHealth();
+    }
+  }, [relays, syncWorkerHealth]);
+
+  const validateRelayUrl = (url: string, currentList: string[]) => {
     if (!url.startsWith("wss://") && !url.startsWith("ws://")) {
       setNotice({
         message: intl.formatMessage({ id: "relay.relayUrlError" }),
         severity: "error",
       });
-      return;
+      return false;
     }
-    if (relays.includes(url)) {
+    if (currentList.includes(url)) {
       setNotice({
         message: intl.formatMessage({ id: "relay.relayAlreadyInList" }),
         severity: "error",
       });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleAddRelay = () => {
+    const url = newRelay.trim();
+    if (!validateRelayUrl(url, relays)) return;
     setRelays((current) => [...current, url]);
     setNewRelay("");
+    setShowAddForm(false);
+    testSingleRelay(url);
+  };
+
+  const handleEditRelay = (oldUrl: string, newUrl: string): boolean => {
+    const otherRelays = relays.filter((r) => r !== oldUrl);
+    if (!validateRelayUrl(newUrl, otherRelays)) return false;
+    setRelays((current) => current.map((r) => (r === oldUrl ? newUrl : r)));
+    removeConnectionStatus(oldUrl);
+    testSingleRelay(newUrl);
+    return true;
+  };
+
+  const handleRemoveRelay = (relayToRemove: string) => {
+    setRelays((current) => current.filter((value) => value !== relayToRemove));
+    removeConnectionStatus(relayToRemove);
+  };
+
+  const handleResetToDefaults = () => {
+    const defaults = [...defaultRelays];
+    setRelays(defaults);
+    const defaultsSet = new Set(defaults);
+    for (const url of relays) {
+      if (!defaultsSet.has(url)) {
+        removeConnectionStatus(url);
+      }
+    }
+    testAllRelays(defaults);
+  };
+
+  const handleTestAll = () => {
+    testAllRelays(relays);
   };
 
   const save = async () => {
@@ -77,28 +143,24 @@ export function RelaySettingsPage() {
     }
   };
 
-  return (
-    <>
-      <Typography variant="h5" fontWeight={800}>
-        {intl.formatMessage({ id: "settings.relays" })}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-        {intl.formatMessage({ id: "settings.relaysDescription" })}
-      </Typography>
-      <SettingsCard
-        label={intl.formatMessage({ id: "settings.connectedRelays" })}
-      >
+  const content = (
+    <Box sx={{ width: "100%" }}>
+      {/* Dashed Add Relay Button or Inline Form */}
+      {showAddForm ? (
         <Box
           sx={{
             display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
             gap: 1,
-            py: 2,
-            borderTop: "1px solid",
-            borderColor: "divider",
+            mb: 2,
+            p: 1.5,
+            border: "1.5px dashed",
+            borderColor: "primary.main",
+            borderRadius: 2,
+            alignItems: "center",
           }}
         >
           <TextField
+            autoFocus
             fullWidth
             size="small"
             placeholder="wss://relay.example.com"
@@ -107,72 +169,131 @@ export function RelaySettingsPage() {
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
-                addRelay();
+                handleAddRelay();
+              } else if (event.key === "Escape") {
+                setShowAddForm(false);
+                setNewRelay("");
               }
             }}
           />
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
-            onClick={addRelay}
+            onClick={handleAddRelay}
+            sx={{ flexShrink: 0 }}
           >
             {intl.formatMessage({ id: "navigation.add" })}
           </Button>
-        </Box>
-
-        <List disablePadding>
-          {relays.map((relay) => (
-            <ListItem
-              key={relay}
-              data-testid="relay-row"
-              secondaryAction={
-                <IconButton
-                  edge="end"
-                  aria-label="remove relay"
-                  onClick={() =>
-                    setRelays((current) =>
-                      current.filter((value) => value !== relay),
-                    )
-                  }
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              }
-              sx={{
-                mb: 0.5,
-                bgcolor: "action.hover",
-                borderRadius: 1,
-              }}
-            >
-              <ListItemText
-                primary={relay}
-                primaryTypographyProps={{
-                  variant: "body2",
-                  sx: { overflowWrap: "anywhere" },
-                }}
-              />
-            </ListItem>
-          ))}
-        </List>
-        {!relays.length && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            textAlign="center"
-            sx={{ py: 2 }}
+          <IconButton
+            size="small"
+            aria-label="cancel add"
+            onClick={() => {
+              setShowAddForm(false);
+              setNewRelay("");
+            }}
           >
-            {intl.formatMessage({ id: "relay.noRelaysConfigured" })}
-          </Typography>
-        )}
-        <Box
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ) : (
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={() => setShowAddForm(true)}
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 1,
-            mt: 2,
+            borderStyle: "dashed",
+            borderWidth: 1.5,
+            borderColor: "primary.main",
+            color: "primary.main",
+            py: 1.25,
+            mb: 2,
+            borderRadius: 2,
+            fontWeight: 600,
+            textTransform: "none",
+            "&:hover": {
+              borderStyle: "dashed",
+              borderWidth: 1.5,
+              borderColor: "primary.main",
+              bgcolor: "action.hover",
+            },
           }}
         >
-          <Button color="inherit" onClick={() => setRelays([...defaultRelays])}>
+          {intl.formatMessage({ id: "relay.addNewRelay" })}
+        </Button>
+      )}
+
+      {/* Relay List */}
+      <List disablePadding>
+        {relays.map((relay) => (
+          <RelayRow
+            key={relay}
+            relay={relay}
+            statusInfo={getStatus(relay)}
+            onTest={testSingleRelay}
+            onEdit={handleEditRelay}
+            onRemove={handleRemoveRelay}
+          />
+        ))}
+      </List>
+
+      {!relays.length && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          textAlign="center"
+          sx={{ py: 3 }}
+        >
+          {intl.formatMessage({ id: "relay.noRelaysConfigured" })}
+        </Typography>
+      )}
+
+      {/* Bottom Actions Bar */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 1.5,
+          mt: 3,
+          pt: 2,
+          borderTop: isDialog ? "none" : "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Button
+          color="primary"
+          startIcon={
+            <RefreshIcon
+              sx={
+                isTestingAll
+                  ? {
+                      animation: "spin 1s linear infinite",
+                      "@keyframes spin": {
+                        "0%": { transform: "rotate(0deg)" },
+                        "100%": { transform: "rotate(360deg)" },
+                      },
+                    }
+                  : undefined
+              }
+            />
+          }
+          onClick={handleTestAll}
+          disabled={isTestingAll || relays.length === 0}
+          data-testid="test-all-connections-button"
+          sx={{
+            color: "primary.main",
+            fontWeight: 600,
+            textTransform: "none",
+          }}
+        >
+          {isTestingAll
+            ? intl.formatMessage({ id: "relay.testingConnections" })
+            : intl.formatMessage({ id: "relay.testAllConnections" })}
+        </Button>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Button color="inherit" onClick={handleResetToDefaults}>
             {intl.formatMessage({ id: "relay.resetToDefaults" })}
           </Button>
           <Button
@@ -184,8 +305,49 @@ export function RelaySettingsPage() {
               ? intl.formatMessage({ id: "event.saving" })
               : intl.formatMessage({ id: "navigation.save" })}
           </Button>
+          {isDialog && onClose && (
+            <Button
+              color="primary"
+              onClick={onClose}
+              sx={{ fontWeight: 600, textTransform: "none" }}
+            >
+              {intl.formatMessage({ id: "navigation.close" })}
+            </Button>
+          )}
         </Box>
-      </SettingsCard>
+      </Box>
+    </Box>
+  );
+
+  return (
+    <>
+      <Typography
+        id="relay-settings-heading"
+        variant="h5"
+        fontWeight={800}
+        sx={{ mb: isDialog ? 2 : 0.5 }}
+      >
+        {intl.formatMessage({
+          id: isDialog ? "relay.manageRelays" : "settings.relays",
+        })}
+      </Typography>
+
+      {!isDialog && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          {intl.formatMessage({ id: "settings.relaysDescription" })}
+        </Typography>
+      )}
+
+      {isDialog ? (
+        content
+      ) : (
+        <SettingsCard
+          label={intl.formatMessage({ id: "settings.connectedRelays" })}
+        >
+          {content}
+        </SettingsCard>
+      )}
+
       <Snackbar
         open={Boolean(notice)}
         autoHideDuration={4000}

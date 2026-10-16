@@ -477,6 +477,13 @@ const dictionary: NestedObject = {
     },
     relay: {
       manageRelays: "Manage Relays",
+      addNewRelay: "Add New Relay",
+      testAllConnections: "Test All Connections",
+      testingConnections: "Testing...",
+      testConnection: "Test connection",
+      editRelay: "Edit relay",
+      saveEdit: "Save changes",
+      cancelEdit: "Cancel",
       relayUrlError: "Relay URL must start with wss:// or ws://",
       relayAlreadyInList: "Relay already in list",
       atLeastOneRelay: "You must have at least one relay",
@@ -486,6 +493,12 @@ const dictionary: NestedObject = {
       noRelaysConfigured:
         "No relays configured. Add a relay or reset to defaults.",
       resetToDefaults: "Reset to Defaults",
+      statusConnected: "Connected ({latency}ms)",
+      statusSlow: "Slow connection ({latency}ms)",
+      statusError: "Connection failed: {error}",
+      statusErrorUnknown: "Unknown error",
+      statusTesting: "Testing connection...",
+      statusUntested: "Untested connection",
     },
     participant: {
       clickToCopy: "Click to copy",
@@ -1031,6 +1044,13 @@ const dictionary: NestedObject = {
     },
     relay: {
       manageRelays: "Relays verwalten",
+      addNewRelay: "Neues Relay hinzufügen",
+      testAllConnections: "Alle Verbindungen testen",
+      testingConnections: "Wird getestet...",
+      testConnection: "Verbindung testen",
+      editRelay: "Relay bearbeiten",
+      saveEdit: "Änderungen speichern",
+      cancelEdit: "Abbrechen",
       relayUrlError: "Relay-URL muss mit wss:// oder ws:// beginnen",
       relayAlreadyInList: "Relay bereits in der Liste",
       atLeastOneRelay: "Sie müssen mindestens ein Relay haben",
@@ -1040,6 +1060,12 @@ const dictionary: NestedObject = {
       noRelaysConfigured:
         "Keine Relays konfiguriert. Fügen Sie ein Relay hinzu oder setzen Sie auf Standardwerte zurück.",
       resetToDefaults: "Auf Standardwerte zurücksetzen",
+      statusConnected: "Verbunden ({latency}ms)",
+      statusSlow: "Langsame Verbindung ({latency}ms)",
+      statusError: "Verbindung fehlgeschlagen: {error}",
+      statusErrorUnknown: "Unbekannter Fehler",
+      statusTesting: "Verbindung wird getestet...",
+      statusUntested: "Nicht getestet",
     },
     participant: {
       clickToCopy: "Klicken zum Kopieren",
