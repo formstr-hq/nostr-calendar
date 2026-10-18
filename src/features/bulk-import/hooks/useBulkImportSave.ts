@@ -1,9 +1,15 @@
 import { useRef, useState } from "react";
+import { useIntl } from "react-intl";
 import { publishPrivateCalendarEvent } from "../../../nostr/events";
 import { getUserPublicKey } from "../../../nostr/crypto";
 import { useCalendarLists } from "../../../stores/calendarLists";
 import { useTimeBasedEvents } from "../../../stores/events";
-import { parseEventRef } from "../../../utils/calendarListTypes";
+import type { DestinationCalendarDraft } from "../../../stores/bulkImport";
+import { findMatchingCalendar } from "../utils/destinationCalendars";
+import {
+  DEFAULT_CALENDAR_TITLE,
+  parseEventRef,
+} from "../../../utils/calendarListTypes";
 import { isAllDayEvent } from "../../../utils/dateHelper";
 import type { ICalendarEvent } from "../../../utils/types";
 
@@ -13,6 +19,7 @@ export interface BulkImportProgress {
 }
 
 export function useBulkImportSave() {
+  const intl = useIntl();
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState<BulkImportProgress>({
     current: 0,
@@ -31,9 +38,10 @@ export function useBulkImportSave() {
 
   const importEvents = async (
     events: ICalendarEvent[],
-    targetCalendarId: string,
+    targetCalendarId?: string,
     onSuccess?: () => void,
     onCancelled?: () => void,
+    destinationCalendars?: DestinationCalendarDraft[],
   ) => {
     if (events.length === 0) return;
     cancelRequestedRef.current = false;
@@ -44,7 +52,52 @@ export function useBulkImportSave() {
 
     try {
       const userPublicKey = await getUserPublicKey();
-      const allEventRefs: string[][] = [];
+
+      // Resolve destination calendars if present
+      const eventIdToCalId = new Map<string, string>();
+      let defaultCalId = targetCalendarId;
+
+      if (destinationCalendars && destinationCalendars.length > 0) {
+        const existingCalendars = [...useCalendarLists.getState().calendars];
+        const nameToCalId = new Map<string, string>();
+
+        for (const dest of destinationCalendars) {
+          const existing = findMatchingCalendar(existingCalendars, dest.name);
+          if (existing) {
+            nameToCalId.set(dest.name, existing.id);
+          } else {
+            // Create calendar under the Synced group in sidebar
+            const created = await useCalendarLists
+              .getState()
+              .createCalendar(dest.name, "", dest.color);
+            nameToCalId.set(dest.name, created.id);
+            existingCalendars.push(created);
+          }
+        }
+
+        for (const dest of destinationCalendars) {
+          const calId = nameToCalId.get(dest.name);
+          if (calId) {
+            for (const id of dest.eventIds) {
+              eventIdToCalId.set(id, calId);
+            }
+          }
+        }
+      }
+
+      if (!defaultCalId) {
+        const existing = useCalendarLists.getState().calendars;
+        if (existing.length > 0) {
+          defaultCalId = existing[0].id;
+        } else {
+          const newCal = await useCalendarLists
+            .getState()
+            .createCalendar(DEFAULT_CALENDAR_TITLE);
+          defaultCalId = newCal.id;
+        }
+      }
+
+      const refsByCalId = new Map<string, string[][]>();
       const allSavedEvents: ICalendarEvent[] = [];
       let completedCount = 0;
 
@@ -57,17 +110,38 @@ export function useBulkImportSave() {
         const batch = events.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
           batch.map(async (event) => {
+            const calId = eventIdToCalId.get(event.id) || defaultCalId;
             const eventToSave: ICalendarEvent = {
               ...event,
-              calendarId: targetCalendarId,
+              calendarId: calId,
               isPrivateEvent: true,
-              allDay: isAllDayEvent(event.begin, event.end),
+              allDay: event.allDay || isAllDayEvent(event.begin, event.end),
             };
+
+            // Look up existing viewKey if this event was previously imported or saved
+            let existingKey: string | undefined = undefined;
+            const cached = useTimeBasedEvents.getState().eventById[event.id];
+            if (cached?.viewKey) {
+              existingKey = cached.viewKey;
+            } else {
+              for (const cal of useCalendarLists.getState().calendars) {
+                for (const ref of cal.eventRefs) {
+                  const parsed = parseEventRef(ref);
+                  if (parsed.eventDTag === event.id && parsed.viewKey) {
+                    existingKey = parsed.viewKey;
+                    break;
+                  }
+                }
+                if (existingKey) break;
+              }
+            }
 
             const createResult = await publishPrivateCalendarEvent(
               eventToSave,
               {
                 userPublicKey,
+                existingDTag: event.id,
+                existingViewKey: existingKey,
                 timeoutMs: 3000,
               },
             );
@@ -85,14 +159,17 @@ export function useBulkImportSave() {
               user: createResult.authorPubkey,
             };
 
-            return { ref: createResult.eventRef, savedEvent };
+            return { ref: createResult.eventRef, savedEvent, calId };
           }),
         );
 
         for (const res of results) {
           if (res.status === "fulfilled") {
-            allEventRefs.push(res.value.ref);
-            allSavedEvents.push(res.value.savedEvent);
+            const { ref, savedEvent, calId } = res.value;
+            const list = refsByCalId.get(calId) || [];
+            list.push(ref);
+            refsByCalId.set(calId, list);
+            allSavedEvents.push(savedEvent);
           } else {
             console.warn("Failed to publish an imported event:", res.reason);
           }
@@ -105,10 +182,12 @@ export function useBulkImportSave() {
         await new Promise((resolve) => setTimeout(resolve, 15));
       }
 
-      if (allEventRefs.length > 0) {
-        await useCalendarLists
-          .getState()
-          .addEventsToCalendar(targetCalendarId, allEventRefs);
+      if (allSavedEvents.length > 0) {
+        for (const [calId, refs] of refsByCalId.entries()) {
+          if (refs.length > 0) {
+            await useCalendarLists.getState().addEventsToCalendar(calId, refs);
+          }
+        }
         useTimeBasedEvents.getState().addEvents(allSavedEvents);
       }
 
@@ -117,11 +196,11 @@ export function useBulkImportSave() {
       } else if (allSavedEvents.length === events.length) {
         onSuccess?.();
       } else {
-        setError("Failed to import events");
+        setError(intl.formatMessage({ id: "bulkImport.importError" }));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
+      console.error("Bulk import failed:", err);
+      setError(intl.formatMessage({ id: "bulkImport.importError" }));
     } finally {
       setIsImporting(false);
       setIsCancelling(false);

@@ -23,16 +23,38 @@ import { useBulkImport } from "../../../stores/bulkImport";
 import { useBulkImportSave } from "../hooks/useBulkImportSave";
 import { BulkImportEventItem } from "./BulkImportEventItem";
 import { buttonHeight, radius } from "../../../theme/tokens";
+import dayjs from "dayjs";
+import { useDateWithRouting } from "../../../hooks/useDateWithRouting";
+import { useLayout } from "../../../hooks/useLayout";
+import { getNextOccurrenceInRange } from "../../../utils/repeatingEventsHelper";
+import type { DestinationCalendarDraft } from "../../../stores/bulkImport";
+import {
+  DEFAULT_CALENDAR_COLOR,
+  DEFAULT_CALENDAR_TITLE,
+} from "../../../utils/calendarListTypes";
 
 export function BulkImportDialog() {
   const intl = useIntl();
-  const { isOpen, events, sourceFileName, close } = useBulkImport();
+  const { isOpen, events, sourceFileName, destinationCalendars, close } =
+    useBulkImport();
   const calendars = useCalendarLists((s) => s.calendars);
+  const { setDate } = useDateWithRouting();
+  const { layout } = useLayout();
 
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [wasCancelled, setWasCancelled] = useState(false);
+
+  const fallbackCalendarTitle = useMemo(() => {
+    return (
+      (sourceFileName
+        ? sourceFileName
+            .replace(/\.(zip|ics|ical)$/i, "")
+            .replace(/\.ical$/i, "")
+        : "") || DEFAULT_CALENDAR_TITLE
+    );
+  }, [sourceFileName]);
 
   const {
     isImporting,
@@ -86,17 +108,43 @@ export function BulkImportDialog() {
     });
   }, []);
 
+  const eventIdToDestCal = useMemo(() => {
+    const map = new Map<string, DestinationCalendarDraft>();
+    for (const cal of destinationCalendars) {
+      for (const id of cal.eventIds) {
+        map.set(id, cal);
+      }
+    }
+    return map;
+  }, [destinationCalendars]);
+
   const selectedEvents = useMemo(
     () => events.filter((e) => selectedIds.has(e.id)),
     [events, selectedIds],
   );
 
   const handleImport = async () => {
-    if (!selectedCalendarId || selectedEvents.length === 0) return;
+    if (selectedEvents.length === 0) return;
+
+    let targetCalendarId = selectedCalendarId;
+    if (destinationCalendars.length <= 1) {
+      if (!targetCalendarId) {
+        if (calendars.length > 0) {
+          targetCalendarId = calendars[0].id;
+          setSelectedCalendarId(targetCalendarId);
+        } else {
+          const newCal = await useCalendarLists
+            .getState()
+            .createCalendar(fallbackCalendarTitle);
+          targetCalendarId = newCal.id;
+          setSelectedCalendarId(targetCalendarId);
+        }
+      }
+    }
 
     await importEvents(
       selectedEvents,
-      selectedCalendarId,
+      targetCalendarId,
       () => {
         setSuccessMessage(
           intl.formatMessage(
@@ -107,11 +155,38 @@ export function BulkImportDialog() {
         setWasCancelled(false);
       },
       () => setWasCancelled(true),
+      destinationCalendars.length > 1 ? destinationCalendars : undefined,
     );
   };
 
   const handleClose = () => {
     if (!isImporting) {
+      if (successMessage && selectedEvents.length > 0) {
+        const now = Date.now();
+        const sorted = [...selectedEvents].sort((a, b) => a.begin - b.begin);
+        const upcoming = sorted.find(
+          (e) => e.end >= now || (e.repeat?.rrule && e.begin <= now),
+        );
+        let targetTimestamp: number | null = null;
+        if (upcoming) {
+          if (upcoming.repeat?.rrule) {
+            const nextOcc = getNextOccurrenceInRange(
+              upcoming,
+              now,
+              now + 365 * 24 * 60 * 60 * 1000,
+            );
+            targetTimestamp = nextOcc ?? upcoming.begin;
+          } else {
+            targetTimestamp = upcoming.begin;
+          }
+        } else {
+          targetTimestamp = sorted[sorted.length - 1].begin;
+        }
+
+        if (targetTimestamp) {
+          setDate(dayjs(targetTimestamp), layout);
+        }
+      }
       close();
     }
   };
@@ -166,7 +241,65 @@ export function BulkImportDialog() {
         sx={{ p: 2, display: "flex", flexDirection: "column", gap: 2 }}
       >
         {error && <Alert severity="error">{error}</Alert>}
-        {successMessage && <Alert severity="success">{successMessage}</Alert>}
+        {successMessage && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Alert severity="success">{successMessage}</Alert>
+            {destinationCalendars.length > 0 && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 1,
+                  p: 1.25,
+                  borderRadius: `${radius.card}px`,
+                  bgcolor: "action.hover",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                {destinationCalendars.map((cal) => {
+                  const count = cal.eventIds.filter((id) =>
+                    selectedIds.has(id),
+                  ).length;
+                  if (count === 0) return null;
+                  return (
+                    <Box
+                      key={cal.name}
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 1,
+                        px: 1.25,
+                        py: 0.5,
+                        borderRadius: `${radius.sm}px`,
+                        bgcolor: "background.paper",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: cal.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {cal.name}:
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {intl.formatMessage(
+                          { id: "bulkImport.eventsFound" },
+                          { count },
+                        )}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+          </Box>
+        )}
         {wasCancelled && (
           <Alert severity="info">
             {intl.formatMessage({ id: "bulkImport.importCancelled" })}
@@ -202,7 +335,48 @@ export function BulkImportDialog() {
           </Box>
         )}
 
-        {calendars.length > 0 && (
+        {destinationCalendars.length > 1 ? (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontWeight: 500 }}
+            >
+              {intl.formatMessage({ id: "bulkImport.destinationCalendars" })}
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {destinationCalendars.map((cal) => (
+                <Box
+                  key={cal.name}
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 1,
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: `${radius.card}px`,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    bgcolor: "action.hover",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      bgcolor: cal.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {cal.name}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        ) : calendars.length > 0 ? (
           <FormControl fullWidth size="small">
             <InputLabel id="bulk-import-cal-label">
               {intl.formatMessage({ id: "event.calendar" })}
@@ -232,6 +406,38 @@ export function BulkImportDialog() {
               ))}
             </Select>
           </FormControl>
+        ) : (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              px: 1.5,
+              py: 1,
+              borderRadius: `${radius.card}px`,
+              border: "1px dashed",
+              borderColor: "divider",
+              bgcolor: "action.hover",
+            }}
+          >
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: DEFAULT_CALENDAR_COLOR,
+                flexShrink: 0,
+              }}
+            />
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {fallbackCalendarTitle}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {intl.formatMessage({ id: "bulkImport.newCalendarNotice" })}
+              </Typography>
+            </Box>
+          </Box>
         )}
 
         <Box
@@ -271,15 +477,20 @@ export function BulkImportDialog() {
             p: 0.5,
           }}
         >
-          {events.map((event) => (
-            <BulkImportEventItem
-              key={event.id}
-              event={event}
-              selected={selectedIds.has(event.id)}
-              onToggle={() => handleToggleOne(event.id)}
-              disabled={isImporting}
-            />
-          ))}
+          {events.map((event) => {
+            const destCal = eventIdToDestCal.get(event.id);
+            return (
+              <BulkImportEventItem
+                key={event.id}
+                event={event}
+                selected={selectedIds.has(event.id)}
+                onToggle={() => handleToggleOne(event.id)}
+                disabled={isImporting}
+                destinationName={destCal?.name}
+                destinationColor={destCal?.color}
+              />
+            );
+          })}
         </Box>
       </DialogContent>
 

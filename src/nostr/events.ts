@@ -27,7 +27,7 @@ import {
   naddrEncode,
 } from "nostr-tools/nip19";
 import { EventKinds } from "./kinds";
-import { defaultRelays } from "../common/relayConfig";
+import { defaultRelays, getRelays } from "../common/relayConfig";
 import { PUBLIC_APP_BASE_URL } from "../utils/platform";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
@@ -251,7 +251,8 @@ export async function publishPrivateCalendarEvent(
         pubkey: signedEvent.pubkey,
         dTag,
         viewKey: nip19.nsecEncode(viewSecretKey),
-        relayHint: publishedRelayHint,
+        relayHint:
+          publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
       }),
     );
     giftWraps = await Promise.all(
@@ -267,7 +268,7 @@ export async function publishPrivateCalendarEvent(
               [
                 "a",
                 `${eventKind}:${signedEvent.pubkey}:${dTag}`,
-                publishedRelayHint,
+                publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
               ],
               ["viewKey", nip19.nsecEncode(viewSecretKey)],
               ["signing_nsec", signingNsec],
@@ -300,7 +301,7 @@ export async function publishPrivateCalendarEvent(
     kind: eventKind,
     authorPubkey: userPublicKey,
     eventDTag: dTag,
-    relayUrl: publishedRelayHint,
+    relayUrl: publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
 
@@ -367,7 +368,8 @@ export async function editPrivateCalendarEvent(
         pubkey: signedEvent.pubkey,
         dTag,
         viewKey: nip19.nsecEncode(viewSecretKey),
-        relayHint: publishedRelayHint,
+        relayHint:
+          publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
       }),
     );
     const giftWraps = await Promise.all(
@@ -383,7 +385,7 @@ export async function editPrivateCalendarEvent(
               [
                 "a",
                 `${eventKind}:${userPublicKey}:${dTag}`,
-                publishedRelayHint,
+                publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
               ],
               ["viewKey", nip19.nsecEncode(viewSecretKey)],
               ["signing_nsec", signingNsec],

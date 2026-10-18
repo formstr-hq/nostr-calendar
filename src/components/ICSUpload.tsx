@@ -5,6 +5,8 @@ import { useIntl } from "react-intl";
 import { parseICSMultiple } from "../common/utils";
 import { extractICSFromZip } from "../common/zipExtractor";
 import { useBulkImport } from "../stores/bulkImport";
+import { useCalendarLists } from "../stores/calendarLists";
+import { buildDestinationCalendars } from "../features/bulk-import/utils/destinationCalendars";
 import { ICalendarEvent } from "../utils/types";
 
 interface ICSUploadProps {
@@ -32,39 +34,59 @@ export const ICSUpload = ({
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const icsContents = isZip
-          ? (await extractICSFromZip(ev.target?.result as ArrayBuffer)).map(
-              (item) => item.content,
-            )
-          : [ev.target?.result as string];
-
-        if (isZip && icsContents.length === 0) {
-          setErrorMessage(
-            intl.formatMessage({ id: "bulkImport.zipContainsNoICSFiles" }),
+        if (isZip) {
+          const icsFiles = await extractICSFromZip(
+            ev.target?.result as ArrayBuffer,
           );
-          return;
-        }
+          if (icsFiles.length === 0) {
+            setErrorMessage(
+              intl.formatMessage({ id: "bulkImport.zipContainsNoICSFiles" }),
+            );
+            return;
+          }
 
-        const events = icsContents.flatMap((content) =>
-          parseICSMultiple(content),
-        );
+          const parsedFiles = icsFiles
+            .map((f) => ({
+              filename: f.filename,
+              content: f.content,
+              events: parseICSMultiple(f.content),
+            }))
+            .filter((f) => f.events.length > 0);
+          const events = parsedFiles.flatMap((f) => f.events);
 
-        if (events.length === 0) {
-          setErrorMessage(
-            intl.formatMessage({
-              id: isZip
-                ? "bulkImport.zipNoEventsFound"
-                : "bulkImport.icsNoEventsFound",
-            }),
-          );
-          return;
-        }
+          if (events.length === 0) {
+            setErrorMessage(
+              intl.formatMessage({ id: "bulkImport.zipNoEventsFound" }),
+            );
+            return;
+          }
 
-        // Single .ics files keep the existing one-event workflow.
-        if (!isZip && events.length === 1 && onImportEvent) {
-          onImportEvent(events[0]);
+          const existingCalendars = useCalendarLists.getState().calendars;
+          const destinationCalendars =
+            parsedFiles.length > 1
+              ? buildDestinationCalendars(parsedFiles, existingCalendars)
+              : [];
+
+          useBulkImport
+            .getState()
+            .openWithEvents(events, file.name, destinationCalendars);
         } else {
-          useBulkImport.getState().openWithEvents(events, file.name);
+          const content = ev.target?.result as string;
+          const events = parseICSMultiple(content);
+
+          if (events.length === 0) {
+            setErrorMessage(
+              intl.formatMessage({ id: "bulkImport.icsNoEventsFound" }),
+            );
+            return;
+          }
+
+          // Single .ics files keep the existing one-event workflow.
+          if (events.length === 1 && onImportEvent) {
+            onImportEvent(events[0]);
+          } else {
+            useBulkImport.getState().openWithEvents(events, file.name);
+          }
         }
       } catch (err) {
         console.error(

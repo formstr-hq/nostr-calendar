@@ -19,6 +19,7 @@ import {
 import { AllDayEventChip, CalendarEventCard } from "./CalendarEvent";
 import { DateLabel } from "./DateLabel";
 import { isWeekend } from "../utils/dateHelper";
+import { getOccurrencesInRange } from "../utils/repeatingEventsHelper";
 import { lightTokens, darkTokens } from "../theme/tokens";
 import { StyledSecondaryHeader } from "./StyledComponents";
 import { MOBILE_TOPBAR_ROW2_HEIGHT } from "./ui/TopBar";
@@ -110,10 +111,25 @@ export function WeekView({ events, date }: ViewProps) {
       : lightTokens.otherMonthBg;
 
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const allDayForDay = (dayStartMs: number) =>
-    events.filter(
-      (e) => e.allDay && e.begin < dayStartMs + DAY_MS && e.end > dayStartMs,
-    );
+  const allDayForDay = (dayStartMs: number) => {
+    const dayEndMs = dayStartMs + DAY_MS;
+    return events.flatMap((event) => {
+      if (!event.allDay) return [];
+      if (!event.repeat?.rrule) {
+        return event.begin < dayEndMs && event.end > dayStartMs ? [event] : [];
+      }
+      const duration = event.end - event.begin;
+      return getOccurrencesInRange(event, dayStartMs, dayEndMs).map(
+        (begin) => ({
+          ...event,
+          begin,
+          end: begin + duration,
+          occurrenceBegin: begin,
+          occurrenceEnd: begin + duration,
+        }),
+      );
+    });
+  };
   const timedEvents = events.filter((e) => !e.allDay);
 
   const hasAnyAllDay = days.some(

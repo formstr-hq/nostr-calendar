@@ -245,16 +245,34 @@ export async function addEventsToCalendarList(
   newEventRefs: string[][],
   callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
 ): Promise<ICalendarList> {
+  const newRefMap = new Map(newEventRefs.map((ref) => [ref[0], ref]));
+  let hasChanges = false;
+
+  // Update existing refs if viewKey or relayUrl changed
+  const updatedExisting = calendarList.eventRefs.map((ref) => {
+    const replacement = newRefMap.get(ref[0]);
+    if (replacement) {
+      if (replacement[1] !== ref[1] || replacement[2] !== ref[2]) {
+        hasChanges = true;
+      }
+      return replacement;
+    }
+    return ref;
+  });
+
   const existingCoords = new Set(calendarList.eventRefs.map((ref) => ref[0]));
   const toAdd = newEventRefs.filter((ref) => !existingCoords.has(ref[0]));
+  if (toAdd.length > 0) {
+    hasChanges = true;
+  }
 
-  if (toAdd.length === 0) {
+  if (!hasChanges) {
     return calendarList;
   }
 
   const updated: ICalendarList = {
     ...calendarList,
-    eventRefs: [...calendarList.eventRefs, ...toAdd],
+    eventRefs: [...updatedExisting, ...toAdd],
   };
 
   const publishedEvent = await publishCalendarList(updated, callbacks);

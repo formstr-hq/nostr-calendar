@@ -305,6 +305,8 @@ const dictionary: NestedObject = {
       deviceReadOnlyNote: "Name and account are read-only for device calendars",
       deviceColorFallbackNote:
         "Some Google-synced calendars don't accept color changes from apps. If that happens here, Formstr will still show this color everywhere in the app — it just won't write back to your device.",
+      eventsCount: "{count} {count, plural, one {event} other {events}}",
+      viewEvents: "View events",
     },
     sidebar: {
       calendars: "Calendars",
@@ -632,10 +634,6 @@ const dictionary: NestedObject = {
       finish: "Finish",
       close: "Close",
       importError: "Failed to import some events",
-      noEventsFound: "No events found in the uploaded file",
-      parsingFile: "Reading file…",
-      invalidFile:
-        "Could not read the file. Please upload a .ics or .zip file.",
       invalidICS:
         "Could not read this .ics file. Check that it is a valid calendar file.",
       invalidZip:
@@ -646,6 +644,8 @@ const dictionary: NestedObject = {
       zipNoEventsFound:
         "No calendar events were found in the .ics files in this ZIP archive.",
       eventsFound: "{count} {count, plural, one {event} other {events}} found",
+      newCalendarNotice: "A new calendar will be created for these events",
+      destinationCalendars: "Destination calendars",
     },
     ics: {
       importTooltip: "Import .ics or .zip file",
@@ -914,6 +914,8 @@ const dictionary: NestedObject = {
         "Name und Konto sind bei Gerätekalendern schreibgeschützt",
       deviceColorFallbackNote:
         "Manche mit Google synchronisierte Kalender akzeptieren keine Farbänderungen von Apps. Falls das hier passiert, zeigt Formstr diese Farbe trotzdem überall in der App an — sie wird nur nicht auf Ihr Gerät zurückgeschrieben.",
+      eventsCount: "{count} {count, plural, one {Termin} other {Termine}}",
+      viewEvents: "Termine anzeigen",
     },
     sidebar: {
       calendars: "Kalender",
@@ -1219,10 +1221,6 @@ const dictionary: NestedObject = {
       finish: "Fertig",
       close: "Schließen",
       importError: "Einige Termine konnten nicht importiert werden",
-      noEventsFound: "Keine Termine in der hochgeladenen Datei gefunden",
-      parsingFile: "Datei wird gelesen…",
-      invalidFile:
-        "Die Datei konnte nicht gelesen werden. Bitte laden Sie eine .ics- oder .zip-Datei hoch.",
       invalidICS:
         "Diese .ics-Datei konnte nicht gelesen werden. Prüfen Sie, ob sie eine gültige Kalenderdatei ist.",
       invalidZip:
@@ -1234,6 +1232,8 @@ const dictionary: NestedObject = {
         "In den .ics-Dateien dieses ZIP-Archivs wurden keine Kalendertermine gefunden.",
       eventsFound:
         "{count} {count, plural, one {Termin} other {Termine}} gefunden",
+      newCalendarNotice: "Ein neuer Kalender wird für diese Termine erstellt",
+      destinationCalendars: "Zielkalender",
     },
     ics: {
       importTooltip: ".ics- oder .zip-Datei importieren",

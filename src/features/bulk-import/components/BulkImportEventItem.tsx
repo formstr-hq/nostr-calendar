@@ -3,6 +3,7 @@ import { Box, Checkbox, Typography } from "@mui/material";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import RepeatIcon from "@mui/icons-material/Repeat";
 import dayjs from "dayjs";
+import { useIntl } from "react-intl";
 import type { ICalendarEvent } from "../../../utils/types";
 import { radius } from "../../../theme/tokens";
 
@@ -11,6 +12,8 @@ interface BulkImportEventItemProps {
   selected: boolean;
   onToggle: () => void;
   disabled?: boolean;
+  destinationName?: string;
+  destinationColor?: string;
 }
 
 export const BulkImportEventItem = memo(function BulkImportEventItem({
@@ -18,12 +21,16 @@ export const BulkImportEventItem = memo(function BulkImportEventItem({
   selected,
   onToggle,
   disabled = false,
+  destinationName,
+  destinationColor,
 }: BulkImportEventItemProps) {
+  const intl = useIntl();
   const isAllDay =
     event.allDay || dayjs(event.end).diff(dayjs(event.begin), "hour") >= 24;
 
+  const allDayLabel = intl.formatMessage({ id: "event.allDayLabel" });
   const dateText = isAllDay
-    ? `${dayjs(event.begin).format("MMM D, YYYY")} (All day)`
+    ? `${dayjs(event.begin).format("MMM D, YYYY")} (${allDayLabel})`
     : `${dayjs(event.begin).format("MMM D, YYYY · h:mm A")} - ${dayjs(event.end).format("h:mm A")}`;
 
   const locationText =
@@ -68,6 +75,37 @@ export const BulkImportEventItem = memo(function BulkImportEventItem({
           >
             {event.title || "Imported Event"}
           </Typography>
+          {destinationName && (
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 0.75,
+                py: 0.15,
+                borderRadius: `${radius.sm}px`,
+                bgcolor: "action.hover",
+                border: "1px solid",
+                borderColor: "divider",
+                flexShrink: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  bgcolor: destinationColor || "primary.main",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{ fontSize: "0.7rem", fontWeight: 600 }}
+              >
+                → {destinationName}
+              </Typography>
+            </Box>
+          )}
           {event.repeat?.rrule && (
             <RepeatIcon
               fontSize="inherit"
