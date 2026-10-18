@@ -1,0 +1,70 @@
+import { finalizeEvent, type UnsignedEvent } from "nostr-tools";
+import { Relay } from "nostr-tools/relay";
+import { TEST_KEYS } from "./keys.js";
+
+const CALENDAR_EVENT_KIND = 31923;
+
+export async function seedRelay(relayUrl: string): Promise<void> {
+  const relay = new Relay(relayUrl);
+  await relay.connect();
+
+  const alice = TEST_KEYS.alice;
+  const tomorrow = Math.floor(Date.now() / 1000) + 86400;
+
+  // Kind-0 profiles so participant / booker names render instead of npubs.
+  for (const [key, metadata] of [
+    [TEST_KEYS.alice, { name: "Alice" }],
+    // Some clients publish username without name/display_name.
+    [TEST_KEYS.bob, { username: "Bob" }],
+    [TEST_KEYS.carol, { name: "Carol", nip05: "carol@profiles.test" }],
+    [TEST_KEYS.dana, { name: "Dana" }],
+  ] as const) {
+    const profile: UnsignedEvent = {
+      kind: 0,
+      pubkey: key.pubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [],
+      content: JSON.stringify(metadata),
+    };
+    await relay.publish(finalizeEvent(profile, key.secretBytes));
+  }
+
+  // NIP-02 contacts exercise contact suggestions and p-tag deduping.
+  // Seeded for Dana (used by event-participants.spec.ts so participant history
+  // stays isolated from tests sharing Alice's account) and Alice.
+  for (const author of [TEST_KEYS.dana, alice]) {
+    const contacts: UnsignedEvent = {
+      kind: 3,
+      pubkey: author.pubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ["p", TEST_KEYS.bob.pubkey],
+        ["p", TEST_KEYS.bob.pubkey, "", "Duplicate Bob"],
+        ["p", TEST_KEYS.carol.pubkey],
+        ["p", "11".repeat(32)],
+      ],
+      content: "",
+    };
+    await relay.publish(finalizeEvent(contacts, author.secretBytes));
+  }
+
+  // One public calendar event by Alice — used by future tests that need a
+  // pre-existing event on the calendar.
+  const unsigned: UnsignedEvent = {
+    kind: CALENDAR_EVENT_KIND,
+    pubkey: alice.pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ["d", "seed-event-01"],
+      ["title", "Seeded Test Event"],
+      ["start", String(tomorrow)],
+      ["end", String(tomorrow + 3600)],
+    ],
+    content: "A seeded event for E2E tests",
+  };
+
+  const signed = finalizeEvent(unsigned, alice.secretBytes);
+  await relay.publish(signed);
+
+  relay.close();
+}

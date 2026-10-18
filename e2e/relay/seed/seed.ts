@@ -17,6 +17,7 @@ export async function seedRelay(relayUrl: string): Promise<void> {
     // Some clients publish username without name/display_name.
     [TEST_KEYS.bob, { username: "Bob" }],
     [TEST_KEYS.carol, { name: "Carol", nip05: "carol@profiles.test" }],
+    [TEST_KEYS.dana, { name: "Dana" }],
   ] as const) {
     const profile: UnsignedEvent = {
       kind: 0,
@@ -28,20 +29,24 @@ export async function seedRelay(relayUrl: string): Promise<void> {
     await relay.publish(finalizeEvent(profile, key.secretBytes));
   }
 
-  // Alice's NIP-02 contacts exercise contact suggestions and p-tag deduping.
-  const contacts: UnsignedEvent = {
-    kind: 3,
-    pubkey: alice.pubkey,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", TEST_KEYS.bob.pubkey],
-      ["p", TEST_KEYS.bob.pubkey, "", "Duplicate Bob"],
-      ["p", TEST_KEYS.carol.pubkey],
-      ["p", "11".repeat(32)],
-    ],
-    content: "",
-  };
-  await relay.publish(finalizeEvent(contacts, alice.secretBytes));
+  // NIP-02 contacts exercise contact suggestions and p-tag deduping.
+  // Seeded for Dana (used by event-participants.spec.ts so participant history
+  // stays isolated from tests sharing Alice's account) and Alice.
+  for (const author of [TEST_KEYS.dana, alice]) {
+    const contacts: UnsignedEvent = {
+      kind: 3,
+      pubkey: author.pubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ["p", TEST_KEYS.bob.pubkey],
+        ["p", TEST_KEYS.bob.pubkey, "", "Duplicate Bob"],
+        ["p", TEST_KEYS.carol.pubkey],
+        ["p", "11".repeat(32)],
+      ],
+      content: "",
+    };
+    await relay.publish(finalizeEvent(contacts, author.secretBytes));
+  }
 
   // One public calendar event by Alice — used by future tests that need a
   // pre-existing event on the calendar.

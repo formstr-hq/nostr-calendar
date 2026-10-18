@@ -8,6 +8,7 @@ const SEEDS: Record<string, string> = {
   alice: "aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0001",
   bob:   "bbbb0000bbbb0000bbbb0000bbbb0000bbbb0000bbbb0000bbbb0000bbbb0002",
   carol: "cccc0000cccc0000cccc0000cccc0000cccc0000cccc0000cccc0000cccc0003",
+  dana:  "dddd0000dddd0000dddd0000dddd0000dddd0000dddd0000dddd0000dddd0005",
 };
 
 export type TestKey = {
@@ -34,4 +35,4 @@ function deriveKey(hexSeed: string): TestKey {
 
 export const TEST_KEYS = Object.fromEntries(
   Object.entries(SEEDS).map(([name, hex]) => [name, deriveKey(hex)]),
-) as Record<"alice" | "bob" | "carol", TestKey>;
+) as Record<"alice" | "bob" | "carol" | "dana", TestKey>;

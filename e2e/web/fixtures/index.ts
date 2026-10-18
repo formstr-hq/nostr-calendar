@@ -104,6 +104,8 @@ type Fixtures = {
   bobPage: Page;
   // A third context authenticated as Carol.
   carolPage: Page;
+  // A fourth context authenticated as Dana (dedicated to isolated participant tests).
+  danaPage: Page;
 };
 
 async function fastAuthedPage(
@@ -147,6 +149,16 @@ export const test = base.extend<Fixtures>({
       browser,
       TEST_KEYS.carol,
       "Carol",
+    );
+    await use(page);
+    await context.close();
+  },
+
+  danaPage: async ({ browser }, use) => {
+    const { page, context } = await fastAuthedPage(
+      browser,
+      TEST_KEYS.dana,
+      "Dana",
     );
     await use(page);
     await context.close();

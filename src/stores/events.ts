@@ -224,6 +224,7 @@ export const useTimeBasedEvents = create<{
     daysAfter?: number;
   }) => void;
   addEvent: (event: ICalendarEvent) => void;
+  addEvents: (events: ICalendarEvent[]) => void;
   updateEvent: (event: ICalendarEvent) => void;
   removeEvent: (id: string) => void;
   resetPrivateEvents: () => void;
@@ -248,6 +249,30 @@ export const useTimeBasedEvents = create<{
     });
     if (added) recordParticipantHistory([newEvent]);
     void syncEventNotifications(newEvent);
+  },
+  addEvents: (newEvents) => {
+    if (newEvents.length === 0) return;
+    const addedEvents: ICalendarEvent[] = [];
+    set(({ events }) => {
+      let store = normalize(events);
+      for (const newEvent of newEvents) {
+        if (!store.allKeys.includes(newEvent.id)) {
+          store = appendOne(store, newEvent.id, newEvent);
+          addedEvents.push(newEvent);
+        } else {
+          store = removeOne(store, newEvent.id);
+          store = appendOne(store, newEvent.id, newEvent);
+          addedEvents.push(newEvent);
+        }
+      }
+      const updatedEvents = denormalize(store);
+      saveEventsToStorage(updatedEvents);
+      return { eventById: store.byKey, events: updatedEvents };
+    });
+    if (addedEvents.length > 0) recordParticipantHistory(addedEvents);
+    for (const evt of addedEvents) {
+      void syncEventNotifications(evt);
+    }
   },
   updateEvent: (updatedEvent) => {
     set(({ events }) => {
@@ -394,7 +419,7 @@ export const useTimeBasedEvents = create<{
     const hintRelays = new Set<string>();
     const viewKeyMap = new Map<
       string,
-      { viewKey: string; calendarId: string; relayUrl: string }
+      Array<{ viewKey: string; calendarId: string; relayUrl: string }>
     >();
 
     for (const ref of visibleRefs) {
@@ -403,11 +428,18 @@ export const useTimeBasedEvents = create<{
       authorPubkeys.add(parsed.authorPubkey);
       kinds.add(parsed.kind);
       if (parsed.relayUrl) hintRelays.add(parsed.relayUrl);
-      viewKeyMap.set(parsed.eventDTag, {
+
+      const list = viewKeyMap.get(parsed.eventDTag) || [];
+      const entry = {
         viewKey: parsed.viewKey || "",
         calendarId: refToCalendarId.get(ref[0]) || "",
         relayUrl: parsed.relayUrl,
-      });
+      };
+      // Avoid duplicate exact viewKey entries
+      if (!list.some((existing) => existing.viewKey === entry.viewKey)) {
+        list.push(entry);
+      }
+      viewKeyMap.set(parsed.eventDTag, list);
     }
 
     // Only re-declare when the visible set actually changed — this method is
@@ -426,17 +458,40 @@ export const useTimeBasedEvents = create<{
       },
       (event) => {
         const dTag = getDTag(event);
-        const meta = dTag ? viewKeyMap.get(dTag) : undefined;
-        if (!meta || !meta.viewKey) return;
-        const decrypted = viewPrivateEvent(event, meta.viewKey);
-        if (decrypted) {
-          processPrivateEvent(
-            decrypted,
-            timeRange,
-            meta.viewKey,
-            meta.calendarId,
-            meta.relayUrl,
-          );
+        const candidates = dTag ? viewKeyMap.get(dTag) : undefined;
+
+        if (candidates && candidates.length > 0) {
+          for (const meta of candidates) {
+            if (!meta.viewKey) continue;
+            const decrypted = viewPrivateEvent(event, meta.viewKey);
+            if (decrypted) {
+              processPrivateEvent(
+                decrypted,
+                timeRange,
+                meta.viewKey,
+                meta.calendarId,
+                meta.relayUrl,
+              );
+              return;
+            }
+          }
+        }
+
+        // Fallback: check if the store already knows a valid viewKey for this event
+        if (dTag) {
+          const cachedEvent = useTimeBasedEvents.getState().eventById[dTag];
+          if (cachedEvent?.viewKey) {
+            const decrypted = viewPrivateEvent(event, cachedEvent.viewKey);
+            if (decrypted) {
+              processPrivateEvent(
+                decrypted,
+                timeRange,
+                cachedEvent.viewKey,
+                cachedEvent.calendarId,
+                cachedEvent.relayHint,
+              );
+            }
+          }
         }
       },
     );

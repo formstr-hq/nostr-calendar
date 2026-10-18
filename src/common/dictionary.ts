@@ -305,6 +305,8 @@ const dictionary: NestedObject = {
       deviceReadOnlyNote: "Name and account are read-only for device calendars",
       deviceColorFallbackNote:
         "Some Google-synced calendars don't accept color changes from apps. If that happens here, Formstr will still show this color everywhere in the app — it just won't write back to your device.",
+      eventsCount: "{count} {count, plural, one {event} other {events}}",
+      viewEvents: "View events",
     },
     sidebar: {
       calendars: "Calendars",
@@ -616,6 +618,38 @@ const dictionary: NestedObject = {
       detailsConfigured: "Details added",
       detailsEmpty: "Add details",
     },
+    bulkImport: {
+      title: "Import Events",
+      importing: "Importing events…",
+      selectAll: "Select all",
+      deselectAll: "Deselect all",
+      importSelected:
+        "Import {count} {count, plural, one {event} other {events}}",
+      importSuccess:
+        "{count} {count, plural, one {event} other {events}} imported successfully",
+      cancelImport: "Cancel import",
+      cancelling: "Cancelling…",
+      importCancelled:
+        "Import cancelled. Events already imported have been kept.",
+      finish: "Finish",
+      close: "Close",
+      importError: "Failed to import some events",
+      invalidICS:
+        "Could not read this .ics file. Check that it is a valid calendar file.",
+      invalidZip:
+        "Could not open this ZIP archive. Check that it is a valid .zip file.",
+      zipContainsNoICSFiles:
+        "This ZIP archive does not contain any .ics files.",
+      icsNoEventsFound: "No calendar events were found in this .ics file.",
+      zipNoEventsFound:
+        "No calendar events were found in the .ics files in this ZIP archive.",
+      eventsFound: "{count} {count, plural, one {event} other {events}} found",
+      newCalendarNotice: "A new calendar will be created for these events",
+      destinationCalendars: "Destination calendars",
+    },
+    ics: {
+      importTooltip: "Import .ics or .zip file",
+    },
   },
   "de-DE": {
     navigation: {
@@ -880,6 +914,8 @@ const dictionary: NestedObject = {
         "Name und Konto sind bei Gerätekalendern schreibgeschützt",
       deviceColorFallbackNote:
         "Manche mit Google synchronisierte Kalender akzeptieren keine Farbänderungen von Apps. Falls das hier passiert, zeigt Formstr diese Farbe trotzdem überall in der App an — sie wird nur nicht auf Ihr Gerät zurückgeschrieben.",
+      eventsCount: "{count} {count, plural, one {Termin} other {Termine}}",
+      viewEvents: "Termine anzeigen",
     },
     sidebar: {
       calendars: "Kalender",
@@ -1168,6 +1204,39 @@ const dictionary: NestedObject = {
       daysCount: "{count} Tag(e)",
       detailsConfigured: "Details hinzugefügt",
       detailsEmpty: "Details hinzufügen",
+    },
+    bulkImport: {
+      title: "Termine importieren",
+      importing: "Termine werden importiert…",
+      selectAll: "Alle auswählen",
+      deselectAll: "Alle abwählen",
+      importSelected:
+        "{count} {count, plural, one {Termin} other {Termine}} importieren",
+      importSuccess:
+        "{count} {count, plural, one {Termin} other {Termine}} erfolgreich importiert",
+      cancelImport: "Import abbrechen",
+      cancelling: "Wird abgebrochen…",
+      importCancelled:
+        "Import abgebrochen. Bereits importierte Termine bleiben erhalten.",
+      finish: "Fertig",
+      close: "Schließen",
+      importError: "Einige Termine konnten nicht importiert werden",
+      invalidICS:
+        "Diese .ics-Datei konnte nicht gelesen werden. Prüfen Sie, ob sie eine gültige Kalenderdatei ist.",
+      invalidZip:
+        "Dieses ZIP-Archiv konnte nicht geöffnet werden. Prüfen Sie, ob es eine gültige .zip-Datei ist.",
+      zipContainsNoICSFiles: "Dieses ZIP-Archiv enthält keine .ics-Dateien.",
+      icsNoEventsFound:
+        "In dieser .ics-Datei wurden keine Kalendertermine gefunden.",
+      zipNoEventsFound:
+        "In den .ics-Dateien dieses ZIP-Archivs wurden keine Kalendertermine gefunden.",
+      eventsFound:
+        "{count} {count, plural, one {Termin} other {Termine}} gefunden",
+      newCalendarNotice: "Ein neuer Kalender wird für diese Termine erstellt",
+      destinationCalendars: "Zielkalender",
+    },
+    ics: {
+      importTooltip: ".ics- oder .zip-Datei importieren",
     },
   },
 };

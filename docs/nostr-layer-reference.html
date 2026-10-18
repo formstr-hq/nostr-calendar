@@ -192,6 +192,7 @@
       <li><a href="#f-priv-edit">Private event: edit</a></li>
       <li><a href="#f-pub-edit">Public event: edit</a></li>
       <li><a href="#f-duplicate">Event duplication</a></li>
+      <li><a href="#f-ics-import">ICS / ZIP import</a></li>
       <li><a href="#f-delete">Event deletion</a></li>
       <li><a href="#f-rsvp-priv">RSVP: private</a></li>
       <li><a href="#f-rsvp-pub">RSVP: public</a></li>
@@ -284,7 +285,7 @@
       <article class="flow" id="f-priv-create">
         <h3>Private event — create <span class="kind-badge">kind 32678</span></h3>
         <p class="trigger">Triggered by: saving a new event in the editor with the <strong>private</strong> toggle on.</p>
-        <div class="field"><span class="label">Identity</span><p>Parameterized-replaceable. <code>d</code> = random/derived hash. Coordinate = <code>32678:&lt;author&gt;:&lt;d&gt;</code>.</p></div>
+        <div class="field"><span class="label">Identity</span><p>Parameterized-replaceable. <code>d</code> = random/derived hash for UI-created events, or deterministic <code>sha256("ics-" + UID)[0..30]</code> for ICS imports (see <a href="#f-ics-import">ICS / ZIP calendar import</a>). Coordinate = <code>32678:&lt;author&gt;:&lt;d&gt;</code>.</p></div>
         <div class="field"><span class="label">Outer tags (public)</span><p>Only <code>["d", dTag]</code> — everything else lives inside encrypted content.</p></div>
         <div class="field"><span class="label">Content (NIP-44 self-encrypted, per-event view key)</span>
           <table class="tagtable">
@@ -339,6 +340,28 @@
       <article class="flow" id="f-duplicate">
         <h3>Event duplication</h3>
         <p>UI convenience only — pre-fills the editor with the source event's data but no <code>d</code>/id, so saving runs through ordinary create (32678 or 31923). No distinct wire behavior.</p>
+      </article>
+
+      <article class="flow" id="f-ics-import">
+        <h3>ICS / ZIP calendar import</h3>
+        <p class="trigger">Triggered by: uploading a <code>.ics</code> file or a <code>.zip</code> archive of <code>.ics</code> files (e.g. Google Calendar Takeout) via the calendar import button.</p>
+        <div class="field"><span class="label">Identity &amp; deterministic d-tag</span>
+          <p>Imported events derive their <code>d</code> tag deterministically from the iCalendar VEVENT <code>UID</code>:</p>
+          <ul>
+            <li>Single or non-recurring event: <code>sha256("ics-" + UID)[0..30]</code> (30-character hex substring)</li>
+            <li>Recurring instance (with <code>RECURRENCE-ID</code>): <code>sha256("ics-" + UID + "-" + RECURRENCE-ID)[0..30]</code></li>
+            <li>Fallback (if no UID present): <code>sha256(JSON(event) + timestamp + index)[0..30]</code></li>
+          </ul>
+        </div>
+        <div class="field"><span class="label">Re-import overwrite (idempotence)</span>
+          <p>Because kind 32678 (private) and kind 31923 (public) are parameterized-replaceable addressable events (coordinate <code>&lt;kind&gt;:&lt;author&gt;:&lt;d&gt;</code>), re-importing an updated or identical ICS file with the same VEVENT <code>UID</code> republishes on the exact same <code>d</code> tag. This replaces/overwrites the existing event on relays instead of creating duplicate calendar entries (affects both the bulk import flow and the single-event import path).</p>
+        </div>
+        <div class="callout"><span class="label">Edge case — cross-dataset / cross-calendar collision</span>
+          <p>The <code>d</code> tag seed is derived solely from the <code>UID</code> and is not namespaced by calendar list. If the same <code>UID</code> appears across different ICS files, datasets, or target calendars under the same user pubkey, the later import will clobber (overwrite) the prior event.</p>
+        </div>
+        <div class="field"><span class="label">Participants &amp; invitation bypass</span>
+          <p>Personal imported events typically have no Nostr participants (<code>participants = []</code>). When <code>participants</code> is empty, profile queries (kind 0 metadata), relay list lookups (NIP-65), and NIP-59 gift-wrap invitation creation are bypassed during bulk publishing to avoid relay request saturation.</p>
+        </div>
       </article>
 
       <article class="flow" id="f-delete">
