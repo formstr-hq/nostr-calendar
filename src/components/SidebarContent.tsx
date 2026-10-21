@@ -23,6 +23,7 @@ import { SidebarDeviceCalendars } from "./sidebar/SidebarDeviceCalendars";
 import { useUser } from "../stores/user";
 import { useSettings } from "../stores/settings";
 import { useAppointmentData } from "../hooks/useAppointmentData";
+import { useAppDesk } from "@formstr/common-ui";
 import {
   getDateFromPathname,
   getLayoutFromPathname,
@@ -52,6 +53,7 @@ export function SidebarContent({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { isInitialized } = useUser();
+  const openDesk = useAppDesk();
   useAppointmentData();
   // Pathname-derived, not useParams() — SidebarContent is mounted above
   // <Routes> (see useCalendarTopBarProps for the same constraint).
@@ -178,6 +180,23 @@ export function SidebarContent({
           pb={1.5}
         >
           <Box display="flex" gap={1.5} flexWrap="wrap">
+            <Box
+              component="button"
+              type="button"
+              onClick={(event) => openDesk(event.currentTarget)}
+              sx={{
+                border: 0,
+                p: 0,
+                bgcolor: "transparent",
+                color: "inherit",
+                font: "inherit",
+                fontSize: "0.75rem",
+                cursor: "pointer",
+                "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              {intl.formatMessage({ id: "sidebar.apps" })}
+            </Box>
             <Typography
               variant="caption"
               component="a"

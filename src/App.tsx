@@ -1,4 +1,5 @@
 import { AppThemeProvider } from "./theme/AppThemeProvider";
+import { AppDeskProvider } from "./contexts/AppDeskProvider";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useUser } from "./stores/user";
@@ -301,7 +302,9 @@ export default function App() {
       >
         <AppThemeProvider>
           <BrowserRouter>
-            <Application />
+            <AppDeskProvider>
+              <Application />
+            </AppDeskProvider>
           </BrowserRouter>
         </AppThemeProvider>
       </LocalizationProvider>

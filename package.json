@@ -35,6 +35,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource/inter": "^5.3.0",
+    "@formstr/common-ui": "^0.1.0",
     "@formstr/local-relay": "0.6.0",
     "@formstr/sdk": "^0.2.7",
     "@formstr/signer": "^0.2.2",

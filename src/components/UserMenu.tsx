@@ -1,9 +1,18 @@
-import { Alert, IconButton, Menu, Snackbar } from "@mui/material";
+import {
+  Alert,
+  Divider,
+  IconButton,
+  Menu,
+  MenuItem,
+  Snackbar,
+} from "@mui/material";
 import { useState } from "react";
 import { useIntl } from "react-intl";
 import { Auth } from "./Auth";
 import { useUser } from "../stores/user";
 import { NostrAvatar } from "./NostrAvatar";
+import AppsIcon from "@mui/icons-material/Apps";
+import { useAppDesk } from "@formstr/common-ui";
 
 export const UserMenu = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -11,6 +20,7 @@ export const UserMenu = () => {
   const open = Boolean(anchorEl);
   const intl = useIntl();
   const { user } = useUser((state) => state);
+  const openDesk = useAppDesk();
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -36,6 +46,16 @@ export const UserMenu = () => {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
       >
+        <MenuItem
+          onClick={() => {
+            if (anchorEl) openDesk(anchorEl);
+            handleClose();
+          }}
+        >
+          <AppsIcon fontSize="small" sx={{ mr: 1 }} />
+          Apps
+        </MenuItem>
+        <Divider />
         <Auth onClose={handleClose} onCopied={() => setCopied(true)} />
       </Menu>
       <Snackbar
