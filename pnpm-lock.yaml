@@ -44,8 +44,8 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@formstr/common-ui':
-        specifier: ^0.1.0
-        version: 0.1.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        specifier: ^0.1.2
+        version: 0.1.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@formstr/local-relay':
         specifier: 0.6.0
         version: 0.6.0(typescript@5.8.3)
@@ -1385,8 +1385,8 @@ packages:
       typescript:
         optional: true
 
-  '@formstr/common-ui@0.1.0':
-    resolution: {integrity: sha512-IpN/zONr5FHa/7euGCqXTQlu15hr+5VTjzKIE1uYYUbti121jASaGNW/jFD+Jt7I2+jNqiWLaIaPGnM4pPo6oQ==}
+  '@formstr/common-ui@0.1.2':
+    resolution: {integrity: sha512-K+wO34KsegxD9j+gKLMZihxb3gJrHKeELGz4aS/VsVOMqD2ZruuvvYtd0Q/pyde9Ij/Klau/n+uUfljYrvHTPw==}
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
@@ -6557,7 +6557,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.8.3
 
-  '@formstr/common-ui@0.1.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+  '@formstr/common-ui@0.1.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
