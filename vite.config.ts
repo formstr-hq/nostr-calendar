@@ -6,6 +6,11 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   // The local-relay worker is a module worker with package imports.
   worker: { format: "es" },
+  resolve: {
+    // The common-ui package is linked from common-packages during development.
+    // Without dedupe, its local React copy shadows the app's and hooks break.
+    dedupe: ["react", "react-dom"],
+  },
   plugins: [
     react(),
     VitePWA({
