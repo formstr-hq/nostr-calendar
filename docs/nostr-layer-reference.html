@@ -555,6 +555,9 @@
         </div>
         <p>Per-event publish fan-out (inside the worker, outside this repo): user relays ∪ author's own outbox ∪ each p-tagged recipient's inbox. Delivery is durable — "zero acceptance means queued for retry, not failed."</p>
         <div class="field"><span class="label">Dedicated profile-search relays</span><p>At data-layer bootstrap the app separately calls <code>setSearchRelays</code> with <code>wss://relay.noswhere.com</code> and <code>wss://nostr.wine</code> (or <code>VITE_TEST_RELAY</code> in tests). Filters with a non-blank NIP-50 <code>search</code> field route there instead of through author/outbox or ordinary user relays; an empty configured set falls back to the ordinary read set. These relays are routing policy only and are not published in kind 10002.</p></div>
+        <div class="field"><span class="label">Relay health &amp; connectivity testing</span>
+          <p>The app never opens raw WebSockets on the main thread; the local-relay worker owns every socket connection. When viewing relay status, <code>getDataLayer().relayHealth()</code> reads the worker's live connection pool state without network overhead (<code>connected: true</code> &rarr; green, <code>connecting</code>/<code>reconnecting</code> &rarr; yellow, disconnected &rarr; red). When the user explicitly requests an on-demand latency test or "Test All Connections", the request is dispatched to <code>relay.worker.ts</code> via <code>pingRelayViaWorker</code>, measuring handshake latency strictly within the worker layer and reporting the result back to the UI.</p>
+        </div>
       </article>
 
       <article class="flow" id="f-profile">

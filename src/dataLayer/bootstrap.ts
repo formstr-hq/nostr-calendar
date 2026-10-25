@@ -27,6 +27,15 @@ import { withResilientObserve } from "./resilientObserve";
 // `pollerama-local-relay:<namespace>`; our worker uses namespace "nostr-calendar".
 const RELAY_DB_NAME = "pollerama-local-relay:nostr-calendar";
 
+export interface RelayPingOutcome {
+  url: string;
+  status: "ok" | "slow" | "error";
+  latencyMs?: number;
+  errorMessage?: string;
+}
+
+const pendingPings = new Map<string, (result: RelayPingOutcome) => void>();
+
 let started = false;
 let worker: Worker | null = null;
 let client: LocalRelayClient | null = null;
@@ -61,12 +70,23 @@ function spawn(): void {
     close: () => base.close(),
     onMessage: (handler) =>
       base.onMessage((m) => {
-        const kind = (m as { kind?: string } | null)?.kind;
-        if (kind === "hydrated") {
+        const msg = m as {
+          kind?: string;
+          reqId?: string;
+          result?: RelayPingOutcome;
+        } | null;
+        if (msg?.kind === "hydrated") {
           notifyRelayRefresh();
-        } else if (kind === "ready") {
+        } else if (msg?.kind === "ready") {
           readyCount += 1;
           if (readyCount > 1) notifyRelayRefresh(); // restart, not first boot
+        } else if (msg?.kind === "pingRelayResult" && msg.reqId) {
+          const resolver = pendingPings.get(msg.reqId);
+          if (resolver && msg.result) {
+            pendingPings.delete(msg.reqId);
+            resolver(msg.result);
+            return;
+          }
         }
         handler(m);
       }),
@@ -125,6 +145,10 @@ export function bootstrapDataLayer(): DataLayer {
 export async function restartDataLayerWiped(): Promise<void> {
   disposeResilient?.();
   disposeResilient = null;
+  for (const resolve of pendingPings.values()) {
+    resolve({ url: "", status: "error", errorMessage: "Worker restarted" });
+  }
+  pendingPings.clear();
   worker?.terminate(); // closes every worker-owned socket with it
   worker = null;
   client = null;
@@ -136,4 +160,35 @@ export async function restartDataLayerWiped(): Promise<void> {
 
   spawn();
   notifyRelayRefresh();
+}
+
+/**
+ * Pings a relay URL strictly through the local-relay Web Worker.
+ * Preserves the architectural invariant that the main thread never opens a raw WebSocket.
+ */
+export function pingRelayViaWorker(url: string): Promise<RelayPingOutcome> {
+  if (!worker) {
+    return Promise.resolve({
+      url,
+      status: "error",
+      errorMessage: "Relay worker is not running",
+    });
+  }
+  const reqId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingPings.delete(reqId);
+      resolve({
+        url,
+        status: "error",
+        errorMessage: "Worker response timed out",
+      });
+    }, 10000);
+
+    pendingPings.set(reqId, (outcome) => {
+      clearTimeout(timer);
+      resolve(outcome);
+    });
+    worker!.postMessage({ kind: "pingRelay", reqId, url });
+  });
 }

@@ -1,5 +1,13 @@
-import { ReactNode } from "react";
-import { Badge, Box, IconButton, Link, Typography } from "@mui/material";
+import { ReactNode, useState } from "react";
+import {
+  Badge,
+  Box,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Link,
+  Typography,
+} from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import NotificationsIcon from "@mui/icons-material/Notifications";
@@ -8,6 +16,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { RelayStatusDots, RelayStatusEntry } from "./RelayStatusDots";
 import type { Layout } from "../../hooks/useLayout";
 import { Link as RouterLink } from "react-router";
+import { RelaySettingsPage } from "../../features/settings/RelaySettingsPage";
 
 export const TOPBAR_HEIGHT = 64;
 /** Height of the mobile-only second row (view switcher + Today) below the main bar. */
@@ -33,6 +42,7 @@ interface TopBarProps {
   onToday?: () => void;
   unreadCount: number;
   onBellClick: () => void;
+  onRelayStatusClick?: () => void;
   onOpenCalendars?: () => void;
   relays: RelayStatusEntry[];
   avatarSlot: ReactNode;
@@ -51,10 +61,12 @@ export function TopBar({
   onToday,
   unreadCount,
   onBellClick,
+  onRelayStatusClick,
   onOpenCalendars,
   relays,
   avatarSlot,
 }: TopBarProps) {
+  const [relaySettingsOpen, setRelaySettingsOpen] = useState(false);
   const viewSwitcher = mode === "calendar" && view && onViewChange && (
     <SegmentedControl
       aria-label="Calendar view"
@@ -89,124 +101,155 @@ export function TopBar({
   );
 
   return (
-    <Box
-      sx={{
-        position: "sticky",
-        top: 0,
-        zIndex: (theme) => theme.zIndex.appBar,
-        bgcolor: "background.paper",
-        borderBottom: "1px solid",
-        borderColor: "divider",
-        pt: "var(--safe-area-top)",
-      }}
-    >
+    <>
       <Box
         sx={{
-          height: TOPBAR_HEIGHT,
-          display: "flex",
-          alignItems: "center",
-          gap: 2,
-          px: isMobile ? 1.5 : 2.5,
+          position: "sticky",
+          top: 0,
+          zIndex: (theme) => theme.zIndex.appBar,
+          bgcolor: "background.paper",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          pt: "var(--safe-area-top)",
         }}
       >
-        <Link
-          component={RouterLink}
-          to="/"
-          underline="none"
-          color="inherit"
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            flexShrink: 0,
-          }}
-        >
-          {!isMobile && (
-            <Typography sx={{ fontWeight: 800, fontSize: 15 }}>
-              Calendar by
-            </Typography>
-          )}
-          <img
-            src="/formstr.png"
-            alt="Formstr"
-            style={{ height: 28, width: "auto" }}
-          />
-        </Link>
-
-        {isMobile && onOpenCalendars && (
-          <IconButton
-            aria-label="Open calendars"
-            onClick={onOpenCalendars}
-            size="small"
-          >
-            <CalendarViewMonthIcon fontSize="small" />
-          </IconButton>
-        )}
-
-        {mode === "calendar" ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            {!isMobile && (
-              <>
-                <IconButton aria-label="previous period" onClick={onPrev}>
-                  <ChevronLeftIcon />
-                </IconButton>
-                <IconButton aria-label="next period" onClick={onNext}>
-                  <ChevronRightIcon />
-                </IconButton>
-              </>
-            )}
-            <Typography
-              data-testid="topbar-date-label"
-              sx={{ fontWeight: 800, fontSize: isMobile ? 15 : 20 }}
-            >
-              {isMobile ? (dateLabelMobile ?? dateLabel) : dateLabel}
-            </Typography>
-          </Box>
-        ) : (
-          <Typography sx={{ fontWeight: 800, fontSize: isMobile ? 15 : 20 }}>
-            {title}
-          </Typography>
-        )}
-
-        <Box sx={{ flex: 1 }} />
-
-        {!isMobile && viewSwitcher}
-        {!isMobile && todayButton}
-
-        {!isMobile && (
-          <IconButton
-            aria-label="Notifications"
-            onClick={onBellClick}
-            size="small"
-          >
-            <Badge badgeContent={unreadCount} color="error">
-              <NotificationsIcon fontSize="small" />
-            </Badge>
-          </IconButton>
-        )}
-
-        {!isMobile && <RelayStatusDots relays={relays} />}
-
-        {avatarSlot}
-      </Box>
-
-      {isMobile && (viewSwitcher || todayButton) && (
         <Box
           sx={{
-            height: MOBILE_TOPBAR_ROW2_HEIGHT,
+            height: TOPBAR_HEIGHT,
             display: "flex",
             alignItems: "center",
-            gap: 1,
-            px: 1.5,
-            borderTop: "1px solid",
-            borderColor: "divider",
-            justifyContent: "space-between",
+            gap: 2,
+            px: isMobile ? 1.5 : 2.5,
           }}
         >
-          {viewSwitcher}
-          {todayButton}
+          <Link
+            component={RouterLink}
+            to="/"
+            underline="none"
+            color="inherit"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexShrink: 0,
+            }}
+          >
+            {!isMobile && (
+              <Typography sx={{ fontWeight: 800, fontSize: 15 }}>
+                Calendar by
+              </Typography>
+            )}
+            <img
+              src="/formstr.png"
+              alt="Formstr"
+              style={{ height: 28, width: "auto" }}
+            />
+          </Link>
+
+          {isMobile && onOpenCalendars && (
+            <IconButton
+              aria-label="Open calendars"
+              onClick={onOpenCalendars}
+              size="small"
+            >
+              <CalendarViewMonthIcon fontSize="small" />
+            </IconButton>
+          )}
+
+          {mode === "calendar" ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              {!isMobile && (
+                <>
+                  <IconButton aria-label="previous period" onClick={onPrev}>
+                    <ChevronLeftIcon />
+                  </IconButton>
+                  <IconButton aria-label="next period" onClick={onNext}>
+                    <ChevronRightIcon />
+                  </IconButton>
+                </>
+              )}
+              <Typography
+                data-testid="topbar-date-label"
+                sx={{ fontWeight: 800, fontSize: isMobile ? 15 : 20 }}
+              >
+                {isMobile ? (dateLabelMobile ?? dateLabel) : dateLabel}
+              </Typography>
+            </Box>
+          ) : (
+            <Typography sx={{ fontWeight: 800, fontSize: isMobile ? 15 : 20 }}>
+              {title}
+            </Typography>
+          )}
+
+          <Box sx={{ flex: 1 }} />
+
+          {!isMobile && viewSwitcher}
+          {!isMobile && todayButton}
+
+          {!isMobile && (
+            <IconButton
+              aria-label="Notifications"
+              onClick={onBellClick}
+              size="small"
+            >
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon fontSize="small" />
+              </Badge>
+            </IconButton>
+          )}
+
+          {!isMobile && (
+            <RelayStatusDots
+              relays={relays}
+              onClick={onRelayStatusClick ?? (() => setRelaySettingsOpen(true))}
+            />
+          )}
+
+          {avatarSlot}
         </Box>
-      )}
-    </Box>
+
+        {isMobile && (viewSwitcher || todayButton) && (
+          <Box
+            sx={{
+              height: MOBILE_TOPBAR_ROW2_HEIGHT,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 1.5,
+              borderTop: "1px solid",
+              borderColor: "divider",
+              justifyContent: "space-between",
+            }}
+          >
+            {viewSwitcher}
+            {todayButton}
+          </Box>
+        )}
+      </Box>
+
+      <Dialog
+        open={relaySettingsOpen}
+        onClose={() => setRelaySettingsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        fullScreen={isMobile}
+        aria-labelledby="relay-settings-heading"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: { xs: 0, sm: 3 },
+              p: { xs: 1, sm: 2 },
+            },
+          },
+        }}
+      >
+        <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+          <RelaySettingsPage
+            isDialog
+            onClose={() => setRelaySettingsOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
