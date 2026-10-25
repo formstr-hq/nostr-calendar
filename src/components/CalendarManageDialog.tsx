@@ -23,10 +23,15 @@ import CircleIcon from "@mui/icons-material/Circle";
 import {
   DEFAULT_NOTIFICATION_PREFERENCE,
   type ICalendarList,
+  findCalendarForEvent,
 } from "../utils/calendarListTypes";
 import { useIntl } from "react-intl";
 import type { NotificationPreference } from "../utils/types";
 import { PRESET_COLORS } from "../utils/calendarColorPresets";
+import dayjs from "dayjs";
+import { useDateWithRouting } from "../hooks/useDateWithRouting";
+import { useLayout } from "../hooks/useLayout";
+import { useTimeBasedEvents } from "../stores/events";
 
 interface CalendarManageDialogProps {
   open: boolean;
@@ -59,11 +64,34 @@ export function CalendarManageDialog({
   const intl = useIntl();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { setDate } = useDateWithRouting();
+  const { layout } = useLayout();
+  const allEvents = useTimeBasedEvents((s) => s.events);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [pendingAction, setPendingAction] = useState<"save" | "delete" | null>(
     null,
   );
   const [actionError, setActionError] = useState(false);
+
+  const handleJumpToEvents = () => {
+    if (!calendar || calendar.eventRefs.length === 0) return;
+    const calEvents = allEvents.filter((e) => {
+      const owning = findCalendarForEvent([calendar], e);
+      return owning?.id === calendar.id || e.calendarId === calendar.id;
+    });
+    const now = Date.now();
+    const sorted = [...calEvents].sort((a, b) => a.begin - b.begin);
+    const upcoming = sorted.find(
+      (e) => e.end >= now || (e.repeat?.rrule && e.begin <= now),
+    );
+    const target = upcoming
+      ? upcoming.begin
+      : (sorted[sorted.length - 1]?.begin ?? null);
+    if (target) {
+      setDate(dayjs(target), layout);
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -143,6 +171,39 @@ export function CalendarManageDialog({
 
       <DialogContent dividers>
         <Box display="flex" flexDirection="column" gap={3}>
+          {calendar && calendar.eventRefs.length > 0 && (
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: "action.hover",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircleIcon sx={{ fontSize: 10, color: calendar.color }} />
+                <Typography variant="body2" fontWeight={600}>
+                  {intl.formatMessage(
+                    { id: "calendarManage.eventsCount" },
+                    { count: calendar.eventRefs.length },
+                  )}
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={handleJumpToEvents}
+                sx={{ textTransform: "none", fontSize: "0.75rem", py: 0.5 }}
+              >
+                {intl.formatMessage({ id: "calendarManage.viewEvents" })}
+              </Button>
+            </Box>
+          )}
+
           <TextField
             fullWidth
             label={intl.formatMessage({ id: "calendarManage.calendarName" })}

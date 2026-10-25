@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { parseICS } from "../common/utils";
+import { parseICSMultiple } from "../common/utils";
 import { ICalendarEvent } from "../utils/types";
 import { useUser } from "../stores/user";
+import { useBulkImport } from "../stores/bulkImport";
 import CalendarEventEdit from "./CalendarEventEdit";
 
 interface ICSListenerProps {
@@ -18,6 +19,19 @@ export function ICSListener({
   const { user } = useUser();
   const pendingIcsContent = useRef<string | null>(null);
 
+  const processContent = (content: string) => {
+    try {
+      const events = parseICSMultiple(content);
+      if (events.length === 1) {
+        onImportEvent(events[0]);
+      } else if (events.length > 1) {
+        useBulkImport.getState().openWithEvents(events);
+      }
+    } catch (err) {
+      console.error("Failed to parse .ics file:", err);
+    }
+  };
+
   // Android currently dispatches this event for .ics file intents. Registering
   // the passive listener everywhere also keeps the bridge testable on the web.
   useEffect(() => {
@@ -31,14 +45,7 @@ export function ICSListener({
         return;
       }
 
-      try {
-        const event = parseICS(content);
-        if (event) {
-          onImportEvent(event);
-        }
-      } catch (err) {
-        console.error("Failed to parse .ics file:", err);
-      }
+      processContent(content);
     };
 
     window.addEventListener("icsFileReceived", handleIcsFile);
@@ -51,14 +58,7 @@ export function ICSListener({
   useEffect(() => {
     if (!user || !pendingIcsContent.current) return;
 
-    try {
-      const event = parseICS(pendingIcsContent.current);
-      if (event) {
-        onImportEvent(event);
-      }
-    } catch (err) {
-      console.error("Failed to parse pending .ics file:", err);
-    }
+    processContent(pendingIcsContent.current);
     pendingIcsContent.current = null;
   }, [user, onImportEvent]);
 

@@ -60,13 +60,59 @@ export async function publishSignedEvent(
   callbacks?: {
     onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
+    timeoutMs?: number;
   },
 ): Promise<PublishResult> {
-  const result = await dataLayer.publishEvent(signed);
-  for (const outcome of result.relayResults) {
-    const ok = outcome.status === "accepted";
-    if (ok) callbacks?.onAcceptedRelays?.(outcome.relay);
-    callbacks?.onRelayComplete?.(outcome.relay, ok);
+  const timeoutMs = callbacks?.timeoutMs;
+  const publishPromise = dataLayer.publishEvent(signed);
+
+  // Capture acceptance and relay completion outside the timeout race so callbacks
+  // always run when the underlying publish settles, even if the caller stopped waiting.
+  let callbacksDispatched = false;
+  const dispatchRelayOutcomes = (res: PublishResult) => {
+    if (callbacksDispatched) return;
+    callbacksDispatched = true;
+    for (const outcome of res.relayResults) {
+      const ok = outcome.status === "accepted";
+      if (ok) callbacks?.onAcceptedRelays?.(outcome.relay);
+      callbacks?.onRelayComplete?.(outcome.relay, ok);
+    }
+  };
+
+  publishPromise
+    .then(dispatchRelayOutcomes)
+    .catch((err) => console.warn("Background publish error:", err));
+
+  let result: PublishResult;
+
+  if (timeoutMs && timeoutMs > 0) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<PublishResult>((resolve) => {
+      timer = setTimeout(
+        () =>
+          resolve({
+            ok: false,
+            accepted: 0,
+            total: 0,
+            relayResults: [],
+          }),
+        timeoutMs,
+      );
+    });
+
+    try {
+      result = await Promise.race([publishPromise, timeoutPromise]);
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    }
+  } else {
+    result = await publishPromise;
   }
+
+  // Ensure callbacks are dispatched if publishPromise won the race
+  dispatchRelayOutcomes(result);
+
   return result;
 }

@@ -23,7 +23,7 @@ import {
 import {
   fetchCalendarLists,
   publishCalendarList,
-  addEventToCalendarList as addEventToCalList,
+  addEventsToCalendarList as addEventsToCalList,
   removeEventFromCalendarList as removeEventFromCalList,
   moveEventBetweenCalendarLists,
   createCalendar,
@@ -92,6 +92,11 @@ interface CalendarListsState {
   addEventToCalendar: (
     calendarId: string,
     eventRef: string[],
+    callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
+  ) => Promise<void>;
+  addEventsToCalendar: (
+    calendarId: string,
+    eventRefs: string[][],
     callbacks?: { onRelayComplete?: (url: string, success: boolean) => void },
   ) => Promise<void>;
   removeEventFromCalendar: (
@@ -330,15 +335,22 @@ export const useCalendarLists = create<CalendarListsState>((set, get) => ({
   },
 
   /**
-   * Adds an event reference to a specific calendar and republishes.
+   * Adds one event reference through the bulk-add path.
    */
   addEventToCalendar: async (calendarId, eventRef, callbacks) => {
+    await get().addEventsToCalendar(calendarId, [eventRef], callbacks);
+  },
+
+  /**
+   * Adds multiple event references to a specific calendar and republishes once.
+   */
+  addEventsToCalendar: async (calendarId, eventRefs, callbacks) => {
     const calendar = get().calendars.find((c) => c.id === calendarId);
     if (!calendar) {
       throw new Error(`Calendar not found: ${calendarId}`);
     }
 
-    const updated = await addEventToCalList(calendar, eventRef, callbacks);
+    const updated = await addEventsToCalList(calendar, eventRefs, callbacks);
 
     set((state) => {
       const calendars = state.calendars.map((c) =>

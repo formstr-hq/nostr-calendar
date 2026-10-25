@@ -30,7 +30,7 @@ async function interceptNip05(page: import("@playwright/test").Page) {
 }
 
 test("searches, deduplicates, and persists event participants", async ({
-  authedPage: page,
+  danaPage: page,
 }) => {
   await interceptNip05(page);
   await createEventViaDialog(page, {

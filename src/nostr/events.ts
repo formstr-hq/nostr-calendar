@@ -27,7 +27,7 @@ import {
   naddrEncode,
 } from "nostr-tools/nip19";
 import { EventKinds } from "./kinds";
-import { defaultRelays } from "../common/relayConfig";
+import { defaultRelays, getRelays } from "../common/relayConfig";
 import { PUBLIC_APP_BASE_URL } from "../utils/platform";
 import { useCalendarLists } from "../stores/calendarLists";
 import { buildEventRef } from "../utils/calendarListTypes";
@@ -102,6 +102,7 @@ async function preparePrivateCalendarEvent(
   dTag: string,
   viewSecretKey: Uint8Array,
   previousCreatedAtSecs = 0,
+  userPubKeyParam?: string,
 ) {
   const eventKind = EventKinds.PrivateCalendarEvent;
   const eventData: (string | number)[][] = [
@@ -149,7 +150,7 @@ async function preparePrivateCalendarEvent(
     }
   });
 
-  const userPublicKey = await getUserPublicKey();
+  const userPublicKey = userPubKeyParam || (await getUserPublicKey());
   eventData.push(["p", userPublicKey]);
   event.participants.forEach((participant) => {
     eventData.push(["p", participant]);
@@ -183,6 +184,8 @@ export async function publishPrivateCalendarEvent(
     existingDTag,
     existingViewKey,
     invitationGiftWrapTags = [],
+    userPublicKey: userPublicKeyParam,
+    timeoutMs,
   }: {
     onAcceptedRelays?: (url: string) => void;
     onRelayComplete?: (url: string, success: boolean) => void;
@@ -195,6 +198,10 @@ export async function publishPrivateCalendarEvent(
     existingViewKey?: string;
     /** Optional public tags to place on the invitation gift wraps. */
     invitationGiftWrapTags?: string[][];
+    /** Optional user public key to avoid re-fetching */
+    userPublicKey?: string;
+    /** Optional publish timeout in ms */
+    timeoutMs?: number;
   },
 ) {
   const viewSecretKey = existingViewKey
@@ -205,7 +212,13 @@ export async function publishPrivateCalendarEvent(
     getPersistedCalendarEventId(event.id) ||
     makeDTag(`${JSON.stringify(event)}-${Date.now()}`);
   const { signedEvent, eventKind, userPublicKey } =
-    await preparePrivateCalendarEvent(event, dTag, viewSecretKey);
+    await preparePrivateCalendarEvent(
+      event,
+      dTag,
+      viewSecretKey,
+      0,
+      userPublicKeyParam,
+    );
 
   // Capture which relay accepts the event to use as a hint in invitations
   // and the creator's calendar list entry, so recipients can fetch from there.
@@ -216,65 +229,70 @@ export async function publishPrivateCalendarEvent(
       onAcceptedRelays?.(url);
     },
     onRelayComplete,
+    timeoutMs,
   });
 
   // Gift-wrap the event keys to each participant (including the creator).
-  // These serve as invitations — recipients will see them as notifications
-  // and can accept them into their own calendars.
-  // Warm the worker's outbox cache with the participants' relay lists first,
-  // so each gift wrap (p-tagging its recipient) routes to the recipient's own
-  // relays — not just the author's.
+  // Only query profiles and relay lists if there are actual participants.
   const targetPubKeys = Array.from(new Set([...event.participants]));
-  const [userProfile] = await Promise.all([
-    fetchUserProfile(userPublicKey),
-    fetchRelayLists(targetPubKeys),
-  ]);
-  const senderName = getSenderDisplayName(userProfile, userPublicKey);
-  const invitationMessage = buildInvitationMessage(
-    senderName,
-    event.title,
-    buildPrivateCalendarEventUrl({
-      kind: eventKind,
-      pubkey: signedEvent.pubkey,
-      dTag,
-      viewKey: nip19.nsecEncode(viewSecretKey),
-      relayHint: publishedRelayHint,
-    }),
-  );
-  const giftWraps = await Promise.all(
-    targetPubKeys.map(async (participant) => {
-      const giftWrapEvent = await wrapEvent(
-        (signingNsec) => ({
-          pubkey: userPublicKey,
-          created_at: Math.floor(Date.now() / 1000),
-          kind: EventKinds.Rumor,
-          content: invitationMessage,
-          tags: [
-            ["p", participant],
-            [
-              "a",
-              `${eventKind}:${signedEvent.pubkey}:${dTag}`,
-              publishedRelayHint,
+  let giftWraps: { giftWrap: Event; participant: string }[] = [];
+
+  if (targetPubKeys.length > 0) {
+    const [userProfile] = await Promise.all([
+      fetchUserProfile(userPublicKey),
+      fetchRelayLists(targetPubKeys),
+    ]);
+    const senderName = getSenderDisplayName(userProfile, userPublicKey);
+    const invitationMessage = buildInvitationMessage(
+      senderName,
+      event.title,
+      buildPrivateCalendarEventUrl({
+        kind: eventKind,
+        pubkey: signedEvent.pubkey,
+        dTag,
+        viewKey: nip19.nsecEncode(viewSecretKey),
+        relayHint:
+          publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
+      }),
+    );
+    giftWraps = await Promise.all(
+      targetPubKeys.map(async (participant) => {
+        const giftWrapEvent = await wrapEvent(
+          (signingNsec) => ({
+            pubkey: userPublicKey,
+            created_at: Math.floor(Date.now() / 1000),
+            kind: EventKinds.Rumor,
+            content: invitationMessage,
+            tags: [
+              ["p", participant],
+              [
+                "a",
+                `${eventKind}:${signedEvent.pubkey}:${dTag}`,
+                publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
+              ],
+              ["viewKey", nip19.nsecEncode(viewSecretKey)],
+              ["signing_nsec", signingNsec],
             ],
-            ["viewKey", nip19.nsecEncode(viewSecretKey)],
-            ["signing_nsec", signingNsec],
+          }),
+          participant,
+          EventKinds.CalendarEventGiftWrap,
+          [
+            ...invitationGiftWrapTags,
+            ["k", EventKinds.CalendarEventOuterGiftWrap.toString()],
           ],
+        );
+        return { giftWrap: giftWrapEvent, participant };
+      }),
+    );
+    await Promise.all(
+      giftWraps.map(({ giftWrap: gw }) =>
+        publishSignedEvent(gw, {
+          onRelayComplete: onInviteRelayComplete,
+          timeoutMs,
         }),
-        participant,
-        EventKinds.CalendarEventGiftWrap,
-        [
-          ...invitationGiftWrapTags,
-          ["k", EventKinds.CalendarEventOuterGiftWrap.toString()],
-        ],
-      );
-      return { giftWrap: giftWrapEvent, participant };
-    }),
-  );
-  await Promise.all(
-    giftWraps.map(({ giftWrap: gw }) =>
-      publishSignedEvent(gw, { onRelayComplete: onInviteRelayComplete }),
-    ),
-  );
+      ),
+    );
+  }
 
   // Add the event reference to the creator's calendar list.
   // The ref includes the viewKey and relay hint so the event can be
@@ -283,7 +301,7 @@ export async function publishPrivateCalendarEvent(
     kind: eventKind,
     authorPubkey: userPublicKey,
     eventDTag: dTag,
-    relayUrl: publishedRelayHint,
+    relayUrl: publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
     viewKey: nip19.nsecEncode(viewSecretKey),
   });
 
@@ -350,7 +368,8 @@ export async function editPrivateCalendarEvent(
         pubkey: signedEvent.pubkey,
         dTag,
         viewKey: nip19.nsecEncode(viewSecretKey),
-        relayHint: publishedRelayHint,
+        relayHint:
+          publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
       }),
     );
     const giftWraps = await Promise.all(
@@ -366,7 +385,7 @@ export async function editPrivateCalendarEvent(
               [
                 "a",
                 `${eventKind}:${userPublicKey}:${dTag}`,
-                publishedRelayHint,
+                publishedRelayHint || getRelays()[0] || defaultRelays[0] || "",
               ],
               ["viewKey", nip19.nsecEncode(viewSecretKey)],
               ["signing_nsec", signingNsec],

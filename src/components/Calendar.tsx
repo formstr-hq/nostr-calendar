@@ -62,6 +62,14 @@ function Calendar() {
   }, []);
 
   const visibleEvents = events.events.flatMap((event) => {
+    // Public events are not part of private calendar lists
+    if (!event.isPrivateEvent) {
+      return [event];
+    }
+    // If calendars haven't loaded yet, preserve visibility
+    if (calendars.length === 0) {
+      return [event];
+    }
     // Calendar-list refs are the ownership source of truth. The event payload
     // can briefly retain its old calendar ID while the event edit is published.
     const owningCalendar = findCalendarForEvent(calendars, event);

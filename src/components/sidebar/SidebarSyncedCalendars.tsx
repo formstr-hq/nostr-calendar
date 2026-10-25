@@ -147,6 +147,25 @@ export function SidebarSyncedCalendars() {
               >
                 {calendar.title}
               </Typography>
+              {calendar.eventRefs.length > 0 && (
+                <Typography
+                  variant="caption"
+                  data-testid="calendar-event-count"
+                  sx={{
+                    color: "text.secondary",
+                    fontSize: "0.75rem",
+                    ml: "auto",
+                    mr: 0.5,
+                    bgcolor: "action.hover",
+                    px: 0.75,
+                    py: 0.1,
+                    borderRadius: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  {calendar.eventRefs.length}
+                </Typography>
+              )}
             </Box>
           </Box>
         ))}

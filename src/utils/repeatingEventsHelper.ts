@@ -308,11 +308,17 @@ export function buildRecurrenceRule({
   return ruleParts.join(";");
 }
 
-function parseRRule(rruleStr: string, dtstart: Date): RRule {
-  const normalized = normalizeRule(rruleStr);
-  return RRule.fromString(
-    `DTSTART:${dtstart.toISOString().replace(/[-:]/g, "").split(".")[0]}Z\nRRULE:${normalized}`,
-  );
+function parseRRule(rruleStr: string, dtstart: Date): RRule | null {
+  try {
+    const normalized = normalizeRule(rruleStr);
+    if (!normalized) return null;
+    return RRule.fromString(
+      `DTSTART:${dtstart.toISOString().replace(/[-:]/g, "").split(".")[0]}Z\nRRULE:${normalized}`,
+    );
+  } catch (e) {
+    console.warn("Failed to parse recurrence rule:", rruleStr, e);
+    return null;
+  }
 }
 
 export function isEventInDateRange(
@@ -334,6 +340,13 @@ export function isEventInDateRange(
 
   const dtstart = new Date(begin);
   const rule = parseRRule(repeat.rrule, dtstart);
+  if (!rule) {
+    return (
+      (begin >= rangeStart && begin <= rangeEnd) ||
+      (end >= rangeStart && end <= rangeEnd) ||
+      (begin <= rangeStart && end >= rangeEnd)
+    );
+  }
 
   // Search for occurrences that could overlap with the range.
   // An occurrence overlaps if its start <= rangeEnd and its end >= rangeStart.
@@ -371,6 +384,9 @@ export function getNextOccurrenceInRange(
 
   const dtstart = new Date(begin);
   const rule = parseRRule(repeat.rrule, dtstart);
+  if (!rule) {
+    return begin >= rangeStart && begin <= rangeEnd ? begin : null;
+  }
 
   const searchStart = new Date(Math.max(begin, rangeStart));
   const searchEnd = new Date(rangeEnd);
@@ -397,6 +413,10 @@ export function getOccurrencesInRange(
   }
 
   const rule = parseRRule(repeat.rrule, new Date(begin));
+  if (!rule) {
+    return begin >= rangeStart && begin <= rangeEnd ? [begin] : [];
+  }
+
   return rule
     .between(new Date(Math.max(begin, rangeStart)), new Date(rangeEnd), true)
     .map((occurrence) => occurrence.getTime());
