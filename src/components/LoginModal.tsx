@@ -44,6 +44,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   const [nip07Loading, setNip07Loading] = useState(false);
   const [nip55Apps, setNip55Apps] = useState<AndroidSignerAppInfo[]>([]);
   const [nip55LoadingPackage, setNip55LoadingPackage] = useState<string>();
+  const [nip55WebLoading, setNip55WebLoading] = useState(false);
+  // Browser NIP-55 is a capability check (Android browser + clipboard), so it
+  // is safe to read synchronously here — unlike the native app list, which
+  // needs a plugin round-trip. `visible` gates the row; `warning` (Firefox
+  // for Android, which cannot read the clipboard) does not disable it.
+  const nip55Web = isNative
+    ? ({ visible: false } as const)
+    : signerManager.nip55WebSupport();
 
   useEffect(() => {
     if (!open) {
@@ -101,6 +109,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
       setError(intl.formatMessage({ id: "login.couldNotLogin" }));
     } finally {
       setNip55LoadingPackage(undefined);
+    }
+  };
+  const loginNip55Web = async () => {
+    setNip55WebLoading(true);
+    setError("");
+    try {
+      await signerManager.loginWithNip55Web();
+      success();
+    } catch {
+      setError(intl.formatMessage({ id: "login.couldNotLogin" }));
+    } finally {
+      setNip55WebLoading(false);
     }
   };
   const success = () => {
@@ -196,6 +216,28 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
                 loading={nip07Loading}
                 disabled={nip07Loading}
               />
+            )}
+            {nip55Web.visible && (
+              <>
+                <AuthOption
+                  icon={<PhonelinkLockOutlinedIcon />}
+                  title={intl.formatMessage({
+                    id: "login.signInWithSignerApp",
+                  })}
+                  description={intl.formatMessage({
+                    id: "login.nip55WebDescription",
+                  })}
+                  onClick={() => void loginNip55Web()}
+                  loading={nip55WebLoading}
+                  disabled={nip55WebLoading}
+                  testId="login-btn-nip55-web"
+                />
+                {nip55Web.warning && (
+                  <Alert severity="warning" sx={{ mx: 2, mb: 1 }}>
+                    {nip55Web.warning}
+                  </Alert>
+                )}
+              </>
             )}
             {isAndroidNative() &&
               nip55Apps.map((app) => (
