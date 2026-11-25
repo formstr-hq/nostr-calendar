@@ -6,8 +6,7 @@ import { nip19 } from "nostr-tools";
 const TEST_DATE = "2027-06-15";
 const MISSING_PROFILE_NPUB = nip19.npubEncode("11".repeat(32));
 
-const shortNpub = (npub: string) =>
-  `${npub.slice(0, 7)}....${npub.slice(-3)}`;
+const shortNpub = (npub: string) => `${npub.slice(0, 7)}....${npub.slice(-3)}`;
 
 async function interceptNip05(page: import("@playwright/test").Page) {
   await page.route(
@@ -69,9 +68,9 @@ test("searches, deduplicates, and persists event participants", async ({
   await expect(
     exactBobOption.getByTestId("participant-contact-icon"),
   ).toBeVisible();
-  await expect(exactBobOption.getByTestId("participant-event-icon")).toHaveCount(
-    0,
-  );
+  // Other specs share Alice's relay/account and may already have created
+  // events with Bob. Contact membership is guaranteed here; history is not
+  // guaranteed absent. Positive history badges are checked below after save.
 
   // Exact NIP-05 resolution is fully intercepted and can be selected by Enter.
   await participantInput.fill("bob@profiles.test");
@@ -79,9 +78,7 @@ test("searches, deduplicates, and persists event participants", async ({
     page.getByRole("option", { name: /Bob bob@profiles\.test/ }),
   ).toBeVisible();
   await participantInput.press("Enter");
-  const bobParticipant = page
-    .getByRole("listitem")
-    .filter({ hasText: "Bob" });
+  const bobParticipant = page.getByRole("listitem").filter({ hasText: "Bob" });
   await expect(bobParticipant).toBeVisible();
 
   // Matching selected participants remain visible after selectable results.

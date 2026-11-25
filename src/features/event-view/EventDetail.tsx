@@ -1,3 +1,4 @@
+import { EventDocuments } from "../documents/components/EventDocuments";
 import {
   Box,
   Dialog,
@@ -189,6 +190,10 @@ export function CalendarEvent({
     <Box sx={{ overflowY: "auto" }}>
       <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 } }}>
         <EventBanner event={event} actions={bannerActions} />
+        <EventDocuments
+          documents={event.documents}
+          isPrivate={event.isPrivateEvent}
+        />
         <EventChipsRow event={event} calendar={calendar} />
 
         <Typography

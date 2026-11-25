@@ -31,6 +31,14 @@ export type NotificationPreference = "enabled" | "disabled";
 export type RelayLineStatus = "pending" | "ok" | "error";
 export type RelayStatusMap = Record<string, RelayLineStatus>;
 
+/** Stable Pages root reference; private titles and capabilities never enter public tags. */
+export interface IDocumentAttachment {
+  naddr: string;
+  title?: string;
+  /** Explicitly authorized existing share capability; private events only. */
+  viewKey?: string;
+}
+
 /**
  * Reference to a Formstr form attached to a calendar event.
  *
@@ -118,6 +126,7 @@ export interface ICalendarEvent {
    * Currently only persisted for private events.
    */
   forms?: IFormAttachment[];
+  documents?: IDocumentAttachment[];
   /** The calendar list ID (d-tag) that this event belongs to. */
   calendarId: string;
 }

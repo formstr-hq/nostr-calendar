@@ -1,9 +1,13 @@
+import { DocumentAttachments } from "../../documents/components/DocumentAttachments";
 import { useState } from "react";
 import { Box } from "@mui/material";
 import { useIntl } from "react-intl";
 import { EventFormAttachments } from "../../../components/EventFormAttachments";
 import { SectionLabel } from "../../../components/ui/SectionLabel";
-import type { IFormAttachment } from "../../../utils/types";
+import type {
+  IFormAttachment,
+  IDocumentAttachment,
+} from "../../../utils/types";
 import {
   AdvancedBox,
   GroupCard,
@@ -13,6 +17,9 @@ import {
 
 interface EventAttachmentsSectionProps {
   variant: "desktop" | "mobile";
+  documents: IDocumentAttachment[];
+  onDocumentsChange: (docs: IDocumentAttachment[]) => void;
+  isPrivate: boolean;
   attachedForms: IFormAttachment[];
   onAdd: (form: IFormAttachment) => void;
   onRemove: (naddr: string) => void;
@@ -20,15 +27,20 @@ interface EventAttachmentsSectionProps {
 
 export function EventAttachmentsSection({
   variant,
+  documents,
+  onDocumentsChange,
+  isPrivate,
   attachedForms,
   onAdd,
   onRemove,
 }: EventAttachmentsSectionProps) {
   const intl = useIntl();
-  const [open, setOpen] = useState(attachedForms.length > 0);
+  const [open, setOpen] = useState(attachedForms.length + documents.length > 0);
   const toggleLabel = intl.formatMessage({ id: "event.attachmentsToggle" });
   const countSuffix =
-    !open && attachedForms.length > 0 ? ` · ${attachedForms.length}` : "";
+    !open && attachedForms.length + documents.length > 0
+      ? ` · ${attachedForms.length + documents.length}`
+      : "";
 
   if (variant === "mobile") {
     return (
@@ -43,10 +55,17 @@ export function EventAttachmentsSection({
         </CollapseToggle>
         {open && (
           <Box sx={{ px: 2, pb: 2, pt: 0.5 }}>
-            <EventFormAttachments
-              attachedForms={attachedForms}
-              onAdd={onAdd}
-              onRemove={onRemove}
+            {isPrivate && (
+              <EventFormAttachments
+                attachedForms={attachedForms}
+                onAdd={onAdd}
+                onRemove={onRemove}
+              />
+            )}
+            <DocumentAttachments
+              documents={documents}
+              onChange={onDocumentsChange}
+              isPrivate={isPrivate}
             />
           </Box>
         )}
@@ -63,12 +82,19 @@ export function EventAttachmentsSection({
       {open && (
         <AdvancedBox sx={{ mt: 1.5 }}>
           <SectionLabel sx={sectionLabelSx}>
-            {intl.formatMessage({ id: "form.attachments" })}
+            {intl.formatMessage({ id: "event.attachmentsToggle" })}
           </SectionLabel>
-          <EventFormAttachments
-            attachedForms={attachedForms}
-            onAdd={onAdd}
-            onRemove={onRemove}
+          {isPrivate && (
+            <EventFormAttachments
+              attachedForms={attachedForms}
+              onAdd={onAdd}
+              onRemove={onRemove}
+            />
+          )}
+          <DocumentAttachments
+            documents={documents}
+            onChange={onDocumentsChange}
+            isPrivate={isPrivate}
           />
         </AdvancedBox>
       )}

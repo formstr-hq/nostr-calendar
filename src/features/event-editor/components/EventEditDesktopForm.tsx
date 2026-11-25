@@ -161,9 +161,12 @@ export function EventEditDesktopForm(props: EventEditFormProps) {
         />
       </Box>
 
-      {isPrivate && eventDetails.source !== "device" && (
+      {eventDetails.source !== "device" && (
         <EventAttachmentsSection
           variant="desktop"
+          documents={eventDetails.documents ?? []}
+          onDocumentsChange={(docs) => updateField("documents", docs)}
+          isPrivate={isPrivate}
           attachedForms={attachedForms}
           onAdd={(form) => updateField("forms", [...attachedForms, form])}
           onRemove={(naddr) =>
