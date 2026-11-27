@@ -1,8 +1,10 @@
+import { CreateDocumentDialog } from "./CreateDocumentDialog";
 import { useState } from "react";
 import {
   Alert,
   Button,
   Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,7 +17,7 @@ import {
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import { useIntl } from "react-intl";
 import type { IDocumentAttachment } from "../../../utils/types";
-import { documentAddress } from "../../../utils/documentLink";
+import { documentAddress, buildDocumentUrl } from "../../../utils/documentLink";
 import { useDocumentPicker } from "../hooks/useDocumentPicker";
 
 export function DocumentAttachments({
@@ -29,12 +31,11 @@ export function DocumentAttachments({
 }) {
   const intl = useIntl();
   const msg = (id: string) => intl.formatMessage({ id });
-  const [input, setInput] = useState("");
-  const [authorize, setAuthorize] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const picker = useDocumentPicker(documents, onChange, isPrivate);
+  const picker = useDocumentPicker(documents, onChange);
   const addSelected = () => {
     const existing = new Set(documents.map((d) => documentAddress(d.naddr)));
     const additions = picker.documents
@@ -60,8 +61,16 @@ export function DocumentAttachments({
             {doc.title || msg("documents.untitled")}
           </Typography>
           <Button
+            component="a"
+            href={buildDocumentUrl(doc, isPrivate) ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {msg("documents.open")}
+          </Button>
+          <Button
             color="error"
-            disabled={picker.checking}
+            disabled={picker.creating}
             onClick={() =>
               onChange(documents.filter((d) => d.naddr !== doc.naddr))
             }
@@ -70,43 +79,17 @@ export function DocumentAttachments({
           </Button>
         </Stack>
       ))}
-      <TextField
-        fullWidth
-        size="small"
-        label={msg("documents.url")}
-        value={input}
-        onChange={(e) => {
-          setInput(e.target.value);
-          setAuthorize(false);
-        }}
-      />
-      {isPrivate && input.includes("#") && (
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={authorize}
-              onChange={(e) => setAuthorize(e.target.checked)}
-            />
-          }
-          label={msg("documents.authorize")}
-        />
-      )}
       <Stack direction="row" spacing={1}>
         <Button
           variant="outlined"
-          disabled={!input.trim() || picker.checking}
-          onClick={async () => {
-            if (await picker.addUrl(input, authorize)) {
-              setInput("");
-              setAuthorize(false);
-            }
-          }}
+          disabled={picker.creating}
+          onClick={() => setCreateOpen(true)}
         >
-          {msg(picker.checking ? "documents.checking" : "navigation.add")}
+          {msg("documents.create")}
         </Button>
         <Button
           variant="outlined"
-          disabled={picker.checking}
+          disabled={picker.creating}
           onClick={() => {
             setOpen(true);
             setSelected(new Set());
@@ -116,6 +99,20 @@ export function DocumentAttachments({
           {msg("documents.myDocs")}
         </Button>
       </Stack>
+      {picker.queued && (
+        <Alert severity="info">{msg("documents.queued")}</Alert>
+      )}
+      {createOpen && (
+        <CreateDocumentDialog
+          open={createOpen}
+          busy={picker.creating}
+          error={picker.error}
+          onClose={() => setCreateOpen(false)}
+          onCreate={async (title, body) => {
+            if (await picker.create(title, body)) setCreateOpen(false);
+          }}
+        />
+      )}
       {picker.error && <Alert severity="error">{msg(picker.error)}</Alert>}
       <Dialog
         open={open}
@@ -123,7 +120,28 @@ export function DocumentAttachments({
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>{msg("documents.myDocs")}</DialogTitle>
+        <DialogTitle>
+          <Stack
+            component="span"
+            direction="row"
+            spacing={1}
+            alignItems="center"
+          >
+            <span>{msg("documents.myDocs")}</span>
+            {picker.loading && (
+              <CircularProgress
+                size="1em"
+                aria-hidden="true"
+                sx={{
+                  "@media (prefers-reduced-motion: reduce)": {
+                    animation: "none",
+                    "& .MuiCircularProgress-circle": { animation: "none" },
+                  },
+                }}
+              />
+            )}
+          </Stack>
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2}>
             <TextField
@@ -132,9 +150,16 @@ export function DocumentAttachments({
               onChange={(e) => setQuery(e.target.value)}
               fullWidth
             />
-            {picker.loading ? (
-              <Typography role="status">{msg("documents.loading")}</Typography>
-            ) : (
+            {picker.loading && (
+              <Typography
+                role="status"
+                variant="caption"
+                color="text.secondary"
+              >
+                {msg("documents.loading")}
+              </Typography>
+            )}
+            {(!picker.loading || picker.documents.length > 0) && (
               <>
                 {picker.error && (
                   <Alert severity="error">{msg(picker.error)}</Alert>
@@ -190,10 +215,7 @@ export function DocumentAttachments({
           <Button onClick={() => setOpen(false)}>
             {msg("navigation.cancel")}
           </Button>
-          <Button
-            onClick={addSelected}
-            disabled={picker.loading || !selected.size}
-          >
+          <Button onClick={addSelected} disabled={!selected.size}>
             {msg("documents.addSelected")}
           </Button>
         </DialogActions>

@@ -1,3 +1,4 @@
+import { SimplePool } from "nostr-tools/pool";
 import { test, expect, navigate } from "../fixtures/index.js";
 import {
   createEventViaDialog,
@@ -26,11 +27,6 @@ for (const mobile of [false, true]) {
           nip44.getConversationKey(key.secretBytes, key.pubkey),
         ),
       });
-    const pointer = nip19.naddrEncode({
-      kind: 33457,
-      pubkey: key.pubkey,
-      identifier: ids[0],
-    });
     await createEventViaDialog(page, {
       date,
       title: prefix,
@@ -62,14 +58,16 @@ for (const mobile of [false, true]) {
         await expect(
           dialog.getByText(`${prefix} 1`, { exact: true }),
         ).toBeVisible();
-        await dialog.getByLabel("Paste document URL").fill(pointer);
-        await dialog
-          .getByRole("button", { name: "Add", exact: true })
-          .last()
-          .click();
+        await expect(dialog.getByLabel("Paste document URL")).toHaveCount(0);
+        await dialog.getByRole("button", { name: "My Docs" }).click();
+        await picker.getByLabel("Search documents").fill(prefix);
         await expect(
-          dialog.getByText("This document is already attached."),
-        ).toBeVisible();
+          picker.getByRole("checkbox", {
+            name: `${prefix} 1 · Personal`,
+            exact: true,
+          }),
+        ).toBeDisabled();
+        await picker.getByRole("button", { name: "Cancel" }).click();
       },
     });
     // Desktop event dialogs and mobile sheets share the same editor state.
@@ -104,83 +102,89 @@ for (const mobile of [false, true]) {
   });
 }
 
-test("existing share links require authorization, preserve only view capability, and coexist with forms", async ({
+test("creates an encrypted Pages document, attaches it and preserves forms after reload", async ({
   authedPage: page,
 }) => {
-  const { encodeNKeys } = await import("../../../src/utils/documentKeys");
-  const owner = TEST_KEYS.bob;
-  const id = `manual-doc-${Date.now()}`;
-  const title = `Manual capability ${Date.now()}`;
-  const viewKey = TEST_KEYS.carol;
-  await publishEvent(testRelayUrl(), owner, {
-    kind: 33457,
-    tags: [["d", id]],
-    content: nip44.encrypt(
-      "# Shared agenda",
-      nip44.getConversationKey(viewKey.secretBytes, viewKey.pubkey),
-    ),
-  });
-  const naddr = nip19.naddrEncode({
-    kind: 33457,
-    pubkey: owner.pubkey,
-    identifier: id,
-  });
+  const title = `Create document event ${Date.now()}`;
+  const docTitle = `New agenda ${Date.now()}`;
   const form = nip19.naddrEncode({
     kind: 30168,
-    pubkey: owner.pubkey,
+    pubkey: TEST_KEYS.alice.pubkey,
     identifier: "existing-form",
   });
-  const url = `https://pages.formstr.app/doc/${naddr}#${encodeNKeys({ viewKey: viewKey.secretHex, editKey: owner.secretHex })}`;
   await createEventViaDialog(page, {
     date: "2027-04-16",
     title,
-    calendarName: `Manual calendar ${Date.now()}`,
+    calendarName: `Creation calendar ${Date.now()}`,
     configure: async (dialog) => {
       await dialog.getByRole("button", { name: /Attachments/ }).click();
+      await expect(dialog.getByLabel("Paste document URL")).toHaveCount(0);
       await dialog.getByPlaceholder("Paste form URL").fill(form);
+      await dialog.getByRole("button", { name: "Add", exact: true }).click();
       await dialog
-        .getByRole("button", { name: "Add", exact: true })
-        .first()
+        .getByRole("button", { name: "Create document", exact: true })
         .click();
-      await dialog.getByLabel("Paste document URL").fill("javascript:alert(1)");
-      await dialog
-        .getByRole("button", { name: "Add", exact: true })
-        .last()
-        .click();
+      const create = page.getByRole("dialog", {
+        name: "Create document",
+        exact: true,
+      });
       await expect(
-        dialog.getByText(/Enter a valid Pages document URL/),
-      ).toBeVisible();
-      await dialog.getByLabel("Paste document URL").fill(url);
-      await dialog
-        .getByRole("button", { name: "Add", exact: true })
-        .last()
-        .click();
+        create.getByRole("button", { name: "Create and attach" }),
+      ).toBeDisabled();
+      await create.getByLabel("Document title").fill(docTitle);
+      await create.getByLabel("Content (optional)").fill("Private agenda body");
+      await create.getByRole("button", { name: "Create and attach" }).click();
+      await expect(create).not.toBeVisible({ timeout: 30000 });
+      await expect(dialog.getByText(docTitle, { exact: true })).toBeVisible();
+      // My Docs reads and decrypts the newly published Pages event, not editor state.
+      await dialog.getByRole("button", { name: "My Docs" }).click();
+      const picker = page.getByRole("dialog", { name: "My Docs", exact: true });
+      await picker.getByLabel("Search documents").fill(docTitle);
       await expect(
-        dialog.getByText(/Share links require a private event/),
-      ).toBeVisible();
-      await dialog
-        .getByRole("checkbox", { name: /I authorize sharing/ })
-        .check();
-      await dialog
-        .getByRole("button", { name: "Add", exact: true })
-        .last()
-        .click();
-      await expect(
-        dialog.getByText("Shared agenda", { exact: true }),
-      ).toBeVisible({ timeout: 30000 });
+        picker.getByRole("checkbox", {
+          name: `${docTitle} · Personal`,
+          exact: true,
+        }),
+      ).toBeDisabled({ timeout: 30000 });
+      await picker.getByRole("button", { name: "Cancel" }).click();
     },
   });
   await navigate(page, "/d/2027/04/16");
   const detail = await openEventModal(page, title);
-  await expect(
-    detail.getByRole("link", { name: "Open in Pages" }),
-  ).toHaveAttribute(
-    "href",
-    `https://pages.formstr.app/doc/${naddr}#${encodeNKeys({ viewKey: viewKey.secretHex })}`,
-  );
+  const href = await detail
+    .getByRole("link", { name: "Open in Pages" })
+    .getAttribute("href");
+  expect(href).toMatch(/^https:\/\/pages\.formstr\.app\/doc\/naddr1/);
+  expect(href).not.toContain("#");
+  const pointer = nip19.decode(new URL(href!).pathname.split("/").pop()!);
+  if (pointer.type !== "naddr") throw new Error("Expected a document address");
+  const pool = new SimplePool();
+  try {
+    const rows = await pool.querySync([testRelayUrl()], {
+      kinds: [33457],
+      authors: [pointer.data.pubkey],
+      "#d": [pointer.data.identifier],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].tags).toEqual([["d", pointer.data.identifier]]);
+    expect(rows[0].content).not.toContain(docTitle);
+    expect(
+      nip44.decrypt(
+        rows[0].content,
+        nip44.getConversationKey(
+          TEST_KEYS.alice.secretBytes,
+          TEST_KEYS.alice.pubkey,
+        ),
+      ),
+    ).toBe(`# ${docTitle}\n\nPrivate agenda body`);
+  } finally {
+    pool.close([testRelayUrl()]);
+  }
+
+  await expect(detail.getByText(docTitle, { exact: true })).toBeVisible();
   await detail.getByRole("button", { name: /^close$/i }).click();
   await expect(detail).not.toBeVisible();
   await openEventEditor(page, title);
   await expect(page.getByText(form, { exact: true })).toBeVisible();
-  await expect(page.getByText("Shared agenda", { exact: true })).toBeVisible();
+  await expect(page.getByText(docTitle, { exact: true })).toBeVisible();
 });

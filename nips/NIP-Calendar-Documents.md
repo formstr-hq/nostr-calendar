@@ -3,8 +3,8 @@
 ## Nostr layer inputs — Pages attachments (2026-11-24)
 
 Scope authorized by the Pages integration feature request: read-only discovery,
-manual existing share links, event create/edit/detail UI, public/private/recurring
-attachment persistence. No Pages writes, key rotation, new sharing, or new kinds.
+document creation (added 2026-11-27), event create/edit/detail UI, public/private/recurring
+attachment persistence. Existing Pages kind 33457 writes are authorized by the create-and-attach request. No key rotation, new sharing, or new kinds.
 Interop target: Calendar clients; other NIP-52 clients ignore the additive tag.
 
 A repeatable `document` tag points to the Pages root NIP-19 `naddr` (kind 33457),
@@ -19,8 +19,7 @@ not an individual version or editor slot:
 
 `viewKey` is Pages' 32-byte hex capability. It is NOT necessarily read-only:
 open-mode Pages documents permit writes by capability holders. Calendar only
-includes it after the user pastes an existing link into a private event and
-explicitly authorizes sharing with all recipients. Legacy edit keys, signing
+retains previously authorized capabilities in existing private attachments. The URL-paste control has been removed; new attachments do not introduce capabilities. Legacy edit keys, signing
 secrets, arbitrary URL parameters, and unknown metadata are never persisted.
 Picker selections are references without credentials. Attaching does not grant
 access or mutate any Pages event, roster, key, or permission.
@@ -74,8 +73,35 @@ signer-injected Pages reader into a small shared package.
 
 Device-only documents and capabilities stored only in Pages' separate-origin
 IndexedDB cannot be discovered. In particular an owner roster may replace their
-self-encrypted metadata; without a synced viewKey the owner must paste an existing
-share link. Unknown/revoked keys, signer refusal, and missing relay data can leave
+self-encrypted metadata; without a synced viewKey the document is unavailable to the picker. Unknown/revoked keys, signer refusal, and missing relay data can leave
 partial results. References without credentials require existing access in Pages;
 Calendar never promises participant access. Details retain saved private titles
 and defer live availability checks to Pages, with an explicit notice.
+
+## Create and attach — 2026-11-27
+
+The event editor replaces URL entry with **Create document**. A title and optional
+Markdown body produce a personal Pages document: raw Markdown `# <title>\n\n<body>`
+is NIP-44 encrypted to the active signer's own pubkey, signed as kind 33457 with
+only a random UUID `d` tag, and published through Calendar's existing local relay.
+No plaintext title, content, sharing key, roster, or permission change is published.
+The owner-only root naddr is automatically attached. The user can open it in Pages
+to continue editing or explicitly share it there. Public calendar events still
+serialize only the naddr; private titles stay inside encrypted calendar content.
+If no relay accepts immediately, the durable outbox queues delivery and the UI
+explains why Pages may not yet open it. Creating is independent of saving the
+calendar event: cancelling the event does not delete the Pages document.
+
+Migration: document attachment tags are unchanged. Existing capability-bearing
+attachments continue to read, render, and re-save safely; only new manual URL entry
+is removed. Pages already reads personal kind-33457 documents with this encryption
+and Markdown shape, so no Pages changes or migration are required.
+
+## Discovery performance
+
+Personal content, metadata, and owner deletions use one combined relay snapshot.
+Per-document resolution reuses that snapshot; shared roster, content, and deletion
+queries are batched by stage. Results become selectable as they resolve. External
+signer decryptions stay queued to avoid competing prompts. Timeout windows and
+author/deletion checks are unchanged; no persisted cache of decrypted titles or
+keys is introduced.

@@ -1,3 +1,4 @@
+import { documentReads } from "./documentReads";
 // Read-only adaptation of nostr-docs DocumentContext, SharedDocsContext and sharedDoc.
 import { getPublicKey, nip19, type Event, type Filter } from "nostr-tools";
 import { decrypt, getConversationKey } from "nostr-tools/nip44";
@@ -174,9 +175,10 @@ export async function resolveDocument(
 
 export async function discoverDocuments(
   reader: DocumentReader,
+  onDocument?: (document: DocumentSummary) => void,
 ): Promise<{ documents: DocumentSummary[]; incomplete: boolean }> {
   const events = await reader.fetch([
-    { kinds: [33457, 34579], authors: [reader.pubkey] },
+    { kinds: [33457, 34579, 5], authors: [reader.pubkey] },
   ]);
   const candidates = new Map<string, { naddr: string; meta?: Metadata }>();
   let incomplete = false;
@@ -203,19 +205,23 @@ export async function discoverDocuments(
     }
   }
   const documents: DocumentSummary[] = [];
-  // Sequential signer requests avoid competing permission prompts on external signers.
-  for (const candidate of candidates.values()) {
-    try {
-      const doc = await resolveDocument(
-        { naddr: candidate.naddr },
-        reader,
-        candidate.meta,
-      );
-      if (doc) documents.push(doc);
-      else incomplete = true;
-    } catch {
-      incomplete = true;
-    }
-  }
+  const snapshotReader = documentReads(reader, events);
+  await Promise.all(
+    [...candidates.values()].map(async (candidate) => {
+      try {
+        const doc = await resolveDocument(
+          { naddr: candidate.naddr },
+          snapshotReader,
+          candidate.meta,
+        );
+        if (doc) {
+          documents.push(doc);
+          onDocument?.(doc);
+        } else incomplete = true;
+      } catch {
+        incomplete = true;
+      }
+    }),
+  );
   return { documents, incomplete };
 }

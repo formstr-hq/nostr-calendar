@@ -172,3 +172,60 @@ test("open roster resolves capability room, skips undecryptable spam and event-i
   rows.push(event(5, "deleted", "", other, 106, [["e", rows[1].id]]));
   expect(await resolveDocument(doc, reader(rows))).toBeNull();
 });
+
+test("personal discovery uses one relay snapshot regardless of document count", async () => {
+  const rows = Array.from({ length: 40 }, (_, i) =>
+    event(33457, `bulk-${i}`, encrypt(`# Document ${i}`)),
+  );
+  const base = reader(rows);
+  let reads = 0;
+  const result = await discoverDocuments({
+    ...base,
+    fetch: async (filters) => {
+      reads++;
+      return base.fetch(filters);
+    },
+  });
+  expect(result.documents).toHaveLength(40);
+  expect(reads).toBe(1);
+});
+
+test("shared lookups are batched and personal results arrive before a slow shared lookup", async () => {
+  const roots = ["one", "two"].map((d) => `33457:${editor}:${d}`);
+  const rows = [
+    event(33457, "personal", encrypt("# Available now")),
+    ...roots.map((root) =>
+      event(34579, root, encrypt(JSON.stringify({ viewKey: hex }))),
+    ),
+    ...["one", "two"].map((d) => event(33457, d, encrypt(`# ${d}`, vk), other)),
+  ];
+  const base = reader(rows);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let sawPersonal!: () => void;
+  const personal = new Promise<void>((resolve) => {
+    sawPersonal = resolve;
+  });
+  let reads = 0;
+  const pending = discoverDocuments(
+    {
+      ...base,
+      fetch: async (filters) => {
+        reads++;
+        if (reads > 1) await gate;
+        return base.fetch(filters);
+      },
+    },
+    (doc) => {
+      if (doc.title === "Available now") sawPersonal();
+    },
+  );
+  await personal;
+  // Shared documents have not completed, but the personal document is usable.
+  release();
+  const result = await pending;
+  expect(result.documents).toHaveLength(3);
+  expect(reads).toBe(4); // initial owner snapshot + shared rosters/content/deletions
+});

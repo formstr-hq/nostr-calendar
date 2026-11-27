@@ -7,7 +7,19 @@ const dictionary: NestedObject = {
     documents: {
       heading: "Documents",
       myDocs: "My Docs",
-      url: "Paste document URL",
+      create: "Create document",
+      title: "Document title",
+      content: "Content (optional)",
+      createAttach: "Create and attach",
+      creating: "Creating…",
+      createError:
+        "Could not create the document. Check your signer and connection, then retry.",
+      tooLarge:
+        "This content is too long. Start with a shorter document and continue editing in Pages.",
+      queued:
+        "Document saved locally and queued for relay delivery. It may not open in Pages until a relay accepts it.",
+      createNotice:
+        "Creates a personal encrypted document in Pages and attaches it here. Only you have access until you share it in Pages. The document remains in Pages even if you cancel this event.",
       search: "Search documents",
       untitled: "Document",
       brand: "Pages by Form*",
