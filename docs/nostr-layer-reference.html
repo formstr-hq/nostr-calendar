@@ -429,6 +429,16 @@
         <div class="callout"><span class="label">No public/followable calendars</span><p>There is no NIP-51-style public list, and no mechanism to subscribe to someone else's calendar — 32123 lists are private and single-owner only.</p></div>
       </article>
 
+      <article class="flow" id="f-documents">
+        <p>Discovery reuses one owner content/metadata/deletion snapshot, batches shared lookups per stage, and streams resolved documents into the picker. Signer decryption is queued. Relay timeout windows, owner checks, and deletion filtering remain unchanged.</p>
+        <p><strong>Create and attach (2026-11-27):</strong> the URL input is replaced by Create document. Calendar signs kind 33457 with a random UUID d tag and raw Markdown content encrypted via NIP-44 to the current signer’s own pubkey, using the existing local-relay publisher. No plaintext title or sharing capability is published. The root naddr is automatically attached, with an Open in Pages action. Zero relay acceptance is queued in the durable outbox and shown to the user. Cancelling the calendar event does not delete the independent document. No roster or permissions are changed, and existing attachment wire formats remain compatible.</p>
+        <h3>Pages document attachments</h3>
+        <p>Read-only discovery of kinds <code>33457</code>, <code>34579</code>, and author-matched kind <code>5</code> deletions through Calendar's signer and local relay. Shared discovery uses self-encrypted per-user metadata, owner viewKey-encrypted rosters, restricted editor sets or open capability-room queries. Root naddrs identify documents across versions.</p>
+        <p>Public events write only <code>["document", naddr]</code>. Private events place <code>["document", naddr, viewKey-or-empty, title-or-empty]</code> exclusively inside their encrypted content. Picker selections contain no keys; existing authorized capabilities are preserved in private events; new attachments are credential-free. A viewKey can permit editing in Pages open mode. No edit keys are retained, and no sharing permissions are changed.</p>
+        <p>Opening uses <code>https://pages.formstr.app/doc/&lt;naddr&gt;#&lt;nkeys&gt;</code>; only authorized private links retain the viewKey fragment. Public readers discard titles and credentials. Device-only pages and unsynced keys cannot be discovered. Availability is checked by Pages on opening.</p>
+        <p>Additive migration: old events and Forms attachments are unchanged, old readers ignore document tags and may drop them on re-save; no dual-write or cutoff. See <code>nips/NIP-Calendar-Documents.md</code> for the authorized inputs, upstream audit, format, and limitations.</p>
+      </article>
+
       <article class="flow" id="f-forms">
         <h3>Forms attached to an event <span class="kind-badge">kind 30168 / 1069</span></h3>
         <p>Not authored by this app's nostr layer — read-only integration with Formstr. Attachment is a <code>["form", naddr, viewKey?]</code> tag <em>inside the encrypted content</em> of a private event, so attachment itself is invisible to non-participants. Only the form's read-only key is stored, never the admin/response key. Submission (kind 1069 signing) happens inside <code>@formstr/sdk</code>, outside this repo's direct control.</p>

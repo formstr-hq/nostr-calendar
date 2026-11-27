@@ -4,6 +4,53 @@ export interface NestedObject {
 
 const dictionary: NestedObject = {
   "en-US": {
+    documents: {
+      heading: "Documents",
+      myDocs: "My Docs",
+      create: "Create document",
+      title: "Document title",
+      content: "Content (optional)",
+      createAttach: "Create and attach",
+      creating: "Creating…",
+      createError:
+        "Could not create the document. Check your signer and connection, then retry.",
+      tooLarge:
+        "This content is too long. Start with a shorter document and continue editing in Pages.",
+      queued:
+        "Document saved locally and queued for relay delivery. It may not open in Pages until a relay accepts it.",
+      createNotice:
+        "Creates a personal encrypted document in Pages and attaches it here. Only you have access until you share it in Pages. The document remains in Pages even if you cancel this event.",
+      search: "Search documents",
+      untitled: "Document",
+      brand: "Pages by Form*",
+      open: "Open in Pages",
+      personal: "Personal",
+      shared: "Shared",
+      loading: "Loading documents…",
+      checking: "Checking…",
+      empty: "No matching documents found.",
+      retry: "Retry",
+      addSelected: "Add selected",
+      accessWarning:
+        "Attaching a reference does not grant access. Participants may need an existing Pages share link or access on their Pages account.",
+      publicWarning:
+        "Public events publish only the document address. Private titles and share credentials are never included.",
+      authorize:
+        "I authorize sharing this existing capability with all event recipients. Depending on the Pages sharing mode, it may also allow editing.",
+      authorizationRequired:
+        "Share links require a private event and explicit authorization. For a public event, paste the document address without its fragment.",
+      invalid:
+        "Enter a valid Pages document URL or document naddr. Device-only documents and other URLs are not supported.",
+      duplicate: "This document is already attached.",
+      unavailable:
+        "Document unavailable, deleted, or inaccessible. Check your Pages access and relays, then retry.",
+      loadError:
+        "Could not load documents. Check your signer and relay connection, then retry.",
+      incomplete:
+        "Some documents could not be read. Device-only pages and shared keys stored only on another device cannot be discovered here.",
+      detailNotice:
+        "Pages checks access when opened. Deleted documents, revoked links, or documents unavailable on your relays may not open.",
+    },
     navigation: {
       today: "today",
       previousDay: "Previous day",
@@ -172,7 +219,7 @@ const dictionary: NestedObject = {
       showAs: "Show as",
       busy: "Busy",
       free: "Free",
-      attachmentsToggle: "Attachments — Formstr form",
+      attachmentsToggle: "Attachments — Forms and Documents",
       save: "Save",
       invitees: "Invitees",
       repeatLabel: "Repeat",

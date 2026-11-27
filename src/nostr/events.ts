@@ -1,3 +1,4 @@
+import { documentTags } from "../utils/documentLink";
 import {
   Event,
   generateSecretKey,
@@ -119,6 +120,8 @@ async function preparePrivateCalendarEvent(
   if (event.notificationPreference) {
     eventData.push(["notification", event.notificationPreference]);
   }
+
+  eventData.push(...documentTags(event.documents, true));
 
   event.forms?.forEach((form) => {
     if (!form?.naddr) return;
@@ -604,6 +607,7 @@ export const publishPublicCalendarEvent = async (
   const pubKey = await getUserPublicKey();
   const id = getPersistedCalendarEventId(event.id) ?? uuid();
   const tags = [
+    ...documentTags(event.documents, false),
     ["title", event.title],
     ["d", id],
     ["start", String(Math.floor(event.begin / 1000))],

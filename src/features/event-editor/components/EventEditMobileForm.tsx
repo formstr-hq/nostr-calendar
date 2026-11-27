@@ -129,9 +129,12 @@ export function EventEditMobileForm(props: EventEditFormProps) {
           />
         </GroupCard>
 
-        {isPrivate && eventDetails.source !== "device" && (
+        {eventDetails.source !== "device" && (
           <EventAttachmentsSection
             variant="mobile"
+            documents={eventDetails.documents ?? []}
+            onDocumentsChange={(docs) => updateField("documents", docs)}
+            isPrivate={isPrivate}
             attachedForms={attachedForms}
             onAdd={(form) => updateField("forms", [...attachedForms, form])}
             onRemove={(naddr) =>

@@ -1,3 +1,4 @@
+import { documentsFromTags } from "./documentLink";
 import { Event } from "nostr-tools";
 import type {
   ICalendarEvent,
@@ -29,6 +30,7 @@ export const nostrEventToCalendar = (
   } = {},
 ): ICalendarEvent => {
   const parsedEvent: ICalendarEvent = {
+    documents: documentsFromTags(event.tags, !!isPrivateEvent),
     description: event.content,
     user: event.pubkey,
     begin: 0,
